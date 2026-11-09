@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Secrets d'environnement. `.env` ne contient aujourd'hui que l'URL Supabase et
+# la clé publishable (publique par construction), mais la convention est de ne
+# jamais versionner d'environnement : un `service_role` y atterrirait un jour.
+.env
+.env.*
+!.env.example
+
+# Sauvegardes de base de données — contiennent des données de production (PII).
+# Le dump de reprise est conservé HORS dépôt : C:\Users\Abdouramane\QERP-backups\
+*.backup
+*.dump
+*.sql.gz
+*.backup.*
+build/
+secrets/
+
+# Artefacts d'analyse transitoires
+.tmp_*
+
+# Réglages locaux de l'outillage (chemins, permissions de session) : propres au
+# poste, jamais partagés. Déjà couverts par un gitignore global sur ce poste, on
+# fige la règle dans le dépôt pour que tout clone se comporte pareil.
+.claude/settings.local.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

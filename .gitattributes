@@ -1,0 +1,53 @@
+# Normalisation des fins de ligne.
+#
+# Sans ce fichier, `core.autocrlf=true` (le défaut Git pour Windows) sort les
+# scripts shell en CRLF au checkout : `bash scripts/schema/verify-lot0.sh` — la
+# preuve de parité objet par objet du lot 0 — échoue alors avec
+# « /usr/bin/bash^M: bad interpreter » ou des `$'\r'` en fin de ligne.
+# Le dépôt est consommé depuis Windows (poste de dev) ET Linux (VPS, CI) :
+# les fins de ligne sont figées ici, pas laissées à la config de chaque poste.
+
+# Défaut : normaliser, stocker en LF.
+* text=auto eol=lf
+
+# Scripts exécutables sur Linux : LF obligatoire.
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+
+# Windows uniquement.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Sources et données textuelles.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Binaires : jamais normalisés, jamais diffés en texte.
+*.pdf binary
+*.docx binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+bun.lockb binary
+
+# Les fichiers de verrouillage ne défilent pas dans les revues : ils sont
+# régénérés, pas relus. `-diff` les fait apparaître comme binaires.
+package-lock.json -diff
+bun.lock -diff
+bun.lockb -diff

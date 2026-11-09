@@ -1,0 +1,14 @@
+- [x] Inclure les tendances de la période sélectionnée dans le CSV principal.
+- [x] Tester le modal réel : rôle et description ARIA, Tab/Maj+Tab, confinement du focus, Échap et retour au déclencheur (6 tests de la page avec son vrai modal).
+- [x] Exécuter les tests ciblés (12/12) et vérifier les contrôles automatiques (build OK).
+- [x] Corriger l'erreur serveur du cockpit consolidé : colonnes qualifiées, solde bancaire et score de risque alignés sur le schéma réel.
+- [x] Vérification connectée : KPI chargés, CSV réel sur 3/6/12 mois, modal au clavier et rejet serveur d'un identifiant de société inaccessible.
+- [x] Ajouter les tests de régression CFO : 16 tests ciblés réussis et script connecté exécuté avec succès.
+- [x] Rédiger et livrer le cahier des charges complet : 22 chapitres, versions PDF/Word/texte, exigences, existant, exclusions et points à valider ; pages contrôlées.
+- [x] Cahier des charges validé.
+- [x] Lot 1 : trésorerie réelle (soldes, flux, exports) et marge brute au coût réel CMP.
+- [x] Recette connectée du Lot 1 effectuée sur les données disponibles et documentée avec réserves ; Lot 2 non engagé.
+- [x] Sélectionner aléatoirement un compte de recette et obtenir une session autorisée.
+- [x] Corriger la marge sans mouvements de stock valorisés : « Coût non renseigné », aucune marge calculée sans coût réel ; ajouter et exécuter les tests.
+- [x] Supprimer le solde historique CFO recopié et la troncature des transactions ; 34 tests réussis, vérification connectée et rapport livré.
+- [ ] Lever les réserves bancaires du Lot 1 : montants non nuls, relevés historiques et isolation de lignes réelles ; bloqué par l’absence de données bancaires autorisées dans deux sociétés.

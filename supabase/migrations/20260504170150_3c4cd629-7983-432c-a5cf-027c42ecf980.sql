@@ -1,0 +1,1 @@
+ALTER VIEW public.ar_aging_view SET (security_invoker = true);

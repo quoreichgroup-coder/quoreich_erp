@@ -1,0 +1,4 @@
+project_id = "banqdfutzlrcvepovrin"
+
+[functions.ai-scheduler]
+verify_jwt = false

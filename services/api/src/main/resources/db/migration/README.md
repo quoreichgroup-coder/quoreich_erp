@@ -1,0 +1,71 @@
+# Migrations Flyway — schéma `public`
+
+## Provenance
+
+Ces migrations ne sont pas écrites à la main : elles sont **extraites du dump de
+production** `flow-bright-desk_261109.backup` (PostgreSQL 17.6, 9 novembre 2026),
+restauré dans un PostgreSQL 18.6 jetable, puis découpé par classes d'objets via
+la liste TOC de `pg_restore`.
+
+`supabase/migrations/` **n'est pas** la source : la fonction
+`get_consolidated_cfo_trends`, utilisée par la page CFO, n'y figure pas — elle
+n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable.
+
+## Fichiers
+
+| Fichier | Origine | Contenu |
+|---|---|---|
+| `V1__bootstrap_roles.sql` | écrit à la main | `anon`, `authenticated`, `service_role`, `qerp_api` |
+| `V2__compat_auth_schema.sql` | écrit à la main | schéma `auth` : `uid()`, `jwt()`, `role()`, `email()`, `auth.users(id)` |
+| `V3..V14__public_*.sql` | **générés** par `scripts/schema/extract-from-dump.sh` | types, séquences, tables, contraintes, index, fonctions, vues, règles, RLS, politiques, triggers, clés étrangères |
+| `V15__privileges.sql` | écrit à la main | droits applicatifs |
+
+**Ne pas éditer `V3..V14` à la main.** Toute correction se fait en amont, puis
+les fichiers sont régénérés : `verify-lot0.sh` échoue si un fichier versionné
+diverge de la régénération.
+
+## Ordre, et pourquoi il est contraint
+
+`V1` doit précéder tout le reste : `CREATE POLICY ... TO authenticated` échoue si
+le rôle n'existe pas, et PostgreSQL valide cette clause à la création.
+
+`V2` doit précéder `V8` (les politiques et 122 corps de fonctions appellent
+`auth.uid()`), `V12`, et `V14` (16 clés étrangères vers `auth.users`).
+
+## Ce qui n'est pas rejoué
+
+Les extensions `pg_cron`, `pg_net` et `supabase_vault` n'existent pas dans
+PostgreSQL standard ; la publication `supabase_realtime` est propre à Supabase.
+Abandonnés et remplacés : `cron` → Quartz, `storage` → MinIO,
+`realtime` → SSE/WebSocket. Vérifié : **aucune fonction de `public` n'appelle
+`net.`, `cron.`, `vault.`, `storage.` ou `realtime.`**
+
+Les ACL d'origine ne sont pas rejouées (elles visaient des rôles Supabase
+inexistants et accordaient `ALL` à `anon`). L'original est conservé dans
+`scripts/schema/reference/acl-original.sql` ; les droits effectifs sont écrits
+délibérément dans `V15`.
+
+## Vérification
+
+```bash
+bash scripts/schema/verify-lot0.sh /chemin/vers/flow-bright-desk_261109.backup
+```
+
+Attendu : `LOT 0 : CRITÈRE DE SORTIE ATTEINT` — parité de 2 885 lignes de
+manifeste, zéro écart, recette d'isolation verte.
+
+## Modèle de sécurité à respecter par l'API
+
+Les 105 tables ne sont **pas** en `FORCE ROW LEVEL SECURITY` : le propriétaire
+des tables contourne les 157 politiques. L'API doit donc :
+
+1. se connecter avec `qerp_api` (non propriétaire, `NOBYPASSRLS`, membre de
+   `authenticated`) ;
+2. à chaque transaction : `SET LOCAL request.jwt.claims = '{"sub":...,"role":"authenticated"}'`
+   — `SET LOCAL`, jamais `SET`, pour que le contexte ne survive pas à la
+   transaction sur une connexion mutualisée ;
+3. ne jamais utiliser `service_role` sur le chemin de requête d'un utilisateur.
+
+Sans contexte, `auth.uid()` vaut `NULL`, donc aucune ligne n'est lue ni écrite :
+l'échec est fermé. C'est prouvé par
+`src/test/resources/fixtures/rls-isolation-test.sql`.
