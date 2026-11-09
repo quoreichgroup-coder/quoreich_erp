@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Sortie de compilation Maven (module services/api). `target` non ancré couvre
+# aussi bien la racine que le module ; les rapports de tests et les classes
+# compilées n'ont rien à faire dans le dépôt, et `target/classes/application.yml`
+# donnerait une seconde copie de la configuration, filtée par Maven, à côté de
+# la source — deux fichiers qui divergeraient sans que rien ne le signale.
+target/
+
 # Secrets d'environnement. `.env` ne contient aujourd'hui que l'URL Supabase et
 # la clé publishable (publique par construction), mais la convention est de ne
 # jamais versionner d'environnement : un `service_role` y atterrirait un jour.

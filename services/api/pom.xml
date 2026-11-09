@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Version 4.1.2, sans le suffixe `.RELEASE`.
+
+    Le service start.spring.io annonce l'identifiant « 4.1.2.RELEASE » et génère
+    un pom.xml qui l'écrit tel quel — vérifié : ce pom ne se résout pas.
+    `spring-boot-starter-parent-4.1.2.RELEASE.pom` répond 404 sur Maven Central,
+    comme les sept starters du squelette. La version réellement publiée est
+    `4.1.2`. Quiconque reprend un squelette Initializr doit corriger cette ligne
+    avant le premier build.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.2</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.quoreich</groupId>
+  <artifactId>qerp-api</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>qerp-api</name>
+  <description>API QUOREICH — ERP financier OHADA/SYSCOHADA (Java 25 / Spring Boot 4.1)</description>
+
+  <properties>
+    <java.version>25</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!--
+      Flyway : surcharge délibérée du BOM.
+
+      Le BOM 4.1.2 gère flyway 12.4.0. La cible est PostgreSQL 18.6, sorti après
+      cette version de Flyway. Le plan de bascule (§2) épingle 13.12.1 ; cette
+      version existe bien pour `flyway-core` et `flyway-database-postgresql`.
+      L'override est vérifié par SchemaMigrationIT, qui applique V1..V15 sur un
+      vrai PostgreSQL 18.6 : si la surcharge cassait l'auto-configuration Flyway
+      de Spring Boot, le test échouerait au démarrage du contexte.
+    -->
+    <flyway.version>13.12.1</flyway.version>
+
+    <!-- ArchUnit n'est pas géré par le BOM Spring Boot : version épinglée ici. -->
+    <archunit.version>1.5.1</archunit.version>
+
+    <!--
+      springdoc-openapi : la ligne 3.x est celle de Spring Boot 4 ; 3.2.0 est
+      compilée sur Boot 4.1.2, exactement notre version.
+
+      Attention à la façon de vérifier cette version : l'API de recherche de
+      Maven Central annonce encore « latestVersion 2.8.6 » pour ces artefacts,
+      alors que `maven-metadata.xml` publie 3.2.0. Se fier à l'index de recherche
+      ferait retenir la ligne Boot 3, incompatible.
+    -->
+    <springdoc.version>3.2.0</springdoc.version>
+  </properties>
+
+  <dependencies>
+    <!--
+      Boot 4 a renommé ses starters : `spring-boot-starter-web` n'est plus le
+      nom canonique, c'est `spring-boot-starter-webmvc`. Idem pour OAuth2
+      (`spring-boot-starter-security-oauth2-resource-server`) et pour Flyway,
+      qui a désormais un starter dédié (`spring-boot-starter-flyway`) au lieu
+      d'exiger flyway-core déclaré à la main.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!--
+      `spring-boot-starter-flyway` apporte flyway-core mais pas le support
+      PostgreSQL, qui vit dans un module séparé depuis Flyway 10. Sans lui,
+      Flyway échoue au démarrage avec « Unsupported Database: PostgreSQL ».
+    -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+
+    <!-- Métriques au format Prometheus, exposées par Actuator sur /actuator/prometheus. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+
+    <!--
+      Contrat OpenAPI.
+
+      `-api` sert le document JSON (/v3/api-docs) ; `-ui` ajoute l'interface
+      Swagger. L'interface est désactivée par défaut et n'est activée que sous le
+      profil `dev` : une surface d'API publique et énumérée est utile au poste de
+      développement et inutile en production, où elle ne sert qu'à cartographier
+      le système pour un tiers. Le document JSON est généré à la compilation et
+      versionné, pour que le client TypeScript n'ait jamais besoin d'un serveur
+      en marche.
+    -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!--
+      Tests — starter `webmvc-test`, pas `test`.
+
+      Boot 4 a éclaté `spring-boot-starter-test` par technologie : chaque module
+      a désormais son starter de test, et c'est lui qui apporte le support MockMvc.
+      `spring-boot-starter-test` seul compile, mais `@AutoConfigureMockMvc` est
+      introuvable — il a quitté `org.springframework.boot.test.autoconfigure.web.servlet`
+      pour `org.springframework.boot.webmvc.test.autoconfigure`, dans un artefact
+      distinct. Comme ce starter tire `spring-boot-starter-test` de façon
+      transitive, il le remplace au lieu de s'y ajouter.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Fournit le post-processeur de requête `jwt()` : il permet de prouver le
+      critère de sortie du lot 1 — requête authentifiée, données bornées à la
+      société — sans déployer Keycloak dans la chaîne de tests. L'authentification
+      testée reste celle de Spring Security ; seul l'émetteur du jeton est simulé.
+    -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Testcontainers 2.0 a renommé ses modules : `org.testcontainers:postgresql`
+      et `org.testcontainers:junit-jupiter` répondent 404 en 2.0.5. Les noms
+      actuels sont `testcontainers-postgresql` et `testcontainers-junit-jupiter`,
+      et la classe du conteneur a changé de paquet
+      (`org.testcontainers.postgresql.PostgreSQLContainer`).
+    -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!--
+        Le poste de développement porte deux JDK 21 et `javapath` en tête de
+        PATH : un build lancé sans JAVA_HOME explicite compilerait en 21 et
+        échouerait sur les sources en 25, avec un message obscur. On échoue
+        franchement, et tôt.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,)</version>
+                  <message>Ce module cible Java 25 : positionnez JAVA_HOME sur le JDK 25.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        `mvn verify` exécute les tests d'intégration (`*IT`), qui démarrent un
+        PostgreSQL 18.6 jetable : c'est le seul contrôle qui prouve que le
+        schéma se reconstruit et que la RLS échoue fermée. Les tests unitaires
+        (`*Test`) restent dans Surefire et ne demandent pas Docker.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

@@ -1,0 +1,155 @@
+#
+# Configuration de l'API QUOREICH.
+#
+# Aucun secret ici : tout ce qui est sensible passe par des variables
+# d'environnement, sans valeur par défaut utilisable. Un mot de passe par défaut
+# en clair dans un fichier versionné est le défaut le plus courant des squelettes
+# générés — il n'y en a aucun dans ce fichier.
+#
+spring:
+  application:
+    name: qerp-api
+
+  # ---------------------------------------------------------------------------
+  # Connexion applicative — rôle NON PRIVILÉGIÉ
+  # ---------------------------------------------------------------------------
+  # `qerp_api` n'est pas propriétaire des tables et porte `NOBYPASSRLS` : c'est
+  # ce qui rend les 157 politiques RLS effectives. Les tables du schéma public ne
+  # sont pas en `FORCE ROW LEVEL SECURITY`, donc un propriétaire les contourne
+  # silencieusement. Se connecter en propriétaire ici viderait l'isolation par
+  # société de tout contenu, sans qu'aucun test unitaire ne s'en aperçoive.
+  datasource:
+    url: ${QERP_DB_URL:jdbc:postgresql://localhost:5432/qerp}
+    username: ${QERP_DB_USER:qerp_api}
+    password: ${QERP_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${QERP_DB_POOL_SIZE:10}
+      # Le contexte société est posé par `SET LOCAL`, qui ne vaut que pour la
+      # transaction en cours. En autocommit, chaque instruction serait sa propre
+      # transaction : le contexte serait posé puis perdu avant la requête
+      # métier, et la RLS ne renverrait aucune ligne. La panne serait invisible
+      # (listes vides) au lieu d'être bruyante.
+      auto-commit: false
+
+  # ---------------------------------------------------------------------------
+  # Migrations — rôle PROPRIÉTAIRE, distinct du rôle applicatif
+  # ---------------------------------------------------------------------------
+  # Flyway crée et modifie des objets : il lui faut `CREATE` sur le schéma. Si on
+  # le faisait tourner sous `qerp_api`, la migration échouerait (bien) ; si on
+  # donnait `CREATE` à `qerp_api`, le rôle applicatif deviendrait propriétaire
+  # des tables qu'il crée et contournerait la RLS sur celles-ci.
+  #
+  # Les valeurs retombent sur celles du datasource tant que QERP_MIGRATION_DB_*
+  # n'est pas défini, pour qu'un poste de développement mono-rôle démarre. En
+  # production, les trois variables sont définies et pointent sur `qerp_migrate`.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    url: ${QERP_MIGRATION_DB_URL:${spring.datasource.url}}
+    user: ${QERP_MIGRATION_DB_USER:${spring.datasource.username}}
+    password: ${QERP_MIGRATION_DB_PASSWORD:${spring.datasource.password}}
+    # Le schéma est l'actif du projet : une migration déjà appliquée ne doit
+    # jamais être réécrite. `validate` refuse au démarrage toute divergence
+    # d'empreinte entre les fichiers versionnés et l'historique en base.
+    validate-on-migrate: true
+    # Aucun `baseline-on-migrate` : la base cible est vide au premier démarrage.
+    # L'activer masquerait une base pré-existante au lieu d'échouer.
+
+  jpa:
+    hibernate:
+      # `validate`, jamais `update` : Hibernate ne touche pas au schéma. Les 105
+      # tables sont la propriété des migrations Flyway, extraites du dump de
+      # production et prouvées identiques objet par objet.
+      ddl-auto: validate
+    # Sans cette option, Hibernate garde la session ouverte pendant le rendu de
+    # la réponse : un chargement paresseux s'exécuterait alors hors de la
+    # transaction qui porte `SET LOCAL`, donc sans contexte société — et
+    # renverrait zéro ligne au lieu d'échouer.
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  error:
+    # Jamais de trace de pile ni de message interne dans une réponse HTTP : ils
+    # exposent la structure du schéma et les noms de contraintes.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      # Le détail (état de la base, de l'espace disque) sert au diagnostic sur le
+      # VPS ; il n'est pas exposé publiquement puisque /actuator est filtré par
+      # la chaîne de sécurité.
+      show-details: when-authorized
+
+qerp:
+  api:
+    # Alimente `info.version` du contrat OpenAPI. Surchargé à la construction pour
+    # que le document publié porte la version réellement déployée.
+    version: @project.version@
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  # Sans ce réglage, Springdoc décrit les réponses en `*/*` : le client généré ne
+  # sait pas alors qu'il reçoit du JSON, et doit le deviner. L'API n'expose que du
+  # JSON — le dire une fois ici vaut mieux que de le répéter sur chaque méthode.
+  default-produces-media-type: application/json
+  swagger-ui:
+    # Désactivée par défaut. L'interface Swagger énumère toute la surface d'API :
+    # c'est un outil de poste de développement, pas une page publique. Elle est
+    # activée sous le profil `dev`, où la chaîne de sécurité ouvre aussi les
+    # chemins correspondants.
+    enabled: false
+    path: /swagger-ui.html
+  # Les points d'entrée sont triés par chemin plutôt que par ordre de découverte :
+  # le document généré doit être stable, sinon la détection de dérive du contrat
+  # signalerait un changement à chaque compilation.
+  packages-to-scan: com.quoreich.qerp
+
+logging:
+  level:
+    root: INFO
+    com.quoreich.qerp: INFO
+
+---
+# Profil de développement : journal lisible par un humain, interface Swagger ouverte.
+spring:
+  config:
+    activate:
+      on-profile: dev
+springdoc:
+  swagger-ui:
+    enabled: true
+logging:
+  level:
+    com.quoreich.qerp: DEBUG
+
+---
+# Profil de production : journal structuré, une ligne JSON par événement.
+#
+# `logging.structured.format.console` est fourni par Spring Boot ; écrire un
+# encodeur Logback maison serait du code à maintenir pour un résultat moins
+# complet. Le format `logstash` est celui que consomment Elastic, Loki et
+# Vector, et il inclut le MDC — donc l'identifiant de corrélation posé par
+# CorrelationIdFilter.
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: WARN
+    com.quoreich.qerp: INFO
+spring:
+  config:
+    activate:
+      on-profile: prod

@@ -49,6 +49,32 @@ Pre-deploy DB guardrail (requires `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDAT
 npx tsx scripts/check-treasury-constraints.ts   # tsx is not a declared dependency; npx fetches it
 ```
 
+Lot 0 end-to-end guardrail — restores the dump, regenerates `V3..V14`, rebuilds from empty,
+diffs the object manifest, runs the RLS isolation fixture. Needs Docker and the production dump
+(which lives outside the repo):
+
+```bash
+PORT=55432 bash scripts/schema/verify-lot0.sh "C:/Users/Abdouramane/QERP-backups/flow-bright-desk_261109.backup"
+```
+
+### Java API (`services/api/`)
+
+Maven is **not installed** and must not be; the module ships a wrapper. The workstation has two
+JDK 21 installs and Oracle's `javapath` first on PATH, so `JAVA_HOME` must be pinned explicitly —
+`maven-enforcer-plugin` fails the build with an explicit message rather than letting `javac`
+report a confusing syntax error. JDK 25 lives at `C:\Users\Abdouramane\tools\jdk-25.0.5+8`.
+
+```bash
+cd services/api
+JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw -B -ntp verify   # unit + integration tests
+JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw -B -ntp test     # unit tests only, no Docker
+JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run  # needs PostgreSQL on 5432
+```
+
+`*IT` classes are Failsafe integration tests and start a disposable `postgres:18.6-alpine`
+container via Testcontainers — they need Docker running. `*Test` classes are Surefire unit tests
+and need nothing. State as of 9 Nov 2026: `verify` is green, 11 unit + 21 integration tests.
+
 ## Architecture
 
 ### Frontend shell
@@ -81,9 +107,16 @@ npx tsx scripts/check-treasury-constraints.ts   # tsx is not a declared dependen
 - Business logic is trigger/view-driven: auto GL posting on payments (`on_ap_payment_recorded`), DR=CR enforcement and posted-entry immutability (`enforce_balanced_entry`, `protect_posted_*`), AR/AP/stock aging views (`security_invoker = true`), invoice status recomputation from payments, `period_locks` plus close/reverse RPCs. `gl_audit_logs` chains entries; note the DB trigger hashes with 8-char truncated MD5 even though the README describes a SHA-256 chain.
 - Edge functions: `import-data` (bulk import, JWT + tenant from profile, allowlisted fields), `ai-scheduler` (cron entry, service-role or `x-scheduler-secret`), `ai-cashflow-forecast`, `ai-gl-anomaly-detection` (Gemini via `LOVABLE_API_KEY`, JWT or service role). They return generic errors and emit one structured `console.log({ audit: ... })` line per run; see `supabase/functions/README.md`.
 
-### Java/Spring re-platform baseline (Lot 0, done)
+### Java/Spring re-platform baseline (Lot 0 done, Lot 1 in progress)
 
-The backend is moving to Java 25 / Spring Boot 4.1 on a single VPS; the PostgreSQL schema is the asset and is reused unchanged. Programme: `docs/PLAN-BASCULE-JAVA.md`; governing spec: `docs/quoreich-cahier-des-charges-v1.md` + `v1.1` change log.
+The backend is moving to Java 25 / Spring Boot 4.1 on a single VPS; the PostgreSQL schema is the asset and is reused unchanged. Programme: `docs/PLAN-BASCULE-JAVA.md`; governing spec: `docs/quoreich-cahier-des-charges-v1.md` + `v1.1` change log. The module is `services/api/`; its entry point is `QerpApiApplication`, and it is a modular monolith whose package boundaries are enforced by `ArchitectureTest` (ArchUnit), not by review discipline. Package layout: `tenant/` (context, connection, startup guard), `web/` (health, correlation id), `config/` (security), `customer/` (the Lot 1 acceptance slice).
+
+- **Lot 1 verification lives in the ITs, not in prose.** `ApiSecurityIT` proves the exit criterion over HTTP with fabricated JWTs (`spring-security-test`'s `jwt()` post-processor — only the issuer is simulated, the whole authorization chain and RLS are production's); `TenantIsolationIT` proves it at the query layer, including that a write to another tenant is refused with no partial effect (asserted **as the table owner**, so the observation is not blind to the rows it looks for); `SchemaMigrationIT` proves the schema rebuilds under Boot-driven Flyway and compares object **name sets** against `public.manifest.tsv`; `ArchitectureTest` holds the structural invariants.
+- **The tenant comes from `profiles`, never from the token.** The policy is `tenant_id = get_user_tenant_id(auth.uid())`, so a `tenant_id` claim cannot widen the perimeter — a token claiming another tenant is simply ineffective. `TenantPrincipal.tenantId` is therefore informational and nullable, and the filter accepts a token without the claim; it returns 403 only for an unparseable `sub` or an unreadable claim. Do not "fix" this into a required claim.
+- **Zero tables use `FORCE ROW LEVEL SECURITY`**, so a table *owner* silently bypasses all 157 policies. `DatabaseSecurityGuard` turns that into a startup refusal: it asserts the connection is neither superuser nor `BYPASSRLS`, owns no `public` table, and is a member of `authenticated`. A legitimate change to any of those makes the app fail to start, by design. `DatabaseSecurityGuard.ConnectionAudit` exists so each refusal path is unit-testable without a container.
+- **`TenantAwareDataSource` issues `set_config('request.jwt.claims', ?, true)` on every connection handed out** — `set_config(..., true)` rather than `SET LOCAL` because it takes a bind parameter, and local scope because connections are pooled. It is installed by a `BeanPostProcessor` that wraps **only the bean named `dataSource`**: Boot's `flywayDataSource` has autocommit on, and wrapping it would abort startup on the first migration. Renaming that bean fails loudly, not silently.
+- **The OpenAPI contract is a versioned file, not a running server.** The chain is one-way and each link is enforced: Java controllers → `services/api/openapi/qerp-api.json` (frozen by `OpenApiContractIT`, which fails with a named JSON path when the server outgrows the file) → `src/api/qerp-schema.ts` (generated by `openapi-typescript`, checked by `npm run api:check`). Regenerate with `./mvnw verify -Dqerp.openapi.update=true`, then `npm run api:types`. Note `springdoc` is on its **3.x** line for Boot 4 (3.2.0 is built on 4.1.2) even though Maven Central's *search API* still advertises `latestVersion 2.8.6` — `maven-metadata.xml` is the authority. Two contract properties are load-bearing and covered by tests: the document is **not public** (it is permitted only under the `dev` profile, and Swagger UI is disabled by default), and it declares **no tenant parameter**, because the perimeter is resolved server-side.
+- **Boot 4 renamed things; a generated Initializr skeleton will not build.** Verified against Maven Central, not assumed: the parent version is `4.1.2` (Initializr emits `4.1.2.RELEASE`, whose POM 404s), it is `spring-boot-starter-webmvc` not `-web`, `spring-boot-starter-security-oauth2-resource-server`, `spring-boot-starter-flyway`, and `@AutoConfigureMockMvc` has moved to `org.springframework.boot.webmvc.test.autoconfigure` in the `spring-boot-starter-webmvc-test` starter (which replaces, not adds to, `spring-boot-starter-test`). Testcontainers 2.0 renamed its modules too: `testcontainers-postgresql` and `testcontainers-junit-jupiter`, with `PostgreSQLContainer` in `org.testcontainers.postgresql` and **non-generic**. ArchUnit is not managed by the Boot BOM and is pinned. Flyway is deliberately overridden to 13.12.1 against the BOM's 12.4.0 for PostgreSQL 18.6; `SchemaMigrationIT` is what proves the override does not break Boot's Flyway auto-configuration.
 
 - **`supabase/migrations/` is not a replayable schema** — `get_consolidated_cfo_trends` exists only in `drizzle/migrations/`. The source of truth is the production dump, which lives **outside the repo** (`C:\Users\Abdouramane\QERP-backups\`) because it contains PII. Never commit `*.backup`/`*.dump`.
 - The real baseline is `services/api/src/main/resources/db/migration/` (`V1..V15`). `V1`, `V2`, `V15` and the README are hand-written; `V3..V14` are **generated** by `scripts/schema/extract-from-dump.sh` and must not be edited by hand.
@@ -124,6 +157,7 @@ These come from `AGENTS.md` and are binding:
 - Vitest + jsdom; setup in `src/test/setup.ts`; tests colocated in `__tests__/` folders or as `*.test.ts` next to the module. There are 54 test/spec files today.
 - Pure logic/RBAC/SoD tests live in `src/lib/__tests__/`; hook tests in `src/hooks/__tests__/`; page/component integration in `src/pages/__tests__/` and `src/components/__tests__/` (the consolidated-CFO modal and focus-restoration suite is `KpiDrilldownDialog.a11y.test.tsx`).
 - Mock Supabase with `vi.mock("@/integrations/supabase/client", ...)` and a hand-rolled PostgREST builder (`select/eq/in/order/limit/range/then`, plus `rpc`); mock `PageShell` as passthrough and `sonner` toasts; wrap in `QueryClientProvider` + `MemoryRouter`. Key regressions: `src/lib/__tests__/lot1-sincerity.test.ts` (no fabricated margins or cash) and `src/hooks/__tests__/use-consolidated-cfo.test.tsx`.
+- The Java module has no mocking library use to speak of: its tests are deliberately end-to-end against a real PostgreSQL. `PostgresFixture` starts one `postgres:18.6-alpine` container for the whole run and gives each IT class its own database, because a test that mocks the database cannot observe RLS — and RLS is what is being tested. Fixtures come from `src/test/resources/fixtures/` (`reference-dataset.sql`, `rls-isolation-test.sql`), seeded once per database.
 
 ## Environment and current state
 
@@ -135,7 +169,7 @@ These come from `AGENTS.md` and are binding:
 
 ### Static checks (state as of 9 Nov 2026)
 
-All four are green; keep them that way:
+All green; keep them that way:
 
 | Commande | Résultat attendu |
 |---|---|
@@ -143,6 +177,9 @@ All four are green; keep them that way:
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 erreur |
 | `npx tsc --noEmit -p tsconfig.node.json` | 0 erreur |
 | `npm test` | 38 fichiers, 336 tests |
+| `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
+| `cd services/api && ./mvnw verify` | 35 tests (11 unitaires + 24 d'intégration), BUILD SUCCESS |
+| `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |
 
 - `@typescript-eslint/no-explicit-any` est en `warn`, pas en `error`, avec justification dans `eslint.config.js` : les 431 sites sont concentrés sur la frontière de types générés (`(supabase as any)`), pratique sanctionnée ci-dessus. En `error`, `npm run lint` était rouge en permanence et ne servait plus de signal.
 - `src/test/setup.ts` doit importer `@testing-library/jest-dom/**vitest**` (et non l'entrée racine, qui augmente le namespace `jest`) : sinon les matchers existent à l'exécution mais pas au typage, et `tsc` remonte 21 erreurs TS2339 dans les tests.

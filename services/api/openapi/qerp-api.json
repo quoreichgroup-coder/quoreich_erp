@@ -1,0 +1,148 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "API QUOREICH",
+    "description" : "API de l'ERP financier OHADA/SYSCOHADA QUOREICH.\n\nToutes les opérations exigent un jeton porteur Keycloak. Le périmètre société n'est jamais un paramètre : il est résolu côté serveur depuis le profil de l'utilisateur, et appliqué par les politiques RLS de PostgreSQL. Appeler l'API avec un jeton d'une autre société ne renvoie donc pas les données de cette société — cela renvoie celles du porteur du jeton.\n\nMontants en XOF, quantifiés en unités entières. Dates au format ISO-8601. Messages d'erreur en français.",
+    "license" : {
+      "name" : "Propriétaire — QUOREICH GROUP"
+    },
+    "version" : "0.0.1-SNAPSHOT"
+  },
+  "servers" : [ {
+    "url" : "/",
+    "description" : "Instance courante"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "name" : "Clients",
+    "description" : "Comptes clients de la société du porteur du jeton"
+  } ],
+  "paths" : {
+    "/health" : {
+      "get" : {
+        "tags" : [ "health-controller" ],
+        "operationId" : "liveness",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/customers" : {
+      "get" : {
+        "tags" : [ "Clients" ],
+        "summary" : "Lister les clients visibles",
+        "description" : "Renvoie les clients de la société du porteur du jeton, triés par nom.\n\nAucun paramètre de société : le périmètre est résolu côté serveur depuis le profil de l'utilisateur et appliqué par les politiques RLS de PostgreSQL. Une requête portant le jeton d'une autre société renvoie les clients de cette autre société, jamais un élargissement.",
+        "operationId" : "listCustomers",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CustomerView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "CustomerView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "status" ]
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "Jeton d'accès Keycloak (en-tête Authorization: Bearer …)",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}

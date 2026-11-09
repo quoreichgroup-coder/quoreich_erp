@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "api:types": "openapi-typescript services/api/openapi/qerp-api.json -o src/api/qerp-schema.ts",
+    "api:check": "node scripts/api/check-openapi-client.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -88,6 +90,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "jsdom": "^20.0.3",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.6",
     "postgres": "^4.0.0",
     "tailwindcss": "^4.3.5",
