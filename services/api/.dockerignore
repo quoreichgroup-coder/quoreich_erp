@@ -1,0 +1,13 @@
+# Contexte de construction réduit au strict nécessaire.
+#
+# `target/` est le point important : un `target/` local contaminerait l'image si
+# le Dockerfile copiait le répertoire entier, et une image construite sur le
+# poste ne serait alors plus reproductible — elle embarquerait un artefact
+# compilé ailleurs, parfois plus ancien que les sources.
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.log

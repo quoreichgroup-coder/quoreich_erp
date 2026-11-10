@@ -1,0 +1,169 @@
+# Intégration continue QUOREICH.
+#
+# Ce que cette chaîne protège, et pourquoi chaque contrôle existe :
+#
+#   - le contrat OpenAPI versionné (`services/api/openapi/qerp-api.json`) ne peut
+#     pas dériver du serveur sans que le test le dise ;
+#   - le client TypeScript généré depuis ce contrat ne peut pas dériver du
+#     contrat ;
+#   - le schéma PostgreSQL se reconstruit depuis une base vide et ses 157
+#     politiques restent actives, y compris pour les lectures hors société ;
+#   - l'image de production se construit réellement et tourne en non-root.
+#
+# Aucun de ces contrôles ne porte de secret : le seul mot de passe de la chaîne
+# est celui du conteneur PostgreSQL jetable des tests d'intégration, et il est
+# écrit dans le code de test.
+#
+# Ce que cette chaîne NE PEUT PAS vérifier, et il faut le savoir :
+# la parité complète du lot 0 (`scripts/schema/verify-lot0.sh`) compare les
+# migrations au dump de production. Ce dump contient des données personnelles
+# réelles (identités, paie, coordonnées bancaires) : il vit hors du dépôt, par
+# conception, et n'est donc pas disponible ici. La CI prouve que « les migrations
+# produisent toujours le manifeste gelé » (`SchemaMigrationIT`) ; la preuve que
+# « les migrations correspondent toujours au dump » reste une vérification locale,
+# à lancer avant toute livraison qui touche `db/migration`.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Une poussée sur une branche annule la construction précédente de cette même
+# branche : un retour tardif sur un commit déjà remplacé n'apprend rien et
+# consomme le temps des exécutants.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Node est épinglé par `.nvmrc` (plan de bascule §2 : Node 26.13 LTS), lu par
+  # `setup-node` via `node-version-file` — une seule source de vérité, donc pas
+  # de variable ici. Java n'a pas d'équivalent : il est écrit là.
+  JAVA_VERSION: "25"
+
+jobs:
+  client-web:
+    name: Client web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` et non `npm install` : la CI doit échouer si `package-lock.json`
+      # n'est plus synchrone avec `package.json`, pas le corriger en silence.
+      - name: Installation
+        run: npm ci
+
+      # Les deux `tsc` et non `npm run build` seul : le build de Vite n'exécute
+      # pas le compilateur, donc un build vert ne prouve rien sur les types.
+      - name: Analyse statique
+        run: |
+          npm run lint
+          npx tsc --noEmit -p tsconfig.app.json
+          npx tsc --noEmit -p tsconfig.node.json
+
+      - name: Tests unitaires
+        run: npm test
+
+      # Régénère le client depuis le contrat et le compare octet pour octet à
+      # celui qui est versionné : c'est le seul contrôle qui relie le contrat
+      # Java au code TypeScript qui le consomme.
+      - name: Dérive du client d'API
+        run: npm run api:check
+
+      # Aucune variable `VITE_*` n'est fournie, et c'est voulu : la construction
+      # ne doit dépendre d'aucune configuration. Les valeurs de `.env` sont lues
+      # à l'exécution dans le navigateur, pas à la compilation.
+      - name: Construction
+        run: npm run build
+
+  api-java:
+    name: API Java
+    runs-on: ubuntu-latest
+    # Mesuré : 18 min 51 sur le poste de développement, dont la majeure partie en
+    # résolution de dépendances à froid et en migrations des 15 versions du
+    # schéma dans le conteneur jetable. Le plafond est volontairement large : un
+    # dépassement par manque de marge rougit une construction saine et apprend à
+    # relancer sans lire, ce qui coûte plus cher que quelques minutes de plafond.
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: JDK 25
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      # `verify` et non `test` : les tests d'intégration (`*IT`) vivent dans
+      # Failsafe. Ce sont eux, et eux seuls, qui prouvent le critère de sortie du
+      # lot 1 — périmètre société résolu côté serveur, refus sans effet partiel —
+      # et qui figent le contrat OpenAPI. Un `test` seul laisserait passer une
+      # régression d'isolation.
+      #
+      # Docker est disponible sur les exécutants hébergés : Testcontainers
+      # démarre un `postgres:18.6-alpine` jetable, identique à celui du poste.
+      # Le Maven Wrapper est utilisé tel quel — la version de Maven est donc
+      # celle du dépôt, et la CI n'emprunte pas un chemin différent du poste.
+      - name: Tests unitaires et d'intégration
+        run: ./mvnw -B -ntp verify
+
+      - name: Rapports de tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rapports-api-java
+          path: |
+            services/api/target/surefire-reports/
+            services/api/target/failsafe-reports/
+          if-no-files-found: ignore
+
+  image-api:
+    name: Image de l'API
+    needs: api-java
+    runs-on: ubuntu-latest
+    # Plus large que `api-java` alors que ce poste fait moins de choses : le
+    # cache Maven de `setup-java` ne traverse pas la frontière du démon Docker.
+    # La construction retélécharge donc tout le dépôt depuis l'intérieur du
+    # conteneur — 10 min 38 pour le seul `dependency:go-offline`, mesuré — et
+    # cela s'ajoute à la compilation. C'est le prix de la reproductibilité : la
+    # construction n'utilise que ce que le dépôt contient.
+    timeout-minutes: 45
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # La construction Docker est le seul contrôle qui attrape une classe
+      # entière de défauts invisibles ailleurs : un bit exécutable perdu sur
+      # `mvnw`, un `.dockerignore` qui laisserait entrer `target/`, une étape de
+      # construction qui ne rejoue plus depuis le dépôt seul. Elle est lancée
+      # après les tests, jamais à la place.
+      - name: Construction de l'image
+        run: docker build --tag qerp-api:ci services/api
+
+      # `USER qerp` est une ligne du Dockerfile ; la vérifier par une exécution
+      # évite qu'elle disparaisse sans que personne ne s'en aperçoive — un
+      # conteneur qui tourne en root est une élévation de privilèges offerte.
+      - name: Le conteneur tourne en non-root
+        run: |
+          uid="$(docker run --rm --entrypoint id qerp-api:ci -u)"
+          echo "uid du processus : $uid"
+          test "$uid" -ne 0

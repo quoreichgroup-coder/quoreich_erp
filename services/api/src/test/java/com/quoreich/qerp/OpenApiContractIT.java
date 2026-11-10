@@ -5,9 +5,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +22,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectWriter;
 
 /**
  * Fige le contrat OpenAPI et refuse toute dérive non accompagnée.
@@ -53,8 +54,38 @@ class OpenApiContractIT {
   private static final String CHEMIN_CONTRAT = "openapi/qerp-api.json";
   private static final String PROPRIETE_REGENERATION = "qerp.openapi.update";
 
-  private static final ObjectMapper JSON =
-      new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+  /**
+   * Jackson 3, celui du serveur — et non Jackson 2.
+   *
+   * <p>Spring Boot 4 a migré sur Jackson 3, dont les paquets sont passés de
+   * {@code com.fasterxml.jackson} à {@code tools.jackson}. Le document servi par
+   * {@code /v3/api-docs} est donc produit par Jackson 3, tandis que Jackson 2
+   * reste sur le chemin de classes, tiré par d'autres bibliothèques. Écrire le
+   * contrat avec le second revenait à figer un artefact avec une autre
+   * bibliothèque que celle qui le produit ; les deux se ressemblent tant que
+   * personne ne touche à l'échappement ou à l'ordre des champs, et divergent
+   * ensuite sans prévenir.
+   *
+   * <p>La migration n'est pas cosmétique : en Jackson 3, {@code JsonNode.fields()}
+   * a disparu au profit de {@code properties()}, et
+   * {@code ObjectMapper.writer(PrettyPrinter)} au profit de {@code writer().with(...)}.
+   */
+  private static final ObjectMapper JSON = new ObjectMapper();
+
+  /**
+   * Écrivain indenté, celui de Jackson 3 — le même que celui qui produit le
+   * document servi.
+   *
+   * <p>Les fins de ligne ne sont volontairement pas obtenues d'un imprimeur
+   * configuré. Une première version remplaçait l'indenteur d'objets par un
+   * {@code DefaultIndenter("  ", "\n")} ; le contrat écrit est resté en CRLF.
+   * L'indenteur n'est donc pas le levier fiable ici, et un réglage dont on ne
+   * peut pas démontrer l'effet n'a rien à faire dans un fichier de test.
+   *
+   * <p>La normalisation se fait à l'écriture ({@link #ecrire}), là où le code
+   * peut la garantir et où elle se lit.
+   */
+  private static final ObjectWriter ECRIVAIN = JSON.writerWithDefaultPrettyPrinter();
 
   @DynamicPropertySource
   static void proprietes(DynamicPropertyRegistry registry) {
@@ -115,27 +146,16 @@ class OpenApiContractIT {
     // paramètre de société dans le contrat signifierait que le client choisit son
     // périmètre, ce qui est exactement ce que la RLS empêche.
     List<String> parametresDeSociete = new ArrayList<>();
-    document
-        .path("paths")
-        .fields()
-        .forEachRemaining(
-            chemin ->
-                chemin
-                    .getValue()
-                    .fields()
-                    .forEachRemaining(
-                        operation ->
-                            operation
-                                .getValue()
-                                .path("parameters")
-                                .forEach(
-                                    parametre -> {
-                                      String nom = parametre.path("name").asText();
-                                      if (nom.contains("tenant") || nom.contains("societe")) {
-                                        parametresDeSociete.add(
-                                            chemin.getKey() + " " + operation.getKey() + " " + nom);
-                                      }
-                                    })));
+    for (Map.Entry<String, JsonNode> chemin : document.path("paths").properties()) {
+      for (Map.Entry<String, JsonNode> operation : chemin.getValue().properties()) {
+        for (JsonNode parametre : operation.getValue().path("parameters")) {
+          String nom = parametre.path("name").asText();
+          if (nom.contains("tenant") || nom.contains("societe")) {
+            parametresDeSociete.add(chemin.getKey() + " " + operation.getKey() + " " + nom);
+          }
+        }
+      }
+    }
     assertThat(parametresDeSociete)
         .as("un paramètre de société laisserait le client choisir son périmètre")
         .isEmpty();
@@ -162,7 +182,13 @@ class OpenApiContractIT {
   private void ecrire(Path emplacement, JsonNode document) {
     try {
       Files.createDirectories(emplacement.getParent());
-      Files.writeString(emplacement, JSON.writeValueAsString(document) + "\n", StandardCharsets.UTF_8);
+      // `\n` explicitement, quelle que soit la plateforme. Le dépôt stocke le
+      // contrat en LF (`.gitattributes`) et la CI tourne sous Linux : sans cette
+      // normalisation, une régénération faite sous Windows produisait un fichier
+      // en CRLF, c'est-à-dire un diff portant sur toutes les lignes du fichier —
+      // exactement la relecture que le test existe pour rendre possible.
+      String contrat = ECRIVAIN.writeValueAsString(document).replace("\r\n", "\n");
+      Files.writeString(emplacement, contrat + "\n", StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw new UncheckedIOException("Écriture du contrat impossible : " + emplacement, e);
     }
@@ -195,10 +221,9 @@ class OpenApiContractIT {
 
   private void aplatir(String prefixe, JsonNode noeud, TreeSet<String> chemins) {
     if (noeud.isObject()) {
-      noeud
-          .fields()
-          .forEachRemaining(
-              champ -> aplatir(prefixe + "/" + champ.getKey(), champ.getValue(), chemins));
+      for (Map.Entry<String, JsonNode> champ : noeud.properties()) {
+        aplatir(prefixe + "/" + champ.getKey(), champ.getValue(), chemins);
+      }
       if (noeud.isEmpty()) {
         chemins.add(prefixe);
       }

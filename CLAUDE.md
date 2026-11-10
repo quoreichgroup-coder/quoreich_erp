@@ -68,12 +68,83 @@ report a confusing syntax error. JDK 25 lives at `C:\Users\Abdouramane\tools\jdk
 cd services/api
 JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw -B -ntp verify   # unit + integration tests
 JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw -B -ntp test     # unit tests only, no Docker
-JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run  # needs PostgreSQL on 5432
+JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run  # see the dev compose below
+```
+
+`spring-boot:run` on its own starts nothing usable: `application.yml` reads `QERP_DB_PASSWORD`
+with no usable default, and Flyway inherits the application credentials unless
+`QERP_MIGRATION_DB_*` is set. Point it at the dev PostgreSQL instead:
+
+```bash
+docker compose -f infra/compose.dev.yml up -d postgres
+cd services/api
+QERP_DB_URL=jdbc:postgresql://localhost:55433/qerp QERP_DB_USER=qerp_api QERP_DB_PASSWORD=qerp_api_dev \
+QERP_MIGRATION_DB_USER=postgres QERP_MIGRATION_DB_PASSWORD=postgres \
+JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run
 ```
 
 `*IT` classes are Failsafe integration tests and start a disposable `postgres:18.6-alpine`
 container via Testcontainers — they need Docker running. `*Test` classes are Surefire unit tests
-and need nothing. State as of 9 Nov 2026: `verify` is green, 11 unit + 21 integration tests.
+and need nothing. State as of 9 Nov 2026: `verify` is green, 11 unit + 24 integration tests.
+
+**The workstation's Docker engine is the least reliable part of this setup, and its failures look
+like code regressions.** They are not. Observed on 10 Nov 2026, on an unchanged revision that had
+just run 24/24 green: (a) `TenantIsolationIT` failed 6/6 with `Failed to initialize JPA
+EntityManagerFactory ... Unable to determine Dialect without JDBC metadata`, whose real cause is
+`PSQLException: This connection has been closed` on every Hikari pool — the shared test container
+lost its connections, with `Thread starvation or clock leap detected (housekeeper delta=46s)` logged
+just before; (b) the next run failed 24/24 in under four minutes with `Could not find a valid Docker
+environment ... NpipeSocketClientProviderStrategy: failed with BadRequestException (Status 400:
+{"ID":"","Containers":0,...})` — the engine answered `/info` with an empty stub. Minutes later
+`docker version` reported 29.5.3 and `docker run hello-world` succeeded. The cause is load: this
+workstation runs ~25 unrelated containers (Elasticsearch, Kibana, Logstash, MariaDB, three
+PostgreSQL, Grafana, MinIO, ClamAV, Frappe, a school-management stack) inside an 8.1 GB Docker VM.
+Vitest suffers the same way — `npm test` silently truncated to 19/38 then 37/38 files with
+`Timeout waiting for worker to respond`, and a serial run took 2 012 s against a normal ~100 s.
+`ubuntu-latest` runners have none of this pressure, which is the argument for reading a red CI run
+as authoritative and a red local run as suspect. When a local run fails this way, re-run it with
+nothing else going on rather than editing code.
+
+### Development environment (`infra/compose.dev.yml`)
+
+PostgreSQL 18.6 plus the API, both bound to `127.0.0.1`. The ports are **not** the conventional
+ones, deliberately: on this workstation 5432 is held by `sms_postgres`, 8080 by a Frappe
+container and 8081 by the Vite dev server, so a default `up` on the usual ports fails. Published
+ports are 55433 and 8090; override with `QERP_DEV_DB_PORT` / `QERP_API_PORT`.
+
+```bash
+docker compose -f infra/compose.dev.yml up -d --build
+docker compose -f infra/compose.dev.yml logs -f api
+docker compose -f infra/compose.dev.yml down -v    # -v wipes the data volume
+```
+
+- The volume mounts at **`/var/lib/postgresql`**, not `/var/lib/postgresql/data`: PostgreSQL 18
+  moved `PGDATA` to `/var/lib/postgresql/18/docker`. Mounting the old path silently loses data on
+  the next `down`.
+- `infra/postgres/init/10-role-applicatif.sh` provisions the `qerp_api` login role. `V1` creates
+  it `NOLOGIN` on purpose — a password does not belong in a versioned migration — so granting
+  LOGIN is a deployment gesture, and the dev container does exactly what
+  `PostgresFixture.provisionApiRole()` does for the tests.
+- The compose file sets `QERP_MIGRATION_DB_USER`/`_PASSWORD` to the owner role. Without them
+  Flyway inherits the datasource credentials (`qerp_api`), which has no `CREATE` on `public`, and
+  the first startup fails. The two-role split is what makes the RLS effective; a single-role dev
+  setup would exercise none of the 157 policies.
+- `QERP_MIGRATION_DB_*` points at `postgres` here. Production uses a dedicated `qerp_migrate`
+  owner role that **does not exist yet** — see `application.yml`, which names it.
+
+### Continuous integration (`.github/workflows/ci.yml`)
+
+Three jobs: `client-web` (Node from `.nvmrc`, `npm ci`, lint, both `tsc` configs, `npm test`,
+`npm run api:check`, `npm run build`), `api-java` (`./mvnw -B -ntp verify` on temurin 25, with
+Testcontainers on `ubuntu-latest`), and `image-api` (builds `services/api/Dockerfile`, then
+asserts the container runs non-root). Actions are pinned to commit SHAs, not floating tags.
+
+Two things CI deliberately cannot do. It does not run `verify-lot0.sh`: that compares the
+migrations to the production dump, which contains real PII and lives outside the repo, so CI
+covers "the migrations still produce the frozen manifest" (`SchemaMigrationIT`) while "the
+migrations still match the dump" stays a local check before any delivery touching `db/migration`.
+And `npm run build` runs without any `VITE_*` variable, because the build genuinely needs none —
+they are read in the browser at runtime.
 
 ## Architecture
 
@@ -162,12 +233,13 @@ These come from `AGENTS.md` and are binding:
 ## Environment and current state
 
 - `.env` at the repo root supplies `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` for project `banqdfutzlrcvepovrin`. That key is the public anon key; never add a `service_role` key or other secret to the frontend. `.env` is git-ignored via `.env` / `.env.*`.
-- This directory **is** its own git repository since 9 Nov 2026: `git init -b main` here, precisely because the parent `C:\` was an accidental repository (untracked, no commits) that would have made `git add .` stage the whole drive. Branch `main`, **no commit yet** — 499 files are staged-able, largest under 2 MB. The production dump is outside the repo (`C:\Users\Abdouramane\QERP-backups\`) and `git check-ignore` confirms `*.backup`/`*.dump`/`*.sql.gz`, `.env`, `node_modules`, `dist`, `.tmp_*`. `bun.lock`/`bun.lockb` are still tracked-looking leftovers — npm is the toolchain.
+- This directory **is** its own git repository since 9 Nov 2026: `git init -b main` here, precisely because the parent `C:\` was an accidental repository (untracked, no commits) that would have made `git add .` stage the whole drive. Branch `main`; two commits as of 9 Nov 2026 (`19e5100` Lot 0, `60955bb` Lot 1). The production dump is outside the repo (`C:\Users\Abdouramane\QERP-backups\`) and `git check-ignore` confirms `*.backup`/`*.dump`/`*.sql.gz`, `.env`, `node_modules`, `dist`, `.tmp_*`, `target/`. `bun.lock`/`bun.lockb` are still tracked-looking leftovers — npm is the toolchain.
+- Node is pinned to **26.13.0** by `.nvmrc`, which `actions/setup-node` reads via `node-version-file`. That is the canonical build version, not a floor: the workstation runs 24.14.1, and `engines` says `>=24.14.1` precisely because everything (lint, both `tsc` configs, 336 tests, `api:check`, `build`) is green on it — a floor above the version the suite is actually verified against would mark the working environment unsupported and turn every local `npm install` into a warning that means nothing. There is deliberately **no `.npmrc` with `engine-strict=true`**.
 - Both `package-lock.json` and `bun.lock`/`bun.lockb` are present; `README.md` and this environment use npm (`npx`), while the e2e spec headers show `pnpm`.
 - Docs drift worth knowing: README claims SHA-256 audit chains and `current_user_tenant()`; the SQL uses MD5-truncated hashes and `get_user_tenant_id()`.
 - Current delivery state is tracked in `roadmap.md` and `docs/recette-lot1.md`: Lot 1 (real treasury, real-cost gross margin, CFO consolidation) is accepted with reserves; the remaining blocker is missing authorized bank data in two companies. Read those before starting new work.
 
-### Static checks (state as of 9 Nov 2026)
+### Static checks (state as of 10 Nov 2026)
 
 All green; keep them that way:
 
@@ -180,6 +252,11 @@ All green; keep them that way:
 | `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
 | `cd services/api && ./mvnw verify` | 35 tests (11 unitaires + 24 d'intégration), BUILD SUCCESS |
 | `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |
+| `docker compose -f infra/compose.dev.yml config` | configuration valide (aucune erreur) |
+
+La même liste, moins `verify-lot0.sh` (qui exige le dump de production), est rejouée par
+`.github/workflows/ci.yml` à chaque poussée : ces contrôles ne valent que s'ils s'exécutent sans
+qu'on ait à y penser.
 
 - `@typescript-eslint/no-explicit-any` est en `warn`, pas en `error`, avec justification dans `eslint.config.js` : les 431 sites sont concentrés sur la frontière de types générés (`(supabase as any)`), pratique sanctionnée ci-dessus. En `error`, `npm run lint` était rouge en permanence et ne servait plus de signal.
 - `src/test/setup.ts` doit importer `@testing-library/jest-dom/**vitest**` (et non l'entrée racine, qui augmente le namespace `jest`) : sinon les matchers existent à l'exécution mais pas au typage, et `tsc` remonte 21 erreurs TS2339 dans les tests.

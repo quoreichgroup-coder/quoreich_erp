@@ -1,0 +1,91 @@
+# Environnement de développement QERP : PostgreSQL 18.6 + l'API Java.
+#
+# Ce fichier ne décrit PAS la production. Le VPS reçoit un déploiement distinct
+# (plan de bascule §7) : là-bas, le propriétaire des tables est le rôle
+# `qerp_migrate`, les mots de passe viennent d'un coffre, et la base n'est pas
+# accessible depuis l'extérieur. Ici, tout est jetable et lié à l'interface
+# locale.
+#
+# Ce qui est en revanche identique, et c'est le point : la SÉPARATION DES RÔLES.
+# L'API se connecte en `qerp_api` — non propriétaire, NOBYPASSRLS, membre de
+# `authenticated` — et les migrations tournent sous un rôle distinct qui, lui,
+# possède les tables. Un poste de développement mono-rôle ferait passer toutes
+# les lectures sans jamais exercer la RLS : les 157 politiques seraient alors
+# vérifiées nulle part avant la production.
+#
+#   docker compose -f infra/compose.dev.yml up -d --build
+#   docker compose -f infra/compose.dev.yml logs -f api
+#   docker compose -f infra/compose.dev.yml down          # garde les données
+#   docker compose -f infra/compose.dev.yml down -v       # repart de zéro
+
+name: qerp-dev
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    container_name: qerp-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: qerp
+    ports:
+      # Lié à 127.0.0.1 : la base de développement n'est pas exposée au réseau
+      # local, même avec un mot de passe jetable.
+      #
+      # 55433 plutôt que le 5432 d'usage : sur le poste de développement, 5432
+      # est déjà tenu par un autre PostgreSQL et 55432 par l'oracle du lot 0
+      # (`scripts/schema/restore-oracle.sh`). Un `up` par défaut qui échoue sur
+      # une erreur de port est un défaut qui ne sert personne. Le port reste
+      # surchargeable par `QERP_DEV_DB_PORT`.
+      - "127.0.0.1:${QERP_DEV_DB_PORT:-55433}:5432"
+    volumes:
+      # PostgreSQL 18 a déplacé son répertoire de données : `PGDATA` vaut
+      # /var/lib/postgresql/18/docker et le volume déclaré par l'image est
+      # /var/lib/postgresql. Monter `/var/lib/postgresql/data`, comme le
+      # faisaient les images 17 et antérieures, n'échoue pas : le conteneur
+      # démarre, mais les données vont ailleurs et disparaissent au premier
+      # `down`. Vérifié sur l'image elle-même (`docker image inspect`).
+      - donnees:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d qerp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: ../services/api
+    container_name: qerp-dev-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Profil `dev` : journal lisible et interface Swagger ouverte.
+      SPRING_PROFILES_ACTIVE: dev
+
+      QERP_DB_URL: jdbc:postgresql://postgres:5432/qerp
+      QERP_DB_USER: qerp_api
+      QERP_DB_PASSWORD: qerp_api_dev
+
+      # Flyway ne peut pas tourner sous `qerp_api` : le rôle applicatif n'a pas
+      # `CREATE` sur le schéma public, et c'est voulu — s'il l'avait, il
+      # deviendrait propriétaire des tables qu'il crée et contournerait la RLS
+      # sur celles-ci (aucune table n'est en FORCE ROW LEVEL SECURITY).
+      # `application.yml` retombe sur les valeurs du datasource quand ces
+      # variables sont absentes : les omettre ferait échouer le premier
+      # démarrage sur un refus de création de table.
+      QERP_MIGRATION_DB_USER: postgres
+      QERP_MIGRATION_DB_PASSWORD: postgres
+    ports:
+      # 8090 plutôt que le 8080 de `SERVER_PORT`, pour la même raison : sur le
+      # poste de développement, 8080 est tenu par un conteneur Frappe et 8081
+      # par le serveur Vite du client web. À l'intérieur du réseau Compose,
+      # l'API écoute bien sur 8080 — seul le port publié change.
+      - "127.0.0.1:${QERP_API_PORT:-8090}:8080"
+
+volumes:
+  donnees:
