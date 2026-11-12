@@ -85,7 +85,7 @@ JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run
 
 `*IT` classes are Failsafe integration tests and start a disposable `postgres:18.6-alpine`
 container via Testcontainers — they need Docker running. `*Test` classes are Surefire unit tests
-and need nothing. State as of 12 Nov 2026: `verify` is green, 11 unit + 37 integration tests.
+and need nothing. State as of 12 Nov 2026: `verify` is green, 11 unit + 38 integration tests.
 
 **The workstation's Docker engine is the least reliable part of this setup, and its failures look
 like code regressions.** They are not. Observed on 10 Nov 2026, on an unchanged revision that had
@@ -191,7 +191,7 @@ The backend is moving to Java 25 / Spring Boot 4.1 on a single VPS; the PostgreS
 
 - **`supabase/migrations/` is not a replayable schema** — `get_consolidated_cfo_trends` exists only in `drizzle/migrations/`. The source of truth is the production dump, which lives **outside the repo** (`C:\Users\Abdouramane\QERP-backups\`) because it contains PII. Never commit `*.backup`/`*.dump`.
 - The real baseline is `services/api/src/main/resources/db/migration/` (`V1..V15`). `V1`, `V2`, `V15` and the README are hand-written; `V3..V14` are **generated** by `scripts/schema/extract-from-dump.sh` and must not be edited by hand.
-- `V16+` are post-baseline evolutions, hand-written, each with a twin in `supabase/migrations/` while Supabase is production. `verify-lot0.sh` stops at V15 (baseline = dump); `SchemaMigrationIT` declares each post-baseline manifest delta explicitly (`DECLENCHEURS_RETIRES`) — never rewrite `public.manifest.tsv`. V16 drops 4 triggers that re-ran an already-attached function (payments ×3 → triple GL posting of every AR receipt / AP payment; goods_receipts ×2 → double stock; journal_entries ×2 → double audit). Historical duplicates are corrected by `scripts/data/doublons-declencheurs/` (reversal via `reverse_journal_entry`, dry-run by default); stock and audit duplicates are reported only.
+- `V16+` are post-baseline evolutions, hand-written, each with a twin in `supabase/migrations/` while Supabase is production. `verify-lot0.sh` stops at V15 (baseline = dump); `SchemaMigrationIT` declares each post-baseline manifest delta explicitly (`DECLENCHEURS_RETIRES`) — never rewrite `public.manifest.tsv`. V16 drops 4 triggers that re-ran an already-attached function (payments ×3 → triple GL posting of every AR receipt / AP payment; goods_receipts ×2 → double stock; journal_entries ×2 → double audit). Historical duplicates are corrected by `scripts/data/doublons-declencheurs/` (reversal via `reverse_journal_entry`, dry-run by default); stock and audit duplicates are reported only. V17 makes AR posting fail closed (SAP/Sage behaviour): `on_ar_invoice_posted` and `on_ap_payment_recorded` raise SQLSTATE `QG001` naming the missing accounts (4110/4000/4310, 5210/4010) instead of skipping the GL entry; drafts are unaffected; the API maps `QG001` to 422 with that message, every other DB refusal stays a generic 409. `on_ap_invoice_posted` and `on_stock_movement_je` still skip silently (Lots 3/4).
 - Verify with `bash scripts/schema/verify-lot0.sh <dump>`: restores the dump into `postgres:18.6-alpine`, regenerates `V3..V14` and fails on drift, rebuilds from an empty database, then diffs a 2 885-line object manifest (columns, constraints, indexes, function bodies, views, triggers, RLS policies, sequences, enums) and runs the RLS isolation fixture. Current result: zero diff.
 - **Tenant context contract**: the API connects as `qerp_api` (non-owner, `NOBYPASSRLS`, member of `authenticated`) and sets `SET LOCAL request.jwt.claims = '{"sub":...,"role":"authenticated"}'` per transaction. `V2__compat_auth_schema.sql` reimplements `auth.uid()/jwt()/role()/email()` so the 157 policies stay byte-identical. With no session variable `auth.uid()` is NULL and RLS fails closed.
 - `auth.users` is reduced to `(id uuid primary key)`; Keycloak must import users **with their original UUIDs** to keep the 16 FKs valid. The `on_auth_user_created` trigger is not recreated — profile provisioning becomes an API responsibility.
@@ -251,7 +251,7 @@ All green; keep them that way:
 | `npx tsc --noEmit -p tsconfig.node.json` | 0 erreur |
 | `npm test` | 38 fichiers, 336 tests |
 | `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
-| `cd services/api && ./mvnw verify` | 48 tests (11 unitaires + 37 d'intégration), BUILD SUCCESS |
+| `cd services/api && ./mvnw verify` | 49 tests (11 unitaires + 38 d'intégration), BUILD SUCCESS |
 | `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |
 | `docker compose -f infra/compose.dev.yml config` | configuration valide (aucune erreur) |
 

@@ -16,7 +16,7 @@ export interface paths {
         put?: never;
         /**
          * Émettre une facture client
-         * @description Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans la société courante.
+         * @description Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans la société courante. 422 si le plan comptable de la société est incomplet (le message nomme les comptes manquants).
          */
         post: operations["createArInvoice"];
         delete?: never;
@@ -36,7 +36,7 @@ export interface paths {
         put?: never;
         /**
          * Enregistrer un encaissement
-         * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante.
+         * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.
          */
         post: operations["recordArPayment"];
         delete?: never;

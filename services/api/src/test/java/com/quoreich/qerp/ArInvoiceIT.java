@@ -54,7 +54,8 @@ class ArInvoiceIT {
             + "SELECT '"
             + PostgresFixture.ALPHA_TENANT
             + "', v.code, v.name, v.t FROM (VALUES "
-            + "('4110','Clients','asset'),('4000','Ventes','revenue'),('4310','TVA collectée','liability'))"
+            + "('4110','Clients','asset'),('4000','Ventes','revenue'),('4310','TVA collectée','liability'),"
+            + "('5210','Banque','asset'))"
             + " AS v(code,name,t) WHERE NOT EXISTS (SELECT 1 FROM gl_accounts g "
             + "WHERE g.tenant_id = '"
             + PostgresFixture.ALPHA_TENANT

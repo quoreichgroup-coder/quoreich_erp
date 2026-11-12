@@ -73,7 +73,7 @@
       "post" : {
         "tags" : [ "Factures clients" ],
         "summary" : "Émettre une facture client",
-        "description" : "Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans la société courante.",
+        "description" : "Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans la société courante. 422 si le plan comptable de la société est incomplet (le message nomme les comptes manquants).",
         "operationId" : "createArInvoice",
         "requestBody" : {
           "content" : {
@@ -129,7 +129,7 @@
       "post" : {
         "tags" : [ "Factures clients" ],
         "summary" : "Enregistrer un encaissement",
-        "description" : "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante.",
+        "description" : "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.",
         "operationId" : "recordArPayment",
         "parameters" : [ {
           "name" : "id",

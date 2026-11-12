@@ -2,6 +2,7 @@ package com.quoreich.qerp.invoice;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,7 +63,8 @@ public class ArInvoiceController {
       description =
           "Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période"
               + " close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans"
-              + " la société courante.")
+              + " la société courante. 422 si le plan comptable de la société est incomplet (le"
+              + " message nomme les comptes manquants).")
   public ResponseEntity<?> create(@RequestBody CreateArInvoice body) {
     String problem = body.problem();
     if (problem != null) {
@@ -78,7 +80,7 @@ public class ArInvoiceController {
       description =
           "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si"
               + " l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou"
-              + " accountant dans la société courante.")
+              + " accountant dans la société courante, 422 si le plan comptable est incomplet.")
   public ResponseEntity<?> pay(@PathVariable UUID id, @RequestBody RecordArPayment body) {
     String problem = body.problem();
     if (problem != null) {
@@ -90,12 +92,33 @@ public class ArInvoiceController {
         .orElse(ResponseEntity.notFound().build());
   }
 
-  /** Message générique : le détail SQL ne sort pas du serveur. */
+  /**
+   * Refus de la base.
+   *
+   * <p>Par défaut, message générique : le détail SQL ne sort pas du serveur. Seule exception, le
+   * code {@code QG001} (plan comptable incomplet, V17) : son message est rédigé par le schéma, ne
+   * contient que des codes de comptes, et c'est précisément ce que l'utilisateur doit lire pour
+   * corriger — comme le « détermination de compte impossible » de SAP. 422 et non 409 : la requête
+   * est bien formée, mais le paramétrage de la société ne permet pas de la traiter.
+   */
   @ExceptionHandler(DataAccessException.class)
   public ResponseEntity<Map<String, String>> refused(DataAccessException e) {
     LOG.warn("Opération AR refusée : {}", e.getMostSpecificCause().getMessage());
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      if (t instanceof SQLException sql && PLAN_INCOMPLET.equals(sql.getSQLState())) {
+        return ResponseEntity.status(422).body(Map.of("error", premiereLigne(sql)));
+      }
+    }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "Opération refusée par les règles comptables"));
+  }
+
+  private static final String PLAN_INCOMPLET = "QG001";
+
+  /** « ERROR: message\n  Hint: … » → « message » (préfixe de sévérité éventuellement localisé). */
+  private static String premiereLigne(SQLException e) {
+    String message = String.valueOf(e.getMessage()).lines().findFirst().orElse("");
+    return message.replaceFirst("^[\\p{Lu}]+:\\s*", "");
   }
 
   @ExceptionHandler(ArWriteForbidden.class)

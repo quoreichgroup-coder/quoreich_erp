@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.quoreich.qerp.tenant.TenantContextHolder;
@@ -87,7 +88,15 @@ class ArParityIT {
             + "', 'accountant'), ('"
             + ALPHA_VIEWER
             + "', 'viewer')) AS v(u, r) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
-            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role);"
+            // Beta : administrateur, mais société SANS plan comptable (cas constaté en production).
+            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT '"
+            + PostgresFixture.BETA_USER
+            + "', 'admin', '"
+            + PostgresFixture.BETA_TENANT
+            + "' WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = '"
+            + PostgresFixture.BETA_USER
+            + "')");
     TenantContextHolder.clear();
   }
 
@@ -315,6 +324,100 @@ class ArParityIT {
 
     assertThat(rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries"))
         .isEqualTo(avant);
+  }
+
+  /**
+   * Plan comptable incomplet (V17) : refus dans les deux chemins, sans aucun effet, avec un message
+   * qui nomme les comptes. Avant V17, la facture passait sans écriture (WARNING invisible) et
+   * l'encaissement passait sans écriture (rien du tout) — c'est ce qu'on a constaté sur le dump.
+   */
+  @Test
+  @DisplayName("plan comptable incomplet : facture puis encaissement refusés dans les deux chemins")
+  void planComptableIncompletRefuseSansEffet() throws Exception {
+    String b = PostgresFixture.BETA_TENANT;
+    String customerBeta = "c0000004-0000-0000-0000-000000000000";
+    List<String> avant =
+        rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries");
+
+    // 1. Aucun compte : la facture émise est refusée.
+    assertThatThrownBy(
+            () ->
+                asUser(
+                    PostgresFixture.BETA_USER,
+                    "INSERT INTO ar_invoices (invoice_number, customer_id, invoice_date, due_date,"
+                        + " subtotal, tax_amount, total, tenant_id, created_by, status, amount_paid)"
+                        + " VALUES ('PAR-HIST-PLAN', ?::uuid, '2030-01-21', '2030-12-31', 1000.00,"
+                        + " 180.00, 1180.00, get_user_tenant_id(auth.uid()), auth.uid(), 'sent', 0)",
+                    customerBeta))
+        .isInstanceOf(SQLException.class)
+        .hasMessageContaining("4110 Clients, 4000 Ventes, 4310 TVA collectée");
+    mockMvc
+        .perform(
+            post("/api/v1/ar/invoices")
+                .with(jwt().jwt(j -> j.subject(PostgresFixture.BETA_USER)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"invoiceNumber\":\"PAR-API-PLAN\",\"customerId\":\""
+                        + customerBeta
+                        + "\",\"invoiceDate\":\"2030-01-21\",\"dueDate\":\"2030-12-31\","
+                        + "\"subtotal\":1000.00,\"taxAmount\":180.00}"))
+        .andExpect(status().is(422))
+        .andExpect(
+            jsonPath("$.error")
+                .value(
+                    "Plan comptable incomplet : compte(s) 4110 Clients, 4000 Ventes, 4310 TVA"
+                        + " collectée absent(s) ; la facture PAR-API-PLAN ne peut pas être émise"));
+    assertThat(rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries"))
+        .isEqualTo(avant);
+
+    // 2. Comptes de vente créés, mais pas la banque : la facture passe, l'encaissement est refusé.
+    PostgresFixture.execute(
+        PostgresFixture.urlOf(DATABASE),
+        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) SELECT '"
+            + b
+            + "', v.code, v.name, v.t FROM (VALUES ('4110','Clients','asset'),"
+            + " ('4000','Ventes','revenue'), ('4310','TVA collectée','liability'))"
+            + " AS v(code, name, t)");
+    String facture =
+        asUser(
+            PostgresFixture.BETA_USER,
+            "INSERT INTO ar_invoices (invoice_number, customer_id, invoice_date, due_date,"
+                + " subtotal, tax_amount, total, tenant_id, created_by, status, amount_paid)"
+                + " VALUES ('PAR-HIST-PLAN-2', ?::uuid, '2030-01-21', '2030-12-31', 1000.00,"
+                + " 180.00, 1180.00, get_user_tenant_id(auth.uid()), auth.uid(), 'sent', 0)"
+                + " RETURNING id",
+            customerBeta);
+    List<String> avantPaiement =
+        rows(
+            "SELECT count(*)::text FROM payments UNION ALL SELECT count(*)::text FROM journal_entries"
+                + " UNION ALL SELECT amount_paid || ' ' || status FROM ar_invoices WHERE id = ?::uuid",
+            facture);
+
+    assertThatThrownBy(
+            () ->
+                asUser(
+                    PostgresFixture.BETA_USER,
+                    "INSERT INTO payments (ar_invoice_id, amount, tenant_id, payment_type,"
+                        + " created_by) VALUES (?::uuid, 100.00, get_user_tenant_id(auth.uid()),"
+                        + " 'ar_receipt', auth.uid())",
+                    facture))
+        .isInstanceOf(SQLException.class)
+        .hasMessageContaining("5210 Banque");
+    mockMvc
+        .perform(
+            post("/api/v1/ar/invoices/" + facture + "/payments")
+                .with(jwt().jwt(j -> j.subject(PostgresFixture.BETA_USER)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":100.00}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("5210 Banque")));
+    assertThat(
+            rows(
+                "SELECT count(*)::text FROM payments UNION ALL SELECT count(*)::text FROM journal_entries"
+                    + " UNION ALL SELECT amount_paid || ' ' || status FROM ar_invoices"
+                    + " WHERE id = ?::uuid",
+                facture))
+        .isEqualTo(avantPaiement);
   }
 
   /**
