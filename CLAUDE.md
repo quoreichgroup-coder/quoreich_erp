@@ -85,7 +85,7 @@ JAVA_HOME=/c/Users/Abdouramane/tools/jdk-25.0.5+8 ./mvnw spring-boot:run
 
 `*IT` classes are Failsafe integration tests and start a disposable `postgres:18.6-alpine`
 container via Testcontainers — they need Docker running. `*Test` classes are Surefire unit tests
-and need nothing. State as of 12 Nov 2026: `verify` is green, 11 unit + 64 integration tests.
+and need nothing. State as of 12 Nov 2026: `verify` is green, 11 unit + 69 integration tests.
 
 **The workstation's Docker engine is the least reliable part of this setup, and its failures look
 like code regressions.** They are not. Observed on 10 Nov 2026, on an unchanged revision that had
@@ -254,7 +254,7 @@ All green; keep them that way:
 | `npx tsc --noEmit -p tsconfig.node.json` | 0 erreur |
 | `npm test` | 46 fichiers, 377 tests |
 | `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
-| `cd services/api && ./mvnw verify` | 75 tests (11 unitaires + 64 d'intégration), BUILD SUCCESS |
+| `cd services/api && ./mvnw verify` | 80 tests (11 unitaires + 69 d'intégration), BUILD SUCCESS |
 | `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |
 | `docker compose -f infra/compose.dev.yml config` | configuration valide (aucune erreur) |
 

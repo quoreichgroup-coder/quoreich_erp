@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "20";
+  private static final String DERNIERE_MIGRATION = "21";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -84,7 +84,10 @@ class SchemaMigrationIT {
           "analytic_rules",
           "analytic_defaults",
           "ar_invoice_analytics",
-          "journal_line_analytics");
+          "journal_line_analytics",
+          // V21 — lignes de facture et codes TVA.
+          "tax_codes",
+          "ar_invoice_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -97,7 +100,11 @@ class SchemaMigrationIT {
           "guard_journal_line_analytics",
           "guard_ar_invoice_analytics",
           "enforce_analytics",
-          "guard_analytic_value_hierarchy");
+          "guard_analytic_value_hierarchy",
+          "guard_tax_code",
+          "compute_ar_invoice_line",
+          "sum_ar_invoice_lines",
+          "impute_ar_revenue_line");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -119,7 +126,11 @@ class SchemaMigrationIT {
           "ar_invoice_analytics/Tenant isolation",
           "ar_invoice_analytics/Gestion comptable",
           "journal_line_analytics/Tenant isolation",
-          "journal_line_analytics/Gestion comptable");
+          "journal_line_analytics/Gestion comptable",
+          "tax_codes/Tenant isolation",
+          "tax_codes/Administrateur de la société",
+          "ar_invoice_lines/Tenant isolation",
+          "ar_invoice_lines/Gestion comptable");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -127,7 +138,10 @@ class SchemaMigrationIT {
           "journal_entries/trg_enforce_analytics",
           "journal_line_analytics/trg_guard_journal_line_analytics",
           "ar_invoice_analytics/trg_guard_ar_invoice_analytics",
-          "analytic_values/trg_guard_analytic_value_hierarchy");
+          "analytic_values/trg_guard_analytic_value_hierarchy",
+          "tax_codes/trg_guard_tax_code",
+          "ar_invoice_lines/trg_compute_ar_invoice_line",
+          "ar_invoice_lines/trg_sum_ar_invoice_lines");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
