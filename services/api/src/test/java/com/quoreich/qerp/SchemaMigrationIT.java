@@ -51,6 +51,24 @@ class SchemaMigrationIT {
 
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
+  /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
+  private static final String DERNIERE_MIGRATION = "16";
+
+  /**
+   * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
+   *
+   * <p>Le manifeste reste la photographie du dump de production ({@code verify-lot0.sh} compare
+   * V1..V15 au dump, pas au-delà) ; les évolutions sont listées ici plutôt que réécrites dans le
+   * manifeste, pour que l'écart reste lisible et justifié. V16 retire les déclencheurs branchés en
+   * double sur la même fonction.
+   */
+  private static final Set<String> DECLENCHEURS_RETIRES =
+      Set.of(
+          "payments/trg_payment_gl",
+          "payments/trg_payment_gl_posting",
+          "goods_receipts/trg_gr_completed",
+          "journal_entries/trg_journal_entry_audit");
+
   @DynamicPropertySource
   static void proprietes(DynamicPropertyRegistry registry) {
     PostgresFixture.configureContext(DATABASE, registry);
@@ -60,7 +78,7 @@ class SchemaMigrationIT {
   @Autowired private JdbcTemplate jdbc;
 
   @Test
-  @DisplayName("les migrations V1..V15 s'appliquent toutes, sans échec ni résidu en attente")
+  @DisplayName("les migrations s'appliquent toutes, sans échec ni résidu en attente")
   void toutesLesMigrationsSontAppliquees() {
     MigrationInfo[] appliquees = flyway.info().applied();
 
@@ -68,8 +86,28 @@ class SchemaMigrationIT {
     assertThat(flyway.info().pending()).isEmpty();
     assertThat(appliquees).allMatch(info -> info.getState() == MigrationState.SUCCESS);
     assertThat(appliquees[appliquees.length - 1].getVersion().getVersion())
-        .as("la dernière migration appliquée doit être V15")
-        .isEqualTo("15");
+        .as("la dernière migration appliquée doit être V%s", DERNIERE_MIGRATION)
+        .isEqualTo(DERNIERE_MIGRATION);
+  }
+
+  @Test
+  @DisplayName("aucune fonction n'est branchée deux fois sur la même table")
+  void aucuneFonctionDeclencheeEnDouble() {
+    // Le dump en contenait trois (paiements ×3, réceptions ×2, audit ×2) : chaque
+    // branchement réexécute la fonction, d'où des écritures et des mouvements de
+    // stock en double. Ce garde-fou empêche qu'une migration en réintroduise un.
+    assertThat(noms("""
+        SELECT c.relname || '/' || p.proname || ' : ' || string_agg(t.tgname, ', ' ORDER BY t.tgname)
+        FROM pg_trigger t
+        JOIN pg_class c ON c.oid = t.tgrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE n.nspname = 'public' AND NOT t.tgisinternal
+        GROUP BY c.relname, p.proname
+        HAVING count(*) > 1
+        """))
+        .as("fonctions déclenchées plusieurs fois sur la même table")
+        .isEmpty();
   }
 
   @Test
@@ -117,7 +155,12 @@ class SchemaMigrationIT {
         WHERE n.nspname = 'public'
         """)), "fonctions");
 
-    memeEnsemble(MANIFESTE.cles("triggers", 0, 1), new LinkedHashSet<>(noms("""
+    Set<String> declencheursAttendus = new LinkedHashSet<>(MANIFESTE.cles("triggers", 0, 1));
+    assertThat(declencheursAttendus)
+        .as("chaque déclencheur déclaré retiré doit exister dans le manifeste de référence")
+        .containsAll(DECLENCHEURS_RETIRES);
+    declencheursAttendus.removeAll(DECLENCHEURS_RETIRES);
+    memeEnsemble(declencheursAttendus, new LinkedHashSet<>(noms("""
         SELECT c.relname || '/' || t.tgname FROM pg_trigger t
         JOIN pg_class c ON c.oid = t.tgrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace

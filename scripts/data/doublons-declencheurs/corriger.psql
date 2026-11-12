@@ -1,0 +1,24 @@
+-- Correction des écritures en double. Par défaut : SIMULATION (ROLLBACK).
+--
+--   Simulation : psql "$URL" -f scripts/data/doublons-declencheurs/corriger.psql
+--   Application : psql "$URL" -v appliquer=1 -f scripts/data/doublons-declencheurs/corriger.psql
+--
+-- À exécuter en propriétaire du schéma, après application de V16.
+\set ON_ERROR_STOP on
+\pset footer off
+
+BEGIN;
+\echo '== Constat AVANT =='
+\ir 01-constat.sql
+\echo '== Contre-passation =='
+\ir 02-contrepassation.sql
+\echo '== Constat APRÈS (a_contrepasser doit valoir 0) =='
+\ir 01-constat.sql
+
+\if :{?appliquer}
+  COMMIT;
+  \echo 'APPLIQUÉ.'
+\else
+  ROLLBACK;
+  \echo 'SIMULATION : rien n''a été enregistré. Relancer avec -v appliquer=1 pour appliquer.'
+\endif

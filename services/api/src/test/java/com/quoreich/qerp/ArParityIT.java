@@ -38,6 +38,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Contrairement à {@link ArInvoiceIT}, le compte 5210 (Banque) existe ici : c'est ce qui
  * déclenche la comptabilisation des encaissements, sans quoi elle n'est jamais exercée.
+ *
+ * <p>Les deux chemins écrivent dans la même base, migrée jusqu'à V16 : la parité porte sur la
+ * logique (API contre INSERT direct), pas sur deux schémas.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -259,16 +262,14 @@ class ArParityIT {
   }
 
   /**
-   * Caractérisation d'un défaut hérité, que la parité reproduit fidèlement : le schéma branche
-   * {@code on_ap_payment_recorded} par trois triggers sur {@code payments}
-   * ({@code trg_on_payment_recorded}, {@code trg_payment_gl}, {@code trg_payment_gl_posting}), et
-   * {@code journal_entries.entry_number} n'est pas unique. Chaque encaissement AR produit donc
-   * <strong>trois</strong> écritures identiques : la banque et les clients sont mouvementés trois
-   * fois. Ce test échouera le jour où le schéma sera corrigé — c'est voulu, il faudra le réécrire.
+   * Le dump branchait {@code on_ap_payment_recorded} par trois triggers sur {@code payments} : chaque
+   * encaissement produisait trois écritures identiques. V16 n'en garde qu'un ; ce test vérifie
+   * l'effet comptable, une seule écriture DR Banque / CR Clients du montant exact, dans les deux
+   * chemins.
    */
   @Test
-  @DisplayName("défaut hérité : un encaissement produit trois écritures (dans les deux chemins)")
-  void encaissementComptabiliseTroisFois() throws Exception {
+  @DisplayName("un encaissement produit exactement une écriture, dans les deux chemins")
+  void encaissementComptabiliseUneSeuleFois() throws Exception {
     String legacy = legacyCreate(PostgresFixture.ALPHA_USER, "PAR-HIST-002", "2030-01-16");
     String api = apiCreate("PAR-API-002", "2030-01-16");
     legacyPay(legacy, "100.00", "TRIPLE-HIST");
@@ -280,7 +281,7 @@ class ArParityIT {
                   "SELECT count(DISTINCT je.id), sum(l.debit) FROM journal_entries je JOIN journal_lines l ON"
                       + " l.entry_id = je.id WHERE je.source = 'ar_receipt' AND je.description = ?",
                   "AR Receipt: " + ref))
-          .containsExactly("3 | 300.00");
+          .containsExactly("1 | 100.00");
     }
   }
 

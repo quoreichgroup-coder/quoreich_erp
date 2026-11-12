@@ -19,6 +19,14 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V2__compat_auth_schema.sql` | écrit à la main | schéma `auth` : `uid()`, `jwt()`, `role()`, `email()`, `auth.users(id)` |
 | `V3..V14__public_*.sql` | **générés** par `scripts/schema/extract-from-dump.sh` | types, séquences, tables, contraintes, index, fonctions, vues, règles, RLS, politiques, triggers, clés étrangères |
 | `V15__privileges.sql` | écrit à la main | droits applicatifs |
+| `V16__suppression_declencheurs_en_double.sql` | écrit à la main | retire 4 déclencheurs qui réexécutaient une fonction déjà branchée (paiements ×3, réceptions ×2, audit ×2) |
+
+**`V1..V15` = la base de référence**, identique au dump : c'est ce que
+`verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des
+évolutions** : chacune est écrite à la main, porte sa jumelle dans
+`supabase/migrations/` tant que Supabase reste en production, et ses écarts au
+manifeste sont déclarés un par un dans `SchemaMigrationIT` — jamais en réécrivant
+le manifeste, qui reste la photographie du dump.
 
 **Ne pas éditer `V3..V14` à la main.** Toute correction se fait en amont, puis
 les fichiers sont régénérés : `verify-lot0.sh` échoue si un fichier versionné
