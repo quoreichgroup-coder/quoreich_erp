@@ -59,7 +59,51 @@ class ArInvoiceIT {
             + "WHERE g.tenant_id = '"
             + PostgresFixture.ALPHA_TENANT
             + "' AND g.code = v.code)");
+    // Rôles : propres à ce test (le jeu de référence n'en porte aucun, et d'autres IT en
+    // dépendent). ALPHA_VIEWER lit seulement ; ALPHA_FOREIGN_ROLE est comptable, mais dans Beta.
+    PostgresFixture.execute(
+        PostgresFixture.urlOf(DATABASE),
+        "INSERT INTO auth.users (id) VALUES ('"
+            + ALPHA_VIEWER
+            + "'), ('"
+            + ALPHA_FOREIGN_ROLE
+            + "') ON CONFLICT DO NOTHING;"
+            + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('"
+            + ALPHA_VIEWER
+            + "', '"
+            + PostgresFixture.ALPHA_TENANT
+            + "', 'Lecteur Alpha'), ('"
+            + ALPHA_FOREIGN_ROLE
+            + "', '"
+            + PostgresFixture.ALPHA_TENANT
+            + "', 'Rôle ailleurs') ON CONFLICT (id) DO NOTHING;"
+            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role,"
+            + " v.t::uuid FROM (VALUES ('"
+            + PostgresFixture.ALPHA_USER
+            + "', 'accountant', '"
+            + PostgresFixture.ALPHA_TENANT
+            + "'), ('"
+            + PostgresFixture.BETA_USER
+            + "', 'admin', '"
+            + PostgresFixture.BETA_TENANT
+            + "'), ('"
+            + ALPHA_VIEWER
+            + "', 'viewer', '"
+            + PostgresFixture.ALPHA_TENANT
+            + "'), ('"
+            + ALPHA_FOREIGN_ROLE
+            + "', 'accountant', '"
+            + PostgresFixture.BETA_TENANT
+            + "')) AS v(u, r, t) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
+            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
     TenantContextHolder.clear();
+  }
+
+  private static final String ALPHA_VIEWER = "aaaaaaaa-0000-0000-0000-000000000003";
+  private static final String ALPHA_FOREIGN_ROLE = "aaaaaaaa-0000-0000-0000-000000000004";
+
+  private static RequestPostProcessor as(String user) {
+    return jwt().jwt(b -> b.subject(user));
   }
 
   private static RequestPostProcessor alpha() {
@@ -237,6 +281,43 @@ class ArInvoiceIT {
     assertThat(betaCsv).doesNotContain("IT-AR-").contains("Numéro,Client");
 
     mockMvc.perform(get("/api/v1/ar/invoices/export")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("lecteur, ou rôle détenu dans une autre société → 403 sans effet ; lecture permise")
+  void ecritureReserveeAuxComptables() throws Exception {
+    JsonNode invoice = createInvoice("IT-AR-005", "2030-01-19");
+    String id = invoice.get("id").asString();
+    long invoices = PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM ar_invoices");
+    long entries = PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM journal_entries");
+    long payments = PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM payments");
+
+    for (String user : new String[] {ALPHA_VIEWER, ALPHA_FOREIGN_ROLE}) {
+      mockMvc
+          .perform(
+              post("/api/v1/ar/invoices")
+                  .with(as(user))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(invoiceBody("IT-AR-REFUS-" + user.substring(32), "2030-01-19")))
+          .andExpect(status().isForbidden());
+      mockMvc
+          .perform(
+              post("/api/v1/ar/invoices/" + id + "/payments")
+                  .with(as(user))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"amount\":10.00}"))
+          .andExpect(status().isForbidden());
+      // Même société : la lecture et l'export restent ouverts.
+      mockMvc.perform(get("/api/v1/ar/invoices/" + id).with(as(user))).andExpect(status().isOk());
+      mockMvc.perform(get("/api/v1/ar/invoices/export").with(as(user))).andExpect(status().isOk());
+    }
+
+    assertThat(PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM ar_invoices"))
+        .isEqualTo(invoices);
+    assertThat(PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM journal_entries"))
+        .isEqualTo(entries);
+    assertThat(PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM payments"))
+        .isEqualTo(payments);
   }
 
   @Test

@@ -61,7 +61,8 @@ public class ArInvoiceController {
       summary = "Émettre une facture client",
       description =
           "Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période"
-              + " close, règle comptable) : aucun effet partiel.")
+              + " close, règle comptable) : aucun effet partiel. 403 sans rôle admin ou accountant dans"
+              + " la société courante.")
   public ResponseEntity<?> create(@RequestBody CreateArInvoice body) {
     String problem = body.problem();
     if (problem != null) {
@@ -76,7 +77,8 @@ public class ArInvoiceController {
       summary = "Enregistrer un encaissement",
       description =
           "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si"
-              + " l'encaissement est refusé (surpaiement, période close).")
+              + " l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou"
+              + " accountant dans la société courante.")
   public ResponseEntity<?> pay(@PathVariable UUID id, @RequestBody RecordArPayment body) {
     String problem = body.problem();
     if (problem != null) {
@@ -94,5 +96,11 @@ public class ArInvoiceController {
     LOG.warn("Opération AR refusée : {}", e.getMostSpecificCause().getMessage());
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "Opération refusée par les règles comptables"));
+  }
+
+  @ExceptionHandler(ArWriteForbidden.class)
+  public ResponseEntity<Map<String, String>> forbidden(ArWriteForbidden e) {
+    LOG.warn("Écriture AR refusée : rôle insuffisant");
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
   }
 }

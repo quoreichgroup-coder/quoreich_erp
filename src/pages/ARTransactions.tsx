@@ -20,6 +20,8 @@ import {
   useARInvoices, useCreateARInvoice, useRecordARPayment, useCustomers,
   type ARInvoice,
 } from "@/hooks/use-ar-data";
+import { apiDownloadCsv, isApiEnabled } from "@/api/client";
+import { exportToCSV } from "@/lib/csv-export";
 
 /* ──────── HELPERS ──────── */
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -271,6 +273,43 @@ export default function ARTransactions() {
     if (search && !inv.invoice_number.toLowerCase().includes(search.toLowerCase()) && !(inv.customer?.name || "").toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  // Avec l'API, l'export est celui du serveur (périmètre société garanti côté serveur, AR-REC) :
+  // il couvre toutes les factures visibles, pas seulement le filtre affiché. Sans API, on
+  // exporte les lignes filtrées déjà chargées.
+  const handleExport = async () => {
+    try {
+      if (isApiEnabled()) {
+        await apiDownloadCsv("/api/v1/ar/invoices/export", "factures-clients.csv");
+        return;
+      }
+      exportToCSV(
+        filtered.map((i) => ({
+          invoice_number: i.invoice_number,
+          customer: i.customer?.name ?? "",
+          invoice_date: i.invoice_date,
+          due_date: i.due_date,
+          total: i.total,
+          amount_paid: i.amount_paid,
+          balance: i.total - i.amount_paid,
+          status: i.status,
+        })),
+        [
+          { key: "invoice_number", header: "Numéro" },
+          { key: "customer", header: "Client" },
+          { key: "invoice_date", header: "Date" },
+          { key: "due_date", header: "Échéance" },
+          { key: "total", header: "Total TTC" },
+          { key: "amount_paid", header: "Encaissé" },
+          { key: "balance", header: "Solde" },
+          { key: "status", header: "Statut" },
+        ],
+        "factures-clients",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export impossible");
+    }
+  };
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);

@@ -44,10 +44,33 @@ public class ArInvoiceQuery {
             rs.getObject("journal_entry_id", UUID.class));
       };
 
+  /**
+   * Droit d'écriture AR : {@code admin} ou {@code accountant} <em>dans la société courante</em>.
+   *
+   * <p>Pourquoi le contrôle est ici et pas laissé à la base : {@code on_ar_invoice_posted} est
+   * {@code SECURITY DEFINER}, si bien que l'écriture comptable qu'il insère contourne
+   * {@code je_insert_accountant}, et {@code ar_invoices}/{@code payments} n'ont qu'une politique
+   * d'isolation société. Sans ce contrôle, un {@code viewer} émettrait facture et écriture. Les
+   * rôles retenus sont ceux que la base exige pour écrire une écriture à la main.
+   *
+   * <p>Plus strict que {@code has_role()}, qui ignore {@code user_roles.tenant_id} : un rôle
+   * détenu dans une autre société ne donne aucun droit ici.
+   */
+  private static final String CAN_WRITE =
+      "SELECT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = auth.uid()"
+          + " AND r.tenant_id = get_user_tenant_id(auth.uid())"
+          + " AND r.role IN ('admin', 'accountant'))";
+
   private final JdbcTemplate jdbc;
 
   public ArInvoiceQuery(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
+  }
+
+  private void requireWriter() {
+    if (!Boolean.TRUE.equals(jdbc.queryForObject(CAN_WRITE, Boolean.class))) {
+      throw new ArWriteForbidden();
+    }
   }
 
   @Transactional(readOnly = true)
@@ -73,6 +96,7 @@ public class ArInvoiceQuery {
    */
   @Transactional
   public ArInvoiceView create(CreateArInvoice in) {
+    requireWriter();
     UUID id =
         jdbc.queryForObject(
             "INSERT INTO ar_invoices (tenant_id, invoice_number, customer_id, invoice_date,"
@@ -90,12 +114,18 @@ public class ArInvoiceQuery {
     return findById(id).orElseThrow();
   }
 
-  /** Enregistre un encaissement ; vide si la facture n'est pas visible (autre société). */
+  /**
+   * Enregistre un encaissement ; vide si la facture n'est pas visible (autre société).
+   *
+   * <p>Visibilité avant droit : une autre société reçoit 404, pas 403, et n'apprend donc pas que
+   * la facture existe.
+   */
   @Transactional
   public Optional<ArInvoiceView> pay(UUID invoiceId, RecordArPayment in) {
     if (findById(invoiceId).isEmpty()) {
       return Optional.empty();
     }
+    requireWriter();
     jdbc.update(
         "INSERT INTO payments (tenant_id, payment_type, ar_invoice_id, amount, payment_date,"
             + " reference, payment_method, created_by) VALUES (get_user_tenant_id(auth.uid()),"
