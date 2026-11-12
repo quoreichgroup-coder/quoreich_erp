@@ -132,6 +132,18 @@ public final class PostgresFixture {
     }
   }
 
+  /**
+   * Applique le référentiel SYSCOHADA révisé à une société, en propriétaire, comme le fait
+   * l'administrateur via {@code apply_accounting_framework()}. Idempotent.
+   */
+  public static void applySyscohada(String databaseName, String tenantId) {
+    execute(
+        urlOf(databaseName),
+        "SELECT public.apply_accounting_framework_to('"
+            + tenantId
+            + "', 'SYSCOHADA_REVISE', NULL)");
+  }
+
   public static void execute(String url, String sql) {
     try (Connection connection = DriverManager.getConnection(url, ADMIN_USER, ADMIN_PASSWORD);
         Statement statement = connection.createStatement()) {

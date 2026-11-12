@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "17";
+  private static final String DERNIERE_MIGRATION = "18";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -68,6 +68,42 @@ class SchemaMigrationIT {
           "payments/trg_payment_gl_posting",
           "goods_receipts/trg_gr_completed",
           "journal_entries/trg_journal_entry_audit");
+
+  /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
+  private static final Set<String> TABLES_AJOUTEES =
+      Set.of(
+          "accounting_frameworks",
+          "accounting_framework_accounts",
+          "posting_roles",
+          "accounting_framework_role_defaults",
+          "tenant_accounting_settings",
+          "tenant_posting_accounts");
+
+  private static final Set<String> FONCTIONS_AJOUTEES =
+      Set.of(
+          "is_tenant_admin",
+          "posting_account",
+          "posting_roles_label",
+          "apply_accounting_framework_to",
+          "apply_accounting_framework");
+
+  private static final Set<String> POLITIQUES_AJOUTEES =
+      Set.of(
+          "accounting_frameworks/Lecture du référentiel",
+          "accounting_framework_accounts/Lecture du référentiel",
+          "posting_roles/Lecture du référentiel",
+          "accounting_framework_role_defaults/Lecture du référentiel",
+          "tenant_accounting_settings/Tenant isolation",
+          "tenant_posting_accounts/Tenant isolation",
+          "tenant_posting_accounts/Administrateur de la société");
+
+  /** Référence (manifeste du dump) plus les ajouts déclarés. */
+  private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
+    Set<String> attendu = new LinkedHashSet<>(reference);
+    assertThat(attendu).as("un ajout déclaré ne doit pas déjà exister dans le dump").doesNotContainAnyElementsOf(ajouts);
+    attendu.addAll(ajouts);
+    return attendu;
+  }
 
   @DynamicPropertySource
   static void proprietes(DynamicPropertyRegistry registry) {
@@ -120,7 +156,7 @@ class SchemaMigrationIT {
           AND c.relname <> ?
         """, TABLE_HISTORIQUE_FLYWAY));
 
-    memeEnsemble(MANIFESTE.colonne("tables_columns", 0), reconstruites, "tables");
+    memeEnsemble(avec(MANIFESTE.colonne("tables_columns", 0), TABLES_AJOUTEES), reconstruites, "tables");
   }
 
   @Test
@@ -133,7 +169,7 @@ class SchemaMigrationIT {
         """));
 
     Set<String> horsManifeste = new TreeSet<>(toutes);
-    horsManifeste.removeAll(MANIFESTE.colonne("tables_columns", 0));
+    horsManifeste.removeAll(avec(MANIFESTE.colonne("tables_columns", 0), TABLES_AJOUTEES));
 
     assertThat(horsManifeste)
         .as("toute autre table inattendue signalerait un objet créé hors des migrations du lot 0")
@@ -149,7 +185,7 @@ class SchemaMigrationIT {
         WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')
         """)), "vues");
 
-    memeEnsemble(MANIFESTE.colonne("functions", 0), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(MANIFESTE.colonne("functions", 0), FONCTIONS_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT DISTINCT p.proname FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
@@ -167,7 +203,7 @@ class SchemaMigrationIT {
         WHERE n.nspname = 'public' AND NOT t.tgisinternal
         """)), "déclencheurs");
 
-    memeEnsemble(MANIFESTE.cles("policies", 1, 2), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(MANIFESTE.cles("policies", 1, 2), POLITIQUES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT tablename || '/' || policyname FROM pg_policies WHERE schemaname = 'public'
         """)), "politiques RLS");
 
@@ -187,7 +223,7 @@ class SchemaMigrationIT {
   @Test
   @DisplayName("la RLS est active exactement sur les tables du manifeste, et FORCE est absent partout")
   void laRlsEstActiveSansEtreForceeSurLesProprietaires() {
-    memeEnsemble(MANIFESTE.tablesAvecRlsActive(), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(MANIFESTE.tablesAvecRlsActive(), TABLES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT c.relname FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relrowsecurity

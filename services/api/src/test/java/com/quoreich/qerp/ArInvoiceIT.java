@@ -48,18 +48,7 @@ class ArInvoiceIT {
   @BeforeEach
   void preparer() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
-    PostgresFixture.execute(
-        PostgresFixture.urlOf(DATABASE),
-        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) "
-            + "SELECT '"
-            + PostgresFixture.ALPHA_TENANT
-            + "', v.code, v.name, v.t FROM (VALUES "
-            + "('4110','Clients','asset'),('4000','Ventes','revenue'),('4310','TVA collectée','liability'),"
-            + "('5210','Banque','asset'))"
-            + " AS v(code,name,t) WHERE NOT EXISTS (SELECT 1 FROM gl_accounts g "
-            + "WHERE g.tenant_id = '"
-            + PostgresFixture.ALPHA_TENANT
-            + "' AND g.code = v.code)");
+    PostgresFixture.applySyscohada(DATABASE, PostgresFixture.ALPHA_TENANT);
     // Rôles : propres à ce test (le jeu de référence n'en porte aucun, et d'autres IT en
     // dépendent). ALPHA_VIEWER lit seulement ; ALPHA_FOREIGN_ROLE est comptable, mais dans Beta.
     PostgresFixture.execute(

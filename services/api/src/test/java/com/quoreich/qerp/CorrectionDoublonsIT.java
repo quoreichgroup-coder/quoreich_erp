@@ -44,12 +44,7 @@ class CorrectionDoublonsIT {
   void contrepasseLesDoublonsUneSeuleFois() throws Exception {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
     String a = PostgresFixture.ALPHA_TENANT;
-    admin(
-        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) SELECT '"
-            + a
-            + "', v.code, v.name, v.t FROM (VALUES ('4110','Clients','asset'),"
-            + " ('4000','Ventes','revenue'), ('4310','TVA collectée','liability'),"
-            + " ('5210','Banque','asset')) AS v(code, name, t)");
+    PostgresFixture.applySyscohada(DATABASE, a);
     recreerLeDefautPourUnPaiement();
 
     assertThat(rows("SELECT count(*) FROM journal_entries WHERE description = ?", RECU))
@@ -133,7 +128,7 @@ class CorrectionDoublonsIT {
   private static String soldeBanque() {
     return rows(
             "SELECT sum(l.debit - l.credit) FROM journal_lines l"
-                + " JOIN gl_accounts g ON g.id = l.account_id AND g.code = '5210'"
+                + " JOIN gl_accounts g ON g.id = l.account_id AND g.code = '521'"
                 + " JOIN journal_entries je ON je.id = l.entry_id"
                 + " WHERE g.tenant_id = '"
                 + PostgresFixture.ALPHA_TENANT

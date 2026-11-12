@@ -37,8 +37,8 @@ import tools.jackson.databind.ObjectMapper;
  * les mêmes triggers. Les deux chemins reçoivent les mêmes montants ; on compare ensuite, en
  * propriétaire, la facture, son écriture et les écritures d'encaissement, ligne à ligne par compte.
  *
- * <p>Contrairement à {@link ArInvoiceIT}, le compte 5210 (Banque) existe ici : c'est ce qui
- * déclenche la comptabilisation des encaissements, sans quoi elle n'est jamais exercée.
+ * <p>La société Alpha applique le référentiel SYSCOHADA révisé (V18) : les écritures portent donc
+ * les comptes 411, 701, 4431 et 521, résolus par rôle comptable et non plus codés en dur.
  *
  * <p>Les deux chemins écrivent dans la même base, migrée jusqu'à V16 : la parité porte sur la
  * logique (API contre INSERT direct), pas sur deux schémas.
@@ -63,17 +63,10 @@ class ArParityIT {
   void preparer() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
     String a = PostgresFixture.ALPHA_TENANT;
+    PostgresFixture.applySyscohada(DATABASE, a);
     PostgresFixture.execute(
         PostgresFixture.urlOf(DATABASE),
-        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) SELECT '"
-            + a
-            + "', v.code, v.name, v.t FROM (VALUES ('4110','Clients','asset'),"
-            + " ('4000','Ventes','revenue'), ('4310','TVA collectée','liability'),"
-            + " ('5210','Banque','asset')) AS v(code, name, t) WHERE NOT EXISTS"
-            + " (SELECT 1 FROM gl_accounts g WHERE g.tenant_id = '"
-            + a
-            + "' AND g.code = v.code);"
-            + "INSERT INTO auth.users (id) VALUES ('"
+        "INSERT INTO auth.users (id) VALUES ('"
             + ALPHA_VIEWER
             + "') ON CONFLICT DO NOTHING;"
             + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('"
@@ -255,7 +248,14 @@ class ArParityIT {
   void memeCycleMemesEcritures() throws Exception {
     String legacy = legacyCreate(PostgresFixture.ALPHA_USER, "PAR-HIST-001", "2030-01-15");
     String api = apiCreate("PAR-API-001", "2030-01-15");
-    assertThat(fingerprint(api, "REC-API-001")).isEqualTo(fingerprint(legacy, "REC-HIST-001"));
+    List<String> emise = fingerprint(api, "REC-API-001");
+    assertThat(emise).isEqualTo(fingerprint(legacy, "REC-HIST-001"));
+    // Comptes SYSCOHADA résolus par rôle : DR 411 TTC, CR 4431 TVA, CR 701 HT.
+    assertThat(emise.stream().filter(l -> l.startsWith("ecriture-facture")).toList())
+        .containsExactly(
+            "ecriture-facture | posted | ar_invoice | 2030-01-15 | 411 | 1180.00 | 0.00",
+            "ecriture-facture | posted | ar_invoice | 2030-01-15 | 4431 | 0.00 | 180.00",
+            "ecriture-facture | posted | ar_invoice | 2030-01-15 | 701 | 0.00 | 1000.00");
 
     legacyPay(legacy, "500.00", "REC-HIST-001-a");
     apiPay(api, "500.00", "REC-API-001-a");
@@ -350,7 +350,7 @@ class ArParityIT {
                         + " 180.00, 1180.00, get_user_tenant_id(auth.uid()), auth.uid(), 'sent', 0)",
                     customerBeta))
         .isInstanceOf(SQLException.class)
-        .hasMessageContaining("4110 Clients, 4000 Ventes, 4310 TVA collectée");
+        .hasMessageContaining("Compte clients (AR_RECEIVABLE), Ventes (SALES_REVENUE), TVA collectée (VAT_OUTPUT)");
     mockMvc
         .perform(
             post("/api/v1/ar/invoices")
@@ -365,19 +365,18 @@ class ArParityIT {
         .andExpect(
             jsonPath("$.error")
                 .value(
-                    "Plan comptable incomplet : compte(s) 4110 Clients, 4000 Ventes, 4310 TVA"
-                        + " collectée absent(s) ; la facture PAR-API-PLAN ne peut pas être émise"));
+                    "Paramétrage comptable incomplet : Compte clients (AR_RECEIVABLE), Ventes"
+                        + " (SALES_REVENUE), TVA collectée (VAT_OUTPUT) ; la facture PAR-API-PLAN ne"
+                        + " peut pas être émise"));
     assertThat(rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries"))
         .isEqualTo(avant);
 
-    // 2. Comptes de vente créés, mais pas la banque : la facture passe, l'encaissement est refusé.
+    // 2. Référentiel appliqué, mais le rôle Banque retiré : la facture passe, l'encaissement est
+    //    refusé.
+    PostgresFixture.applySyscohada(DATABASE, b);
     PostgresFixture.execute(
         PostgresFixture.urlOf(DATABASE),
-        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) SELECT '"
-            + b
-            + "', v.code, v.name, v.t FROM (VALUES ('4110','Clients','asset'),"
-            + " ('4000','Ventes','revenue'), ('4310','TVA collectée','liability'))"
-            + " AS v(code, name, t)");
+        "DELETE FROM tenant_posting_accounts WHERE tenant_id = '" + b + "' AND role_code = 'BANK'");
     String facture =
         asUser(
             PostgresFixture.BETA_USER,
@@ -402,7 +401,7 @@ class ArParityIT {
                         + " 'ar_receipt', auth.uid())",
                     facture))
         .isInstanceOf(SQLException.class)
-        .hasMessageContaining("5210 Banque");
+        .hasMessageContaining("Banque (BANK)");
     mockMvc
         .perform(
             post("/api/v1/ar/invoices/" + facture + "/payments")
@@ -410,7 +409,7 @@ class ArParityIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"amount\":100.00}"))
         .andExpect(status().is(422))
-        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("5210 Banque")));
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Banque (BANK)")));
     assertThat(
             rows(
                 "SELECT count(*)::text FROM payments UNION ALL SELECT count(*)::text FROM journal_entries"
