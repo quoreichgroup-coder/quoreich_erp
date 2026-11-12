@@ -4,6 +4,67 @@
  */
 
 export interface paths {
+    "/api/v1/analytics/values/{value}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Modifier une section (libellé, parent, validité, activation)
+         * @description Administrateur ou comptable. 422 si la hiérarchie devient circulaire.
+         */
+        put: operations["updateAnalyticValue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/axes/{axis}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Renommer, ordonner, activer ou désactiver un axe
+         * @description Administrateur de la société. Un axe désactivé n'est plus contrôlé ni imputé.
+         */
+        put: operations["updateAnalyticAxis"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/axes/{axis}/rules/{prefix}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rendre un axe obligatoire ou interdit sur une plage de comptes
+         * @description Administrateur de la société. Le préfixe le plus long l'emporte ; sans règle, l'axe est facultatif.
+         */
+        put: operations["setAnalyticRule"];
+        post?: never;
+        /** Retirer une règle analytique */
+        delete: operations["deleteAnalyticRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/posting-accounts/{role}": {
         parameters: {
             query?: never;
@@ -59,6 +120,46 @@ export interface paths {
          * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.
          */
         post: operations["recordArPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/axes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Créer un axe analytique
+         * @description Administrateur de la société. 409 si le code existe déjà.
+         */
+        post: operations["createAnalyticAxis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/axes/{axis}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Créer une section sur un axe
+         * @description Administrateur ou comptable. 409 si le code existe sur l'axe, 422 si le parent est sur un autre axe.
+         */
+        post: operations["createAnalyticValue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -160,6 +261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lire le paramétrage analytique de la société */
+        get: operations["getAnalyticsSetup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/setup": {
         parameters: {
             query?: never;
@@ -218,6 +336,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpdateAnalyticValue: {
+            name?: string;
+            /** Format: uuid */
+            parentId?: string;
+            /** Format: date */
+            validFrom?: string;
+            /** Format: date */
+            validTo?: string;
+            active?: boolean;
+        };
+        UpdateAnalyticAxis: {
+            name?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+            active?: boolean;
+        };
+        SetAnalyticRule: {
+            requirement?: string;
+        };
         AssignPostingAccount: {
             /** Format: uuid */
             glAccountId?: string;
@@ -239,6 +376,22 @@ export interface components {
             paymentDate?: string;
             reference?: string;
             paymentMethod?: string;
+        };
+        CreateAnalyticAxis: {
+            code?: string;
+            name?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+        };
+        CreateAnalyticValue: {
+            code?: string;
+            name?: string;
+            /** Format: uuid */
+            parentId?: string;
+            /** Format: date */
+            validFrom?: string;
+            /** Format: date */
+            validTo?: string;
         };
         ApplyFrameworkResult: {
             framework: string;
@@ -271,6 +424,43 @@ export interface components {
             status: string;
             /** Format: uuid */
             journalEntryId?: string;
+        };
+        AnalyticAxisView: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** Format: int32 */
+            sortOrder: number;
+            active: boolean;
+            values: components["schemas"]["AnalyticValueView"][];
+            rules: components["schemas"]["AnalyticRuleView"][];
+        };
+        AnalyticRuleView: {
+            /** @description Préfixe de numéro de compte : 7, 70, 701… */
+            accountPrefix: string;
+            /** @enum {string} */
+            requirement: "required" | "forbidden";
+        };
+        AnalyticValueView: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** Format: uuid */
+            parentId?: string;
+            /** Format: date */
+            validFrom?: string;
+            /** Format: date */
+            validTo?: string;
+            active: boolean;
+        };
+        AnalyticsSetupView: {
+            /** @description Administrateur : axes et règles */
+            canManageAxes: boolean;
+            /** @description Administrateur ou comptable : sections */
+            canManageValues: boolean;
+            axes: components["schemas"]["AnalyticAxisView"][];
         };
         AccountingFrameworkView: {
             code: string;
@@ -318,6 +508,196 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    updateAnalyticValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                value: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAnalyticValue"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateAnalyticAxis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                axis: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAnalyticAxis"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setAnalyticRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                axis: string;
+                prefix: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetAnalyticRule"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteAnalyticRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                axis: string;
+                prefix: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSetupView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     assignPostingAccount: {
         parameters: {
             query?: never;
@@ -466,6 +846,100 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordArPayment"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createAnalyticAxis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAnalyticAxis"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createAnalyticValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                axis: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAnalyticValue"];
             };
         };
         responses: {
@@ -692,6 +1166,48 @@ export interface operations {
                 };
                 content: {
                     "text/csv;charset=UTF-8": string;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAnalyticsSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSetupView"];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

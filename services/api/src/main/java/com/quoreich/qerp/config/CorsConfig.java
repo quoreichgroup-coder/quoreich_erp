@@ -26,7 +26,7 @@ public class CorsConfig {
         Arrays.stream(allowedOrigins.split(",")).map(String::trim).filter(o -> !o.isEmpty()).toList();
     CorsConfiguration cors = new CorsConfiguration();
     cors.setAllowedOrigins(origins);
-    cors.setAllowedMethods(List.of("GET", "POST", "PUT", "OPTIONS"));
+    cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id"));
     cors.setExposedHeaders(List.of("Content-Disposition", "X-Correlation-Id"));
     cors.setAllowCredentials(false);

@@ -95,8 +95,8 @@ public class ArInvoiceController {
   /**
    * Refus de la base.
    *
-   * <p>Par défaut, message générique : le détail SQL ne sort pas du serveur. Seule exception, le
-   * code {@code QG001} (plan comptable incomplet, V17) : son message est rédigé par le schéma, ne
+   * <p>Par défaut, message générique : le détail SQL ne sort pas du serveur. Seules exceptions, les
+   * codes {@code QG001} (paramétrage comptable incomplet) et {@code QG002} (imputation analytique) : son message est rédigé par le schéma, ne
    * contient que des codes de comptes, et c'est précisément ce que l'utilisateur doit lire pour
    * corriger — comme le « détermination de compte impossible » de SAP. 422 et non 409 : la requête
    * est bien formée, mais le paramétrage de la société ne permet pas de la traiter.
@@ -105,7 +105,7 @@ public class ArInvoiceController {
   public ResponseEntity<Map<String, String>> refused(DataAccessException e) {
     LOG.warn("Opération AR refusée : {}", e.getMostSpecificCause().getMessage());
     for (Throwable t = e; t != null; t = t.getCause()) {
-      if (t instanceof SQLException sql && PLAN_INCOMPLET.equals(sql.getSQLState())) {
+      if (t instanceof SQLException sql && REFUS_METIER.contains(sql.getSQLState())) {
         return ResponseEntity.status(422).body(Map.of("error", premiereLigne(sql)));
       }
     }
@@ -113,7 +113,8 @@ public class ArInvoiceController {
         .body(Map.of("error", "Opération refusée par les règles comptables"));
   }
 
-  private static final String PLAN_INCOMPLET = "QG001";
+  /** QG001 : paramétrage comptable incomplet (V17, V18) ; QG002 : imputation analytique (V19). */
+  private static final java.util.Set<String> REFUS_METIER = java.util.Set.of("QG001", "QG002");
 
   /** « ERROR: message\n  Hint: … » → « message » (préfixe de sévérité éventuellement localisé). */
   private static String premiereLigne(SQLException e) {

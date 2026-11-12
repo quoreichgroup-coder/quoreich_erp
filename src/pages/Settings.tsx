@@ -10,8 +10,10 @@ import {
   CalendarDays, BookOpen, Receipt, CreditCard, GitBranch, Users, ShieldCheck,
   Plus, Pencil, Search, ChevronDown, ChevronRight, Trash2, Check, X,
   Clock, AlertTriangle, ArrowUp, Eye, FileText, Download, Play, UserMinus, RefreshCw,
-  Zap, Shield, Hash, Bot,
+  Zap, Shield, Hash, Bot, Landmark, Layers,
 } from "lucide-react";
+import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
 import { AiSchedulesSettings } from "@/components/AiSchedulesSettings";
 import { ProcurementRolesPanel } from "@/components/ProcurementRolesPanel";
 import { SalesRolesPanel } from "@/components/SalesRolesPanel";
@@ -28,6 +30,8 @@ import {
 const tabs = [
   { id: "fiscal", label: "Fiscal Years", icon: CalendarDays },
   { id: "accounts", label: "Chart of Accounts", icon: BookOpen },
+  { id: "posting", label: "Comptabilisation", icon: Landmark },
+  { id: "analytics", label: "Analytique", icon: Layers },
   { id: "tax", label: "Tax Configuration", icon: Receipt },
   { id: "payment", label: "Payment Terms", icon: CreditCard },
   { id: "workflow", label: "Workflow Engine", icon: GitBranch },
@@ -358,6 +362,10 @@ const Settings = () => {
           )}
 
           {/* ── Chart of Accounts ── */}
+          {activeTab === "posting" && <div className="max-w-4xl"><PostingAccountsPanel /></div>}
+
+          {activeTab === "analytics" && <div className="max-w-5xl"><AnalyticAxesPanel /></div>}
+
           {activeTab === "accounts" && (
             <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

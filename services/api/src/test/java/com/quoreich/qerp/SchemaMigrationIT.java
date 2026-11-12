@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "19";
+  private static final String DERNIERE_MIGRATION = "20";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -96,7 +96,8 @@ class SchemaMigrationIT {
           "tenant_has_any_role",
           "guard_journal_line_analytics",
           "guard_ar_invoice_analytics",
-          "enforce_analytics");
+          "enforce_analytics",
+          "guard_analytic_value_hierarchy");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -125,7 +126,8 @@ class SchemaMigrationIT {
       Set.of(
           "journal_entries/trg_enforce_analytics",
           "journal_line_analytics/trg_guard_journal_line_analytics",
-          "ar_invoice_analytics/trg_guard_ar_invoice_analytics");
+          "ar_invoice_analytics/trg_guard_ar_invoice_analytics",
+          "analytic_values/trg_guard_analytic_value_hierarchy");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {

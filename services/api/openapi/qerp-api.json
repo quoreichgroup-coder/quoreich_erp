@@ -16,6 +16,9 @@
     "bearerAuth" : [ ]
   } ],
   "tags" : [ {
+    "name" : "Analytique",
+    "description" : "Axes, sections et règles analytiques de la société du porteur"
+  }, {
     "name" : "Paramétrage comptable",
     "description" : "Référentiel et comptes de comptabilisation de la société du porteur"
   }, {
@@ -26,6 +29,267 @@
     "description" : "Factures et encaissements AR de la société du porteur"
   } ],
   "paths" : {
+    "/api/v1/analytics/values/{value}" : {
+      "put" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Modifier une section (libellé, parent, validité, activation)",
+        "description" : "Administrateur ou comptable. 422 si la hiérarchie devient circulaire.",
+        "operationId" : "updateAnalyticValue",
+        "parameters" : [ {
+          "name" : "value",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateAnalyticValue"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/axes/{axis}" : {
+      "put" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Renommer, ordonner, activer ou désactiver un axe",
+        "description" : "Administrateur de la société. Un axe désactivé n'est plus contrôlé ni imputé.",
+        "operationId" : "updateAnalyticAxis",
+        "parameters" : [ {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateAnalyticAxis"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/axes/{axis}/rules/{prefix}" : {
+      "put" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Rendre un axe obligatoire ou interdit sur une plage de comptes",
+        "description" : "Administrateur de la société. Le préfixe le plus long l'emporte ; sans règle, l'axe est facultatif.",
+        "operationId" : "setAnalyticRule",
+        "parameters" : [ {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "prefix",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetAnalyticRule"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Retirer une règle analytique",
+        "operationId" : "deleteAnalyticRule",
+        "parameters" : [ {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "prefix",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalyticsSetupView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/posting-accounts/{role}" : {
       "put" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -212,6 +476,127 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/RecordArPayment"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/axes" : {
+      "post" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Créer un axe analytique",
+        "description" : "Administrateur de la société. 409 si le code existe déjà.",
+        "operationId" : "createAnalyticAxis",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAnalyticAxis"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/axes/{axis}/values" : {
+      "post" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Créer une section sur un axe",
+        "description" : "Administrateur ou comptable. 409 si le code existe sur l'axe, 422 si le parent est sur un autre axe.",
+        "operationId" : "createAnalyticValue",
+        "parameters" : [ {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAnalyticValue"
               }
             }
           },
@@ -507,6 +892,51 @@
         }
       }
     },
+    "/api/v1/analytics" : {
+      "get" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Lire le paramétrage analytique de la société",
+        "operationId" : "getAnalyticsSetup",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalyticsSetupView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/setup" : {
       "get" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -652,6 +1082,52 @@
   },
   "components" : {
     "schemas" : {
+      "UpdateAnalyticValue" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "validFrom" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "validTo" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "UpdateAnalyticAxis" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SetAnalyticRule" : {
+        "type" : "object",
+        "properties" : {
+          "requirement" : {
+            "type" : "string"
+          }
+        }
+      },
       "AssignPostingAccount" : {
         "type" : "object",
         "properties" : {
@@ -702,6 +1178,44 @@
           },
           "paymentMethod" : {
             "type" : "string"
+          }
+        }
+      },
+      "CreateAnalyticAxis" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "CreateAnalyticValue" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "validFrom" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "validTo" : {
+            "type" : "string",
+            "format" : "date"
           }
         }
       },
@@ -784,6 +1298,106 @@
           }
         },
         "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]
+      },
+      "AnalyticAxisView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "active" : {
+            "type" : "boolean"
+          },
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AnalyticValueView"
+            }
+          },
+          "rules" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AnalyticRuleView"
+            }
+          }
+        },
+        "required" : [ "active", "code", "id", "name", "rules", "sortOrder", "values" ]
+      },
+      "AnalyticRuleView" : {
+        "type" : "object",
+        "properties" : {
+          "accountPrefix" : {
+            "type" : "string",
+            "description" : "Préfixe de numéro de compte : 7, 70, 701…"
+          },
+          "requirement" : {
+            "type" : "string",
+            "enum" : [ "required", "forbidden" ]
+          }
+        },
+        "required" : [ "accountPrefix", "requirement" ]
+      },
+      "AnalyticValueView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "validFrom" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "validTo" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "active", "code", "id", "name" ]
+      },
+      "AnalyticsSetupView" : {
+        "type" : "object",
+        "properties" : {
+          "canManageAxes" : {
+            "type" : "boolean",
+            "description" : "Administrateur : axes et règles"
+          },
+          "canManageValues" : {
+            "type" : "boolean",
+            "description" : "Administrateur ou comptable : sections"
+          },
+          "axes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AnalyticAxisView"
+            }
+          }
+        },
+        "required" : [ "axes", "canManageAxes", "canManageValues" ]
       },
       "AccountingFrameworkView" : {
         "type" : "object",

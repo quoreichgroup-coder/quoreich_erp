@@ -272,6 +272,19 @@ class AxesAnalytiquesIT {
         .hasMessageContaining("journal_line_analytics_value_id_axis_id_fkey");
   }
 
+  @Test
+  @DisplayName("hiérarchie : une boucle A → B → A est refusée par la base elle-même (V20)")
+  void hierarchieSansBoucle() {
+    String a = UUID.randomUUID().toString();
+    String b = UUID.randomUUID().toString();
+    owner("INSERT INTO analytic_values (id, tenant_id, axis_id, code, name) VALUES ('" + a + "', '" + A
+        + "', '" + DEPT + "', 'H-" + a.substring(0, 6) + "', 'Parent');"
+        + "INSERT INTO analytic_values (id, tenant_id, axis_id, code, name, parent_id) VALUES ('" + b
+        + "', '" + A + "', '" + DEPT + "', 'H-" + b.substring(0, 6) + "', 'Enfant', '" + a + "')");
+    assertThatThrownBy(() -> owner("UPDATE analytic_values SET parent_id = '" + b + "' WHERE id = '" + a + "'"))
+        .hasMessageContaining("Hiérarchie circulaire");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {

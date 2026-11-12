@@ -42,7 +42,14 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
 
   const response = await fetch(`${apiBaseUrl()}${path}`, { ...init, headers });
   if (!response.ok) {
-    let message = `Erreur ${response.status}`;
+    // Message par défaut quand le serveur n'en donne pas (401 et 403 de la couche sécurité
+    // arrivent sans corps) : dire à l'utilisateur quoi faire, pas seulement le code.
+    let message =
+      response.status === 401
+        ? "Session non reconnue par le serveur : reconnectez-vous"
+        : response.status === 403
+          ? "Accès refusé : droits insuffisants dans la société courante"
+          : `Erreur ${response.status}`;
     try {
       const body = (await response.json()) as { error?: string };
       if (body.error) message = body.error;
@@ -64,6 +71,10 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return (await authorizedFetch(path, { method: "PUT", body: JSON.stringify(body) })).json() as Promise<T>;
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  return (await authorizedFetch(path, { method: "DELETE" })).json() as Promise<T>;
 }
 
 /** Télécharge un CSV servi par l'API (avec jeton : un simple lien `<a href>` n'en porte pas). */

@@ -60,7 +60,10 @@ public final class PostgresFixture {
         new PostgreSQLContainer(DockerImageName.parse("postgres:18.6-alpine"))
             .withDatabaseName("qerp_bootstrap")
             .withUsername(ADMIN_USER)
-            .withPassword(ADMIN_PASSWORD);
+            .withPassword(ADMIN_PASSWORD)
+            // Marge au-delà des 100 connexions par défaut : chaque classe d'IT garde son
+            // contexte Spring en cache, donc son pool, jusqu'à la fin du lancement.
+            .withCommand("postgres", "-c", "max_connections=200");
     container.start();
     Runtime.getRuntime().addShutdownHook(new Thread(container::stop, "qerp-postgres-stop"));
     CONTAINER = container;
@@ -83,6 +86,12 @@ public final class PostgresFixture {
     registry.add("spring.datasource.url", () -> urlOf(databaseName));
     registry.add("spring.datasource.username", () -> API_USER);
     registry.add("spring.datasource.password", () -> API_PASSWORD);
+    // Pool réduit : les tests s'exécutent un par un, et le cache de contextes de Spring
+    // garde un pool par classe d'IT. À 10 connexions par pool (défaut de l'application),
+    // 13 classes épuisaient les 100 connexions du conteneur : « remaining connection
+    // slots are reserved for roles with the SUPERUSER attribute ».
+    registry.add("spring.datasource.hikari.maximum-pool-size", () -> 3);
+    registry.add("spring.datasource.hikari.minimum-idle", () -> 1);
     // Les migrations : rôle propriétaire, distinct. Spring Boot fabrique pour
     // Flyway une seconde source de données à partir de ces trois propriétés.
     registry.add("spring.flyway.url", () -> urlOf(databaseName));
