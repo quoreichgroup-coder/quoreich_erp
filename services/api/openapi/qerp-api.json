@@ -426,6 +426,71 @@
         }
       }
     },
+    "/api/v1/accounting/tax-codes/{id}" : {
+      "put" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Renommer, activer ou désactiver un code TVA, ou changer son compte",
+        "description" : "Administrateur de la société. Le code et le taux ne se modifient pas.",
+        "operationId" : "updateTaxCode",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateTaxCode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/posting-accounts/{role}" : {
       "put" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -778,6 +843,108 @@
         }
       }
     },
+    "/api/v1/accounting/tax-codes" : {
+      "get" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Lister les codes TVA de la société",
+        "operationId" : "listTaxCodes",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/TaxCodeView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Créer un code TVA",
+        "description" : "Administrateur de la société. Le taux est figé après création. 409 si le code existe.",
+        "operationId" : "createTaxCode",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateTaxCode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/frameworks/{code}/apply" : {
       "post" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -949,6 +1116,64 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ArInvoiceView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ar/invoices/{id}/lines" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Lire les lignes d'une facture client",
+        "description" : "Liste vide pour une facture d'en-tête (sans ligne). 404 si la facture n'est pas visible.",
+        "operationId" : "listArInvoiceLines",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ArInvoiceLineView"
+                  }
                 }
               }
             }
@@ -1331,6 +1556,21 @@
           }
         }
       },
+      "UpdateTaxCode" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          },
+          "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "AssignPostingAccount" : {
         "type" : "object",
         "properties" : {
@@ -1369,6 +1609,12 @@
             "items" : {
               "$ref" : "#/components/schemas/InvoiceAnalytic"
             }
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InvoiceLine"
+            }
           }
         }
       },
@@ -1385,6 +1631,34 @@
           }
         },
         "required" : [ "axisId", "valueId" ]
+      },
+      "InvoiceLine" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "quantity" : {
+            "type" : "number"
+          },
+          "unitPrice" : {
+            "type" : "number"
+          },
+          "discountPct" : {
+            "type" : "number",
+            "description" : "Remise en %, 0 par défaut"
+          },
+          "taxCodeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "revenueAccountId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Compte de vente propre ; sinon le rôle Ventes"
+          }
+        },
+        "required" : [ "description", "quantity", "unitPrice" ]
       },
       "RecordArPayment" : {
         "type" : "object",
@@ -1439,6 +1713,24 @@
           "validTo" : {
             "type" : "string",
             "format" : "date"
+          }
+        }
+      },
+      "CreateTaxCode" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "number"
+          },
+          "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },
@@ -1521,6 +1813,37 @@
           }
         },
         "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]
+      },
+      "ArInvoiceLineView" : {
+        "type" : "object",
+        "properties" : {
+          "lineNo" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "quantity" : {
+            "type" : "number"
+          },
+          "unitPrice" : {
+            "type" : "number"
+          },
+          "discountPct" : {
+            "type" : "number"
+          },
+          "taxCode" : {
+            "type" : "string"
+          },
+          "netAmount" : {
+            "type" : "number"
+          },
+          "taxAmount" : {
+            "type" : "number"
+          }
+        },
+        "required" : [ "description", "discountPct", "lineNo", "netAmount", "quantity", "taxAmount", "unitPrice" ]
       },
       "AnalyticAxisView" : {
         "type" : "object",
@@ -1635,6 +1958,37 @@
           }
         },
         "required" : [ "axisId", "valueId" ]
+      },
+      "TaxCodeView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "number",
+            "description" : "Taux en pourcentage, ex. 18.00"
+          },
+          "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Compte de TVA propre ; sinon le rôle TVA collectée"
+          },
+          "accountCode" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "active", "code", "id", "name", "rate" ]
       },
       "AccountingFrameworkView" : {
         "type" : "object",

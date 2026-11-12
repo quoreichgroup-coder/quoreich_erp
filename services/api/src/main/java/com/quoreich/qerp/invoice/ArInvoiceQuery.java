@@ -108,12 +108,32 @@ public class ArInvoiceQuery {
             in.customerId(),
             in.invoiceDate(),
             in.dueDate(),
-            in.subtotal(),
-            in.taxAmount());
+            // Avec des lignes, l'en-tête part de zéro : la base le recalcule à chaque ligne.
+            in.linesOrEmpty().isEmpty() ? in.subtotal() : java.math.BigDecimal.ZERO,
+            in.linesOrEmpty().isEmpty() ? in.taxAmount() : java.math.BigDecimal.ZERO);
     // Sections choisies : posées sur la facture encore en brouillon, lues par
     // on_ar_invoice_posted au passage à 'sent'. Une section d'un autre axe, ou d'une autre
     // société (invisible sous la RLS), est refusée ici avec un message clair ; une section
     // inactive l'est à la comptabilisation (QG002), qui connaît la date.
+    // Lignes (V21) : comptes et codes TVA contrôlés ici pour un message clair ; la base calcule
+    // les montants et met l'en-tête à jour (somme des lignes).
+    int lineNo = 1;
+    for (CreateArInvoice.InvoiceLine l : in.linesOrEmpty()) {
+      if (l.taxCodeId() != null
+          && !exists("SELECT EXISTS (SELECT 1 FROM tax_codes WHERE id = ? AND is_active)", l.taxCodeId())) {
+        throw new ArInvoiceUnprocessable("Code TVA inconnu ou inactif dans la société (ligne " + lineNo + ")");
+      }
+      if (l.revenueAccountId() != null
+          && !exists("SELECT EXISTS (SELECT 1 FROM gl_accounts WHERE id = ? AND is_active)", l.revenueAccountId())) {
+        throw new ArInvoiceUnprocessable("Compte de vente inconnu ou inactif dans la société (ligne " + lineNo + ")");
+      }
+      jdbc.update(
+          "INSERT INTO ar_invoice_lines (tenant_id, invoice_id, line_no, description, quantity, unit_price,"
+              + " discount_pct, tax_code_id, revenue_account_id) VALUES (get_user_tenant_id(auth.uid()),"
+              + " ?, ?, ?, ?, ?, COALESCE(?, 0), ?, ?)",
+          id, lineNo++, l.description().strip(), l.quantity(), l.unitPrice(), l.discountPct(),
+          l.taxCodeId(), l.revenueAccountId());
+    }
     for (CreateArInvoice.InvoiceAnalytic a : in.analyticsOrEmpty()) {
       Boolean ok =
           jdbc.queryForObject(
@@ -159,5 +179,32 @@ public class ArInvoiceQuery {
         in.reference(),
         in.paymentMethod());
     return findById(invoiceId);
+  }
+
+  private boolean exists(String sql, Object... args) {
+    return Boolean.TRUE.equals(jdbc.queryForObject(sql, Boolean.class, args));
+  }
+
+  public record ArInvoiceLineView(
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) int lineNo,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) String description,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal quantity,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal unitPrice,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal discountPct,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.NOT_REQUIRED) String taxCode,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal netAmount,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal taxAmount) {}
+
+  /** Lignes d'une facture visible ; vide si la facture n'en a pas (facture d'en-tête). */
+  @Transactional(readOnly = true)
+  public Optional<List<ArInvoiceLineView>> lines(UUID invoiceId) {
+    if (findById(invoiceId).isEmpty()) return Optional.empty();
+    return Optional.of(jdbc.query(
+        "SELECT l.line_no, l.description, l.quantity, l.unit_price, l.discount_pct, t.code, l.net_amount, l.tax_amount"
+            + " FROM ar_invoice_lines l LEFT JOIN tax_codes t ON t.id = l.tax_code_id"
+            + " WHERE l.invoice_id = ? ORDER BY l.line_no",
+        (rs, i) -> new ArInvoiceLineView(rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
+            rs.getBigDecimal(5), rs.getString(6), rs.getBigDecimal(7), rs.getBigDecimal(8)),
+        invoiceId));
   }
 }

@@ -56,6 +56,13 @@ public class ArInvoiceController {
     return query.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
   }
 
+  @GetMapping("/{id}/lines")
+  @Operation(operationId = "listArInvoiceLines", summary = "Lire les lignes d'une facture client",
+      description = "Liste vide pour une facture d'en-tête (sans ligne). 404 si la facture n'est pas visible.")
+  public ResponseEntity<List<ArInvoiceQuery.ArInvoiceLineView>> lines(@PathVariable UUID id) {
+    return query.lines(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+  }
+
   @PostMapping
   @Operation(
       operationId = "createArInvoice",

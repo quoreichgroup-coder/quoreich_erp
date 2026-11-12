@@ -86,6 +86,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/tax-codes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Renommer, activer ou désactiver un code TVA, ou changer son compte
+         * @description Administrateur de la société. Le code et le taux ne se modifient pas.
+         */
+        put: operations["updateTaxCode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/posting-accounts/{role}": {
         parameters: {
             query?: never;
@@ -187,6 +207,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/tax-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister les codes TVA de la société */
+        get: operations["listTaxCodes"];
+        put?: never;
+        /**
+         * Créer un code TVA
+         * @description Administrateur de la société. Le taux est figé après création. 409 si le code existe.
+         */
+        post: operations["createTaxCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/frameworks/{code}/apply": {
         parameters: {
             query?: never;
@@ -254,6 +295,26 @@ export interface paths {
         };
         /** Lire une facture client */
         get: operations["getArInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ar/invoices/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lire les lignes d'une facture client
+         * @description Liste vide pour une facture d'en-tête (sans ligne). 404 si la facture n'est pas visible.
+         */
+        get: operations["listArInvoiceLines"];
         put?: never;
         post?: never;
         delete?: never;
@@ -400,6 +461,12 @@ export interface components {
         SetAnalyticRule: {
             requirement?: string;
         };
+        UpdateTaxCode: {
+            name?: string;
+            active?: boolean;
+            /** Format: uuid */
+            glAccountId?: string;
+        };
         AssignPostingAccount: {
             /** Format: uuid */
             glAccountId?: string;
@@ -415,12 +482,27 @@ export interface components {
             subtotal?: number;
             taxAmount?: number;
             analytics?: components["schemas"]["InvoiceAnalytic"][];
+            lines?: components["schemas"]["InvoiceLine"][];
         };
         InvoiceAnalytic: {
             /** Format: uuid */
             axisId: string;
             /** Format: uuid */
             valueId: string;
+        };
+        InvoiceLine: {
+            description: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Remise en %, 0 par défaut */
+            discountPct?: number;
+            /** Format: uuid */
+            taxCodeId?: string;
+            /**
+             * Format: uuid
+             * @description Compte de vente propre ; sinon le rôle Ventes
+             */
+            revenueAccountId?: string;
         };
         RecordArPayment: {
             amount?: number;
@@ -444,6 +526,13 @@ export interface components {
             validFrom?: string;
             /** Format: date */
             validTo?: string;
+        };
+        CreateTaxCode: {
+            code?: string;
+            name?: string;
+            rate?: number;
+            /** Format: uuid */
+            glAccountId?: string;
         };
         ApplyFrameworkResult: {
             framework: string;
@@ -476,6 +565,17 @@ export interface components {
             status: string;
             /** Format: uuid */
             journalEntryId?: string;
+        };
+        ArInvoiceLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            description: string;
+            quantity: number;
+            unitPrice: number;
+            discountPct: number;
+            taxCode?: string;
+            netAmount: number;
+            taxAmount: number;
         };
         AnalyticAxisView: {
             /** Format: uuid */
@@ -519,6 +619,21 @@ export interface components {
             axisId: string;
             /** Format: uuid */
             valueId: string;
+        };
+        TaxCodeView: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** @description Taux en pourcentage, ex. 18.00 */
+            rate: number;
+            /**
+             * Format: uuid
+             * @description Compte de TVA propre ; sinon le rôle TVA collectée
+             */
+            glAccountId?: string;
+            accountCode?: string;
+            active: boolean;
         };
         AccountingFrameworkView: {
             code: string;
@@ -850,6 +965,54 @@ export interface operations {
             };
         };
     };
+    updateTaxCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaxCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     assignPostingAccount: {
         parameters: {
             query?: never;
@@ -1128,6 +1291,94 @@ export interface operations {
             };
         };
     };
+    listTaxCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCodeView"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createTaxCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     applyAccountingFramework: {
         parameters: {
             query?: never;
@@ -1276,6 +1527,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArInvoiceView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listArInvoiceLines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArInvoiceLineView"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

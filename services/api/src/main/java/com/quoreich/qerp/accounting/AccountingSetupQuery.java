@@ -144,6 +144,58 @@ public class AccountingSetupQuery {
     return setup();
   }
 
+  // ─── Codes TVA (V21) ───
+
+  @Transactional(readOnly = true)
+  public List<TaxCodeView> taxCodes() {
+    return jdbc.query(
+        "SELECT t.id, t.code, t.name, t.rate, t.gl_account_id, g.code AS account_code, t.is_active"
+            + " FROM tax_codes t LEFT JOIN gl_accounts g ON g.id = t.gl_account_id ORDER BY t.code",
+        (rs, i) ->
+            new TaxCodeView(
+                rs.getObject("id", UUID.class),
+                rs.getString("code"),
+                rs.getString("name"),
+                rs.getBigDecimal("rate"),
+                rs.getObject("gl_account_id", UUID.class),
+                rs.getString("account_code"),
+                rs.getBoolean("is_active")));
+  }
+
+  @Transactional
+  public List<TaxCodeView> createTaxCode(CreateTaxCode in) {
+    requireAdmin();
+    if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM tax_codes WHERE code = ?)", Boolean.class, in.code()))) {
+      throw new AccountingRefusal(HttpStatus.CONFLICT, "Un code TVA porte déjà le code " + in.code());
+    }
+    requireOwnAccount(in.glAccountId());
+    jdbc.update(
+        "INSERT INTO tax_codes (tenant_id, code, name, rate, gl_account_id)"
+            + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, ?, ?)",
+        in.code(), in.name().strip(), in.rate(), in.glAccountId());
+    return taxCodes();
+  }
+
+  @Transactional
+  public List<TaxCodeView> updateTaxCode(UUID id, UpdateTaxCode in) {
+    requireAdmin();
+    requireOwnAccount(in.glAccountId());
+    int n = jdbc.update(
+        "UPDATE tax_codes SET name = ?, is_active = ?, gl_account_id = ? WHERE id = ?",
+        in.name().strip(), in.active(), in.glAccountId(), id);
+    if (n == 0) throw new AccountingRefusal(HttpStatus.NOT_FOUND, "Code TVA introuvable");
+    return taxCodes();
+  }
+
+  /** Compte facultatif : s'il est donné, il doit être un compte actif du plan de la société. */
+  private void requireOwnAccount(UUID account) {
+    if (account == null) return;
+    List<Boolean> active = jdbc.query("SELECT is_active FROM gl_accounts WHERE id = ?", (rs, i) -> rs.getBoolean(1), account);
+    if (active.isEmpty() || !active.getFirst()) {
+      throw new AccountingRefusal(HttpStatus.valueOf(422), "Compte inconnu ou inactif dans le plan de la société");
+    }
+  }
+
   private boolean isAdmin() {
     return Boolean.TRUE.equals(jdbc.queryForObject("SELECT is_tenant_admin()", Boolean.class));
   }

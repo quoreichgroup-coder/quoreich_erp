@@ -89,6 +89,32 @@ public class AccountingSetupController {
     return ResponseEntity.ok(query.assign(role, body.glAccountId()));
   }
 
+  @GetMapping("/tax-codes")
+  @Operation(operationId = "listTaxCodes", summary = "Lister les codes TVA de la société")
+  public List<TaxCodeView> taxCodes() {
+    return query.taxCodes();
+  }
+
+  @PostMapping("/tax-codes")
+  @Operation(
+      operationId = "createTaxCode",
+      summary = "Créer un code TVA",
+      description = "Administrateur de la société. Le taux est figé après création. 409 si le code existe.")
+  public ResponseEntity<?> createTaxCode(@RequestBody CreateTaxCode body) {
+    if (body.problem() != null) return ResponseEntity.badRequest().body(Map.of("error", body.problem()));
+    return ResponseEntity.ok(query.createTaxCode(body));
+  }
+
+  @PutMapping("/tax-codes/{id}")
+  @Operation(
+      operationId = "updateTaxCode",
+      summary = "Renommer, activer ou désactiver un code TVA, ou changer son compte",
+      description = "Administrateur de la société. Le code et le taux ne se modifient pas.")
+  public ResponseEntity<?> updateTaxCode(@PathVariable java.util.UUID id, @RequestBody UpdateTaxCode body) {
+    if (body.problem() != null) return ResponseEntity.badRequest().body(Map.of("error", body.problem()));
+    return ResponseEntity.ok(query.updateTaxCode(id, body));
+  }
+
   @ExceptionHandler(AccountingRefusal.class)
   public ResponseEntity<Map<String, String>> refused(AccountingRefusal e) {
     LOG.warn("Paramétrage comptable refusé ({}) : {}", e.status().value(), e.getMessage());
