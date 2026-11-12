@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/accounting/posting-accounts/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Associer un compte à un rôle comptable
+         * @description 404 si le rôle est inconnu, 403 hors administrateur de la société, 422 si le compte n'appartient pas au plan de la société ou est inactif.
+         */
+        put: operations["assignPostingAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ar/invoices": {
         parameters: {
             query?: never;
@@ -39,6 +59,26 @@ export interface paths {
          * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.
          */
         post: operations["recordArPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/frameworks/{code}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Appliquer un référentiel à la société
+         * @description Crée les comptes absents du plan et associe les rôles non encore paramétrés ; ne remplace jamais un choix existant. Rejouable sans effet. 403 hors administrateur de la société, 404 si le référentiel est inconnu, 409 si la société en applique déjà un autre.
+         */
+        post: operations["applyAccountingFramework"];
         delete?: never;
         options?: never;
         head?: never;
@@ -120,10 +160,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lire le paramétrage comptable de la société
+         * @description Référentiel appliqué, droit de modification du porteur, et compte de chaque rôle.
+         */
+        get: operations["getAccountingSetup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/gl-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister les comptes du plan de la société */
+        get: operations["listGlAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/frameworks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister les référentiels comptables */
+        get: operations["listAccountingFrameworks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AssignPostingAccount: {
+            /** Format: uuid */
+            glAccountId?: string;
+        };
         CreateArInvoice: {
             invoiceNumber?: string;
             /** Format: uuid */
@@ -141,6 +239,13 @@ export interface components {
             paymentDate?: string;
             reference?: string;
             paymentMethod?: string;
+        };
+        ApplyFrameworkResult: {
+            framework: string;
+            /** Format: int32 */
+            accountsCreated: number;
+            /** Format: int32 */
+            rolesAssigned: number;
         };
         CustomerView: {
             /** Format: uuid */
@@ -167,6 +272,43 @@ export interface components {
             /** Format: uuid */
             journalEntryId?: string;
         };
+        AccountingFrameworkView: {
+            code: string;
+            name: string;
+            scope: string;
+            version: string;
+            /** @description Faux tant qu'un expert-comptable local n'a pas validé les numéros et intitulés */
+            validated: boolean;
+        };
+        AccountingSetupView: {
+            /** @description Référentiel appliqué ; absent si aucun ne l'a encore été */
+            framework?: components["schemas"]["AccountingFrameworkView"];
+            /** @description Vrai si le porteur est administrateur de la société courante */
+            canEdit: boolean;
+            /** @description Vrai si chaque rôle a un compte actif : aucune comptabilisation ne sera refusée pour paramétrage */
+            complete: boolean;
+            roles: components["schemas"]["PostingAccountView"][];
+        };
+        PostingAccountView: {
+            roleCode: string;
+            label: string;
+            module: string;
+            description: string;
+            /** Format: uuid */
+            glAccountId?: string;
+            accountCode?: string;
+            accountName?: string;
+            ready: boolean;
+            suggestedAccountCode?: string;
+        };
+        GlAccountOption: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            accountType: string;
+            active: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -176,6 +318,54 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    assignPostingAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignPostingAccount"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     listArInvoices: {
         parameters: {
             query?: never;
@@ -286,6 +476,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    applyAccountingFramework: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyFrameworkResult"];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */
@@ -458,6 +692,132 @@ export interface operations {
                 };
                 content: {
                     "text/csv;charset=UTF-8": string;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAccountingSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingSetupView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listGlAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccountOption"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listAccountingFrameworks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingFrameworkView"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

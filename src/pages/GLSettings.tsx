@@ -5,10 +5,12 @@ import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, BookOpen, Calendar, FileText, Globe } from "lucide-react";
+import { Settings, BookOpen, Calendar, FileText, Globe, Landmark } from "lucide-react";
+import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { cn } from "@/lib/utils";
 
 const tabs = [
+  { id: "posting", label: "Paramétrage comptable", icon: Landmark },
   { id: "general", label: "General", icon: Settings },
   { id: "journals", label: "Journal Types", icon: BookOpen },
   { id: "fiscal", label: "Fiscal Calendar", icon: Calendar },
@@ -33,7 +35,7 @@ const fiscalPeriods = [
 ];
 
 export default function GLSettings() {
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("posting");
 
   return (
     <PageShell>
@@ -54,6 +56,8 @@ export default function GLSettings() {
           </button>
         ))}
       </div>
+
+      {activeTab === "posting" && <div className="max-w-4xl"><PostingAccountsPanel /></div>}
 
       {activeTab === "general" && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">

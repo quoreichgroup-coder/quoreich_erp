@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, CreditCard, FileText, Bell, Calculator, Globe, BookOpen, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import {
   useARPaymentTerms, useUpsertARPaymentTerm,
   useARNumberingSeries, useUpdateARNumberingSeries,
@@ -18,7 +18,7 @@ import {
 
 const tabs = [
   { id: "general", label: "General", icon: Settings },
-  { id: "glposting", label: "GL Posting", icon: BookOpen },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "payment", label: "Payment Terms", icon: CreditCard },
   { id: "numbering", label: "Numbering", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -273,7 +273,7 @@ export default function ARSettings() {
         ))}
       </div>
       {activeTab === "general" && <GeneralTab />}
-      {activeTab === "glposting" && <div className="max-w-3xl"><GLPostingConfigPanel config={defaultGLPostingSettings.AR} /></div>}
+      {activeTab === "glposting" && <div className="max-w-4xl"><PostingAccountsPanel modules={["AR", "TRE"]} /></div>}
       {activeTab === "payment" && <PaymentTermsTab />}
       {activeTab === "numbering" && <NumberingTab />}
       {activeTab === "notifications" && <NotificationsTab />}

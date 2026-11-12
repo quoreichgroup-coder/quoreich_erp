@@ -16,6 +16,9 @@
     "bearerAuth" : [ ]
   } ],
   "tags" : [ {
+    "name" : "Paramétrage comptable",
+    "description" : "Référentiel et comptes de comptabilisation de la société du porteur"
+  }, {
     "name" : "Clients",
     "description" : "Comptes clients de la société du porteur du jeton"
   }, {
@@ -23,6 +26,70 @@
     "description" : "Factures et encaissements AR de la société du porteur"
   } ],
   "paths" : {
+    "/api/v1/accounting/posting-accounts/{role}" : {
+      "put" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Associer un compte à un rôle comptable",
+        "description" : "404 si le rôle est inconnu, 403 hors administrateur de la société, 422 si le compte n'appartient pas au plan de la société ou est inactif.",
+        "operationId" : "assignPostingAccount",
+        "parameters" : [ {
+          "name" : "role",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignPostingAccount"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ar/invoices" : {
       "get" : {
         "tags" : [ "Factures clients" ],
@@ -157,6 +224,60 @@
               "application/json" : {
                 "schema" : {
                   "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounting/frameworks/{code}/apply" : {
+      "post" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Appliquer un référentiel à la société",
+        "description" : "Crée les comptes absents du plan et associe les rôles non encore paramétrés ; ne remplace jamais un choix existant. Rejouable sans effet. 403 hors administrateur de la société, 404 si le référentiel est inconnu, 409 si la société en applique déjà un autre.",
+        "operationId" : "applyAccountingFramework",
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApplyFrameworkResult"
                 }
               }
             }
@@ -385,10 +506,161 @@
           }
         }
       }
+    },
+    "/api/v1/accounting/setup" : {
+      "get" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Lire le paramétrage comptable de la société",
+        "description" : "Référentiel appliqué, droit de modification du porteur, et compte de chaque rôle.",
+        "operationId" : "getAccountingSetup",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountingSetupView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounting/gl-accounts" : {
+      "get" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Lister les comptes du plan de la société",
+        "operationId" : "listGlAccounts",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/GlAccountOption"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounting/frameworks" : {
+      "get" : {
+        "tags" : [ "Paramétrage comptable" ],
+        "summary" : "Lister les référentiels comptables",
+        "operationId" : "listAccountingFrameworks",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AccountingFrameworkView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
     "schemas" : {
+      "AssignPostingAccount" : {
+        "type" : "object",
+        "properties" : {
+          "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "CreateArInvoice" : {
         "type" : "object",
         "properties" : {
@@ -432,6 +704,23 @@
             "type" : "string"
           }
         }
+      },
+      "ApplyFrameworkResult" : {
+        "type" : "object",
+        "properties" : {
+          "framework" : {
+            "type" : "string"
+          },
+          "accountsCreated" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rolesAssigned" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "accountsCreated", "framework", "rolesAssigned" ]
       },
       "CustomerView" : {
         "type" : "object",
@@ -495,6 +784,108 @@
           }
         },
         "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]
+      },
+      "AccountingFrameworkView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "scope" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "validated" : {
+            "type" : "boolean",
+            "description" : "Faux tant qu'un expert-comptable local n'a pas validé les numéros et intitulés"
+          }
+        },
+        "required" : [ "code", "name", "scope", "validated", "version" ]
+      },
+      "AccountingSetupView" : {
+        "type" : "object",
+        "properties" : {
+          "framework" : {
+            "$ref" : "#/components/schemas/AccountingFrameworkView",
+            "description" : "Référentiel appliqué ; absent si aucun ne l'a encore été"
+          },
+          "canEdit" : {
+            "type" : "boolean",
+            "description" : "Vrai si le porteur est administrateur de la société courante"
+          },
+          "complete" : {
+            "type" : "boolean",
+            "description" : "Vrai si chaque rôle a un compte actif : aucune comptabilisation ne sera refusée pour paramétrage"
+          },
+          "roles" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PostingAccountView"
+            }
+          }
+        },
+        "required" : [ "canEdit", "complete", "roles" ]
+      },
+      "PostingAccountView" : {
+        "type" : "object",
+        "properties" : {
+          "roleCode" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "module" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountCode" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "ready" : {
+            "type" : "boolean"
+          },
+          "suggestedAccountCode" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "description", "label", "module", "ready", "roleCode" ]
+      },
+      "GlAccountOption" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "accountType" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "accountType", "active", "code", "id", "name" ]
       }
     },
     "securitySchemes" : {

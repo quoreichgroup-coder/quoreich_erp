@@ -62,6 +62,10 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return (await authorizedFetch(path, { method: "POST", body: JSON.stringify(body) })).json() as Promise<T>;
 }
 
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return (await authorizedFetch(path, { method: "PUT", body: JSON.stringify(body) })).json() as Promise<T>;
+}
+
 /** Télécharge un CSV servi par l'API (avec jeton : un simple lien `<a href>` n'en porte pas). */
 export async function apiDownloadCsv(path: string, filename: string): Promise<void> {
   const blob = await (await authorizedFetch(path)).blob();
