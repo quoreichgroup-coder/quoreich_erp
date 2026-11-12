@@ -22,6 +22,7 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V16__suppression_declencheurs_en_double.sql` | écrit à la main | retire 4 déclencheurs qui réexécutaient une fonction déjà branchée (paiements ×3, réceptions ×2, audit ×2) |
 | `V17__comptabilisation_ar_refus_si_plan_incomplet.sql` | écrit à la main | facture émise et encaissement/paiement refusés (`QG001`) si un compte du plan manque, au lieu d'être acceptés sans écriture |
 | `V18__parametrage_comptable.sql` | écrit à la main | référentiels comptables (SYSCOHADA révisé), rôles comptables, comptes par société ; la comptabilisation AR ne cite plus aucun numéro de compte |
+| `V19__axes_analytiques.sql` | écrit à la main | axes analytiques par société (sections datées, règles obligatoire/interdit par préfixe de compte, défauts par client, imputation des lignes), contrôle `QG002` à la comptabilisation, contre-passation qui recopie l'analytique |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des

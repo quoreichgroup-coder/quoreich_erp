@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "18";
+  private static final String DERNIERE_MIGRATION = "19";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -77,7 +77,14 @@ class SchemaMigrationIT {
           "posting_roles",
           "accounting_framework_role_defaults",
           "tenant_accounting_settings",
-          "tenant_posting_accounts");
+          "tenant_posting_accounts",
+          // V19 — axes analytiques.
+          "analytic_axes",
+          "analytic_values",
+          "analytic_rules",
+          "analytic_defaults",
+          "ar_invoice_analytics",
+          "journal_line_analytics");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -85,7 +92,11 @@ class SchemaMigrationIT {
           "posting_account",
           "posting_roles_label",
           "apply_accounting_framework_to",
-          "apply_accounting_framework");
+          "apply_accounting_framework",
+          "tenant_has_any_role",
+          "guard_journal_line_analytics",
+          "guard_ar_invoice_analytics",
+          "enforce_analytics");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -95,7 +106,26 @@ class SchemaMigrationIT {
           "accounting_framework_role_defaults/Lecture du référentiel",
           "tenant_accounting_settings/Tenant isolation",
           "tenant_posting_accounts/Tenant isolation",
-          "tenant_posting_accounts/Administrateur de la société");
+          "tenant_posting_accounts/Administrateur de la société",
+          "analytic_axes/Tenant isolation",
+          "analytic_axes/Administrateur de la société",
+          "analytic_rules/Tenant isolation",
+          "analytic_rules/Administrateur de la société",
+          "analytic_values/Tenant isolation",
+          "analytic_values/Gestion comptable",
+          "analytic_defaults/Tenant isolation",
+          "analytic_defaults/Gestion comptable",
+          "ar_invoice_analytics/Tenant isolation",
+          "ar_invoice_analytics/Gestion comptable",
+          "journal_line_analytics/Tenant isolation",
+          "journal_line_analytics/Gestion comptable");
+
+  /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
+  private static final Set<String> DECLENCHEURS_AJOUTES =
+      Set.of(
+          "journal_entries/trg_enforce_analytics",
+          "journal_line_analytics/trg_guard_journal_line_analytics",
+          "ar_invoice_analytics/trg_guard_ar_invoice_analytics");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
@@ -196,6 +226,7 @@ class SchemaMigrationIT {
         .as("chaque déclencheur déclaré retiré doit exister dans le manifeste de référence")
         .containsAll(DECLENCHEURS_RETIRES);
     declencheursAttendus.removeAll(DECLENCHEURS_RETIRES);
+    declencheursAttendus = avec(declencheursAttendus, DECLENCHEURS_AJOUTES);
     memeEnsemble(declencheursAttendus, new LinkedHashSet<>(noms("""
         SELECT c.relname || '/' || t.tgname FROM pg_trigger t
         JOIN pg_class c ON c.oid = t.tgrelid
