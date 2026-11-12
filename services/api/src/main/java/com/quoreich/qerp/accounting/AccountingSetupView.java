@@ -23,7 +23,8 @@ public record AccountingSetupView(
 
   static AccountingSetupView of(
       AccountingFrameworkView framework, boolean canEdit, List<PostingAccountView> roles) {
-    return new AccountingSetupView(
-        framework, canEdit, roles.stream().allMatch(PostingAccountView::ready), List.copyOf(roles));
+    // Aucun rôle lu n'est pas « tout est prêt » : allMatch sur une liste vide vaut vrai.
+    boolean complete = !roles.isEmpty() && roles.stream().allMatch(PostingAccountView::ready);
+    return new AccountingSetupView(framework, canEdit, complete, List.copyOf(roles));
   }
 }

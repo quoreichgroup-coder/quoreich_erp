@@ -66,7 +66,8 @@ export function buildAccountingSetup(input: {
   return {
     framework: input.framework ? toFramework(input.framework) : undefined,
     canEdit: input.canEdit,
-    complete: roles.every((r) => r.ready),
+    // Aucun rôle lu n'est pas « tout est prêt » : une liste vide ne prouve rien.
+    complete: roles.length > 0 && roles.every((r) => r.ready),
     roles,
   };
 }

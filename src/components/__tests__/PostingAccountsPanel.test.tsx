@@ -95,6 +95,13 @@ describe("PostingAccountsPanel", () => {
     expect(screen.getByTestId("posting-accounts-missing")).toHaveTextContent("1 rôle(s) à paramétrer : Compte clients.");
   });
 
+  it("aucun rôle lu : n'annonce jamais un paramétrage complet", () => {
+    mocks.setup = loaded({ canEdit: true, complete: false, roles: [] });
+    render(<PostingAccountsPanel />);
+    expect(screen.getByTestId("posting-accounts-no-roles")).toBeInTheDocument();
+    expect(screen.queryByTestId("posting-accounts-complete")).toBeNull();
+  });
+
   it("erreur de lecture : message visible et reprise manuelle", () => {
     const refetch = vi.fn();
     mocks.setup = { isLoading: false, isError: true, error: new Error("permission denied"), data: undefined, refetch };

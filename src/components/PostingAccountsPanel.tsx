@@ -70,7 +70,11 @@ export function PostingAccountsPanel({ modules }: { modules?: string[] }) {
         ) : null}
       </div>
 
-      {missing.length === 0 ? (
+      {roles.length === 0 ? (
+        <p className="flex items-center gap-1.5 text-xs text-destructive" role="status" data-testid="posting-accounts-no-roles">
+          <AlertTriangle className="w-4 h-4" /> Aucun rôle comptable n'a pu être lu : le paramétrage ne peut pas être vérifié.
+        </p>
+      ) : missing.length === 0 ? (
         <p className="flex items-center gap-1.5 text-xs text-success" data-testid="posting-accounts-complete">
           <CheckCircle2 className="w-4 h-4" /> Paramétrage complet : aucune comptabilisation ne sera refusée pour compte manquant.
         </p>

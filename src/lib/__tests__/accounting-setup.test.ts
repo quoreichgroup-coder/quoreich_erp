@@ -42,6 +42,11 @@ describe("paramétrage comptable — reconstitution de la vue de l'API", () => {
     expect(setup.roles.every((r) => r.glAccountId === undefined && r.suggestedAccountCode === undefined)).toBe(true);
   });
 
+  it("aucun rôle lu : le paramétrage n'est pas déclaré complet", () => {
+    const setup = buildAccountingSetup({ framework: null, canEdit: true, roles: [], mappings: [], accounts: [], defaults: [] });
+    expect(setup.complete).toBe(false);
+  });
+
   it("une correspondance vers un compte invisible (autre société) n'est pas prête", () => {
     const setup = buildAccountingSetup({
       framework: null, canEdit: true, roles: [roles[1]],
