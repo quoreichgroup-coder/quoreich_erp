@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -22,6 +22,10 @@ import {
 } from "@/hooks/use-ar-data";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
+import { AnalyticSelectors } from "@/components/AnalyticSelectors";
+import { useAnalyticsSetup, useCustomerAnalyticDefaults } from "@/hooks/use-analytics-setup";
+import { useAccountingSetup } from "@/hooks/use-accounting-setup";
+import { requiredAxisIds } from "@/lib/analytics-setup";
 
 /* ──────── HELPERS ──────── */
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -59,15 +63,37 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
   const tax = parseFloat(form.tax_amount) || 0;
   const total = subtotal + tax;
 
+  // Analytique : sections par défaut du client, puis choix de l'utilisateur (prioritaire).
+  const analyticsSetup = useAnalyticsSetup();
+  const accountingSetup = useAccountingSetup();
+  const customerDefaults = useCustomerAnalyticDefaults(form.customer_id || undefined);
+  const [analytics, setAnalytics] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    // Nouveau client : ses défauts remplacent ceux du précédent, sauf sur les axes déjà choisis à la main.
+    const defaults = Object.fromEntries((customerDefaults.data ?? []).map((d) => [d.axisId, d.valueId]));
+    setAnalytics((prev) => {
+      const next: Record<string, string> = { ...defaults };
+      for (const axis of touched) next[axis] = prev[axis] ?? "";
+      return next;
+    });
+  }, [customerDefaults.data, form.customer_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const salesAccount = accountingSetup.data?.roles.find((r) => r.roleCode === "SALES_REVENUE")?.accountCode;
+  const required = useMemo(() => requiredAxisIds(analyticsSetup.data, salesAccount), [analyticsSetup.data, salesAccount]);
+
   const handleCreate = async () => {
     if (!form.customer_id || subtotal <= 0) { toast.error("Remplissez tous les champs"); return; }
-    await createInvoice.mutateAsync({
-      ...form,
-      subtotal,
-      tax_amount: tax,
-      total,
-    });
-    onClose();
+    const missing = (analyticsSetup.data?.axes ?? []).filter((a) => required.has(a.id) && !analytics[a.id]);
+    if (missing.length > 0) {
+      toast.error(`Section obligatoire sur le compte de ventes ${salesAccount} : ${missing.map((a) => a.name).join(", ")}`);
+      return;
+    }
+    try {
+      await createInvoice.mutateAsync({ ...form, subtotal, tax_amount: tax, total, analytics });
+      onClose();
+    } catch {
+      /* le refus est déjà affiché par la mutation ; la saisie reste ouverte pour correction */
+    }
   };
 
   return (
@@ -108,6 +134,16 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
             <Label className="text-xs">TVA (XOF)</Label>
             <Input type="number" className="h-8 text-xs" value={form.tax_amount} onChange={e => setForm(f => ({ ...f, tax_amount: e.target.value }))} />
           </div>
+          <AnalyticSelectors
+            date={form.invoice_date}
+            value={analytics}
+            required={required}
+            idPrefix="invoice"
+            onChange={(axisId, valueId) => {
+              setTouched((t) => new Set(t).add(axisId));
+              setAnalytics((a) => ({ ...a, [axisId]: valueId }));
+            }}
+          />
           <div className="bg-muted/30 rounded p-3 text-xs">
             <div className="flex justify-between"><span>Sous-total</span><span className="tabular-nums">{fmtCurrency(subtotal)}</span></div>
             <div className="flex justify-between"><span>TVA</span><span className="tabular-nums">{fmtCurrency(tax)}</span></div>

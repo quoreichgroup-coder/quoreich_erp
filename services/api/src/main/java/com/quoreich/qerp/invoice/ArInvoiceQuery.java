@@ -110,6 +110,28 @@ public class ArInvoiceQuery {
             in.dueDate(),
             in.subtotal(),
             in.taxAmount());
+    // Sections choisies : posées sur la facture encore en brouillon, lues par
+    // on_ar_invoice_posted au passage à 'sent'. Une section d'un autre axe, ou d'une autre
+    // société (invisible sous la RLS), est refusée ici avec un message clair ; une section
+    // inactive l'est à la comptabilisation (QG002), qui connaît la date.
+    for (CreateArInvoice.InvoiceAnalytic a : in.analyticsOrEmpty()) {
+      Boolean ok =
+          jdbc.queryForObject(
+              "SELECT EXISTS (SELECT 1 FROM analytic_values v JOIN analytic_axes x ON x.id = v.axis_id"
+                  + " WHERE v.id = ? AND v.axis_id = ?)",
+              Boolean.class,
+              a.valueId(),
+              a.axisId());
+      if (!Boolean.TRUE.equals(ok)) {
+        throw new ArInvoiceUnprocessable("Section analytique inconnue pour cet axe dans la société");
+      }
+      jdbc.update(
+          "INSERT INTO ar_invoice_analytics (tenant_id, invoice_id, axis_id, value_id)"
+              + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, ?)",
+          id,
+          a.axisId(),
+          a.valueId());
+    }
     jdbc.update("UPDATE ar_invoices SET status = 'sent' WHERE id = ?", id);
     return findById(id).orElseThrow();
   }

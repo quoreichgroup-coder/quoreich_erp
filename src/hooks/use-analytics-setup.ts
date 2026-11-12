@@ -125,3 +125,44 @@ export function useDeleteAnalyticRule() {
     return checkTouched(db.from("analytic_rules").delete().eq("axis_id", r.axisId).eq("account_prefix", r.prefix).select("axis_id"));
   }, "Règle retirée");
 }
+
+// ─── Sections par défaut d'un client ───
+
+export interface CustomerAnalyticDefault { axisId: string; valueId: string }
+
+export function useCustomerAnalyticDefaults(customerId: string | undefined) {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["customer-analytic-defaults", tenantId, customerId, source()],
+    enabled: Boolean(tenantId && customerId),
+    retry: false,
+    queryFn: async (): Promise<CustomerAnalyticDefault[]> => {
+      if (isApiEnabled()) return apiGet<CustomerAnalyticDefault[]>(`/api/v1/analytics/customers/${customerId}/defaults`);
+      const rows = await check<{ axis_id: string; value_id: string }[]>(
+        db.from("analytic_defaults").select("axis_id, value_id").eq("customer_id", customerId),
+      );
+      return rows.map((r) => ({ axisId: r.axis_id, valueId: r.value_id }));
+    },
+  });
+}
+
+/** Pose (valueId) ou retire (valueId vide) la section par défaut d'un client sur un axe. */
+export function useSetCustomerAnalyticDefault() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ customerId, axisId, valueId }: { customerId: string; axisId: string; valueId?: string }) => {
+      const path = `/api/v1/analytics/customers/${customerId}/defaults/${axisId}`;
+      if (isApiEnabled()) return valueId ? apiPut(path, { valueId }) : apiDelete(path);
+      if (!valueId) return check(db.from("analytic_defaults").delete().eq("customer_id", customerId).eq("axis_id", axisId));
+      return check(db.from("analytic_defaults").upsert(
+        { tenant_id: await fetchTenantId(), customer_id: customerId, axis_id: axisId, value_id: valueId },
+        { onConflict: "customer_id,axis_id" },
+      ).select("axis_id"));
+    },
+    onSuccess: (_r, v) => {
+      qc.invalidateQueries({ queryKey: ["customer-analytic-defaults"] });
+      toast.success(v.valueId ? "Section par défaut enregistrée" : "Section par défaut retirée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}

@@ -2,6 +2,7 @@ package com.quoreich.qerp.analytics;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -93,6 +94,32 @@ public class AnalyticsController {
   @Operation(operationId = "deleteAnalyticRule", summary = "Retirer une règle analytique")
   public AnalyticsSetupView deleteRule(@PathVariable UUID axis, @PathVariable String prefix) {
     return query.deleteRule(axis, prefix);
+  }
+
+  @GetMapping("/customers/{customer}/defaults")
+  @Operation(
+      operationId = "listCustomerAnalyticDefaults",
+      summary = "Lire les sections par défaut d'un client",
+      description = "Reprises sur ses factures quand aucune section n'est choisie. 404 si le client n'est pas visible.")
+  public List<CustomerAnalyticDefault> customerDefaults(@PathVariable UUID customer) {
+    return query.customerDefaults(customer);
+  }
+
+  @PutMapping("/customers/{customer}/defaults/{axis}")
+  @Operation(
+      operationId = "setCustomerAnalyticDefault",
+      summary = "Définir la section par défaut d'un client sur un axe",
+      description = "Administrateur ou comptable. 422 si la section n'appartient pas à l'axe.")
+  public ResponseEntity<?> setCustomerDefault(
+      @PathVariable UUID customer, @PathVariable UUID axis, @RequestBody SetCustomerAnalyticDefault body) {
+    if (body.problem() != null) return ResponseEntity.badRequest().body(Map.of("error", body.problem()));
+    return ResponseEntity.ok(query.setCustomerDefault(customer, axis, body));
+  }
+
+  @DeleteMapping("/customers/{customer}/defaults/{axis}")
+  @Operation(operationId = "clearCustomerAnalyticDefault", summary = "Retirer la section par défaut d'un client sur un axe")
+  public List<CustomerAnalyticDefault> clearCustomerDefault(@PathVariable UUID customer, @PathVariable UUID axis) {
+    return query.clearCustomerDefault(customer, axis);
   }
 
   private static ResponseEntity<?> run(String problem, Supplier<AnalyticsSetupView> action) {

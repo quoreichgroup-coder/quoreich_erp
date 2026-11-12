@@ -122,6 +122,12 @@ public class ArInvoiceController {
     return message.replaceFirst("^[\\p{Lu}]+:\\s*", "");
   }
 
+  @ExceptionHandler(ArInvoiceUnprocessable.class)
+  public ResponseEntity<Map<String, String>> unprocessable(ArInvoiceUnprocessable e) {
+    LOG.warn("Facture AR inapplicable : {}", e.getMessage());
+    return ResponseEntity.status(422).body(Map.of("error", e.getMessage()));
+  }
+
   @ExceptionHandler(ArWriteForbidden.class)
   public ResponseEntity<Map<String, String>> forbidden(ArWriteForbidden e) {
     LOG.warn("Écriture AR refusée : rôle insuffisant");

@@ -98,6 +98,17 @@ record SetAnalyticRule(String requirement) {
   }
 }
 
+/** Section par défaut d'un client pour un axe : reprise sur ses factures si aucune n'est choisie. */
+record CustomerAnalyticDefault(
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID axisId,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID valueId) {}
+
+record SetCustomerAnalyticDefault(UUID valueId) {
+  String problem() {
+    return valueId == null ? "valueId obligatoire" : null;
+  }
+}
+
 /** Refus métier, avec son statut HTTP ; le message est rédigé ici, jamais recopié du SQL. */
 class AnalyticsRefusal extends RuntimeException {
   private final int status;

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Users, Loader2 } from "lucide-react";
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from "@/hooks/use-ar-data";
+import { CustomerAnalyticDefaults } from "@/components/AnalyticSelectors";
 
 const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30 };
 
@@ -219,6 +220,8 @@ const Customers = () => {
                 <Input type="number" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: Number(e.target.value) }))} />
               </div>
             </div>
+            {/* Une section par défaut se rattache à un client existant : visible en modification seulement. */}
+            {editingCustomer && <CustomerAnalyticDefaults customerId={editingCustomer.id} />}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

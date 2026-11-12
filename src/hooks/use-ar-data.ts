@@ -431,7 +431,11 @@ export function useCreateARInvoice() {
       subtotal: number;
       tax_amount: number;
       total: number;
+      /** Section choisie par axe ({ axisId: valueId }) ; l'emporte sur le défaut du client. */
+      analytics?: Record<string, string>;
     }) => {
+      const { analytics: chosen = {}, ...fields } = inv;
+      const analytics = Object.entries(chosen).filter(([, valueId]) => Boolean(valueId));
       if (isApiEnabled()) {
         // Le total est recalculé côté base (HT + TVA) : on n'envoie que les composantes.
         return apiPost("/api/v1/ar/invoices", {
@@ -441,12 +445,34 @@ export function useCreateARInvoice() {
           dueDate: inv.due_date,
           subtotal: inv.subtotal,
           taxAmount: inv.tax_amount,
+          analytics: analytics.map(([axisId, valueId]) => ({ axisId, valueId })),
         });
       }
       const tenant_id = await fetchTenantId();
+      if (analytics.length > 0) {
+        // Les sections se posent sur une facture en brouillon (V19), lues à l'émission. Sans
+        // transaction entre appels PostgREST, un refus à l'émission (section inactive, règle)
+        // laisserait un brouillon orphelin : on le retire avant de rendre l'erreur d'origine.
+        const { data: draft, error: draftError } = await supabase.from("ar_invoices").insert({
+          ...fields, tenant_id, created_by: user!.id, status: "draft", amount_paid: 0,
+        }).select().single();
+        if (draftError) throw draftError;
+        const db = supabase as any;
+        const { error: anaError } = await db.from("ar_invoice_analytics").insert(
+          analytics.map(([axis_id, value_id]) => ({ tenant_id, invoice_id: draft.id, axis_id, value_id })),
+        );
+        const { data: sent, error: sentError } = anaError
+          ? { data: null, error: anaError }
+          : await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", draft.id).select().single();
+        if (anaError || sentError) {
+          await supabase.from("ar_invoices").delete().eq("id", draft.id);
+          throw anaError ?? sentError;
+        }
+        return sent;
+      }
       // status='sent' triggers the JE auto-post (DR 4110 / CR 4000 + 4310)
       const { data, error } = await supabase.from("ar_invoices").insert({
-        ...inv,
+        ...fields,
         tenant_id,
         created_by: user!.id,
         status: "sent",

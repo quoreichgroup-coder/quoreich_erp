@@ -24,6 +24,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/customers/{customer}/defaults/{axis}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Définir la section par défaut d'un client sur un axe
+         * @description Administrateur ou comptable. 422 si la section n'appartient pas à l'axe.
+         */
+        put: operations["setCustomerAnalyticDefault"];
+        post?: never;
+        /** Retirer la section par défaut d'un client sur un axe */
+        delete: operations["clearCustomerAnalyticDefault"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/axes/{axis}": {
         parameters: {
             query?: never;
@@ -278,6 +299,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/customers/{customer}/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lire les sections par défaut d'un client
+         * @description Reprises sur ses factures quand aucune section n'est choisie. 404 si le client n'est pas visible.
+         */
+        get: operations["listCustomerAnalyticDefaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/setup": {
         parameters: {
             query?: never;
@@ -346,6 +387,10 @@ export interface components {
             validTo?: string;
             active?: boolean;
         };
+        SetCustomerAnalyticDefault: {
+            /** Format: uuid */
+            valueId?: string;
+        };
         UpdateAnalyticAxis: {
             name?: string;
             /** Format: int32 */
@@ -369,6 +414,13 @@ export interface components {
             dueDate?: string;
             subtotal?: number;
             taxAmount?: number;
+            analytics?: components["schemas"]["InvoiceAnalytic"][];
+        };
+        InvoiceAnalytic: {
+            /** Format: uuid */
+            axisId: string;
+            /** Format: uuid */
+            valueId: string;
         };
         RecordArPayment: {
             amount?: number;
@@ -462,6 +514,12 @@ export interface components {
             canManageValues: boolean;
             axes: components["schemas"]["AnalyticAxisView"][];
         };
+        CustomerAnalyticDefault: {
+            /** Format: uuid */
+            axisId: string;
+            /** Format: uuid */
+            valueId: string;
+        };
         AccountingFrameworkView: {
             code: string;
             name: string;
@@ -530,6 +588,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setCustomerAnalyticDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: string;
+                axis: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCustomerAnalyticDefault"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    clearCustomerAnalyticDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: string;
+                axis: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAnalyticDefault"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */
@@ -1208,6 +1360,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalyticsSetupView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listCustomerAnalyticDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAnalyticDefault"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

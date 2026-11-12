@@ -87,6 +87,22 @@ export function requirementsFor(
     });
 }
 
+/**
+ * Sections imputables à une date : actives et dans leur période de validité — la même condition
+ * que enforce_analytics(). Proposer une section que la base refuserait serait un piège.
+ */
+export function usableValues(axis: AnalyticAxis, date: string): AnalyticValue[] {
+  return axis.values.filter(
+    (v) => v.active && (!v.validFrom || v.validFrom <= date) && (!v.validTo || date <= v.validTo),
+  );
+}
+
+/** Axes obligatoires sur un compte (ex. le compte de ventes de la société), dans l'ordre. */
+export function requiredAxisIds(setup: AnalyticsSetup | undefined, accountCode: string | undefined): Set<string> {
+  if (!setup || !accountCode) return new Set();
+  return new Set(requirementsFor(setup, accountCode).filter((r) => r.requirement === "required").map((r) => r.axis.id));
+}
+
 /** Code d'axe : comme la base, majuscules, chiffres et _ , commençant par une lettre. */
 export const AXIS_CODE = /^[A-Z][A-Z0-9_]*$/;
 export const ACCOUNT_PREFIX = /^[0-9]+$/;

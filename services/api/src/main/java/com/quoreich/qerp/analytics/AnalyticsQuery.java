@@ -176,6 +176,50 @@ public class AnalyticsQuery {
     return setup();
   }
 
+  // ─── Sections par défaut d'un client ───
+
+  @Transactional(readOnly = true)
+  public List<CustomerAnalyticDefault> customerDefaults(UUID customer) {
+    requireCustomer(customer);
+    return jdbc.query(
+        "SELECT d.axis_id, d.value_id FROM analytic_defaults d JOIN analytic_axes a ON a.id = d.axis_id"
+            + " WHERE d.customer_id = ? ORDER BY a.sort_order, a.code",
+        (rs, i) -> new CustomerAnalyticDefault(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)),
+        customer);
+  }
+
+  @Transactional
+  public List<CustomerAnalyticDefault> setCustomerDefault(UUID customer, UUID axis, SetCustomerAnalyticDefault in) {
+    requireValueManager();
+    requireCustomer(customer);
+    requireAxis(axis);
+    if (!exists("SELECT EXISTS (SELECT 1 FROM analytic_values WHERE id = ? AND axis_id = ?)", in.valueId(), axis)) {
+      throw new AnalyticsRefusal(422, "La section doit appartenir à cet axe");
+    }
+    jdbc.update(
+        "INSERT INTO analytic_defaults (tenant_id, customer_id, axis_id, value_id)"
+            + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, ?)"
+            + " ON CONFLICT (customer_id, axis_id) DO UPDATE SET value_id = EXCLUDED.value_id",
+        customer,
+        axis,
+        in.valueId());
+    return customerDefaults(customer);
+  }
+
+  @Transactional
+  public List<CustomerAnalyticDefault> clearCustomerDefault(UUID customer, UUID axis) {
+    requireValueManager();
+    requireCustomer(customer);
+    jdbc.update("DELETE FROM analytic_defaults WHERE customer_id = ? AND axis_id = ?", customer, axis);
+    return customerDefaults(customer);
+  }
+
+  private void requireCustomer(UUID customer) {
+    if (!exists("SELECT EXISTS (SELECT 1 FROM customers WHERE id = ?)", customer)) {
+      throw new AnalyticsRefusal(404, "Client introuvable");
+    }
+  }
+
   // ─── Contrôles ───
 
   private boolean exists(String sql, Object... args) {

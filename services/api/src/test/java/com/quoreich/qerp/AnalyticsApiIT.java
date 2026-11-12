@@ -182,6 +182,82 @@ class AnalyticsApiIT {
     mockMvc.perform(delete("/api/v1/analytics/axes/" + dept + "/rules/7").with(admin())).andExpect(status().isNotFound());
   }
 
+  private static final String CLIENT = "c0000001-0000-0000-0000-000000000000";
+
+  private String facture(String numero, String analytics) {
+    return "{\"invoiceNumber\":\"" + numero + "\",\"customerId\":\"" + CLIENT + "\",\"invoiceDate\":\"2030-06-10\","
+        + "\"dueDate\":\"2030-07-10\",\"subtotal\":100.00,\"taxAmount\":0"
+        + (analytics == null ? "" : ",\"analytics\":" + analytics) + "}";
+  }
+
+  /** Section portée par la ligne de produit (701) de l'écriture de la facture. */
+  private String sectionDeLaLigneDeProduit(ResultActions creation) throws Exception {
+    String entry = json.readTree(creation.andReturn().getResponse().getContentAsString()).get("journalEntryId").asString();
+    try (var c = java.sql.DriverManager.getConnection(PostgresFixture.urlOf(DATABASE), PostgresFixture.ADMIN_USER, PostgresFixture.ADMIN_PASSWORD);
+        var st = c.createStatement();
+        var rs = st.executeQuery("SELECT coalesce(v.code, '-') FROM journal_lines l JOIN gl_accounts g ON g.id = l.account_id"
+            + " LEFT JOIN journal_line_analytics la ON la.line_id = l.id LEFT JOIN analytic_values v ON v.id = la.value_id"
+            + " WHERE l.entry_id = '" + entry + "' AND g.code = '701'")) {
+      rs.next();
+      return rs.getString(1);
+    }
+  }
+
+  @Test
+  @Order(5)
+  @DisplayName("section par défaut d'un client : posée par le comptable, reprise sur sa facture")
+  void sectionParDefautDuClient() throws Exception {
+    String dept = axe("DEPT");
+    send(put("/api/v1/analytics/axes/" + dept), admin(), "{\"name\":\"Département\",\"active\":true}").andExpect(status().isOk());
+    send(put("/api/v1/analytics/axes/" + dept + "/rules/7"), admin(), "{\"requirement\":\"required\"}").andExpect(status().isOk());
+
+    String base = "/api/v1/analytics/customers/" + CLIENT + "/defaults";
+    mockMvc.perform(get(base).with(comptable())).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+    send(put(base + "/" + dept), comptable(), "{\"valueId\":\"" + section("CC", "ATELIER") + "\"}")
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.error").value("La section doit appartenir à cet axe"));
+    send(put(base + "/" + dept), comptable(), "{\"valueId\":\"" + section("DEPT", "COM") + "\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].axisId").value(dept))
+        .andExpect(jsonPath("$[0].valueId").value(section("DEPT", "COM")));
+    // Le client d'Alpha est invisible pour Beta.
+    mockMvc.perform(get(base).with(beta())).andExpect(status().isNotFound());
+
+    org.assertj.core.api.Assertions.assertThat(
+            sectionDeLaLigneDeProduit(send(post("/api/v1/ar/invoices"), admin(), facture("ANA-DEF-1", null)).andExpect(status().isCreated())))
+        .isEqualTo("COM");
+  }
+
+  @Test
+  @Order(6)
+  @DisplayName("section choisie sur la facture : prioritaire ; autre axe 422 sans effet ; axe en double 400")
+  void sectionChoisieSurLaFacture() throws Exception {
+    String dept = axe("DEPT");
+    String choix = "[{\"axisId\":\"" + dept + "\",\"valueId\":\"" + section("DEPT", "COM-EST") + "\"}]";
+    org.assertj.core.api.Assertions.assertThat(
+            sectionDeLaLigneDeProduit(send(post("/api/v1/ar/invoices"), admin(), facture("ANA-CHX-1", choix)).andExpect(status().isCreated())))
+        .isEqualTo("COM-EST");
+
+    String autreAxe = "[{\"axisId\":\"" + dept + "\",\"valueId\":\"" + section("CC", "ATELIER") + "\"}]";
+    send(post("/api/v1/ar/invoices"), admin(), facture("ANA-CHX-2", autreAxe))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.error").value("Section analytique inconnue pour cet axe dans la société"));
+    org.assertj.core.api.Assertions.assertThat(PostgresFixture.countAsAdmin(DATABASE,
+            "SELECT count(*) FROM ar_invoices WHERE invoice_number = 'ANA-CHX-2'"))
+        .isZero();
+
+    String doublon = "[{\"axisId\":\"" + dept + "\",\"valueId\":\"" + section("DEPT", "COM") + "\"},"
+        + "{\"axisId\":\"" + dept + "\",\"valueId\":\"" + section("DEPT", "COM-EST") + "\"}]";
+    send(post("/api/v1/ar/invoices"), admin(), facture("ANA-CHX-3", doublon)).andExpect(status().isBadRequest());
+
+    // Sans défaut ni choix, l'obligation refuse la facture.
+    mockMvc.perform(delete("/api/v1/analytics/customers/" + CLIENT + "/defaults/" + dept).with(comptable()))
+        .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+    send(post("/api/v1/ar/invoices"), admin(), facture("ANA-CHX-4", null))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.error").value(containsString("obligatoire sur le compte 701")));
+  }
+
   @Test
   @Order(4)
   @DisplayName("une autre société ne voit ni ne modifie l'analytique d'Alpha")

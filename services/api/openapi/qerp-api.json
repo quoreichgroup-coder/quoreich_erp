@@ -94,6 +94,142 @@
         }
       }
     },
+    "/api/v1/analytics/customers/{customer}/defaults/{axis}" : {
+      "put" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Définir la section par défaut d'un client sur un axe",
+        "description" : "Administrateur ou comptable. 422 si la section n'appartient pas à l'axe.",
+        "operationId" : "setCustomerAnalyticDefault",
+        "parameters" : [ {
+          "name" : "customer",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetCustomerAnalyticDefault"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Retirer la section par défaut d'un client sur un axe",
+        "operationId" : "clearCustomerAnalyticDefault",
+        "parameters" : [ {
+          "name" : "customer",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "axis",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CustomerAnalyticDefault"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/axes/{axis}" : {
       "put" : {
         "tags" : [ "Analytique" ],
@@ -937,6 +1073,64 @@
         }
       }
     },
+    "/api/v1/analytics/customers/{customer}/defaults" : {
+      "get" : {
+        "tags" : [ "Analytique" ],
+        "summary" : "Lire les sections par défaut d'un client",
+        "description" : "Reprises sur ses factures quand aucune section n'est choisie. 404 si le client n'est pas visible.",
+        "operationId" : "listCustomerAnalyticDefaults",
+        "parameters" : [ {
+          "name" : "customer",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CustomerAnalyticDefault"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/setup" : {
       "get" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -1105,6 +1299,15 @@
           }
         }
       },
+      "SetCustomerAnalyticDefault" : {
+        "type" : "object",
+        "properties" : {
+          "valueId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "UpdateAnalyticAxis" : {
         "type" : "object",
         "properties" : {
@@ -1160,8 +1363,28 @@
           },
           "taxAmount" : {
             "type" : "number"
+          },
+          "analytics" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InvoiceAnalytic"
+            }
           }
         }
+      },
+      "InvoiceAnalytic" : {
+        "type" : "object",
+        "properties" : {
+          "axisId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "valueId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "axisId", "valueId" ]
       },
       "RecordArPayment" : {
         "type" : "object",
@@ -1398,6 +1621,20 @@
           }
         },
         "required" : [ "axes", "canManageAxes", "canManageValues" ]
+      },
+      "CustomerAnalyticDefault" : {
+        "type" : "object",
+        "properties" : {
+          "axisId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "valueId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "axisId", "valueId" ]
       },
       "AccountingFrameworkView" : {
         "type" : "object",
