@@ -18,8 +18,178 @@
   "tags" : [ {
     "name" : "Clients",
     "description" : "Comptes clients de la société du porteur du jeton"
+  }, {
+    "name" : "Factures clients",
+    "description" : "Factures et encaissements AR de la société du porteur"
   } ],
   "paths" : {
+    "/api/v1/ar/invoices" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Lister les factures clients visibles",
+        "operationId" : "listArInvoices",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ArInvoiceView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Émettre une facture client",
+        "description" : "Comptabilise l'écriture équilibrée dans la même transaction. 409 si refusée (période close, règle comptable) : aucun effet partiel.",
+        "operationId" : "createArInvoice",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateArInvoice"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ar/invoices/{id}/payments" : {
+      "post" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Enregistrer un encaissement",
+        "description" : "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close).",
+        "operationId" : "recordArPayment",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecordArPayment"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health" : {
       "get" : {
         "tags" : [ "health-controller" ],
@@ -115,10 +285,154 @@
           }
         }
       }
+    },
+    "/api/v1/ar/invoices/{id}" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Lire une facture client",
+        "operationId" : "getArInvoice",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ArInvoiceView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ar/invoices/export" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Exporter les factures clients en CSV",
+        "description" : "Même périmètre que la liste : uniquement la société du porteur (RLS), jamais d'autre.",
+        "operationId" : "exportArInvoices",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "text/csv;charset=UTF-8" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
     "schemas" : {
+      "CreateArInvoice" : {
+        "type" : "object",
+        "properties" : {
+          "invoiceNumber" : {
+            "type" : "string"
+          },
+          "customerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "invoiceDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "dueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "subtotal" : {
+            "type" : "number"
+          },
+          "taxAmount" : {
+            "type" : "number"
+          }
+        }
+      },
+      "RecordArPayment" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "paymentDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reference" : {
+            "type" : "string"
+          },
+          "paymentMethod" : {
+            "type" : "string"
+          }
+        }
+      },
       "CustomerView" : {
         "type" : "object",
         "properties" : {
@@ -134,6 +448,53 @@
           }
         },
         "required" : [ "id", "name", "status" ]
+      },
+      "ArInvoiceView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "invoiceNumber" : {
+            "type" : "string"
+          },
+          "customerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "invoiceDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "dueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "subtotal" : {
+            "type" : "number"
+          },
+          "taxAmount" : {
+            "type" : "number"
+          },
+          "total" : {
+            "type" : "number"
+          },
+          "amountPaid" : {
+            "type" : "number"
+          },
+          "balance" : {
+            "type" : "number"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "journalEntryId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]
       }
     },
     "securitySchemes" : {

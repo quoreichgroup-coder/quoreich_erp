@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
+import type { ApiSchemas } from "@/api";
+import { toARInvoice } from "@/lib/ar-api-mapping";
 
 // ============================================================
 //  AR CONFIG HOOKS — DB-driven (no mocks)
@@ -394,8 +397,18 @@ export interface Payment {
 // ─── AR Invoices ───
 export function useARInvoices() {
   return useQuery({
-    queryKey: ["ar-invoices"],
+    // L'origine des données fait partie de la clé : basculer VITE_QERP_API_URL ne doit pas
+    // servir au front le cache de l'autre source.
+    queryKey: ["ar-invoices", isApiEnabled() ? "api" : "supabase"],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const [invoices, customers] = await Promise.all([
+          apiGet<ApiSchemas["ArInvoiceView"][]>("/api/v1/ar/invoices"),
+          apiGet<ApiSchemas["CustomerView"][]>("/api/v1/customers"),
+        ]);
+        const byId = new Map(customers.map((c) => [c.id, c]));
+        return invoices.map((i) => toARInvoice(i, byId)) as ARInvoice[];
+      }
       const { data, error } = await supabase
         .from("ar_invoices")
         .select("*, customer:customers(id, name, credit_limit, payment_terms)")
@@ -419,6 +432,17 @@ export function useCreateARInvoice() {
       tax_amount: number;
       total: number;
     }) => {
+      if (isApiEnabled()) {
+        // Le total est recalculé côté base (HT + TVA) : on n'envoie que les composantes.
+        return apiPost("/api/v1/ar/invoices", {
+          invoiceNumber: inv.invoice_number,
+          customerId: inv.customer_id,
+          invoiceDate: inv.invoice_date,
+          dueDate: inv.due_date,
+          subtotal: inv.subtotal,
+          taxAmount: inv.tax_amount,
+        });
+      }
       const tenant_id = await fetchTenantId();
       // status='sent' triggers the JE auto-post (DR 4110 / CR 4000 + 4310)
       const { data, error } = await supabase.from("ar_invoices").insert({
@@ -492,6 +516,15 @@ export function useRecordARPayment() {
       payment_method: string;
       reference: string;
     }) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/ar/invoices/${payment.ar_invoice_id}/payments`, {
+          amount: payment.amount,
+          paymentDate: payment.payment_date,
+          paymentMethod: payment.payment_method,
+          reference: payment.reference,
+        });
+        return;
+      }
       // Insert payment — DB triggers will:
       //  • post the bank/clients JE (on_ap_payment_recorded)
       //  • recompute invoice amount_paid + status (recompute_ar_invoice_from_payment)

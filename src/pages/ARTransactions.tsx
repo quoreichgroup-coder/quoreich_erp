@@ -297,7 +297,7 @@ export default function ARTransactions() {
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { const unpaid = filtered.find(i => i.status !== "paid"); if (unpaid) setPaymentInv(unpaid); }}><CreditCard className="w-3.5 h-3.5" /> Enregistrer paiement</Button>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5"><Download className="w-3.5 h-3.5" /> Export</Button>
+          <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={handleExport}><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
       </div>
 

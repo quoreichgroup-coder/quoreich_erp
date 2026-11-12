@@ -50,6 +50,8 @@ public class SecurityConfig {
         // que le navigateur n'ajoute pas tout seul. Il n'y a donc pas de requête
         // forgée à travers le navigateur, et le jeton CSRF protégerait un vecteur
         // inexistant.
+        // CORS avant l'authentification : une pré-requête OPTIONS ne porte pas de jeton.
+        .cors(Customizer.withDefaults())
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .httpBasic(AbstractHttpConfigurer::disable)

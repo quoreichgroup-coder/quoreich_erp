@@ -130,6 +130,11 @@ spring:
 springdoc:
   swagger-ui:
     enabled: true
+qerp:
+  api:
+    cors:
+      # Serveur de développement Vite (voir CLAUDE.md : 8080 est pris par Frappe).
+      allowed-origins: http://localhost:8081
 logging:
   level:
     com.quoreich.qerp: DEBUG
