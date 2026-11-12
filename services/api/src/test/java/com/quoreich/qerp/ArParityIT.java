@@ -1,0 +1,344 @@
+package com.quoreich.qerp;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.quoreich.qerp.tenant.TenantContextHolder;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * Parité AR : le chemin API produit en base exactement ce que produit le chemin historique.
+ *
+ * <p>Le chemin historique est celui du client web sur Supabase ({@code use-ar-data.ts}) : un
+ * INSERT direct de la facture en {@code status = 'sent'} avec le total calculé par le navigateur,
+ * puis un INSERT direct de l'encaissement. Il est rejoué ici tel quel, en SQL, sous le rôle
+ * {@code authenticated} avec les mêmes claims que PostgREST — donc sous les mêmes politiques et
+ * les mêmes triggers. Les deux chemins reçoivent les mêmes montants ; on compare ensuite, en
+ * propriétaire, la facture, son écriture et les écritures d'encaissement, ligne à ligne par compte.
+ *
+ * <p>Contrairement à {@link ArInvoiceIT}, le compte 5210 (Banque) existe ici : c'est ce qui
+ * déclenche la comptabilisation des encaissements, sans quoi elle n'est jamais exercée.
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+class ArParityIT {
+
+  private static final String DATABASE = "qerp_it_ar_parity";
+  private static final String CUSTOMER_ALPHA = "c0000001-0000-0000-0000-000000000000";
+  private static final String ALPHA_VIEWER = "aaaaaaaa-0000-0000-0000-000000000003";
+
+  @DynamicPropertySource
+  static void proprietes(DynamicPropertyRegistry registry) {
+    PostgresFixture.configureContext(DATABASE, registry);
+  }
+
+  @Autowired private MockMvc mockMvc;
+  @Autowired private ObjectMapper json;
+
+  @BeforeEach
+  void preparer() {
+    PostgresFixture.loadReferenceDatasetOnce(DATABASE);
+    String a = PostgresFixture.ALPHA_TENANT;
+    PostgresFixture.execute(
+        PostgresFixture.urlOf(DATABASE),
+        "INSERT INTO gl_accounts (tenant_id, code, name, account_type) SELECT '"
+            + a
+            + "', v.code, v.name, v.t FROM (VALUES ('4110','Clients','asset'),"
+            + " ('4000','Ventes','revenue'), ('4310','TVA collectée','liability'),"
+            + " ('5210','Banque','asset')) AS v(code, name, t) WHERE NOT EXISTS"
+            + " (SELECT 1 FROM gl_accounts g WHERE g.tenant_id = '"
+            + a
+            + "' AND g.code = v.code);"
+            + "INSERT INTO auth.users (id) VALUES ('"
+            + ALPHA_VIEWER
+            + "') ON CONFLICT DO NOTHING;"
+            + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('"
+            + ALPHA_VIEWER
+            + "', '"
+            + a
+            + "', 'Lecteur Alpha') ON CONFLICT (id) DO NOTHING;"
+            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role, '"
+            + a
+            + "' FROM (VALUES ('"
+            + PostgresFixture.ALPHA_USER
+            + "', 'accountant'), ('"
+            + ALPHA_VIEWER
+            + "', 'viewer')) AS v(u, r) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
+            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+    TenantContextHolder.clear();
+  }
+
+  // ─── Chemin historique : ce que fait le client web via PostgREST ───
+
+  /** Exécute une instruction sous l'identité d'un utilisateur, comme PostgREST. */
+  private static String asUser(String user, String sql, Object... params) throws SQLException {
+    try (Connection c =
+        DriverManager.getConnection(
+            PostgresFixture.urlOf(DATABASE), PostgresFixture.API_USER, PostgresFixture.API_PASSWORD)) {
+      c.setAutoCommit(false);
+      try (PreparedStatement claims =
+          c.prepareStatement("SELECT set_config('request.jwt.claims', ?, true)")) {
+        claims.setString(1, "{\"sub\":\"" + user + "\",\"role\":\"authenticated\"}");
+        claims.execute();
+      }
+      try (PreparedStatement st = c.prepareStatement(sql)) {
+        for (int i = 0; i < params.length; i++) st.setObject(i + 1, params[i]);
+        String result = null;
+        if (st.execute()) {
+          try (ResultSet rs = st.getResultSet()) {
+            if (rs.next()) result = rs.getString(1);
+          }
+        }
+        c.commit();
+        return result;
+      } catch (SQLException e) {
+        c.rollback();
+        throw e;
+      }
+    }
+  }
+
+  /** {@code useCreateARInvoice} sans API : INSERT direct en 'sent', total fourni par le client. */
+  private static String legacyCreate(String user, String number, String date) throws SQLException {
+    return asUser(
+        user,
+        "INSERT INTO ar_invoices (invoice_number, customer_id, invoice_date, due_date, subtotal,"
+            + " tax_amount, total, tenant_id, created_by, status, amount_paid) VALUES (?, ?::uuid,"
+            + " ?::date, '2030-12-31', 1000.00, 180.00, 1180.00, get_user_tenant_id(auth.uid()),"
+            + " auth.uid(), 'sent', 0) RETURNING id",
+        number,
+        CUSTOMER_ALPHA,
+        date);
+  }
+
+  /** {@code useRecordARPayment} sans API : INSERT direct dans payments. */
+  private static void legacyPay(String invoiceId, String amount, String reference)
+      throws SQLException {
+    asUser(
+        PostgresFixture.ALPHA_USER,
+        "INSERT INTO payments (ar_invoice_id, amount, payment_date, payment_method, reference,"
+            + " tenant_id, payment_type, created_by) VALUES (?::uuid, ?::numeric, '2030-02-01',"
+            + " 'bank_transfer', ?, get_user_tenant_id(auth.uid()), 'ar_receipt', auth.uid())",
+        invoiceId,
+        amount,
+        reference);
+  }
+
+  // ─── Chemin API ───
+
+  private String apiCreate(String number, String date) throws Exception {
+    String body =
+        mockMvc
+            .perform(
+                post("/api/v1/ar/invoices")
+                    .with(jwt().jwt(b -> b.subject(PostgresFixture.ALPHA_USER)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"invoiceNumber\":\""
+                            + number
+                            + "\",\"customerId\":\""
+                            + CUSTOMER_ALPHA
+                            + "\",\"invoiceDate\":\""
+                            + date
+                            + "\",\"dueDate\":\"2030-12-31\",\"subtotal\":1000.00,"
+                            + "\"taxAmount\":180.00}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return json.readTree(body).get("id").asString();
+  }
+
+  private void apiPay(String invoiceId, String amount, String reference) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/ar/invoices/" + invoiceId + "/payments")
+                .with(jwt().jwt(b -> b.subject(PostgresFixture.ALPHA_USER)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"amount\":"
+                        + amount
+                        + ",\"paymentDate\":\"2030-02-01\",\"reference\":\""
+                        + reference
+                        + "\",\"paymentMethod\":\"bank_transfer\"}"))
+        .andExpect(status().isOk());
+  }
+
+  // ─── Observation, en propriétaire (hors RLS) ───
+
+  private static List<String> rows(String sql, Object... params) {
+    List<String> out = new ArrayList<>();
+    try (Connection c =
+            DriverManager.getConnection(
+                PostgresFixture.urlOf(DATABASE),
+                PostgresFixture.ADMIN_USER,
+                PostgresFixture.ADMIN_PASSWORD);
+        PreparedStatement st = c.prepareStatement(sql)) {
+      for (int i = 0; i < params.length; i++) st.setObject(i + 1, params[i]);
+      try (ResultSet rs = st.executeQuery()) {
+        int n = rs.getMetaData().getColumnCount();
+        while (rs.next()) {
+          StringBuilder row = new StringBuilder();
+          for (int i = 1; i <= n; i++) row.append(i > 1 ? " | " : "").append(rs.getString(i));
+          out.add(row.toString());
+        }
+      }
+    } catch (SQLException e) {
+      throw new IllegalStateException("Observation échouée : " + sql, e);
+    }
+    return out;
+  }
+
+  /**
+   * Empreinte comptable d'une facture : facture, écriture de facture, écritures d'encaissement.
+   * Ni identifiant, ni numéro, ni horodatage — seulement ce qui doit être identique.
+   */
+  private static List<String> fingerprint(String invoiceId, String receiptPrefix) {
+    List<String> f = new ArrayList<>();
+    f.addAll(
+        rows(
+            "SELECT 'facture', subtotal, tax_amount, total, amount_paid, status,"
+                + " journal_entry_id IS NOT NULL FROM ar_invoices WHERE id = ?::uuid",
+            invoiceId));
+    f.addAll(
+        rows(
+            "SELECT 'ecriture-facture', je.status, je.source, je.entry_date, a.code, l.debit,"
+                + " l.credit FROM ar_invoices i JOIN journal_entries je ON je.id = i.journal_entry_id"
+                + " JOIN journal_lines l ON l.entry_id = je.id JOIN gl_accounts a ON a.id ="
+                + " l.account_id WHERE i.id = ?::uuid ORDER BY a.code, l.debit, l.credit",
+            invoiceId));
+    f.addAll(
+        rows(
+            "SELECT 'ecritures-encaissement', count(DISTINCT je.id), a.code, sum(l.debit),"
+                + " sum(l.credit), min(je.status) FROM journal_entries je JOIN journal_lines l ON"
+                + " l.entry_id = je.id JOIN gl_accounts a ON a.id = l.account_id WHERE je.source ="
+                + " 'ar_receipt' AND je.description LIKE 'AR Receipt: ' || ? || '%' GROUP BY"
+                + " a.code ORDER BY a.code",
+            receiptPrefix));
+    return f;
+  }
+
+  @Test
+  @DisplayName("facture, paiement partiel, paiement final : même état et mêmes écritures")
+  void memeCycleMemesEcritures() throws Exception {
+    String legacy = legacyCreate(PostgresFixture.ALPHA_USER, "PAR-HIST-001", "2030-01-15");
+    String api = apiCreate("PAR-API-001", "2030-01-15");
+    assertThat(fingerprint(api, "REC-API-001")).isEqualTo(fingerprint(legacy, "REC-HIST-001"));
+
+    legacyPay(legacy, "500.00", "REC-HIST-001-a");
+    apiPay(api, "500.00", "REC-API-001-a");
+    List<String> partiel = fingerprint(api, "REC-API-001");
+    assertThat(partiel).isEqualTo(fingerprint(legacy, "REC-HIST-001"));
+    assertThat(partiel.getFirst()).contains("500.00").contains("partially_paid");
+
+    legacyPay(legacy, "680.00", "REC-HIST-001-b");
+    apiPay(api, "680.00", "REC-API-001-b");
+    List<String> solde = fingerprint(api, "REC-API-001");
+    assertThat(solde).isEqualTo(fingerprint(legacy, "REC-HIST-001"));
+    assertThat(solde.getFirst()).contains("1180.00 | paid");
+  }
+
+  /**
+   * Caractérisation d'un défaut hérité, que la parité reproduit fidèlement : le schéma branche
+   * {@code on_ap_payment_recorded} par trois triggers sur {@code payments}
+   * ({@code trg_on_payment_recorded}, {@code trg_payment_gl}, {@code trg_payment_gl_posting}), et
+   * {@code journal_entries.entry_number} n'est pas unique. Chaque encaissement AR produit donc
+   * <strong>trois</strong> écritures identiques : la banque et les clients sont mouvementés trois
+   * fois. Ce test échouera le jour où le schéma sera corrigé — c'est voulu, il faudra le réécrire.
+   */
+  @Test
+  @DisplayName("défaut hérité : un encaissement produit trois écritures (dans les deux chemins)")
+  void encaissementComptabiliseTroisFois() throws Exception {
+    String legacy = legacyCreate(PostgresFixture.ALPHA_USER, "PAR-HIST-002", "2030-01-16");
+    String api = apiCreate("PAR-API-002", "2030-01-16");
+    legacyPay(legacy, "100.00", "TRIPLE-HIST");
+    apiPay(api, "100.00", "TRIPLE-API");
+
+    for (String ref : new String[] {"TRIPLE-HIST", "TRIPLE-API"}) {
+      assertThat(
+              rows(
+                  "SELECT count(DISTINCT je.id), sum(l.debit) FROM journal_entries je JOIN journal_lines l ON"
+                      + " l.entry_id = je.id WHERE je.source = 'ar_receipt' AND je.description = ?",
+                  "AR Receipt: " + ref))
+          .containsExactly("3 | 300.00");
+    }
+  }
+
+  @Test
+  @DisplayName("période close : refus dans les deux chemins, aucune facture ni écriture")
+  void periodeCloseRefuseeDansLesDeuxChemins() throws Exception {
+    PostgresFixture.execute(
+        PostgresFixture.urlOf(DATABASE),
+        "INSERT INTO period_locks (tenant_id, period, module, status) SELECT '"
+            + PostgresFixture.ALPHA_TENANT
+            + "', '2021-03', 'GL', 'closed' WHERE NOT EXISTS (SELECT 1 FROM period_locks WHERE"
+            + " tenant_id = '"
+            + PostgresFixture.ALPHA_TENANT
+            + "' AND period = '2021-03' AND module = 'GL')");
+    List<String> avant = rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries");
+
+    assertThatThrownBy(() -> legacyCreate(PostgresFixture.ALPHA_USER, "PAR-HIST-CLOS", "2021-03-10"))
+        .isInstanceOf(SQLException.class);
+    mockMvc
+        .perform(
+            post("/api/v1/ar/invoices")
+                .with(jwt().jwt(b -> b.subject(PostgresFixture.ALPHA_USER)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"invoiceNumber\":\"PAR-API-CLOS\",\"customerId\":\""
+                        + CUSTOMER_ALPHA
+                        + "\",\"invoiceDate\":\"2021-03-10\",\"dueDate\":\"2021-04-10\","
+                        + "\"subtotal\":1000.00,"
+                        + "\"taxAmount\":180.00}"))
+        .andExpect(status().isConflict());
+
+    assertThat(rows("SELECT count(*) FROM ar_invoices UNION ALL SELECT count(*) FROM journal_entries"))
+        .isEqualTo(avant);
+  }
+
+  /**
+   * Écart <strong>voulu</strong> entre les deux chemins : le chemin historique laisse un lecteur
+   * émettre une facture et son écriture ({@code on_ar_invoice_posted} est SECURITY DEFINER),
+   * l'API la refuse. Le test fige les deux comportements pour que l'écart reste documenté.
+   */
+  @Test
+  @DisplayName("écart voulu : le chemin historique laisse un lecteur facturer, l'API refuse")
+  void lecteurAutoriseHistoriquementRefuseParLApi() throws Exception {
+    String legacy = legacyCreate(ALPHA_VIEWER, "PAR-HIST-LECTEUR", "2030-01-20");
+    assertThat(rows("SELECT journal_entry_id IS NOT NULL FROM ar_invoices WHERE id = ?::uuid", legacy))
+        .containsExactly("t");
+
+    mockMvc
+        .perform(
+            post("/api/v1/ar/invoices")
+                .with(jwt().jwt(b -> b.subject(ALPHA_VIEWER)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"invoiceNumber\":\"PAR-API-LECTEUR\",\"customerId\":\""
+                        + CUSTOMER_ALPHA
+                        + "\",\"invoiceDate\":\"2030-01-20\",\"dueDate\":\"2030-12-31\","
+                        + "\"subtotal\":1000.00,"
+                        + "\"taxAmount\":180.00}"))
+        .andExpect(status().isForbidden());
+  }
+}
