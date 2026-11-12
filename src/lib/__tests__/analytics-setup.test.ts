@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnalyticsSetup, requirementsFor, valueTree, type AnalyticValue } from "../analytics-setup";
+import { buildAnalyticsSetup, requiredAxisIds, requirementsFor, usableValues, valueTree, type AnalyticValue } from "../analytics-setup";
 
 const v = (id: string, code: string, parentId?: string): AnalyticValue => ({ id, code, name: code, parentId, active: true });
 
@@ -43,5 +43,32 @@ describe("analytique — ce qu'exige un compte", () => {
 
   it("un compte vide ne déclenche aucune règle", () => {
     expect(requirementsFor(setup, "  ").every((r) => r.requirement === "optional")).toBe(true);
+  });
+});
+
+describe("analytique — sections proposées et axes obligatoires", () => {
+  const setup = buildAnalyticsSetup({
+    canManageAxes: true, canManageValues: true,
+    axes: [{ id: "dept", code: "DEPT", name: "Département", sort_order: 1, is_active: true }],
+    values: [
+      { id: "ok", axis_id: "dept", code: "OK", name: "Active", parent_id: null, valid_from: null, valid_to: null, is_active: true },
+      { id: "off", axis_id: "dept", code: "OFF", name: "Inactive", parent_id: null, valid_from: null, valid_to: null, is_active: false },
+      { id: "fut", axis_id: "dept", code: "FUT", name: "Future", parent_id: null, valid_from: "2031-01-01", valid_to: null, is_active: true },
+      { id: "old", axis_id: "dept", code: "OLD", name: "Échue", parent_id: null, valid_from: null, valid_to: "2029-12-31", is_active: true },
+    ],
+    rules: [{ axis_id: "dept", account_prefix: "7", requirement: "required" }],
+  });
+
+  it("ne propose que les sections actives et valides à la date, bornes incluses", () => {
+    expect(usableValues(setup.axes[0], "2030-06-01").map((v) => v.code)).toEqual(["OK"]);
+    expect(usableValues(setup.axes[0], "2031-01-01").map((v) => v.code)).toEqual(["FUT", "OK"]);
+    expect(usableValues(setup.axes[0], "2029-12-31").map((v) => v.code)).toEqual(["OK", "OLD"]);
+  });
+
+  it("déduit les axes obligatoires du compte de ventes ; rien sans compte ni paramétrage", () => {
+    expect([...requiredAxisIds(setup, "701")]).toEqual(["dept"]);
+    expect(requiredAxisIds(setup, "4000").size).toBe(0);
+    expect(requiredAxisIds(setup, undefined).size).toBe(0);
+    expect(requiredAxisIds(undefined, "701").size).toBe(0);
   });
 });

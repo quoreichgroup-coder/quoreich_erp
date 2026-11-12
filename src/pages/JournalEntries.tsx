@@ -13,6 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useJournalEntries, useGLAccounts, useCreateJournalEntry, type JournalEntry } from "@/hooks/use-journal-data";
 import { useReverseJournalEntry } from "@/hooks/use-gl-data";
+import { useAnalyticsSetup } from "@/hooks/use-analytics-setup";
+import { requirementsFor, usableValues, type AnalyticAxis, type Requirement } from "@/lib/analytics-setup";
+import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -21,10 +24,8 @@ import {
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
-interface FormLine { id: number; account_id: string; label: string; debit: string; credit: string; costCenter: string; department: string; project: string; }
+interface FormLine { id: number; account_id: string; label: string; debit: string; credit: string; analytics: Record<string, string>; }
 
-const costCenters = ["CC-100", "CC-200", "CC-300", "CC-400"];
-const departments = ["Administration", "Commercial", "Operations", "HR", "Finance"];
 
 let nextLineId = 3;
 
@@ -32,6 +33,14 @@ const JournalEntries = () => {
   const { data: entries = [], isLoading } = useJournalEntries();
   const { data: glAccounts = [] } = useGLAccounts();
   const createEntry = useCreateJournalEntry();
+  // Colonnes analytiques : un axe actif de la société = une colonne. Aucun axe, aucune colonne.
+  const { data: analyticsSetup } = useAnalyticsSetup();
+  const activeAxes = useMemo(() => (analyticsSetup?.axes ?? []).filter(a => a.active), [analyticsSetup]);
+  const requirementFor = (axis: AnalyticAxis, accountId: string): Requirement => {
+    const code = glAccounts.find(a => a.id === accountId)?.code;
+    if (!analyticsSetup || !code) return "optional";
+    return requirementsFor(analyticsSetup, code).find(r => r.axis.id === axis.id)?.requirement ?? "optional";
+  };
   const reverseEntry = useReverseJournalEntry();
 
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
@@ -50,13 +59,13 @@ const JournalEntries = () => {
   const [entryRef, setEntryRef] = useState("");
   const [entryDesc, setEntryDesc] = useState("");
   const [lines, setLines] = useState<FormLine[]>([
-    { id: 1, account_id: "", label: "", debit: "", credit: "", costCenter: "", department: "", project: "" },
-    { id: 2, account_id: "", label: "", debit: "", credit: "", costCenter: "", department: "", project: "" },
+    { id: 1, account_id: "", label: "", debit: "", credit: "", analytics: {} },
+    { id: 2, account_id: "", label: "", debit: "", credit: "", analytics: {} },
   ]);
 
-  const addRow = () => setLines([...lines, { id: nextLineId++, account_id: "", label: "", debit: "", credit: "", costCenter: "", department: "", project: "" }]);
+  const addRow = () => setLines([...lines, { id: nextLineId++, account_id: "", label: "", debit: "", credit: "", analytics: {} }]);
   const removeRow = (id: number) => { if (lines.length > 2) setLines(lines.filter((l) => l.id !== id)); };
-  const updateLine = (id: number, field: keyof FormLine, value: string) => {
+  const updateLine = (id: number, field: Exclude<keyof FormLine, "id" | "analytics">, value: string) => {
     setLines(lines.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
   };
 
@@ -122,6 +131,14 @@ const JournalEntries = () => {
 
   const handleSave = async (status: "draft" | "posted") => {
     const ref = entryRef || `JE-${format(new Date(), "yyyyMMdd-HHmmss")}`;
+    if (status === "posted") {
+      // Même règle que la base (QG002), annoncée avant l'envoi. Un brouillon peut rester incomplet.
+      const manque = lines.filter(l => l.account_id).flatMap(l =>
+        activeAxes.filter(a => requirementFor(a, l.account_id) === "required" && !l.analytics[a.id])
+          .map(a => `${a.name} sur le compte ${glAccounts.find(g => g.id === l.account_id)?.code}`));
+      if (manque.length > 0) { toast.error(`Section obligatoire : ${[...new Set(manque)].join(" ; ")}`); return; }
+    }
+    try {
     await createEntry.mutateAsync({
       entry_number: ref,
       entry_date: format(entryDate, "yyyy-MM-dd"),
@@ -133,15 +150,16 @@ const JournalEntries = () => {
         description: l.label,
         debit: parseFloat(l.debit) || 0,
         credit: parseFloat(l.credit) || 0,
-        cost_center: l.costCenter || undefined,
-        department: l.department || undefined,
-        project: l.project || undefined,
+        analytics: l.analytics,
       })),
     });
+    } catch {
+      return; // refus déjà affiché par la mutation ; la saisie reste ouverte
+    }
     setShowNewEntry(false);
     setLines([
-      { id: 1, account_id: "", label: "", debit: "", credit: "", costCenter: "", department: "", project: "" },
-      { id: 2, account_id: "", label: "", debit: "", credit: "", costCenter: "", department: "", project: "" },
+      { id: 1, account_id: "", label: "", debit: "", credit: "", analytics: {} },
+      { id: 2, account_id: "", label: "", debit: "", credit: "", analytics: {} },
     ]);
     setEntryDesc("");
     setEntryRef("");
@@ -210,9 +228,9 @@ const JournalEntries = () => {
                   <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Description</th>
                   <th className="text-right py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Debit</th>
                   <th className="text-right py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Credit</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Cost Center</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Department</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Project</th>
+                  {activeAxes.map(a => (
+                    <th key={a.id} className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">{a.name}</th>
+                  ))}
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -228,19 +246,25 @@ const JournalEntries = () => {
                     <td className="py-1.5 px-3"><Input className="border-0 bg-transparent shadow-none h-8 text-xs" placeholder="Label" value={line.label} onChange={(e) => updateLine(line.id, "label", e.target.value)} /></td>
                     <td className="py-1.5 px-3"><Input className="border-0 bg-transparent shadow-none h-8 text-xs text-right tabular-nums" placeholder="0" type="number" value={line.debit} onChange={(e) => updateLine(line.id, "debit", e.target.value)} /></td>
                     <td className="py-1.5 px-3"><Input className="border-0 bg-transparent shadow-none h-8 text-xs text-right tabular-nums" placeholder="0" type="number" value={line.credit} onChange={(e) => updateLine(line.id, "credit", e.target.value)} /></td>
-                    <td className="py-1.5 px-3">
-                      <Select value={line.costCenter} onValueChange={(v) => updateLine(line.id, "costCenter", v)}>
-                        <SelectTrigger className="border-0 bg-transparent shadow-none h-8 text-xs"><SelectValue placeholder="CC" /></SelectTrigger>
-                        <SelectContent>{costCenters.map(cc => <SelectItem key={cc} value={cc}>{cc}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-1.5 px-3">
-                      <Select value={line.department} onValueChange={(v) => updateLine(line.id, "department", v)}>
-                        <SelectTrigger className="border-0 bg-transparent shadow-none h-8 text-xs"><SelectValue placeholder="Dept" /></SelectTrigger>
-                        <SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-1.5 px-3"><Input className="border-0 bg-transparent shadow-none h-8 text-xs" placeholder="Project" value={line.project} onChange={(e) => updateLine(line.id, "project", e.target.value)} /></td>
+                    {activeAxes.map(axis => {
+                      const need = requirementFor(axis, line.account_id);
+                      return (
+                        <td key={axis.id} className="py-1.5 px-3">
+                          <select
+                            aria-label={`${axis.name}, ligne ${line.id}`}
+                            data-testid={`je-line-${line.id}-axis-${axis.code}`}
+                            value={line.analytics[axis.id] ?? ""}
+                            disabled={need === "forbidden"}
+                            aria-invalid={need === "required" && !line.analytics[axis.id] ? true : undefined}
+                            onChange={(e) => setLines(ls => ls.map(l => l.id === line.id ? { ...l, analytics: { ...l.analytics, [axis.id]: e.target.value } } : l))}
+                            className="h-8 w-full min-w-28 rounded-md border border-input bg-background px-2 text-xs disabled:opacity-50 aria-[invalid=true]:border-destructive"
+                          >
+                            <option value="">{need === "forbidden" ? "Interdit" : need === "required" ? "— Obligatoire —" : "—"}</option>
+                            {usableValues(axis, format(entryDate, "yyyy-MM-dd")).map(v => <option key={v.id} value={v.id}>{v.code} {v.name}</option>)}
+                          </select>
+                        </td>
+                      );
+                    })}
                     <td className="py-1.5 px-3 text-center"><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeRow(line.id)}><Trash2 className="w-3.5 h-3.5" /></Button></td>
                   </tr>
                 ))}

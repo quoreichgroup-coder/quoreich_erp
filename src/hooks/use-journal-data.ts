@@ -71,26 +71,53 @@ export function useCreateJournalEntry() {
       description: string;
       source: string;
       status: string;
-      lines: { account_id: string; description: string; debit: number; credit: number; cost_center?: string; department?: string; project?: string }[];
+      /** analytics : section par axe ({ axisId: valueId }), contrôlée à la comptabilisation (QG002). */
+      lines: { account_id: string; description: string; debit: number; credit: number; analytics?: Record<string, string> }[];
     }) => {
       const tenant_id = await fetchTenantId();
-      const { lines, ...header } = entry;
+      const { lines, status, ...header } = entry;
 
+      // Toujours en brouillon d'abord : la base contrôle l'équilibre et l'analytique au moment
+      // où l'écriture devient 'posted', et il lui faut alors ses lignes et leurs imputations.
+      // (Insérer l'en-tête directement en 'posted' était refusé : « cannot post empty entry ».)
       const { data, error } = await supabase
         .from("journal_entries")
-        .insert({
-          ...header,
-          tenant_id,
-          created_by: user!.id,
-          ...(entry.status === "posted" ? { posted_by: user!.id, posted_at: new Date().toISOString() } : {}),
-        })
+        .insert({ ...header, status: "draft", tenant_id, created_by: user!.id })
         .select()
         .single();
       if (error) throw error;
 
-      const lineRows = lines.map((l) => ({ ...l, entry_id: data.id }));
+      // Identifiants de lignes générés ici pour rattacher chaque imputation à sa ligne sans
+      // dépendre de l'ordre de retour.
+      const lineRows = lines.map(({ analytics: _a, ...l }) => ({ ...l, id: crypto.randomUUID(), entry_id: data.id }));
+      const analyticRows = lines.flatMap((l, i) =>
+        Object.entries(l.analytics ?? {})
+          .filter(([, valueId]) => Boolean(valueId))
+          .map(([axis_id, value_id]) => ({ line_id: lineRows[i].id, axis_id, value_id })),
+      );
+      const fail = async (cause: { message: string }): Promise<never> => {
+        // Pas de transaction entre appels : on retire le brouillon incomplet. Si la suppression
+        // est refusée (réservée à l'administrateur), il reste un brouillon, et on le dit.
+        await supabase.from("journal_lines").delete().eq("entry_id", data.id);
+        const { data: gone } = await supabase.from("journal_entries").delete().eq("id", data.id).select("id");
+        throw new Error(gone?.length ? cause.message : `${cause.message} — l'écriture ${entry.entry_number} reste en brouillon`);
+      };
+
       const { error: lineErr } = await supabase.from("journal_lines").insert(lineRows);
-      if (lineErr) throw lineErr;
+      if (lineErr) return fail(lineErr);
+      if (analyticRows.length > 0) {
+        const { error: anaErr } = await (supabase as any).from("journal_line_analytics").insert(analyticRows);
+        if (anaErr) return fail(anaErr);
+      }
+      if (status === "posted") {
+        const { error: postErr } = await supabase
+          .from("journal_entries")
+          .update({ status: "posted", posted_by: user!.id, posted_at: new Date().toISOString() })
+          .eq("id", data.id);
+        // Refus de comptabilisation (déséquilibre, période close, analytique) : le brouillon
+        // complet est conservé pour correction, rien n'est perdu.
+        if (postErr) throw new Error(`${postErr.message} — l'écriture ${entry.entry_number} est conservée en brouillon`);
+      }
 
       return data;
     },
