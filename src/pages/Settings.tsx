@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
+import { TaxCodesPanel } from "@/components/TaxCodesPanel";
 import { AiSchedulesSettings } from "@/components/AiSchedulesSettings";
 import { ProcurementRolesPanel } from "@/components/ProcurementRolesPanel";
 import { SalesRolesPanel } from "@/components/SalesRolesPanel";
@@ -32,7 +33,7 @@ const tabs = [
   { id: "accounts", label: "Chart of Accounts", icon: BookOpen },
   { id: "posting", label: "Comptabilisation", icon: Landmark },
   { id: "analytics", label: "Analytique", icon: Layers },
-  { id: "tax", label: "Tax Configuration", icon: Receipt },
+  { id: "tax", label: "Codes TVA", icon: Receipt },
   { id: "payment", label: "Payment Terms", icon: CreditCard },
   { id: "workflow", label: "Workflow Engine", icon: GitBranch },
   { id: "roles", label: "Permissions Matrix", icon: Users },
@@ -62,12 +63,6 @@ const fiscalYears = [
   { year: "FY 2023–2024", start: "2023-01-01", end: "2023-12-31", status: "Closed", periods: 12, closed: 12 },
 ];
 
-const taxRates = [
-  { code: "VAT-18", name: "Standard VAT", rate: "18%", type: "Output", status: "Active" },
-  { code: "VAT-0", name: "Zero-Rated", rate: "0%", type: "Output", status: "Active" },
-  { code: "WHT-5", name: "Withholding Tax", rate: "5%", type: "Input", status: "Active" },
-  { code: "EXEMPT", name: "Tax Exempt", rate: "—", type: "—", status: "Active" },
-];
 
 const paymentTerms = [
   { code: "NET-30", name: "Net 30 Days", days: 30, discount: "—", status: "Active" },
@@ -412,127 +407,8 @@ const Settings = () => {
           )}
 
           {/* ── Tax Configuration ── */}
-          {activeTab === "tax" && (
-            <div className="space-y-4">
-              {/* Tax Liability KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[
-                  { label: "Output VAT (Collected)", value: "18,540,000", color: "text-foreground" },
-                  { label: "Input VAT (Deductible)", value: "12,380,000", color: "text-foreground" },
-                  { label: "Net VAT Liability", value: "6,160,000", color: "text-destructive" },
-                  { label: "WHT Withheld", value: "2,450,000", color: "text-primary" },
-                ].map(k => (
-                  <div key={k.label} className="bg-card rounded-lg border border-border p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{k.label}</p>
-                    <p className={cn("text-xl font-semibold tabular-nums mt-1", k.color)}>{k.value} <span className="text-[10px] font-normal text-muted-foreground">XOF</span></p>
-                  </div>
-                ))}
-              </div>
+          {activeTab === "tax" && <div className="max-w-4xl"><TaxCodesPanel /></div>}
 
-              {/* Tax Rates Table */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-medium text-foreground">Tax Rates Configuration</h3>
-                    <HelpIcon text="Tax codes auto-applied on AR/AP transactions and invoices based on Chart of Accounts mapping." />
-                  </div>
-                  <Button size="sm" className="h-7 text-[11px] gap-1"><Plus className="w-3 h-3" /> Add Tax Rate</Button>
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Code</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Description</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Rate</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Type</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">GL Account</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-2 w-10"></th>
-                  </tr></thead>
-                  <tbody>
-                    {taxRates.map((tax) => (
-                      <tr key={tax.code} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-2.5 font-mono text-foreground font-medium">{tax.code}</td>
-                        <td className="px-4 py-2.5 text-foreground">{tax.name}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{tax.rate}</td>
-                        <td className="px-4 py-2.5 text-muted-foreground">{tax.type}</td>
-                        <td className="px-4 py-2.5 font-mono text-muted-foreground">
-                          {tax.code === "VAT-18" ? "2300" : tax.code === "WHT-5" ? "2310" : "—"}
-                        </td>
-                        <td className="px-4 py-2.5"><StatusBadge status={tax.status} /></td>
-                        <td className="px-4 py-2.5 text-right"><button className="p-1 rounded hover:bg-muted transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Tax Liability Tracking */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-medium text-foreground">Tax Liability Tracking</h3>
-                    <HelpIcon text="Monthly VAT/WHT liability summary. Amounts auto-calculated from posted AR/AP transactions." />
-                  </div>
-                  <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1"><Download className="w-3 h-3" /> Export Tax Report</Button>
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Period</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Output VAT</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Input VAT</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Net Liability</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">WHT</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Filing Status</th>
-                  </tr></thead>
-                  <tbody>
-                    {[
-                      { period: "March 2026", output: 6200000, input: 4120000, wht: 820000, status: "Pending" },
-                      { period: "February 2026", output: 6540000, input: 4380000, wht: 890000, status: "Filed" },
-                      { period: "January 2026", output: 5800000, input: 3880000, wht: 740000, status: "Filed" },
-                    ].map(row => (
-                      <tr key={row.period} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-2.5 font-medium text-foreground">{row.period}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.output)}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.input)}</td>
-                        <td className={cn("px-4 py-2.5 text-right tabular-nums font-medium", row.output - row.input > 0 ? "text-destructive" : "text-success")}>
-                          {fmt(row.output - row.input)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.wht)}</td>
-                        <td className="px-4 py-2.5"><StatusBadge status={row.status === "Filed" ? "Active" : "warning"} label={row.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Auto-Calculation Preview */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <h3 className="text-sm font-medium text-foreground">Tax Auto-Calculation Preview</h3>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Shows how tax codes are auto-applied on new transactions based on account mapping</p>
-                </div>
-                <div className="p-4 space-y-3">
-                  {[
-                    { scenario: "Sales Invoice (VAT-18)", base: 5000000, tax: 900000, total: 5900000, accounts: "DR 1110 Receivables → CR 4000 Revenue + CR 2300 VAT Payable" },
-                    { scenario: "Supplier Bill (VAT-18)", base: 3200000, tax: 576000, total: 3776000, accounts: "DR 5000 COGS + DR 2310 VAT Recoverable → CR 2010 Payables" },
-                    { scenario: "Service Invoice (WHT-5)", base: 2000000, tax: 100000, total: 1900000, accounts: "DR 5100 Services → CR 2010 Payables + CR 2320 WHT Payable" },
-                  ].map(s => (
-                    <div key={s.scenario} className="bg-muted/20 rounded p-3 border border-border">
-                      <p className="text-xs font-medium text-foreground">{s.scenario}</p>
-                      <div className="grid grid-cols-3 gap-3 mt-2">
-                        <div><p className="text-[10px] text-muted-foreground">Base</p><p className="text-xs tabular-nums font-medium">{fmt(s.base)}</p></div>
-                        <div><p className="text-[10px] text-muted-foreground">Tax</p><p className="text-xs tabular-nums font-medium text-primary">{fmt(s.tax)}</p></div>
-                        <div><p className="text-[10px] text-muted-foreground">Total</p><p className="text-xs tabular-nums font-semibold">{fmt(s.total)}</p></div>
-                      </div>
-                      <p className="text-[10px] font-mono text-muted-foreground mt-2">{s.accounts}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Payment Terms ── */}
           {activeTab === "payment" && (
             <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">

@@ -26,6 +26,8 @@ import { AnalyticSelectors } from "@/components/AnalyticSelectors";
 import { useAnalyticsSetup, useCustomerAnalyticDefaults } from "@/hooks/use-analytics-setup";
 import { useAccountingSetup } from "@/hooks/use-accounting-setup";
 import { requiredAxisIds } from "@/lib/analytics-setup";
+import { useTaxCodes } from "@/hooks/use-tax-codes";
+import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
 
 /* ──────── HELPERS ──────── */
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -55,13 +57,14 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
     invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
     invoice_date: new Date().toISOString().split("T")[0],
     due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    subtotal: "",
-    tax_amount: "0",
   });
 
-  const subtotal = parseFloat(form.subtotal) || 0;
-  const tax = parseFloat(form.tax_amount) || 0;
-  const total = subtotal + tax;
+  // Lignes (V21) : l'aperçu reproduit le calcul de la base, qui fait foi.
+  const { data: taxCodes = [] } = useTaxCodes();
+  const activeTaxCodes = taxCodes.filter((t) => t.active);
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  const { amounts, subtotal, tax, total, allValid } = invoiceTotals(lines, taxCodes);
+  const setLine = (i: number, patch: Partial<DraftLine>) => setLines((ls) => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
 
   // Analytique : sections par défaut du client, puis choix de l'utilisateur (prioritaire).
   const analyticsSetup = useAnalyticsSetup();
@@ -82,14 +85,24 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
   const required = useMemo(() => requiredAxisIds(analyticsSetup.data, salesAccount), [analyticsSetup.data, salesAccount]);
 
   const handleCreate = async () => {
-    if (!form.customer_id || subtotal <= 0) { toast.error("Remplissez tous les champs"); return; }
+    if (!form.customer_id) { toast.error("Choisissez un client"); return; }
+    if (!allValid) { toast.error("Chaque ligne doit avoir un libellé, une quantité positive, un prix et une remise entre 0 et 100 %"); return; }
+    if (total <= 0) { toast.error("Le total de la facture doit être positif"); return; }
     const missing = (analyticsSetup.data?.axes ?? []).filter((a) => required.has(a.id) && !analytics[a.id]);
     if (missing.length > 0) {
       toast.error(`Section obligatoire sur le compte de ventes ${salesAccount} : ${missing.map((a) => a.name).join(", ")}`);
       return;
     }
     try {
-      await createInvoice.mutateAsync({ ...form, subtotal, tax_amount: tax, total, analytics });
+      await createInvoice.mutateAsync({
+        ...form, subtotal, tax_amount: tax, total, analytics,
+        lines: lines.map((l) => ({
+          description: l.description.trim(), quantity: Number(l.quantity.replace(",", ".")),
+          unit_price: Number(l.unitPrice.replace(",", ".")),
+          discount_pct: l.discountPct === "" ? 0 : Number(l.discountPct.replace(",", ".")),
+          tax_code_id: l.taxCodeId || undefined,
+        })),
+      });
       onClose();
     } catch {
       /* le refus est déjà affiché par la mutation ; la saisie reste ouverte pour correction */
@@ -98,7 +111,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">Nouvelle facture AR</DialogTitle>
         </DialogHeader>
@@ -125,14 +138,51 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
               <Label className="text-xs">Échéance</Label>
               <Input type="date" className="h-8 text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Montant HT (XOF)</Label>
-              <Input type="number" className="h-8 text-xs" value={form.subtotal} onChange={e => setForm(f => ({ ...f, subtotal: e.target.value }))} />
-            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">TVA (XOF)</Label>
-            <Input type="number" className="h-8 text-xs" value={form.tax_amount} onChange={e => setForm(f => ({ ...f, tax_amount: e.target.value }))} />
+          <div className="space-y-2" data-testid="invoice-lines">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="py-1.5 pr-2 font-medium">Libellé</th>
+                    <th className="py-1.5 pr-2 font-medium text-right w-20">Qté</th>
+                    <th className="py-1.5 pr-2 font-medium text-right w-28">Prix unitaire</th>
+                    <th className="py-1.5 pr-2 font-medium text-right w-20">Remise %</th>
+                    <th className="py-1.5 pr-2 font-medium w-32">TVA</th>
+                    <th className="py-1.5 pr-2 font-medium text-right w-28">HT</th>
+                    <th className="w-8"><span className="sr-only">Retirer</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr key={i} className="border-b border-border/50" data-testid={`invoice-line-${i + 1}`}>
+                      <td className="py-1 pr-2"><Input aria-label={`Libellé ligne ${i + 1}`} className="h-8 text-xs" value={l.description} onChange={e => setLine(i, { description: e.target.value })} /></td>
+                      <td className="py-1 pr-2"><Input aria-label={`Quantité ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.quantity} onChange={e => setLine(i, { quantity: e.target.value })} /></td>
+                      <td className="py-1 pr-2"><Input aria-label={`Prix unitaire ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.unitPrice} onChange={e => setLine(i, { unitPrice: e.target.value })} /></td>
+                      <td className="py-1 pr-2"><Input aria-label={`Remise ligne ${i + 1}`} inputMode="decimal" placeholder="0" className="h-8 text-xs text-right" value={l.discountPct} onChange={e => setLine(i, { discountPct: e.target.value })} /></td>
+                      <td className="py-1 pr-2">
+                        <select aria-label={`Code TVA ligne ${i + 1}`} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={l.taxCodeId} onChange={e => setLine(i, { taxCodeId: e.target.value })}>
+                          <option value="">Sans TVA</option>
+                          {activeTaxCodes.map(t => <option key={t.id} value={t.id}>{t.code} · {t.rate} %</option>)}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2 text-right tabular-nums">{amounts[i].valid ? fmt(amounts[i].net) : "—"}</td>
+                      <td className="py-1 text-right">
+                        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" aria-label={`Retirer la ligne ${i + 1}`}
+                          disabled={lines.length === 1} onClick={() => setLines(ls => ls.filter((_, k) => k !== i))}>×</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1" data-testid="btn-add-line"
+              onClick={() => setLines(ls => [...ls, emptyLine(ls[ls.length - 1]?.taxCodeId ?? "")])}>
+              <Plus className="w-3 h-3" /> Ajouter une ligne
+            </Button>
+            {activeTaxCodes.length === 0 && (
+              <p className="text-xs text-muted-foreground">Aucun code TVA actif : créez-en dans Paramètres → Codes TVA pour facturer de la TVA.</p>
+            )}
           </div>
           <AnalyticSelectors
             date={form.invoice_date}

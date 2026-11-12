@@ -249,10 +249,10 @@ All green; keep them that way:
 
 | Commande | Résultat attendu |
 |---|---|
-| `npm run lint` | **0 erreur**, 458 avertissements (essentiellement `no-explicit-any`, 9 `react-refresh/only-export-components`, 7 `react-hooks/exhaustive-deps`) |
+| `npm run lint` | **0 erreur**, 461 avertissements (essentiellement `no-explicit-any`, 9 `react-refresh/only-export-components`, 7 `react-hooks/exhaustive-deps`) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 erreur |
 | `npx tsc --noEmit -p tsconfig.node.json` | 0 erreur |
-| `npm test` | 46 fichiers, 377 tests |
+| `npm test` | 49 fichiers, 386 tests |
 | `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
 | `cd services/api && ./mvnw verify` | 83 tests (11 unitaires + 72 d'intégration), BUILD SUCCESS |
 | `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |

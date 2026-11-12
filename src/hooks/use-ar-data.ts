@@ -433,8 +433,10 @@ export function useCreateARInvoice() {
       total: number;
       /** Section choisie par axe ({ axisId: valueId }) ; l'emporte sur le défaut du client. */
       analytics?: Record<string, string>;
+      /** Lignes (V21) : la base calcule HT et TVA ; l'en-tête devient leur somme. */
+      lines?: { description: string; quantity: number; unit_price: number; discount_pct: number; tax_code_id?: string }[];
     }) => {
-      const { analytics: chosen = {}, ...fields } = inv;
+      const { analytics: chosen = {}, lines = [], ...fields } = inv;
       const analytics = Object.entries(chosen).filter(([, valueId]) => Boolean(valueId));
       if (isApiEnabled()) {
         // Le total est recalculé côté base (HT + TVA) : on n'envoie que les composantes.
@@ -446,21 +448,38 @@ export function useCreateARInvoice() {
           subtotal: inv.subtotal,
           taxAmount: inv.tax_amount,
           analytics: analytics.map(([axisId, valueId]) => ({ axisId, valueId })),
+          ...(lines.length > 0 ? {
+            lines: lines.map((l) => ({
+              description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
+              discountPct: l.discount_pct, taxCodeId: l.tax_code_id || null,
+            })),
+          } : {}),
         });
       }
       const tenant_id = await fetchTenantId();
-      if (analytics.length > 0) {
+      if (analytics.length > 0 || lines.length > 0) {
         // Les sections se posent sur une facture en brouillon (V19), lues à l'émission. Sans
         // transaction entre appels PostgREST, un refus à l'émission (section inactive, règle)
         // laisserait un brouillon orphelin : on le retire avant de rendre l'erreur d'origine.
         const { data: draft, error: draftError } = await supabase.from("ar_invoices").insert({
           ...fields, tenant_id, created_by: user!.id, status: "draft", amount_paid: 0,
+          // Avec des lignes, l'en-tête part de zéro : la base le recalcule à chaque ligne.
+          ...(lines.length > 0 ? { subtotal: 0, tax_amount: 0, total: 0 } : {}),
         }).select().single();
         if (draftError) throw draftError;
         const db = supabase as any;
-        const { error: anaError } = await db.from("ar_invoice_analytics").insert(
-          analytics.map(([axis_id, value_id]) => ({ tenant_id, invoice_id: draft.id, axis_id, value_id })),
-        );
+        const { error: lineError } = lines.length > 0
+          ? await db.from("ar_invoice_lines").insert(lines.map((l, i) => ({
+              tenant_id, invoice_id: draft.id, line_no: i + 1, description: l.description, quantity: l.quantity,
+              unit_price: l.unit_price, discount_pct: l.discount_pct, tax_code_id: l.tax_code_id || null,
+            })))
+          : { error: null };
+        const { error: anaError } = lineError
+          ? { error: lineError }
+          : analytics.length > 0
+            ? await db.from("ar_invoice_analytics").insert(
+                analytics.map(([axis_id, value_id]) => ({ tenant_id, invoice_id: draft.id, axis_id, value_id })))
+            : { error: null };
         const { data: sent, error: sentError } = anaError
           ? { data: null, error: anaError }
           : await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", draft.id).select().single();
