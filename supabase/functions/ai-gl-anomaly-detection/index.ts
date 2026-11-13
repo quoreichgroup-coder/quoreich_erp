@@ -3,6 +3,7 @@
 // Returns detailed journal lines per anomaly + entry_id for drill-down.
 // Persists each run into ai_analysis_history.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { chatCompletion, readAiConfig, toolArguments } from "../_shared/ai-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,14 +124,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
+    // Fournisseur d'IA choisi par les secrets AI_BASE_URL / AI_API_KEY / AI_MODEL (voir _shared).
+    const aiConfig = readAiConfig((name) => Deno.env.get(name));
+    if ("error" in aiConfig) throw new Error(aiConfig.error);
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+    const aiResp = await chatCompletion(aiConfig, {
         messages: [
           {
             role: "system",
@@ -170,12 +168,11 @@ Deno.serve(async (req) => {
           },
         }],
         tool_choice: { type: "function", function: { name: "report_anomalies" } },
-      }),
     });
 
     if (!aiResp.ok) {
       const code = aiResp.status;
-      const errMsg = code === 429 ? "Limite de requêtes atteinte." : code === 402 ? "Crédits IA épuisés." : "Erreur IA";
+      const errMsg = aiResp.message;
       await supabase.from("ai_analysis_history").insert({
         tenant_id: tenantId,
         analysis_type: "gl_anomaly_detection",
@@ -189,14 +186,13 @@ Deno.serve(async (req) => {
         created_by: userId,
       });
       return new Response(JSON.stringify({ error: errMsg }), {
-        status: code === 429 || code === 402 ? code : 500,
+        status: code === 429 || code === 402 || code === 503 ? code : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const aiJson = await aiResp.json();
-    const args = aiJson.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const parsed = args ? JSON.parse(args) : { anomalies: [], summary: "" };
+    const aiJson = aiResp.json;
+    const parsed = toolArguments(aiJson) ?? { anomalies: [], summary: "" };
 
     // Attach entry_id and journal lines to each anomaly for UI drill-down
     const enrichedAnomalies = (parsed.anomalies as Array<{ entry_ref: string }>).map((a) => {

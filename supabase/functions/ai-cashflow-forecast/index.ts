@@ -3,6 +3,7 @@
 // over user-supplied horizons (default 30/60/90 days) or a custom date range.
 // Persists each run into ai_analysis_history.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { chatCompletion, readAiConfig, toolArguments } from "../_shared/ai-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,15 +121,12 @@ Deno.serve(async (req) => {
       buckets: horizonBuckets,
     };
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
+    // Fournisseur d'IA choisi par les secrets AI_BASE_URL / AI_API_KEY / AI_MODEL (voir _shared).
+    const aiConfig = readAiConfig((name) => Deno.env.get(name));
+    if ("error" in aiConfig) throw new Error(aiConfig.error);
 
     const horizonEnum = horizons.map((d) => `${d}j`);
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+    const aiResp = await chatCompletion(aiConfig, {
         messages: [
           {
             role: "system",
@@ -169,16 +167,11 @@ Deno.serve(async (req) => {
           },
         }],
         tool_choice: { type: "function", function: { name: "cashflow_forecast" } },
-      }),
     });
 
     if (!aiResp.ok) {
       const code = aiResp.status;
-      const errMsg = code === 429
-        ? "Limite de requêtes atteinte, réessayez dans un instant."
-        : code === 402
-          ? "Crédits IA épuisés. Ajoutez du crédit à votre espace."
-          : "Erreur IA";
+      const errMsg = aiResp.message;
       await supabase.from("ai_analysis_history").insert({
         tenant_id: tenantId,
         analysis_type: "cashflow_forecast",
@@ -192,14 +185,13 @@ Deno.serve(async (req) => {
         created_by: userId,
       });
       return new Response(JSON.stringify({ error: errMsg }), {
-        status: code === 429 || code === 402 ? code : 500,
+        status: code === 429 || code === 402 || code === 503 ? code : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const aiJson = await aiResp.json();
-    const args = aiJson.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const forecast = args ? JSON.parse(args) : null;
+    const aiJson = aiResp.json;
+    const forecast = toolArguments(aiJson) ?? null;
 
     const payload = { forecast, inputs: summary };
 
