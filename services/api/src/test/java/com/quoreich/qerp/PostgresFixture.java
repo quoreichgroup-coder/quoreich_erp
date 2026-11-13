@@ -122,7 +122,32 @@ public final class PostgresFixture {
       // Numérotation automatique (V22) coupée pour les sociétés de recette : les tests
       // désignent leurs factures par numéro. NumerotationFacturesIT la rallume et la teste.
       execute(urlOf(databaseName), "UPDATE ar_general_settings SET auto_numbering = false");
+      // Attribution d'un rôle système dans la matrice (V23), comme le fait l'écran : les tests
+      // n'ont plus d'autre table où l'écrire depuis que user_roles est supprimée (V32). Schéma à
+      // part : SchemaMigrationIT ne compare que public, et rien de l'application ne l'appelle.
+      execute(urlOf(databaseName), """
+          CREATE SCHEMA IF NOT EXISTS test_support;
+          CREATE OR REPLACE FUNCTION test_support.grant_role(_user uuid, _role text, _tenant uuid) RETURNS void
+              LANGUAGE sql AS $$
+            INSERT INTO public.user_role_assignments (user_id, role_id, tenant_id)
+            SELECT _user, r.id, _tenant FROM public.erp_roles r WHERE r.tenant_id = _tenant AND r.code = _role
+            ON CONFLICT (user_id, role_id) DO NOTHING
+          $$;
+          """);
     }
+  }
+
+  /** Attribue des rôles système : triplets (utilisateur, code de rôle, société). Idempotent. */
+  public static void grantRoles(String databaseName, String... userRoleTenant) {
+    if (userRoleTenant.length % 3 != 0) {
+      throw new IllegalArgumentException("grantRoles attend des triplets (utilisateur, rôle, société)");
+    }
+    StringBuilder sql = new StringBuilder();
+    for (int i = 0; i < userRoleTenant.length; i += 3) {
+      sql.append("SELECT test_support.grant_role('").append(userRoleTenant[i]).append("', '")
+          .append(userRoleTenant[i + 1]).append("', '").append(userRoleTenant[i + 2]).append("');");
+    }
+    execute(urlOf(databaseName), sql.toString());
   }
 
   /**

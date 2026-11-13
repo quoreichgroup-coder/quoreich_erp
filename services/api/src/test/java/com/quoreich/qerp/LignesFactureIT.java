@@ -51,8 +51,7 @@ class LignesFactureIT {
     owner("INSERT INTO auth.users (id) VALUES ('" + COMPTABLE + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + COMPTABLE + "', '" + A
         + "', 'Comptable Alpha') ON CONFLICT (id) DO NOTHING;"
-        + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT '" + COMPTABLE + "', 'accountant', '" + A
-        + "' WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = '" + COMPTABLE + "');"
+        + "SELECT test_support.grant_role('" + COMPTABLE + "', 'accountant', '" + A + "');"
         + "INSERT INTO gl_accounts (tenant_id, code, name, account_type) VALUES ('" + A
         + "', '4432', 'TVA facturée sur prestations', 'liability') ON CONFLICT (tenant_id, code) DO NOTHING;"
         + "INSERT INTO tax_codes (id, tenant_id, code, name, rate) VALUES"

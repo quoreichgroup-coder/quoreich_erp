@@ -50,13 +50,9 @@ class ParametrageComptableIT {
             + "') ON CONFLICT DO NOTHING;"
             + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + ALPHA_COMPTABLE + "', '"
             + A + "', 'Comptable Alpha'), ('" + ALPHA_ADMIN_AILLEURS + "', '" + A
-            + "', 'Admin ailleurs') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role,"
-            + " v.t::uuid FROM (VALUES ('" + ALPHA_ADMIN + "', 'admin', '" + A + "'), ('"
-            + ALPHA_COMPTABLE + "', 'accountant', '" + A + "'), ('" + ALPHA_ADMIN_AILLEURS
-            + "', 'admin', '" + B + "'), ('" + BETA_ADMIN + "', 'admin', '" + B
-            + "')) AS v(u, r, t) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
-            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+            + "', 'Admin ailleurs') ON CONFLICT (id) DO NOTHING");
+    PostgresFixture.grantRoles(DATABASE, ALPHA_ADMIN, "admin", A, ALPHA_COMPTABLE, "accountant", A,
+        ALPHA_ADMIN_AILLEURS, "admin", B, BETA_ADMIN, "admin", B);
   }
 
   @Test

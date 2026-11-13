@@ -53,8 +53,8 @@ public class ArInvoiceQuery {
    * d'isolation société. Sans ce contrôle, un {@code viewer} émettrait facture et écriture. Les
    * rôles retenus sont ceux que la base exige pour écrire une écriture à la main.
    *
-   * <p>Plus strict que {@code has_role()}, qui ignore {@code user_roles.tenant_id} : un rôle
-   * détenu dans une autre société ne donne aucun droit ici.
+   * <p>Un rôle détenu dans une autre société ne donne aucun droit ici : la matrice est lue dans
+   * la société du profil.
    */
   private static final String CAN_WRITE =
       // Modèle d'autorisations unique (V23) : rôle détenu dans la société courante.

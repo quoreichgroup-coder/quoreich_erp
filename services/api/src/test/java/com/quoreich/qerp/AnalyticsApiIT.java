@@ -59,12 +59,9 @@ class AnalyticsApiIT {
         PostgresFixture.urlOf(DATABASE),
         "INSERT INTO auth.users (id) VALUES ('" + COMPTABLE + "') ON CONFLICT DO NOTHING;"
             + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + COMPTABLE + "', '" + A
-            + "', 'Comptable Alpha') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role,"
-            + " v.t::uuid FROM (VALUES ('" + PostgresFixture.ALPHA_USER + "', 'admin', '" + A + "'), ('"
-            + COMPTABLE + "', 'accountant', '" + A + "'), ('" + PostgresFixture.BETA_USER + "', 'admin', '"
-            + B + "')) AS v(u, r, t) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
-            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+            + "', 'Comptable Alpha') ON CONFLICT (id) DO NOTHING");
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "admin", A, COMPTABLE, "accountant", A,
+        PostgresFixture.BETA_USER, "admin", B);
     TenantContextHolder.clear();
   }
 

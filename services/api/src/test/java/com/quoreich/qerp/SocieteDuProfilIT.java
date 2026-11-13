@@ -59,7 +59,7 @@ class SocieteDuProfilIT {
   @Test
   @DisplayName("créer son profil déjà rattaché à une société est refusé ; sans société, accepté ; l'onboarding rattache")
   void creationEtOnboarding() throws Exception {
-    owner("DELETE FROM profiles WHERE id = '" + NOUVEAU + "'; DELETE FROM user_roles WHERE user_id = '" + NOUVEAU + "';"
+    owner("DELETE FROM profiles WHERE id = '" + NOUVEAU + "';"
         + "INSERT INTO auth.users (id) VALUES ('" + NOUVEAU + "') ON CONFLICT DO NOTHING");
     assertThatThrownBy(() -> asUser(NOUVEAU, "INSERT INTO profiles (id, tenant_id, full_name) VALUES (auth.uid(), '" + B + "', 'Intrus')"))
         .hasMessageContaining("Un profil ne peut pas être rattaché à une société par l'utilisateur lui-même");
@@ -72,14 +72,12 @@ class SocieteDuProfilIT {
   }
 
   @Test
-  @DisplayName("un administrateur ne lit plus les rôles des utilisateurs d'une autre société (V27)")
+  @DisplayName("un administrateur ne lit pas les rôles des utilisateurs d'une autre société (V27, matrice depuis V32)")
   void rolesDesAutresSocietesInvisibles() throws Exception {
-    owner("INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, 'admin', v.t::uuid FROM (VALUES ('"
-        + PostgresFixture.ALPHA_USER + "', '" + A + "'), ('" + PostgresFixture.BETA_USER + "', '" + B + "')) AS v(u, t)"
-        + " WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid AND x.role = 'admin')");
-    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_roles WHERE tenant_id = '" + B + "'"))
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "admin", A, PostgresFixture.BETA_USER, "admin", B);
+    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_role_assignments WHERE tenant_id = '" + B + "'"))
         .isEqualTo("0");
-    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_roles WHERE tenant_id = '" + A + "'"))
+    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_role_assignments WHERE tenant_id = '" + A + "'"))
         .isEqualTo("1");
     // Journaux de rôles : ni lecture du journal risques d'une autre société, ni écriture au nom d'une autre.
     owner("INSERT INTO risk_role_audit (tenant_id, actor_user_id, target_user_id, role, action) VALUES ('" + B + "', '"

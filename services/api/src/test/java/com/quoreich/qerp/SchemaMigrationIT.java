@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "31";
+  private static final String DERNIERE_MIGRATION = "32";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -68,6 +68,19 @@ class SchemaMigrationIT {
           "payments/trg_payment_gl_posting",
           "goods_receipts/trg_gr_completed",
           "journal_entries/trg_journal_entry_audit");
+
+  /** V32 — user_roles, table de transition depuis V23, est supprimée avec ses politiques. */
+  private static final Set<String> TABLES_RETIREES = Set.of("user_roles");
+
+  private static final Set<String> POLITIQUES_RETIREES =
+      Set.of(
+          "user_roles/Admins delete roles",
+          "user_roles/Admins insert roles",
+          "user_roles/Admins update roles",
+          "user_roles/Admins view all roles",
+          "user_roles/Users can view own roles");
+
+  private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
@@ -120,18 +133,9 @@ class SchemaMigrationIT {
           "has_permission",
           "seed_tenant_system_roles",
           "on_tenant_seed_system_roles",
-          "mirror_user_roles",
           "guard_system_roles",
-          "legacy_has_role",
-          "legacy_has_crm_perm",
-          "legacy_has_hr_perm",
-          "legacy_has_inventory_perm",
-          "legacy_has_procurement_perm",
-          "legacy_has_sales_perm",
-          "legacy_has_treasury_perm",
           "guard_profile_tenant",
           "audit_authorizations",
-          "mirror_role_assignments",
           "guard_role_assignments",
           "guard_role_in_use",
           "my_access",
@@ -189,16 +193,22 @@ class SchemaMigrationIT {
           "ar_invoice_lines/trg_sum_ar_invoice_lines",
           "ar_invoices/trg_assign_ar_invoice_number",
           "tenants/trg_seed_system_roles",
-          "user_roles/trg_mirror_user_roles",
           "erp_roles/trg_guard_system_roles",
           "erp_role_permissions/trg_guard_system_role_permissions",
           "profiles/trg_guard_profile_tenant",
           "erp_roles/trg_audit_erp_roles",
           "erp_role_permissions/trg_audit_erp_role_permissions",
           "user_role_assignments/trg_audit_user_role_assignments",
-          "user_role_assignments/trg_mirror_role_assignments",
           "user_role_assignments/trg_guard_role_assignments",
           "erp_roles/trg_guard_role_in_use");
+
+  /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
+  private static Set<String> sans(Set<String> reference, Set<String> retraits) {
+    Set<String> attendu = new LinkedHashSet<>(reference);
+    assertThat(attendu).as("un retrait déclaré doit exister dans le dump").containsAll(retraits);
+    attendu.removeAll(retraits);
+    return attendu;
+  }
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
@@ -259,7 +269,7 @@ class SchemaMigrationIT {
           AND c.relname <> ?
         """, TABLE_HISTORIQUE_FLYWAY));
 
-    memeEnsemble(avec(MANIFESTE.colonne("tables_columns", 0), TABLES_AJOUTEES), reconstruites, "tables");
+    memeEnsemble(avec(sans(MANIFESTE.colonne("tables_columns", 0), TABLES_RETIREES), TABLES_AJOUTEES), reconstruites, "tables");
   }
 
   @Test
@@ -272,7 +282,7 @@ class SchemaMigrationIT {
         """));
 
     Set<String> horsManifeste = new TreeSet<>(toutes);
-    horsManifeste.removeAll(avec(MANIFESTE.colonne("tables_columns", 0), TABLES_AJOUTEES));
+    horsManifeste.removeAll(avec(sans(MANIFESTE.colonne("tables_columns", 0), TABLES_RETIREES), TABLES_AJOUTEES));
 
     assertThat(horsManifeste)
         .as("toute autre table inattendue signalerait un objet créé hors des migrations du lot 0")
@@ -307,7 +317,7 @@ class SchemaMigrationIT {
         WHERE n.nspname = 'public' AND NOT t.tgisinternal
         """)), "déclencheurs");
 
-    memeEnsemble(avec(MANIFESTE.cles("policies", 1, 2), POLITIQUES_AJOUTEES), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(sans(MANIFESTE.cles("policies", 1, 2), POLITIQUES_RETIREES), POLITIQUES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT tablename || '/' || policyname FROM pg_policies WHERE schemaname = 'public'
         """)), "politiques RLS");
 
@@ -317,7 +327,7 @@ class SchemaMigrationIT {
         SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
         """)), "séquences");
 
-    memeEnsemble(MANIFESTE.cles("fk_to_auth_users", 0, 1), new LinkedHashSet<>(noms("""
+    memeEnsemble(sans(MANIFESTE.cles("fk_to_auth_users", 0, 1), CLES_AUTH_RETIREES), new LinkedHashSet<>(noms("""
         SELECT c.relname || '/' || con.conname FROM pg_constraint con
         JOIN pg_class c ON c.oid = con.conrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -329,7 +339,7 @@ class SchemaMigrationIT {
   @Test
   @DisplayName("la RLS est active exactement sur les tables du manifeste, et FORCE est absent partout")
   void laRlsEstActiveSansEtreForceeSurLesProprietaires() {
-    memeEnsemble(avec(MANIFESTE.tablesAvecRlsActive(), TABLES_AJOUTEES), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(sans(MANIFESTE.tablesAvecRlsActive(), TABLES_RETIREES), TABLES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT c.relname FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relrowsecurity

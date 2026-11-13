@@ -66,26 +66,12 @@ class ArInvoiceIT {
             + ALPHA_FOREIGN_ROLE
             + "', '"
             + PostgresFixture.ALPHA_TENANT
-            + "', 'Rôle ailleurs') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role,"
-            + " v.t::uuid FROM (VALUES ('"
-            + PostgresFixture.ALPHA_USER
-            + "', 'accountant', '"
-            + PostgresFixture.ALPHA_TENANT
-            + "'), ('"
-            + PostgresFixture.BETA_USER
-            + "', 'admin', '"
-            + PostgresFixture.BETA_TENANT
-            + "'), ('"
-            + ALPHA_VIEWER
-            + "', 'viewer', '"
-            + PostgresFixture.ALPHA_TENANT
-            + "'), ('"
-            + ALPHA_FOREIGN_ROLE
-            + "', 'accountant', '"
-            + PostgresFixture.BETA_TENANT
-            + "')) AS v(u, r, t) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
-            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+            + "', 'Rôle ailleurs') ON CONFLICT (id) DO NOTHING");
+    PostgresFixture.grantRoles(DATABASE,
+        PostgresFixture.ALPHA_USER, "accountant", PostgresFixture.ALPHA_TENANT,
+        PostgresFixture.BETA_USER, "admin", PostgresFixture.BETA_TENANT,
+        ALPHA_VIEWER, "viewer", PostgresFixture.ALPHA_TENANT,
+        ALPHA_FOREIGN_ROLE, "accountant", PostgresFixture.BETA_TENANT);
     TenantContextHolder.clear();
   }
 

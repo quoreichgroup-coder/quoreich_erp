@@ -47,10 +47,8 @@ class NumerotationFacturesIT {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
     PostgresFixture.applySyscohada(DATABASE, A);
     PostgresFixture.applySyscohada(DATABASE, B);
-    owner("UPDATE ar_general_settings SET auto_numbering = true WHERE tenant_id = '" + A + "';"
-        + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, 'admin', v.t::uuid FROM (VALUES ('"
-        + PostgresFixture.ALPHA_USER + "', '" + A + "'), ('" + PostgresFixture.BETA_USER + "', '" + B
-        + "')) AS v(u, t) WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid)");
+    owner("UPDATE ar_general_settings SET auto_numbering = true WHERE tenant_id = '" + A + "'");
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "admin", A, PostgresFixture.BETA_USER, "admin", B);
   }
 
   /** Émet une facture d'en-tête (chemin historique : INSERT direct en 'sent'). Renvoie son numéro. */

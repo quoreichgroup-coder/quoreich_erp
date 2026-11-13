@@ -35,6 +35,7 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V29__conversion_opportunite_droit_du_catalogue.sql` | écrit à la main | `convert_opportunity_to_quote` vérifie `has_permission(…, 'crm.convert')` au lieu de `user_roles` (crm_manager/crm_admin) : l'administrateur voyait le bouton actif puis était refusé |
 | `V30__declencheurs_ventes_achats_repares.sql` | écrit à la main | `enforce_sales_period_lock` et `seed_procurement_approval_queue` lisaient dans une même expression des colonnes propres à chaque table : devis, commandes clients, bons de livraison et soumissions à approbation des achats échouaient tous |
 | `V31__roles_des_modules_et_invitations.sql` | écrit à la main | les 12 `assign_*_role` écrivent dans la matrice (`module_role_set`), cible vérifiée dans la société de l'appelant, séparation des tâches lue dans la matrice ; `tenant_invitations` + `create_tenant_invitation` / `revoke_tenant_invitation` ; `join_tenant` prend un code à usage unique et refuse un utilisateur déjà rattaché ; `create_tenant_for_user` de même |
+| `V32__suppression_de_user_roles.sql` | écrit à la main | reprise dans la matrice de toute ligne de `user_roles` absente (société du profil si la ligne n'en avait pas), puis suppression des deux recopies, des sept témoins `legacy_*` et de `user_roles` |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des

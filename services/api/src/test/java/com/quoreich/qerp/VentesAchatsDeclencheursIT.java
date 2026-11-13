@@ -26,7 +26,7 @@ import org.springframework.test.context.DynamicPropertySource;
  *   <li>Soumission à approbation d'une demande d'achat ou d'une commande fournisseur :
  *       {@code seed_procurement_approval_queue} échouait de même.
  *   <li>Conversion d'une opportunité en devis : le droit est {@code crm.convert} du catalogue —
- *       accordé à admin, que l'ancien contrôle par user_roles refusait.
+ *       accordé à admin, que l'ancien contrôle (rôles crm_* seulement) refusait.
  * </ul>
  */
 @SpringBootTest
@@ -46,9 +46,8 @@ class VentesAchatsDeclencheursIT {
   @BeforeEach
   void preparer() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
-    owner("INSERT INTO user_roles (user_id, role, tenant_id) SELECT '" + ADMIN + "', 'admin', '" + A + "'"
-        + " WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = '" + ADMIN + "' AND role = 'admin');"
-        + "INSERT INTO auth.users (id) VALUES ('" + SANS_DROIT + "') ON CONFLICT DO NOTHING;"
+    PostgresFixture.grantRoles(DATABASE, ADMIN, "admin", A);
+    owner("INSERT INTO auth.users (id) VALUES ('" + SANS_DROIT + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + SANS_DROIT + "', '" + A + "', 'Sans droit CRM')"
         + " ON CONFLICT (id) DO NOTHING;"
         + "DELETE FROM period_locks WHERE tenant_id = '" + A + "' AND module = 'Sales'");
@@ -100,7 +99,8 @@ class VentesAchatsDeclencheursIT {
     owner("INSERT INTO crm_opportunities (id, tenant_id, name, stage, amount, customer_id) VALUES"
         + " ('00000000-0000-0000-0000-00000000c001', '" + A + "', 'Opportunité gagnée', 'won', 500000, '" + CLIENT + "')"
         + " ON CONFLICT (id) DO NOTHING");
-    assertThat(count("SELECT count(*) FROM user_roles WHERE user_id = '" + ADMIN + "' AND role::text LIKE 'crm_%'"))
+    assertThat(count("SELECT count(*) FROM user_role_assignments a JOIN erp_roles r ON r.id = a.role_id"
+        + " WHERE a.user_id = '" + ADMIN + "' AND r.code LIKE 'crm_%'"))
         .as("l'administrateur n'a aucun rôle CRM : c'est le cas que l'ancien contrôle refusait")
         .isZero();
 

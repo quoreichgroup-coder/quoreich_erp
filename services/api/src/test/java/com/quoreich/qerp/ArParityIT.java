@@ -73,23 +73,10 @@ class ArParityIT {
             + ALPHA_VIEWER
             + "', '"
             + a
-            + "', 'Lecteur Alpha') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role, '"
-            + a
-            + "' FROM (VALUES ('"
-            + PostgresFixture.ALPHA_USER
-            + "', 'accountant'), ('"
-            + ALPHA_VIEWER
-            + "', 'viewer')) AS v(u, r) WHERE NOT EXISTS (SELECT 1 FROM user_roles x"
-            + " WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role);"
-            // Beta : administrateur, mais société SANS plan comptable (cas constaté en production).
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT '"
-            + PostgresFixture.BETA_USER
-            + "', 'admin', '"
-            + PostgresFixture.BETA_TENANT
-            + "' WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = '"
-            + PostgresFixture.BETA_USER
-            + "')");
+            + "', 'Lecteur Alpha') ON CONFLICT (id) DO NOTHING");
+    // Beta : administrateur, mais société SANS plan comptable (cas constaté en production).
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "accountant", a, ALPHA_VIEWER, "viewer", a,
+        PostgresFixture.BETA_USER, "admin", PostgresFixture.BETA_TENANT);
     TenantContextHolder.clear();
   }
 

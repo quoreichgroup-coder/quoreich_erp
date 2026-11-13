@@ -59,11 +59,9 @@ class AxesAnalytiquesIT {
         "INSERT INTO auth.users (id) VALUES ('" + COMPTABLE + "') ON CONFLICT DO NOTHING;"
             + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + COMPTABLE + "', '" + A
             + "', 'Comptable Alpha') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role,"
-            + " v.t::uuid FROM (VALUES ('" + ADMIN + "', 'admin', '" + A + "'), ('" + COMPTABLE
-            + "', 'accountant', '" + A + "'), ('" + BETA + "', 'admin', '" + B + "')) AS v(u, r, t)"
-            + " WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid"
-            + " AND x.role = v.r::app_role);"
+            + "SELECT test_support.grant_role('" + ADMIN + "', 'admin', '" + A + "');"
+            + "SELECT test_support.grant_role('" + COMPTABLE + "', 'accountant', '" + A + "');"
+            + "SELECT test_support.grant_role('" + BETA + "', 'admin', '" + B + "');"
             + "INSERT INTO analytic_axes (id, tenant_id, code, name) VALUES ('" + DEPT + "', '" + A
             + "', 'DEPT', 'Département') ON CONFLICT DO NOTHING;"
             + "INSERT INTO analytic_values (id, tenant_id, axis_id, code, name, is_active, valid_from)"

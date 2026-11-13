@@ -30,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Matrice des autorisations par HTTP (V23, V25) : rôles sur mesure, droits du catalogue,
- * affectations, avec leur effet réel dans la base, la recopie vers user_roles et le journal.
+ * affectations, avec leur effet réel dans la base et le journal.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,10 +57,8 @@ class AuthorizationsApiIT {
     PostgresFixture.execute(PostgresFixture.urlOf(DATABASE),
         "INSERT INTO auth.users (id) VALUES ('" + COMPTABLE + "'), ('" + CAISSIER + "') ON CONFLICT DO NOTHING;"
             + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + COMPTABLE + "', '" + A + "', 'Comptable Alpha'),"
-            + " ('" + CAISSIER + "', '" + A + "', 'Caissier Alpha') ON CONFLICT (id) DO NOTHING;"
-            + "INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, v.r::app_role, '" + A + "' FROM (VALUES ('"
-            + ADMIN + "', 'admin'), ('" + COMPTABLE + "', 'accountant')) AS v(u, r)"
-            + " WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid AND x.role = v.r::app_role)");
+            + " ('" + CAISSIER + "', '" + A + "', 'Caissier Alpha') ON CONFLICT (id) DO NOTHING");
+    PostgresFixture.grantRoles(DATABASE, ADMIN, "admin", A, COMPTABLE, "accountant", A);
     TenantContextHolder.clear();
   }
 
@@ -132,7 +130,7 @@ class AuthorizationsApiIT {
 
   @Test
   @Order(3)
-  @DisplayName("affectations : utilisateur hors société 404, rôle à revoir 409, recopie vers user_roles")
+  @DisplayName("affectations : utilisateur hors société 404, rôle à revoir 409, rôle système effectif pour les modules")
   void affectations() throws Exception {
     send(post("/api/v1/authorizations/assignments"), ADMIN,
             "{\"userId\":\"" + PostgresFixture.BETA_USER + "\",\"roleId\":\"" + roleId("Caissier") + "\"}")
@@ -147,13 +145,13 @@ class AuthorizationsApiIT {
     send(put("/api/v1/authorizations/roles/" + roleId("Ancien rôle")), ADMIN, "{\"name\":\"Ancien rôle\",\"active\":true}")
         .andExpect(jsonPath("$.roles[?(@.name == 'Ancien rôle')].needsReview").value(false));
 
-    // Un rôle système affecté depuis la matrice apparaît aussi pour les écrans de modules.
+    // Un rôle système affecté depuis la matrice vaut pour les contrôles des modules (has_role).
     String manager = systemRoleId("treasury_manager");
     send(post("/api/v1/authorizations/assignments"), ADMIN, "{\"userId\":\"" + CAISSIER + "\",\"roleId\":\"" + manager + "\"}");
-    assertThat(sql("SELECT count(*) FROM user_roles WHERE user_id = '" + CAISSIER + "' AND role = 'treasury_manager'")).isEqualTo("1");
+    assertThat(sql("SELECT count(*) FROM profiles WHERE id = '" + CAISSIER + "' AND has_role(id, 'treasury_manager')")).isEqualTo("1");
     mockMvc.perform(delete("/api/v1/authorizations/assignments/" + CAISSIER + "/" + manager).with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk());
-    assertThat(sql("SELECT count(*) FROM user_roles WHERE user_id = '" + CAISSIER + "' AND role = 'treasury_manager'")).isEqualTo("0");
+    assertThat(sql("SELECT count(*) FROM profiles WHERE id = '" + CAISSIER + "' AND has_role(id, 'treasury_manager')")).isEqualTo("0");
   }
 
   @Test

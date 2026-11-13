@@ -61,10 +61,8 @@ class RolesDesModulesIT {
   @BeforeEach
   void preparer() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
-    owner("INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, 'admin', v.t::uuid FROM (VALUES ('"
-        + ADMIN_A + "', '" + A + "'), ('" + ADMIN_B + "', '" + B + "')) AS v(u, t)"
-        + " WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid AND x.role = 'admin');"
-        + "INSERT INTO auth.users (id) VALUES ('" + MEMBRE_A + "'), ('" + NOUVEAU + "') ON CONFLICT DO NOTHING;"
+    PostgresFixture.grantRoles(DATABASE, ADMIN_A, "admin", A, ADMIN_B, "admin", B);
+    owner("INSERT INTO auth.users (id) VALUES ('" + MEMBRE_A + "'), ('" + NOUVEAU + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + MEMBRE_A + "', '" + A + "', 'Membre Alpha')"
         + " ON CONFLICT (id) DO NOTHING;"
         + "INSERT INTO profiles (id, full_name) VALUES ('" + NOUVEAU + "', 'Nouvel employé') ON CONFLICT (id) DO NOTHING");
