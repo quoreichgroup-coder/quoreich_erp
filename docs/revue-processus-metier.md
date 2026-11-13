@@ -17,7 +17,7 @@ Légende : ✅ conforme et prouvé par un parcours · 🟡 présent mais incompl
 | Approbation de la commande | Stratégie de libération selon les seuils | Pas de seuil ; tout membre peut approuver | 🟡 |
 | Réception (MIGO) | Fournisseur → ses commandes → quantités par ligne ; sur-réception refusée ; écriture stock / GR-IR | Fournisseur d'abord, puis seulement ses commandes ; restant par ligne ; sur-réception refusée ; stock compté une fois au coût (V34) ; **aucune écriture comptable** | 🟡 |
 | Facture fournisseur (MIRO) | Fournisseur → sa commande ; lignes ; montant de contrôle ; rapprochement prix / quantité ; blocage hors tolérance | Fournisseur → seulement ses commandes (V36, également contrôlé en base) ; **en-tête seul**, sans lignes, sans montant de contrôle ni rapprochement | 🟡 |
-| Comptabilisation de la facture | Charge + TVA déductible / fournisseur | **Aucune écriture** : la fonction cherche les comptes 4010 / 6010 et ne fait rien quand ils manquent (6 factures sur 6 dans la société de test) | ❌ |
+| Comptabilisation de la facture | Charge + TVA déductible / fournisseur | **Corrigé par V37** : rôles PURCHASES / VAT_INPUT / AP_PAYABLE, approbation refusée (QG001) si le paramétrage manque ; prouvé par le parcours (601 / 4452 / 401). Historique : script de rattrapage en simulation | ✅ |
 | Approbation (bon à payer) | Tiers habilité, séparation des tâches | Paiement impossible avant approbation (prouvé) ; mais l'approbation n'est qu'une colonne modifiable par tous | 🟡 |
 | Paiement (F-53 / F110) | Fournisseur → SES postes ouverts → imputation, lettrage | V36 : fournisseur d'abord, seules ses factures approuvées et ouvertes, répartition par échéance, tout ou rien, contrôle en base ; écriture fournisseur / banque datée du paiement (V34) | ✅ |
 | Paiement en double | Contrôle des doublons | Non (pas de clé d'idempotence) | ❌ |
@@ -59,7 +59,7 @@ Légende : ✅ conforme et prouvé par un parcours · 🟡 présent mais incompl
 
 ## Écarts classés et rattachement au plan du Lot 3
 
-1. **Critique — la facture fournisseur ne passe aucune écriture** : la dette fournisseur, la charge et la TVA déductible manquent, et le compte 401 finit débiteur. → Étape 3 (rôles de comptabilisation, refus QG001).
+1. ~~Critique — la facture fournisseur ne passe aucune écriture~~ → **corrigé (V37, 14 nov. 2026)** ; reste le rattrapage de l'historique, à décider avec l'expert-comptable.
 2. **Critique — approbation et paiement ouverts à tous, sans séparation des tâches.** → Étape 2.
 3. **Haute — facture fournisseur sans lignes, sans montant de contrôle ni rapprochement à trois voies.** → Étape 4.
 4. **Haute — doublons de factures et de paiements non contrôlés.** → Étape 4.
@@ -89,7 +89,7 @@ Légende : ✅ conforme et prouvé par un parcours · 🟡 présent mais incompl
 
 | Chemin | Parcours | Résultat |
 |---|---|---|
-| Nuage : front → Supabase | `npm run test:e2e:parcours` — 9 parcours (tiers, achats, réceptions, fournisseurs, clients, comptabilité, exports) | 8 réussis + 1 échec attendu (écriture de la facture fournisseur, Lot 3 étape 3) ; aucune erreur serveur ni navigateur |
+| Nuage : front → Supabase | `npm run test:e2e:parcours` — 9 parcours (tiers, achats, réceptions, fournisseurs, clients, comptabilité, exports) | 9 réussis depuis V37 ; aucune erreur serveur ni navigateur |
 | Sur site : front → API Java → PostgreSQL local | `npm run test:e2e:sur-site` — client, facture à lignes, détail, encaissement, export | réussi ; vérifié en base : la donnée est dans la base locale et **absente** de Supabase |
 
 Constats sur site :

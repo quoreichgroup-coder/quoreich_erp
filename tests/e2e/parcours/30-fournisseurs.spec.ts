@@ -116,13 +116,12 @@ test("facture fournisseur → approbation → règlements par fournisseur", asyn
 });
 
 /*
- * Défaut connu, planifié au Lot 3 (étape 3 : comptabilisation par rôles, refus QG001) : la facture
- * fournisseur approuvée ne passe aucune écriture (on_ap_invoice_posted cherche 4010 / 6010 et
- * abandonne en silence ; le plan SYSCOHADA a 401 / 601). Marqué « échec attendu » : il reste
- * visible dans chaque rapport et devient « réussite inattendue » dès qu'il est corrigé.
+ * V37 (Lot 3, étape 3) : l'approbation comptabilise la facture fournisseur par rôles — 601 achats
+ * et 4452 TVA déductible au débit, 401 fournisseurs au crédit — au lieu de l'approuver sans
+ * écriture (défaut révélé par ce parcours, marqué « échec attendu » jusqu'à la correction).
  */
-test("la facture fournisseur approuvée porte son écriture comptable", async ({ page }) => {
-  test.fail(true, "Lot 3, étape 3 : la facture fournisseur ne passe aucune écriture");
+test("la facture fournisseur approuvée porte son écriture comptable", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
   const fournisseur = `${RUN} Fournisseur écriture`;
   const numero = `FF-${RUN}-GL`;
   await assurerPlanComptable(page);
@@ -130,5 +129,12 @@ test("la facture fournisseur approuvée porte son écriture comptable", async ({
   const f = await saisirFacture(page, fournisseur, numero, "50000", "9000");
   await f.locator("td").first().click();
   const panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
-  await expect(panneau.getByTestId("journal-entry-preview"), "écriture fournisseur / charge / TVA attendue").toBeVisible({ timeout: 10_000 });
+  const ecriture = panneau.getByTestId("journal-entry-preview");
+  await expect(ecriture).toBeVisible();
+  await expect(ecriture.locator("tbody tr").filter({ hasText: /^601/ })).toContainText("50 000");
+  await expect(ecriture.locator("tbody tr").filter({ hasText: /^4452/ })).toContainText("9 000");
+  await expect(ecriture.locator("tbody tr").filter({ hasText: /^401/ })).toContainText("59 000");
+  await expect(ecriture.locator("tfoot"), "équilibrée").toContainText(/59\s000\s*59\s000/);
+  await obs.joindre(testInfo);
+  expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

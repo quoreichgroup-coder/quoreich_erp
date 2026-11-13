@@ -212,9 +212,15 @@ export default function APTransactions() {
 
   const totalPayable = filtered.filter(i => i.status !== "paid").reduce((s, i) => s + (i.total - i.amount_paid), 0);
 
+  // L'approbation comptabilise la facture (V37) : un paramétrage incomplet la refuse (QG001), et le
+  // message de la base est affiché par le hook ; rien n'est approuvé.
   const handleApprove = async (inv: APInvoice) => {
-    await updateInvoice.mutateAsync({ id: inv.id, approval_status: "approved", status: "open" });
-    toast.success("Facture approuvée");
+    try {
+      await updateInvoice.mutateAsync({ id: inv.id, approval_status: "approved", status: "open" });
+      toast.success("Facture approuvée et comptabilisée");
+    } catch {
+      /* refus déjà affiché */
+    }
   };
 
   return (

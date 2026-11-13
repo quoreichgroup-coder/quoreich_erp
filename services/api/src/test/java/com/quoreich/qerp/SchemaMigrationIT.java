@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "36";
+  private static final String DERNIERE_MIGRATION = "37";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -165,7 +165,8 @@ class SchemaMigrationIT {
           "guard_goods_receipt",
           "guard_gr_lines",
           "record_settlement",
-          "guard_invoice_origin");
+          "guard_invoice_origin",
+          "ap_invoice_journal_entry");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
