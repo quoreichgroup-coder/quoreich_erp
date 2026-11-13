@@ -134,10 +134,12 @@ class AutorisationsEquivalenceIT {
     owner("INSERT INTO auth.users (id) VALUES ('" + u + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + u + "', '" + A + "', 'Caissier') ON CONFLICT (id) DO NOTHING;"
         + "INSERT INTO erp_roles (id, tenant_id, name, is_system, needs_review) VALUES ('" + role + "', '" + A
-        + "', 'Caissier sur mesure', false, true) ON CONFLICT DO NOTHING;"
+        + "', 'Caissier sur mesure', false, false) ON CONFLICT DO NOTHING;"
         + "INSERT INTO erp_role_permissions (role_id, permission_code) VALUES ('" + role + "', 'treasury.match') ON CONFLICT DO NOTHING;"
         + "INSERT INTO user_role_assignments (user_id, role_id, tenant_id) VALUES ('" + u + "', '" + role + "', '" + A
-        + "') ON CONFLICT DO NOTHING");
+        + "') ON CONFLICT DO NOTHING;"
+        // Cas réel : un rôle de l'ancienne matrice, déjà affecté, repris « à revoir » par V23.
+        + "UPDATE erp_roles SET needs_review = true WHERE id = '" + role + "'");
     assertThat(rows("SELECT has_treasury_perm('" + u + "', 'match')::text")).containsExactly("false");
     owner("UPDATE erp_roles SET needs_review = false WHERE id = '" + role + "'");
     assertThat(rows("SELECT has_treasury_perm('" + u + "', 'match') || ' ' || has_treasury_perm('" + u + "', 'close_period')"))
@@ -164,6 +166,29 @@ class AutorisationsEquivalenceIT {
     assertThat(rows("SELECT count(*) || ' ' || count(*) FILTER (WHERE code = 'admin') FROM erp_roles"
             + " WHERE tenant_id = '33333333-3333-3333-3333-333333333333'"))
         .containsExactly("50 1");
+  }
+
+  @Test
+  @DisplayName("règles de la base (V26), quel que soit le chemin : dernier admin, rôle à revoir, rôle affecté")
+  void reglesDeLaMatrice() {
+    String role = "f0000000-0000-0000-0000-0000000000e3";
+    owner("INSERT INTO erp_roles (id, tenant_id, name, needs_review) VALUES ('" + role + "', '" + A
+        + "', 'Rôle repris', true) ON CONFLICT DO NOTHING");
+    assertThatThrownBy(() -> owner("INSERT INTO user_role_assignments (user_id, role_id, tenant_id)"
+            + " VALUES (md5('role:viewer')::uuid, '" + role + "', '" + A + "')"))
+        .hasMessageContaining("Rôle à revoir");
+
+    // md5('role:admin') est le seul administrateur d'Alpha : ni par la matrice, ni par user_roles.
+    assertThatThrownBy(() -> owner("DELETE FROM user_role_assignments a USING erp_roles r WHERE r.id = a.role_id"
+            + " AND r.code = 'admin' AND a.user_id = md5('role:admin')::uuid"))
+        .hasMessageContaining("Impossible de retirer le dernier administrateur");
+    assertThatThrownBy(() -> owner("DELETE FROM user_roles WHERE user_id = md5('role:admin')::uuid AND role = 'admin'"))
+        .hasMessageContaining("Impossible de retirer le dernier administrateur");
+
+    owner("UPDATE erp_roles SET needs_review = false WHERE id = '" + role + "';"
+        + "INSERT INTO user_role_assignments (user_id, role_id, tenant_id) VALUES (md5('role:viewer')::uuid, '" + role + "', '" + A + "')");
+    assertThatThrownBy(() -> owner("DELETE FROM erp_roles WHERE id = '" + role + "'"))
+        .hasMessageContaining("Retirez d'abord ce rôle à ses 1 utilisateur(s)");
   }
 
   // ─── Outils ───

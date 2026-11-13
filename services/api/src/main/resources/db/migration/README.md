@@ -29,6 +29,7 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V23__roles_centralises.sql` | écrit à la main | modèle d'autorisations unique (catalogue de droits, rôles système et sur mesure par société), lu par has_role / has_permission / has_*_perm, limité à la société ; anciennes fonctions gardées comme témoins legacy_* |
 | `V24__societe_du_profil_protegee.sql` | écrit à la main | **sécurité** : un utilisateur ne peut plus changer lui-même la société de son profil (faille d'isolation entre sociétés héritée du schéma de production) |
 | `V25__matrice_des_autorisations.sql` | écrit à la main | journal des changements d'autorisations tenu par la base, recopie des rôles système affectés depuis la matrice vers user_roles |
+| `V26__regles_de_la_matrice.sql` | écrit à la main | règles de la matrice dans la base : jamais de société sans administrateur, rôle à revoir non affectable, rôle affecté non supprimable |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des
