@@ -7,8 +7,17 @@
 - [x] Rédiger et livrer le cahier des charges complet : 22 chapitres, versions PDF/Word/texte, exigences, existant, exclusions et points à valider ; pages contrôlées.
 - [x] Cahier des charges validé.
 - [x] Lot 1 : trésorerie réelle (soldes, flux, exports) et marge brute au coût réel CMP.
-- [x] Recette connectée du Lot 1 effectuée sur les données disponibles et documentée avec réserves ; Lot 2 non engagé.
+- [x] Recette connectée du Lot 1 effectuée sur les données disponibles et documentée avec réserves.
 - [x] Sélectionner aléatoirement un compte de recette et obtenir une session autorisée.
 - [x] Corriger la marge sans mouvements de stock valorisés : « Coût non renseigné », aucune marge calculée sans coût réel ; ajouter et exécuter les tests.
 - [x] Supprimer le solde historique CFO recopié et la troncature des transactions ; 34 tests réussis, vérification connectée et rapport livré.
 - [ ] Lever les réserves bancaires du Lot 1 : montants non nuls, relevés historiques et isolation de lignes réelles ; bloqué par l’absence de données bancaires autorisées dans deux sociétés.
+- [x] Lot 2 : tranche verticale AR sur l'API Java — facture, encaissements, période close, export, parité SQL démontrée (`docs/recette-lot2.md`).
+- [x] Lot 2 : comptabilisation fiabilisée (doublons supprimés, refus si plan comptable incomplet), paramétrage comptable SYSCOHADA, axes analytiques, lignes de facture et codes TVA, numérotation à l'émission (V16–V22).
+- [x] Lot 2 : modèle d'autorisations unique et matrice dans `/settings`, écrans lisant leurs droits dans la base, `user_roles` supprimée (V23–V28, V31, V32).
+- [x] Lot 2 : failles d'isolation fermées — changement de société du profil (V24), politiques entre sociétés (V27), entrée dans une société par son nom remplacée par une invitation (V31).
+- [x] Lot 2 : ventes et achats débloqués (V30), conversion d'opportunité (V29), Playwright installé et suite e2e verte.
+- [ ] Réception métier du Lot 2 : confirmer l'application de V16–V32 par Lovable et la CI verte, puis recette au navigateur par un utilisateur autorisé.
+- [ ] Production : jouer `scripts/data/doublons-declencheurs/corriger.psql` à blanc, relire, appliquer.
+- [ ] Faire valider le référentiel SYSCOHADA par un expert-comptable (§ 138) ; décider de la reprise des factures historiques sans écriture.
+- [ ] Lot 3 : AP, GL, achats (AP-REC, GL-REC, ACH-REC).
