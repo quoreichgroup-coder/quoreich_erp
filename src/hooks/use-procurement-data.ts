@@ -45,11 +45,15 @@ export function useCreateRequisition() {
           description: l.description,
           quantity: l.quantity,
           estimated_unit_cost: l.estimated_unit_cost,
-          total: l.quantity * l.estimated_unit_cost,
+          // total : colonne calculée par la base (quantité × coût), jamais envoyée.
           item_id: l.item_id || null,
         }));
         const { error: lineErr } = await supabase.from("requisition_lines").insert(lineRows);
-        if (lineErr) throw lineErr;
+        if (lineErr) {
+          // En-tête puis lignes : sans ses lignes, la demande n'existe pas.
+          await supabase.from("purchase_requisitions").delete().eq("id", data.id);
+          throw lineErr;
+        }
       }
       return data;
     },
@@ -121,11 +125,14 @@ export function useCreatePurchaseOrder() {
           description: l.description,
           quantity: l.quantity,
           unit_cost: l.unit_cost,
-          total: l.quantity * l.unit_cost,
+          // total : colonne calculée par la base, jamais envoyée.
           item_id: l.item_id || null,
         }));
         const { error: lineErr } = await supabase.from("po_lines").insert(lineRows);
-        if (lineErr) throw lineErr;
+        if (lineErr) {
+          await supabase.from("purchase_orders").delete().eq("id", data.id);
+          throw lineErr;
+        }
       }
 
       // Link requisition to PO

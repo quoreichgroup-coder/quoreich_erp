@@ -21,6 +21,8 @@ process.env.E2E_BASE_URL ??= `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: "tests/e2e",
   testMatch: "**/*.spec.ts",
+  // Parcours connectés au vrai Supabase : configuration à part (playwright.parcours.config.ts).
+  testIgnore: "**/parcours/**",
   // Poste chargé (une vingtaine de conteneurs) : peu de workers, délais larges.
   workers: process.env.CI ? 2 : 1,
   timeout: 60_000,

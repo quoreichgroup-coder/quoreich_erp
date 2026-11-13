@@ -168,6 +168,30 @@ class ReceptionsEtPaiementsIT {
         .isZero();
   }
 
+  @Test
+  @DisplayName("V35 : une demande approuvée se convertit en commande, lignes reprises, numéro de la séquence")
+  void conversionDemandeEnCommande() throws SQLException {
+    String demande = "00000000-0000-0000-0000-00000000f501";
+    owner("INSERT INTO purchase_requisitions (id, tenant_id, pr_number, description, estimated_total, status, requested_by)"
+        + " VALUES ('" + demande + "', '" + A + "', 'DA-V35', 'Portables', 900000, 'approved', '" + ADMIN + "')"
+        + " ON CONFLICT (id) DO NOTHING;"
+        + "INSERT INTO requisition_lines (requisition_id, description, quantity, estimated_unit_cost)"
+        + " SELECT '" + demande + "', 'Portable', 3, 300000"
+        + " WHERE NOT EXISTS (SELECT 1 FROM requisition_lines WHERE requisition_id = '" + demande + "')");
+
+    asUser(ADMIN, "SELECT convert_pr_to_po('" + demande + "', '" + FOURNISSEUR + "')");
+
+    assertThat(texte("SELECT p.status || ' ' || p.total::numeric(18,2) || ' ' || (p.po_number LIKE 'PO-%')::text"
+            + " || ' ' || count(l.id) || ' ' || sum(l.total)::numeric(18,2)"
+            + " FROM purchase_requisitions r JOIN purchase_orders p ON p.id = r.po_id JOIN po_lines l ON l.po_id = p.id"
+            + " WHERE r.id = '" + demande + "' GROUP BY p.status, p.total, p.po_number"))
+        .as("commande en brouillon, une ligne de 3 × 300 000, total recalculé")
+        .isEqualTo("draft 900000.00 true 1 900000.00");
+    assertThat(texte("SELECT status FROM purchase_requisitions WHERE id = '" + demande + "'")).isEqualTo("converted");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT convert_pr_to_po('" + demande + "', '" + FOURNISSEUR + "')"))
+        .hasMessageContaining("doit être approuvée");
+  }
+
   // ─── Outils ───
 
   /** Une réception comme l'écran la fait : en-tête en attente, lignes, puis validation. */

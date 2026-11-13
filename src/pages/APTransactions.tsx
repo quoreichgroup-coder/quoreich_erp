@@ -195,7 +195,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30" onClick={onClose} />
-      <div className="w-full max-w-lg bg-card border-l border-border shadow-xl flex flex-col animate-in slide-in-from-right">
+      <div role="dialog" aria-modal="true" aria-label={`Facture ${inv.invoice_number}`} className="w-full max-w-lg bg-card border-l border-border shadow-xl flex flex-col animate-in slide-in-from-right">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">{inv.invoice_number}</p>
@@ -203,7 +203,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} />
-            <button onClick={onClose} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"><X className="w-4 h-4" /></button>
           </div>
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-5">

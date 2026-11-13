@@ -33,6 +33,7 @@ import {
 } from "@/hooks/use-procurement-data";
 
 import { useSuppliers } from "@/hooks/use-ap-data";
+import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -174,6 +175,105 @@ function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
 // ── Main Component ──────────────────────────────────────────────────
 
+// ── Create Goods Receipt Dialog ───────────────────────────────────────
+// En-tête (commande, date) puis lignes (quantité reçue par ligne de commande, plafonnée au
+// restant) ; la base crée la réception en attente, ajoute les lignes et la valide (V34).
+
+function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
+  open: boolean; onOpenChange: (v: boolean) => void; pos: any[]; grs: any[];
+}) {
+  const { user } = useAuth();
+  const createGR = useCreateGoodsReceipt();
+  const [poId, setPoId] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [qty, setQty] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const receivable = pos.filter((p) => isReceivable(p.status));
+  const po = receivable.find((p) => p.id === poId);
+  const lines = po ? linesToReceive(po.id, po.lines ?? [], grs) : [];
+
+  const reset = () => { setPoId(""); setQty({}); setError(null); };
+  const choosePo = (id: string) => {
+    setPoId(id);
+    const p = receivable.find((x) => x.id === id);
+    const l = p ? linesToReceive(p.id, p.lines ?? [], grs) : [];
+    setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
+    setError(null);
+  };
+
+  const submit = (complete: boolean) => {
+    if (!po || !user) return;
+    const entries = lines.map((l) => ({ po_line_id: l.id, item_id: l.item_id, quantity: Number(qty[l.id] ?? 0), remaining: l.remaining }));
+    const problem = validateReceipt(entries);
+    if (problem) { setError(problem); return; }
+    createGR.mutate({
+      gr_number: `GR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+      po_id: po.id,
+      tenant_id: po.tenant_id,
+      received_by: user.id,
+      receipt_date: date,
+      complete,
+      lines: entries.filter((e) => e.quantity > 0).map((e) => ({ po_line_id: e.po_line_id, item_id: e.item_id ?? undefined, quantity_received: e.quantity })),
+    }, { onSuccess: () => { onOpenChange(false); reset(); } });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle className="text-sm">Nouvelle réception de marchandises</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs" htmlFor="gr-po">Commande</Label>
+              <select id="gr-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={poId}
+                onChange={(e) => choosePo(e.target.value)}>
+                <option value="">— Sélectionner —</option>
+                {receivable.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.supplier?.name ?? "—"}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs" htmlFor="gr-date">Date de réception</Label>
+              <Input id="gr-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+          {receivable.length === 0 && <p className="text-xs text-muted-foreground">Aucune commande approuvée à réceptionner.</p>}
+          {po && (
+            <Table><TableHeader><TableRow className="bg-muted/30">
+              <TableHead className="text-xs">Ligne</TableHead>
+              <TableHead className="text-xs text-right">Commandé</TableHead>
+              <TableHead className="text-xs text-right">Déjà reçu</TableHead>
+              <TableHead className="text-xs text-right">Restant</TableHead>
+              <TableHead className="text-xs text-right">Reçu maintenant</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {lines.map((l, i) => (
+                <TableRow key={l.id} className="text-xs">
+                  <TableCell>{l.description}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmt(l.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmt(l.received)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmt(l.remaining)}</TableCell>
+                  <TableCell className="text-right">
+                    <Input aria-label={`Quantité reçue ligne ${i + 1}`} inputMode="decimal" className="h-8 w-24 ml-auto text-right text-xs"
+                      value={qty[l.id] ?? ""} onChange={(e) => setQty((q) => ({ ...q, [l.id]: e.target.value }))} disabled={l.remaining === 0} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody></Table>
+          )}
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button size="sm" variant="outline" onClick={() => submit(false)} disabled={!po || createGR.isPending}>Enregistrer en attente</Button>
+          <Button size="sm" onClick={() => submit(true)} disabled={!po || createGR.isPending}>
+            {createGR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Enregistrer et valider
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ProcurementTransactions() {
   const { user } = useAuth();
   const { data: requisitions, isLoading: loadingPR } = useRequisitions();
@@ -185,6 +285,7 @@ export default function ProcurementTransactions() {
 
   const [showCreatePR, setShowCreatePR] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
+  const [showCreateGR, setShowCreateGR] = useState(false);
   const [convertPR, setConvertPR] = useState<any | null>(null);
   const { data: suppliers } = useSuppliers();
   const convertMutation = useConvertPRToPO();
@@ -207,6 +308,7 @@ export default function ProcurementTransactions() {
         <div className="flex gap-2">
           <Button size="sm" className="gap-1.5" onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
           <Button size="sm" variant="outline" className="gap-1.5"><Download className="w-3.5 h-3.5" />Export</Button>
         </div>
       </div>
@@ -402,6 +504,7 @@ export default function ProcurementTransactions() {
       {/* Dialogs */}
       <CreateRequisitionDialog open={showCreatePR} onOpenChange={setShowCreatePR} />
       <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
+      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} />
 
       <Dialog open={!!convertPR} onOpenChange={(o) => { if (!o) { setConvertPR(null); setConvertSupplier(""); } }}>
         <DialogContent>

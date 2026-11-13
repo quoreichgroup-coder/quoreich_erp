@@ -22,6 +22,7 @@
     "db:supabase-bundle": "bash scripts/schema/deploy-supabase.sh --print-bundle",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:parcours": "playwright test -c playwright.parcours.config.ts",
     "test:e2e:report": "playwright show-report",
     "dev:cloud": "vite --mode cloud"
   },
