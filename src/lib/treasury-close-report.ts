@@ -4,7 +4,7 @@ import type { TreasuryCloseHistoryRow } from "@/hooks/use-treasury-close";
 
 type ReportRow = { label: string; value: string };
 
-export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): Promise<void> {
+export async function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): Promise<void> {
   const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
   const closedAt = row.closed_at ? new Date(row.closed_at).toLocaleString("fr-FR") : "—";
 
@@ -24,14 +24,14 @@ export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): Promise
     { key: "value", header: "Valeur" },
   ];
 
-  return exportToPDF<ReportRow>({
+  await exportToPDF<ReportRow>({
     filename: `treasury-close-${row.period}.pdf`,
     title: `Clôture Trésorerie — ${row.period}`,
     subtitle: `Statut : ${row.status} · Généré depuis l'historique des clôtures`,
     columns,
     rows,
     orientation: "portrait",
-  });
+  }, { throwOnError: true }); // le message est celui de l'écran (safeExportTreasuryCloseReport)
 }
 
 /**

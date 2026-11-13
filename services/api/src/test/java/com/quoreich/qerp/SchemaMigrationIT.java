@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "27";
+  private static final String DERNIERE_MIGRATION = "28";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -302,6 +302,8 @@ class SchemaMigrationIT {
         SELECT tablename || '/' || policyname FROM pg_policies WHERE schemaname = 'public'
         """)), "politiques RLS");
 
+    // La colonne d'identité de V28 (erp_authorization_audit.seq) n'apparaît pas ici :
+    // information_schema.sequences ne liste pas les séquences internes des colonnes d'identité.
     memeEnsemble(MANIFESTE.colonne("sequences", 0), new LinkedHashSet<>(noms("""
         SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
         """)), "séquences");

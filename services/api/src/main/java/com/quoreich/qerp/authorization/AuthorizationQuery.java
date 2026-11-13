@@ -82,7 +82,8 @@ public class AuthorizationQuery {
         "SELECT a.created_at, pa.full_name, a.action, a.role_name, pt.full_name, a.permission_code"
             + " FROM erp_authorization_audit a"
             + " LEFT JOIN profiles pa ON pa.id = a.actor_id LEFT JOIN profiles pt ON pt.id = a.target_user_id"
-            + " ORDER BY a.created_at DESC, a.id LIMIT ?",
+            // seq (V28) : created_at est l'heure de la transaction, commune à tous ses événements.
+            + " ORDER BY a.seq DESC LIMIT ?",
         (rs, i) -> new AuthorizationAuditView(rs.getObject(1, OffsetDateTime.class), rs.getString(2), rs.getString(3),
             rs.getString(4), rs.getString(5), rs.getString(6)),
         Math.max(1, Math.min(limit, 500)));

@@ -66,7 +66,8 @@ export function useAuthorizationAudit(enabled: boolean) {
         actor_id: string | null; target_user_id: string | null }[]>(
         db.from("erp_authorization_audit")
           .select("created_at, action, role_name, permission_code, actor_id, target_user_id")
-          .order("created_at", { ascending: false }).limit(100),
+          // seq (V28) : created_at est l'heure de la transaction, commune à tous ses événements.
+          .order("seq", { ascending: false }).limit(100),
       );
       const ids = [...new Set(rows.flatMap((r) => [r.actor_id, r.target_user_id]).filter(Boolean))] as string[];
       const names = ids.length === 0 ? [] : await check<{ id: string; full_name: string | null }[]>(

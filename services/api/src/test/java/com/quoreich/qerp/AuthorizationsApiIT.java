@@ -204,4 +204,27 @@ class AuthorizationsApiIT {
     mockMvc.perform(get("/api/v1/authorizations/audit").with(jwt().jwt(b -> b.subject(COMPTABLE))))
         .andExpect(status().isForbidden());
   }
+
+  @Test
+  @Order(6)
+  @DisplayName("journal : l'ordre des événements d'une même opération est celui des faits (V28)")
+  void ordreDuJournal() throws Exception {
+    // Une seule requête = une seule transaction : created_at (now()) y est identique partout.
+    send(post("/api/v1/authorizations/roles"), ADMIN,
+        "{\"name\":\"Copie ordonnée\",\"copyFromRoleId\":\"" + systemRoleId("treasury_clerk") + "\"}");
+    String r = roleId("Copie ordonnée");
+    send(put("/api/v1/authorizations/roles/" + r + "/permissions"), ADMIN, "{\"permissions\":[\"treasury.match\"]}");
+
+    assertThat(sql("SELECT count(DISTINCT created_at) FROM erp_authorization_audit WHERE role_id = '" + r
+        + "' AND action IN ('role_created', 'permission_granted')")).isEqualTo("1");
+    assertThat(sql("SELECT count(*) FROM (SELECT string_agg(action, ',' ORDER BY seq) AS suite"
+        + " FROM erp_authorization_audit WHERE role_id = '" + r + "') x WHERE suite = 'role_created,"
+        + "permission_granted,permission_granted,permission_granted,permission_granted,"
+        + "permission_removed,permission_removed,permission_removed'")).isEqualTo("1");
+    mockMvc.perform(get("/api/v1/authorizations/audit").with(jwt().jwt(b -> b.subject(ADMIN))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].action").value("permission_removed"))
+        .andExpect(jsonPath("$[3].action").value("permission_granted"))
+        .andExpect(jsonPath("$[7].action").value("role_created"));
+  }
 }

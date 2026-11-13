@@ -1,4 +1,5 @@
 import type { RowInput } from "jspdf-autotable";
+import { toast } from "sonner";
 
 export type PdfColumn<T> = {
   key: keyof T | string;
@@ -23,11 +24,31 @@ export type PdfExportOptions<T> = {
  *
  * `jspdf` et `jspdf-autotable` pèsent ensemble ~680 kB : ils sont chargés à la
  * demande, au moment du clic, au lieu d'être embarqués dans le chunk de chaque
- * page qui sait exporter. Les appelants peuvent ignorer la promesse.
+ * page qui sait exporter.
+ *
+ * Échec : la plupart des appelants ignorent la promesse (bouton « PDF » d'un écran). Un rejet y
+ * devenait un rejet non géré, sans aucun message pour l'utilisateur. Par défaut l'échec est donc
+ * signalé ici, par un toast, et la promesse se résout à `false` — elle ne rejette jamais.
+ * Un appelant qui gère lui-même l'échec (message propre, audit, toast de succès à n'afficher
+ * qu'après coup) passe `{ throwOnError: true }` et l'attend avec `await`.
  */
 export async function exportToPDF<T extends Record<string, unknown>>(
   opts: PdfExportOptions<T>,
-): Promise<void> {
+  { throwOnError = false }: { throwOnError?: boolean } = {},
+): Promise<boolean> {
+  try {
+    await renderPdf(opts);
+    return true;
+  } catch (e) {
+    if (throwOnError) throw e;
+    toast.error("Impossible de générer le PDF", {
+      description: e instanceof Error && e.message ? e.message : "Erreur inattendue — réessayez.",
+    });
+    return false;
+  }
+}
+
+async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptions<T>): Promise<void> {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),

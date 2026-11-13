@@ -235,7 +235,9 @@ export default function InventoryReporting() {
           "historique-clotures-stock",
         );
       } else {
-        exportToPDF<Row>({
+        // Attendu : le toast « terminé » et l'audit « success » ne viennent qu'après le fichier ;
+        // un échec passe par le catch ci-dessous (toast d'échec + audit « failed »).
+        await exportToPDF<Row>({
           filename: "historique-clotures-stock",
           title: "Historique des clôtures de stock",
           subtitle: `${all.length.toLocaleString("fr-FR")} clôture(s) — généré ${new Date().toLocaleDateString("fr-FR")}`,
@@ -251,7 +253,7 @@ export default function InventoryReporting() {
           ],
           rows: all,
           orientation: "landscape",
-        });
+        }, { throwOnError: true });
       }
       toast.success(`Export ${kind.toUpperCase()} terminé — ${all.length.toLocaleString("fr-FR")} ligne(s)`, { id: toastId });
       if (tenantId && user?.id) {
