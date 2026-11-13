@@ -12,7 +12,9 @@ test("journal des écritures et états comptables : affichage et exports", async
 
   obs.etape("journal des écritures");
   await page.goto("/journal");
+  await page.getByPlaceholder(/Rechercher|Search/i).first().fill("BQ-");
   await expect(page.getByText(/BQ-\d{4}-\d{6}/).first(), "encaissements et paiements au journal de banque, avec leur numéro de pièce").toBeVisible();
+  await page.getByPlaceholder(/Rechercher|Search/i).first().fill("");
   let telechargement = page.waitForEvent("download");
   await page.getByTestId("btn-export-csv").click();
   expect((await telechargement).suggestedFilename()).toMatch(/^ecritures-comptables.*\.csv$/);

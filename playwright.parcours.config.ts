@@ -41,9 +41,15 @@ export default defineConfig({
   projects: [
     { name: "connexion", testMatch: /00-connexion\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     {
-      name: "parcours",
-      testIgnore: /00-connexion\.spec\.ts/,
+      name: "approbateur",
+      testMatch: /01-approbateur\.spec\.ts/,
       dependencies: ["connexion"],
+      use: { ...devices["Desktop Chrome"], storageState: "test-results-parcours/.auth/session.json" },
+    },
+    {
+      name: "parcours",
+      testIgnore: /0[01]-(connexion|approbateur)\.spec\.ts/,
+      dependencies: ["approbateur"],
       use: { ...devices["Desktop Chrome"], storageState: "test-results-parcours/.auth/session.json" },
     },
   ],

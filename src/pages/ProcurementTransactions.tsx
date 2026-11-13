@@ -22,10 +22,10 @@ import { useQuery } from "@tanstack/react-query";
 import {
   useRequisitions,
   useCreateRequisition,
-  useApproveRequisition,
   usePurchaseOrders,
   useCreatePurchaseOrder,
-  useApprovePurchaseOrder,
+  useApprovalQueue,
+  useUpdateProcurementDraft,
   useGoodsReceipts,
   useCreateGoodsReceipt,
   useCompleteGoodsReceipt,
@@ -38,6 +38,7 @@ import { useSuppliers } from "@/hooks/use-ap-data";
 import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
 import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
 import { DocumentDetail } from "@/components/DocumentDetail";
+import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -73,12 +74,18 @@ function useMyTenantId() {
   return data?.tenant_id as string | undefined;
 }
 
-function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+const toDraftLines = (rows: any[] | undefined, price: string): DraftDocLine[] =>
+  rows && rows.length
+    ? rows.map((l) => ({ description: l.description ?? "", quantity: String(l.quantity), unitPrice: String(l[price] ?? "") }))
+    : [emptyDocLine()];
+
+function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any }) {
   const { user } = useAuth();
   const tenantId = useMyTenantId();
   const createPR = useCreateRequisition();
-  const [desc, setDesc] = useState("");
-  const [lines, setLines] = useState<DraftDocLine[]>([emptyDocLine()]);
+  const updateDraft = useUpdateProcurementDraft();
+  const [desc, setDesc] = useState(edit?.description ?? "");
+  const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "estimated_unit_cost"));
   const [error, setError] = useState<string | null>(null);
   const reset = () => { setDesc(""); setLines([emptyDocLine()]); setError(null); };
 
@@ -88,6 +95,12 @@ function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpen
     if (problem) { setError(problem); return; }
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
     const rows = toLines(lines);
+    if (edit) {
+      updateDraft.mutate(
+        { docType: "PR", id: edit.id, header: { description: desc.trim(), estimated_total: documentFooter(lines).total }, lines: rows },
+        { onSuccess: () => onOpenChange(false) });
+      return;
+    }
     createPR.mutate({
       pr_number: `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       description: desc.trim(),
@@ -101,7 +114,7 @@ function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpen
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle className="text-sm">Nouvelle demande d'achat</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la demande " + edit.pr_number : "Nouvelle demande d'achat"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div><Label className="text-xs" htmlFor="pr-desc">Objet de la demande</Label>
             <Input id="pr-desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex : équipement informatique du service comptable" /></div>
@@ -111,7 +124,7 @@ function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpen
         <DialogFooter>
           <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button size="sm" onClick={handleSubmit} disabled={createPR.isPending}>
-            {createPR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Créer la demande
+            {(createPR.isPending || updateDraft.isPending) && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}{edit ? "Enregistrer" : "Créer la demande"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -119,14 +132,15 @@ function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpen
   );
 }
 
-function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any }) {
   const { user } = useAuth();
   const tenantId = useMyTenantId();
   const createPO = useCreatePurchaseOrder();
+  const updateDraft = useUpdateProcurementDraft();
   const { data: suppliers } = useSuppliers();
-  const [supplierId, setSupplierId] = useState("");
-  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [lines, setLines] = useState<DraftDocLine[]>([emptyDocLine()]);
+  const [supplierId, setSupplierId] = useState(edit?.supplier_id ?? "");
+  const [orderDate, setOrderDate] = useState(() => edit?.order_date ?? new Date().toISOString().slice(0, 10));
+  const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "unit_cost"));
   const [error, setError] = useState<string | null>(null);
   const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); };
 
@@ -135,6 +149,12 @@ function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
     const problem = validateDocLines(lines);
     if (problem) { setError(problem); return; }
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
+    if (edit) {
+      updateDraft.mutate(
+        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate }, lines: toLines(lines) },
+        { onSuccess: () => onOpenChange(false) });
+      return;
+    }
     createPO.mutate({
       po_number: `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       supplier_id: supplierId,
@@ -149,7 +169,7 @@ function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader><DialogTitle className="text-sm">Nouvelle commande fournisseur</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la commande " + edit.po_number : "Nouvelle commande fournisseur"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><Label className="text-xs" htmlFor="po-supplier">Fournisseur</Label>
@@ -168,7 +188,7 @@ function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
         <DialogFooter>
           <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button size="sm" onClick={handleSubmit} disabled={createPO.isPending}>
-            {createPO.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Créer la commande
+            {(createPO.isPending || updateDraft.isPending) && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}{edit ? "Enregistrer" : "Créer la commande"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -358,8 +378,9 @@ export default function ProcurementTransactions() {
   const { data: requisitions, isLoading: loadingPR } = useRequisitions();
   const { data: purchaseOrders, isLoading: loadingPO } = usePurchaseOrders();
   const { data: goodsReceipts, isLoading: loadingGR } = useGoodsReceipts();
-  const approvePR = useApproveRequisition();
-  const approvePO = useApprovePurchaseOrder();
+  const { data: approvals = [] } = useApprovalQueue(undefined, "all");
+  const [editPR, setEditPR] = useState<any | null>(null);
+  const [editPO, setEditPO] = useState<any | null>(null);
   const completeGR = useCompleteGoodsReceipt();
 
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -409,7 +430,7 @@ export default function ProcurementTransactions() {
           { label: "Requisitions", value: prs.length, sub: `${prs.filter((r: any) => r.status === "draft").length} draft` },
           { label: "Purchase Orders", value: pos.length, sub: `${fmt(pos.reduce((s: number, p: any) => s + p.total, 0))} XOF` },
           { label: "Goods Receipts", value: grs.length, sub: `${grs.filter((g: any) => g.status === "completed").length} completed` },
-          { label: "Pending Approval", value: prs.filter((r: any) => r.status === "draft").length + pos.filter((p: any) => p.status === "draft").length, sub: "across PR & PO" },
+          { label: "Pending Approval", value: prs.filter((r: any) => r.status === "pending_approval").length + pos.filter((p: any) => p.status === "pending_approval").length, sub: "demandes et commandes soumises" },
         ].map(k => (
           <div key={k.label} className="bg-card rounded-lg border border-border p-3">
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{k.label}</span>
@@ -455,13 +476,7 @@ export default function ProcurementTransactions() {
                     <TableCell>{pr.request_date}</TableCell>
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "pr", doc: pr })}>Voir</Button>
-                      {pr.status === "draft" && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
-                          onClick={() => approvePR.mutate({ id: pr.id, approved_by: user!.id })}
-                          disabled={approvePR.isPending}>
-                          Approve
-                        </Button>
-                      )}
+                      <ProcurementLifecycleActions docType="PR" doc={pr} approvals={approvals} onEdit={() => setEditPR(pr)} />
                       {pr.status === "approved" && !pr.po_id && (
                         perms?.canConvert ? (
                           <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary"
@@ -512,13 +527,7 @@ export default function ProcurementTransactions() {
                     <TableCell>{po.order_date}</TableCell>
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "po", doc: po })}>Voir</Button>
-                      {po.status === "draft" && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
-                          onClick={() => approvePO.mutate({ id: po.id, approved_by: user!.id })}
-                          disabled={approvePO.isPending}>
-                          Approve
-                        </Button>
-                      )}
+                      <ProcurementLifecycleActions docType="PO" doc={po} approvals={approvals} onEdit={() => setEditPO(po)} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -597,6 +606,8 @@ export default function ProcurementTransactions() {
       {/* Dialogs */}
       <CreateRequisitionDialog open={showCreatePR} onOpenChange={setShowCreatePR} />
       <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
+      {editPR && <CreateRequisitionDialog open edit={editPR} onOpenChange={(o) => { if (!o) setEditPR(null); }} />}
+      {editPO && <CreatePODialog open edit={editPO} onOpenChange={(o) => { if (!o) setEditPO(null); }} />}
       <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} />
       <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} />
 

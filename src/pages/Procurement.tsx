@@ -1,5 +1,6 @@
 import { exportToCSV } from "@/lib/csv-export";
 import { useState } from "react";
+import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -16,8 +17,7 @@ import {
   useRequisitions,
   usePurchaseOrders,
   useGoodsReceipts,
-  useApproveRequisition,
-  useApprovePurchaseOrder,
+  useApprovalQueue,
 } from "@/hooks/use-procurement-data";
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,8 +48,10 @@ export default function Procurement() {
   const { data: purchaseOrders, isLoading: loadingPO } = usePurchaseOrders();
   const { data: goodsReceipts, isLoading: loadingGR } = useGoodsReceipts();
   const { data: suppliers } = useSuppliers();
-  const approvePR = useApproveRequisition();
-  const approvePO = useApprovePurchaseOrder();
+  // Cycle de vie (V39) : soumission, approbation par niveau, rejet, annulation ; la modification
+  // d'une pièce se fait dans l'écran des transactions, qui porte le formulaire complet.
+  const { data: approvals = [] } = useApprovalQueue(undefined, "all");
+  const editer = () => navigate("/procurement/transactions");
 
   const [selectedPR, setSelectedPR] = useState<any | null>(null);
 
@@ -158,12 +160,9 @@ export default function Procurement() {
                     <TableCell className="font-mono text-[10px]">{pr.po_id ? "→ PO" : "—"}</TableCell>
                     <TableCell>{pr.request_date}</TableCell>
                     <TableCell>
-                      {pr.status === "draft" && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
-                          onClick={(e) => { e.stopPropagation(); approvePR.mutate({ id: pr.id, approved_by: user!.id }); }}>
-                          Approve
-                        </Button>
-                      )}
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <ProcurementLifecycleActions docType="PR" doc={pr} approvals={approvals} onEdit={editer} />
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -195,12 +194,7 @@ export default function Procurement() {
                     <TableCell className="text-[10px]">{po.lines?.length || 0} items</TableCell>
                     <TableCell>{po.order_date}</TableCell>
                     <TableCell>
-                      {po.status === "draft" && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
-                          onClick={() => approvePO.mutate({ id: po.id, approved_by: user!.id })}>
-                          Approve
-                        </Button>
-                      )}
+                      <ProcurementLifecycleActions docType="PO" doc={po} approvals={approvals} onEdit={editer} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -241,10 +235,7 @@ export default function Procurement() {
                       </div>
                       <div className="text-xs font-mono font-medium">{fmt(r.estimated_total)} XOF</div>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1"
-                          onClick={() => approvePR.mutate({ id: r.id, approved_by: user!.id })}>
-                          <CheckCircle className="w-3 h-3 text-success" />Approuver
-                        </Button>
+                        <ProcurementLifecycleActions docType="PR" doc={r} approvals={approvals} onEdit={editer} />
                       </div>
                     </div>
                   ))}
@@ -331,12 +322,9 @@ export default function Procurement() {
                     </div>
                   </div>
                 )}
-                {selectedPR.status === "draft" && (
-                  <Button size="sm" className="w-full gap-1.5"
-                    onClick={() => { approvePR.mutate({ id: selectedPR.id, approved_by: user!.id }); setSelectedPR(null); }}>
-                    <CheckCircle className="w-3.5 h-3.5" />Approuver cette demande
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-1">
+                  <ProcurementLifecycleActions docType="PR" doc={selectedPR} approvals={approvals} onEdit={editer} />
+                </div>
               </div>
             </>
           )}

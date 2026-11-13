@@ -65,23 +65,6 @@ export function useCreateRequisition() {
   });
 }
 
-export function useApproveRequisition() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, approved_by }: { id: string; approved_by: string }) => {
-      const { error } = await supabase
-        .from("purchase_requisitions")
-        .update({ status: "approved", approved_by, approved_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["purchase-requisitions"] });
-      toast.success("Requisition approved");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
 
 // ── Purchase Orders ──────────────────────────────────────────────────────
 
@@ -150,23 +133,6 @@ export function useCreatePurchaseOrder() {
   });
 }
 
-export function useApprovePurchaseOrder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, approved_by }: { id: string; approved_by: string }) => {
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({ status: "approved", approved_by })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["purchase-orders"] });
-      toast.success("PO approved");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
 
 // ── Goods Receipts ──────────────────────────────────────────────────────
 
@@ -555,3 +521,86 @@ export function useProcurementRoleAudit() {
   });
 }
 
+
+// ── Cycle de vie des pièces d'achat (V39) ───────────────────────────────
+// Brouillon → soumis (file selon les seuils de la société) → approuvé niveau par niveau par des
+// tiers habilités (useApproveStep / useRejectStep) → ou rejeté, de nouveau modifiable. Le statut
+// ne change que par ces fonctions : la base refuse une mise à jour directe.
+
+export type ProcurementDocType = "PR" | "PO";
+const TABLE: Record<ProcurementDocType, string> = { PR: "purchase_requisitions", PO: "purchase_orders" };
+
+function invalidateProcurement(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["procurement-approvals"] });
+  qc.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+  qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+}
+
+export function useSubmitProcurement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ docType, id }: { docType: ProcurementDocType; id: string }) => {
+      const { data, error } = await supabase.rpc("procurement_submit" as any, { _doc_type: docType, _doc_id: id });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (levels) => {
+      invalidateProcurement(qc);
+      toast.success(`Pièce soumise : ${levels} niveau${levels > 1 ? "x" : ""} d'approbation`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useCancelProcurement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ docType, id, reason }: { docType: ProcurementDocType; id: string; reason: string }) => {
+      const { error } = await supabase.rpc("procurement_cancel" as any, { _doc_type: docType, _doc_id: id, _reason: reason });
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidateProcurement(qc); toast.success("Pièce annulée"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+/** Suppression d'un brouillon ou d'une pièce rejetée (la base refuse au-delà). */
+export function useDeleteProcurementDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ docType, id }: { docType: ProcurementDocType; id: string }) => {
+      const { data, error } = await (supabase as any).from(TABLE[docType]).delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Pièce introuvable ou non supprimable.");
+    },
+    onSuccess: () => { invalidateProcurement(qc); toast.success("Pièce supprimée"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+/** Modification d'un brouillon ou d'une pièce rejetée : en-tête puis lignes remplacées. */
+export function useUpdateProcurementDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      docType: ProcurementDocType; id: string; header: Record<string, unknown>;
+      lines: { description: string; quantity: number; unitPrice: number }[];
+    }) => {
+      const db = supabase as any;
+      const { data, error } = await db.from(TABLE[input.docType]).update(input.header).eq("id", input.id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Pièce introuvable ou non modifiable.");
+      const lineTable = input.docType === "PR" ? "requisition_lines" : "po_lines";
+      const parent = input.docType === "PR" ? "requisition_id" : "po_id";
+      const { error: delErr } = await db.from(lineTable).delete().eq(parent, input.id);
+      if (delErr) throw delErr;
+      const rows = input.lines.map((l) => input.docType === "PR"
+        ? { requisition_id: input.id, description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice }
+        : { po_id: input.id, description: l.description, quantity: l.quantity, unit_cost: l.unitPrice });
+      const { error: insErr } = await db.from(lineTable).insert(rows);
+      if (insErr) throw insErr;
+    },
+    onSuccess: () => { invalidateProcurement(qc); toast.success("Pièce modifiée"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}

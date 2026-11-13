@@ -37,3 +37,20 @@ export async function assurerPlanComptable(page: Page): Promise<string> {
   await t.waitFor({ state: "visible", timeout: 30_000 });
   return (await t.innerText()).replace(/\s+/g, " ").trim();
 }
+
+/** Paramètre des achats « demande obligatoire avant commande », réglé par l'écran des paramètres. */
+export async function demandeObligatoire(page: Page, actif: boolean) {
+  await page.goto("/procurement/settings");
+  await page.waitForLoadState("networkidle");
+  const interrupteur = page.getByRole("switch", { name: "Exiger une PR approuvée avant PO" });
+  await expect(interrupteur).toBeVisible();
+  if ((await interrupteur.getAttribute("aria-checked")) !== String(actif)) await interrupteur.click();
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).first().click();
+  await expect(page.locator("[data-sonner-toast]").last()).toBeVisible();
+}
+
+/** Page de l'approbateur (second membre de la société de test, session enregistrée par 01-approbateur). */
+export async function pageApprobateur(browser: import("@playwright/test").Browser, baseURL: string | undefined) {
+  const ctx = await browser.newContext({ baseURL, locale: "fr-FR", storageState: "test-results-parcours/.auth/approbateur.json" });
+  return { ctx, page: await ctx.newPage() };
+}

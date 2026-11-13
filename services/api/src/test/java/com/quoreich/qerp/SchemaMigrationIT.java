@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "38";
+  private static final String DERNIERE_MIGRATION = "39";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -172,7 +172,13 @@ class SchemaMigrationIT {
           "guard_invoice_origin",
           "ap_invoice_journal_entry",
           "journal_for_source",
-          "assign_journal_batch");
+          "assign_journal_batch",
+          "procurement_doc",
+          "procurement_set_status",
+          "procurement_submit",
+          "procurement_cancel",
+          "guard_procurement_document",
+          "guard_procurement_lines");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -250,7 +256,12 @@ class SchemaMigrationIT {
           "ap_invoices/trg_guard_ap_invoice_origin",
           "ar_invoices/trg_guard_ar_invoice_origin",
           // V38 — journal, lot et numéro de pièce attribués à l'insertion.
-          "journal_entries/trg_assign_journal_batch");
+          "journal_entries/trg_assign_journal_batch",
+          // V39 — cycle de vie des pièces d'achat.
+          "purchase_requisitions/trg_guard_procurement_document",
+          "purchase_orders/trg_guard_procurement_document",
+          "requisition_lines/trg_guard_procurement_lines",
+          "po_lines/trg_guard_procurement_lines");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

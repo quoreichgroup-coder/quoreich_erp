@@ -137,14 +137,14 @@ export default function ProcurementSettings() {
                 <Label className="text-xs font-medium">Exiger une PR approuvée avant PO</Label>
                 <p className="text-[11px] text-muted-foreground">Bloque la création/approbation d'un PO sans PR validée.</p>
               </div>
-              <Switch checked={reqPR} onCheckedChange={setReqPR} />
+              <Switch checked={reqPR} onCheckedChange={setReqPR} aria-label="Exiger une PR approuvée avant PO" />
             </div>
             <div className="flex items-center justify-between p-3 border border-border rounded">
               <div>
                 <Label className="text-xs font-medium">Exiger un GR avant facture AP</Label>
                 <p className="text-[11px] text-muted-foreground">Empêche la saisie d'une facture sans réception préalable.</p>
               </div>
-              <Switch checked={reqGR} onCheckedChange={setReqGR} />
+              <Switch checked={reqGR} onCheckedChange={setReqGR} aria-label="Exiger un GR avant facture AP" />
             </div>
             <Button size="sm" onClick={save3WM} disabled={update.isPending}>Enregistrer</Button>
           </CardContent>

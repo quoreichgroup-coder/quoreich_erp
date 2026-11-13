@@ -1,16 +1,23 @@
 import { readFileSync, existsSync } from "node:fs";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-/** Identifiants du compte de test : variables d'environnement, sinon fichier hors dépôt. */
-export function identifiants(): { email: string; password: string } | null {
-  let email = process.env.E2E_EMAIL;
-  let password = process.env.E2E_PASSWORD;
+/**
+ * Identifiants d'un compte de test : variables d'environnement, sinon fichier hors dépôt.
+ * « auteur » saisit les pièces (administrateur de la société de test) ; « approbateur » les
+ * approuve (séparation des tâches : l'auteur n'approuve jamais ses propres pièces).
+ */
+export function identifiants(qui: "auteur" | "approbateur" = "auteur"): { email: string; password: string } | null {
+  const prefixe = qui === "auteur" ? "E2E" : "E2E_APPROVER";
+  let email = process.env[`${prefixe}_EMAIL`];
+  let password = process.env[`${prefixe}_PASSWORD`];
   const fichier = process.env.E2E_CREDENTIALS_FILE ?? "C:/Users/Abdouramane/QERP-backups/e2e-credentials.txt";
   if ((!email || !password) && existsSync(fichier)) {
     for (const ligne of readFileSync(fichier, "utf8").split(/\r?\n/)) {
-      const [k, ...v] = ligne.split("=");
-      if (k === "E2E_EMAIL") email ??= v.join("=").trim();
-      if (k === "E2E_PASSWORD") password ??= v.join("=").trim();
+      const i = ligne.indexOf("=");
+      if (i < 0) continue;
+      const cle = ligne.slice(0, i), valeur = ligne.slice(i + 1).trim();
+      if (cle === `${prefixe}_EMAIL`) email ??= valeur;
+      if (cle === `${prefixe}_PASSWORD`) password ??= valeur;
     }
   }
   return email && password ? { email, password } : null;
@@ -39,9 +46,27 @@ export function surveiller(page: Page) {
     if (m.type() === "error") incidents.push({ quand: etape, type: "erreur-console", detail: m.text().slice(0, 400) });
   });
   page.on("pageerror", (e) => incidents.push({ quand: etape, type: "erreur-page", detail: String(e).slice(0, 400) }));
+  const attendus: { etape: string; motif: RegExp }[] = [];
   return {
     incidents,
     etape(nom: string) { etape = nom; },
+    /**
+     * Refus métier ANNONCÉ dans l'étape courante (ex. un paramètre de la société qui interdit
+     * l'action) : le refus du serveur qui porte ce motif, et la ligne de console que le navigateur
+     * écrit pour toute réponse 400, ne comptent pas comme incidents. Tout autre refus, oui.
+     */
+    refusAttendu(motif: RegExp) { attendus.push({ etape, motif }); },
+    /** Incidents hors refus annoncés : c'est ce qu'un parcours exige vide. */
+    inattendus(): Incident[] {
+      const etapesTolerees = new Set(
+        incidents.filter((i) => i.type === "refus-serveur" && attendus.some((a) => a.etape === i.quand && a.motif.test(i.detail)))
+          .map((i) => i.quand));
+      return incidents.filter((i) => {
+        if (i.type === "refus-serveur") return !attendus.some((a) => a.etape === i.quand && a.motif.test(i.detail));
+        if (i.type === "erreur-console" && etapesTolerees.has(i.quand) && /status of 400/.test(i.detail)) return false;
+        return true;
+      });
+    },
     async joindre(testInfo: TestInfo) {
       await testInfo.attach("incidents.json", { body: JSON.stringify(incidents, null, 2), contentType: "application/json" });
     },
