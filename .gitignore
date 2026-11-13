@@ -62,3 +62,5 @@ blob-report/
 # Parcours de bout en bout connectés (rapports, captures, session du compte de test)
 playwright-report-parcours/
 test-results-parcours/
+playwright-report-sur-site/
+test-results-sur-site/

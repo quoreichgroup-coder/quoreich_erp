@@ -1,11 +1,13 @@
+import { exportToCSV } from "@/lib/csv-export";
 import { useState } from "react";
+import type React from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -34,6 +36,9 @@ import {
 
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
+import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
+import { DocumentDetail } from "@/components/DocumentDetail";
+import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -52,49 +57,61 @@ const statusBadge = (s: string) => {
   }
 };
 
-// ── Create Requisition Dialog ──────────────────────────────────────────
+// ── Pièces d'achat : en-tête, lignes, pied ─────────────────────────────
+// Le pied (total) est calculé à partir des lignes, jamais saisi ; la base le recalcule de même.
 
-function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function useMyTenantId() {
   const { user } = useAuth();
-  const createPR = useCreateRequisition();
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-
-  const { data: profile } = useQuery({
-    queryKey: ["my-profile"],
+  const { data } = useQuery({
+    queryKey: ["my-profile", user?.id],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("tenant_id").eq("id", user!.id).single();
       return data;
     },
     enabled: !!user,
   });
+  return data?.tenant_id as string | undefined;
+}
+
+function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const { user } = useAuth();
+  const tenantId = useMyTenantId();
+  const createPR = useCreateRequisition();
+  const [desc, setDesc] = useState("");
+  const [lines, setLines] = useState<DraftDocLine[]>([emptyDocLine()]);
+  const [error, setError] = useState<string | null>(null);
+  const reset = () => { setDesc(""); setLines([emptyDocLine()]); setError(null); };
 
   const handleSubmit = () => {
-    if (!desc || !amount || !profile?.tenant_id || !user) return;
-    const num = `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+    if (!desc.trim()) { setError("Objet de la demande requis."); return; }
+    const problem = validateDocLines(lines);
+    if (problem) { setError(problem); return; }
+    if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
+    const rows = toLines(lines);
     createPR.mutate({
-      pr_number: num,
-      description: desc,
-      estimated_total: parseFloat(amount),
-      tenant_id: profile.tenant_id,
+      pr_number: `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+      description: desc.trim(),
+      estimated_total: documentFooter(lines).total,
+      tenant_id: tenantId,
       requested_by: user.id,
-      lines: [{ description: desc, quantity: 1, estimated_unit_cost: parseFloat(amount) }],
-    }, {
-      onSuccess: () => { onOpenChange(false); setDesc(""); setAmount(""); },
-    });
+      lines: rows.map((l) => ({ description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice })),
+    }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle className="text-sm">New Purchase Requisition</DialogTitle></DialogHeader>
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle className="text-sm">Nouvelle demande d'achat</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div><Label className="text-xs">Description</Label><Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex: Serveurs Dell x5" /></div>
-          <div><Label className="text-xs">Estimated Total (XOF)</Label><Input type="number" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+          <div><Label className="text-xs" htmlFor="pr-desc">Objet de la demande</Label>
+            <Input id="pr-desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex : équipement informatique du service comptable" /></div>
+          <DocumentLinesEditor lines={lines} onChange={setLines} priceLabel="Coût estimé" />
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
+          <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button size="sm" onClick={handleSubmit} disabled={createPR.isPending}>
-            {createPR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Create
+            {createPR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Créer la demande
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -102,70 +119,56 @@ function CreateRequisitionDialog({ open, onOpenChange }: { open: boolean; onOpen
   );
 }
 
-// ── Create PO Dialog ──────────────────────────────────────────────────
-
 function CreatePODialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { user } = useAuth();
+  const tenantId = useMyTenantId();
   const createPO = useCreatePurchaseOrder();
   const { data: suppliers } = useSuppliers();
-  const { data: requisitions } = useRequisitions();
   const [supplierId, setSupplierId] = useState("");
-  const [prId, setPrId] = useState("");
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-
-  const { data: profile } = useQuery({
-    queryKey: ["my-profile"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("tenant_id").eq("id", user!.id).single();
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const approvedPRs = (requisitions || []).filter((r: any) => r.status === "approved");
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [lines, setLines] = useState<DraftDocLine[]>([emptyDocLine()]);
+  const [error, setError] = useState<string | null>(null);
+  const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); };
 
   const handleSubmit = () => {
-    if (!supplierId || !amount || !profile?.tenant_id || !user) return;
-    const num = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+    if (!supplierId) { setError("Choisissez le fournisseur."); return; }
+    const problem = validateDocLines(lines);
+    if (problem) { setError(problem); return; }
+    if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
     createPO.mutate({
-      po_number: num,
+      po_number: `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       supplier_id: supplierId,
-      total: parseFloat(amount),
-      tenant_id: profile.tenant_id,
+      order_date: orderDate,
+      total: documentFooter(lines).total,
+      tenant_id: tenantId,
       created_by: user.id,
-      requisition_id: prId || undefined,
-      lines: [{ description: desc || "Item", quantity: 1, unit_cost: parseFloat(amount) }],
-    }, {
-      onSuccess: () => { onOpenChange(false); setSupplierId(""); setAmount(""); setDesc(""); setPrId(""); },
-    });
+      lines: toLines(lines).map((l) => ({ description: l.description, quantity: l.quantity, unit_cost: l.unitPrice })),
+    }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle className="text-sm">New Purchase Order</DialogTitle></DialogHeader>
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle className="text-sm">Nouvelle commande fournisseur</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div><Label className="text-xs">Supplier</Label>
-            <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-              <SelectContent>{(suppliers || []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          {approvedPRs.length > 0 && (
-            <div><Label className="text-xs">From Requisition (optional)</Label>
-              <Select value={prId} onValueChange={setPrId}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>{approvedPRs.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.pr_number} — {r.description}</SelectItem>)}</SelectContent>
-              </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label className="text-xs" htmlFor="po-supplier">Fournisseur</Label>
+              <select id="po-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                <option value="">— Sélectionner —</option>
+                {(suppliers || []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
             </div>
-          )}
-          <div><Label className="text-xs">Description</Label><Input value={desc} onChange={e => setDesc(e.target.value)} /></div>
-          <div><Label className="text-xs">Total (XOF)</Label><Input type="number" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+            <div><Label className="text-xs" htmlFor="po-date">Date de commande</Label>
+              <Input id="po-date" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
+          </div>
+          <DocumentLinesEditor lines={lines} onChange={setLines} />
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
+          <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button size="sm" onClick={handleSubmit} disabled={createPO.isPending}>
-            {createPO.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Create PO
+            {createPO.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Créer la commande
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -199,6 +202,10 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
   const po = receivable.find((p) => p.id === poId);
   const lines = po ? linesToReceive(po.id, po.lines ?? [], grs) : [];
 
+  // Pied de la réception : quantité et valeur (au coût de la ligne de commande) reçues maintenant.
+  const qtyOf = (id: string) => { const n = Number(String(qty[id] ?? "").replace(",", ".")); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const receivedNow = lines.reduce((s, l) => s + qtyOf(l.id), 0);
+  const receivedValue = lines.reduce((s, l) => s + qtyOf(l.id) * Number(l.unit_cost || 0), 0);
   const reset = () => { setSupplierId(""); setPoId(""); setQty({}); setError(null); };
   const chooseSupplier = (id: string) => { setSupplierId(id); setPoId(""); setQty({}); setError(null); };
   const choosePo = (id: string) => {
@@ -274,7 +281,15 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody></Table>
+            </TableBody>
+            <TableFooter>
+              <TableRow className="text-xs font-medium">
+                <TableCell colSpan={4}>Total reçu maintenant · valeur au coût de la commande</TableCell>
+                <TableCell className="text-right tabular-nums" data-testid="gr-footer">
+                  {fmt(receivedNow)} · {fmt(receivedValue)} XOF
+                </TableCell>
+              </TableRow>
+            </TableFooter></Table>
           )}
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
@@ -284,6 +299,55 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
             {createGR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Enregistrer et valider
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Lecture d'une pièce d'achat : en-tête, lignes, pied ───────────────
+type DocView = { kind: "pr" | "po" | "gr"; doc: any } | null;
+
+function ProcurementDocDialog({ view, onClose, pos, grs }: { view: DocView; onClose: () => void; pos: any[]; grs: any[] }) {
+  if (!view) return null;
+  const { kind, doc } = view;
+  let title = "", header: [string, React.ReactNode][] = [], columns: { label: string; align?: "right" }[] = [],
+    rows: React.ReactNode[][] = [], footer: [string, React.ReactNode, boolean?][] = [];
+  if (kind === "pr") {
+    const lines = doc.lines ?? [];
+    title = `Demande d'achat ${doc.pr_number}`;
+    header = [["Objet", doc.description], ["Statut", doc.status], ["Date", doc.request_date], ["Commande", doc.po_id ? "convertie" : "—"]];
+    columns = [{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "Coût estimé", align: "right" }, { label: "Montant", align: "right" }];
+    rows = lines.map((l: any) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.estimated_unit_cost)), fmt(Number(l.total))]);
+    footer = [["Lignes", String(lines.length)], ["Total estimé", `${fmt(lines.reduce((s: number, l: any) => s + Number(l.total), 0))} XOF`, true]];
+  } else if (kind === "po") {
+    const lines = linesToReceive(doc.id, doc.lines ?? [], grs);
+    title = `Commande ${doc.po_number}`;
+    header = [["Fournisseur", doc.supplier?.name], ["Statut", doc.status], ["Date de commande", doc.order_date], ["Lignes", String(lines.length)]];
+    columns = [{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" }, { label: "Montant", align: "right" }, { label: "Reçu", align: "right" }];
+    rows = lines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_cost)), fmt(Number(l.quantity) * Number(l.unit_cost)), fmt(l.received)]);
+    const total = lines.reduce((s, l) => s + Number(l.quantity) * Number(l.unit_cost), 0);
+    const recu = lines.reduce((s, l) => s + l.received * Number(l.unit_cost), 0);
+    footer = [["Total commandé", `${fmt(total)} XOF`, true], ["Reçu (valeur)", `${fmt(recu)} XOF`], ["Reste à recevoir", `${fmt(total - recu)} XOF`]];
+  } else {
+    const po = pos.find((p) => p.id === doc.po_id);
+    const poLines = new Map((po?.lines ?? []).map((l: any) => [l.id, l]));
+    const lines = doc.lines ?? [];
+    title = `Réception ${doc.gr_number}`;
+    header = [["Commande", doc.po?.po_number], ["Fournisseur", doc.po?.supplier?.name], ["Date de réception", doc.receipt_date], ["Statut", doc.status]];
+    columns = [{ label: "Libellé" }, { label: "Reçu", align: "right" }, { label: "Refusé", align: "right" }, { label: "Valeur", align: "right" }];
+    rows = lines.map((l: any) => {
+      const pl: any = poLines.get(l.po_line_id);
+      return [pl?.description ?? "—", fmt(Number(l.quantity_received)), fmt(Number(l.quantity_rejected)), fmt(Number(l.quantity_received) * Number(pl?.unit_cost ?? 0))];
+    });
+    const qte = lines.reduce((s: number, l: any) => s + Number(l.quantity_received), 0);
+    const valeur = lines.reduce((s: number, l: any) => s + Number(l.quantity_received) * Number((poLines.get(l.po_line_id) as any)?.unit_cost ?? 0), 0);
+    footer = [["Quantité reçue", fmt(qte)], ["Valeur au coût de la commande", `${fmt(valeur)} XOF`, true]];
+  }
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
+        <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} />
       </DialogContent>
     </Dialog>
   );
@@ -301,6 +365,17 @@ export default function ProcurementTransactions() {
   const [showCreatePR, setShowCreatePR] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
   const [showCreateGR, setShowCreateGR] = useState(false);
+  const [docView, setDocView] = useState<DocView>(null);
+  const [tab, setTab] = useState("requisitions");
+  // Export de l'onglet affiché, avec les mêmes lignes que l'écran.
+  const exportTab = () => {
+    if (tab === "po") exportToCSV(pos.map((p: any) => ({ numero: p.po_number, fournisseur: p.supplier?.name ?? "", date: p.order_date, total: p.total, statut: p.status, lignes: p.lines?.length ?? 0 })),
+      [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "commandes");
+    else if (tab === "gr") exportToCSV(grs.map((g: any) => ({ numero: g.gr_number, commande: g.po?.po_number ?? "", fournisseur: g.po?.supplier?.name ?? "", date: g.receipt_date, statut: g.status, lignes: g.lines?.length ?? 0 })),
+      [{ key: "numero", header: "N° réception" }, { key: "commande", header: "Commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "receptions");
+    else exportToCSV(prs.map((r: any) => ({ numero: r.pr_number, objet: r.description, total: r.estimated_total, statut: r.status, date: r.request_date, commande: r.po_id ? "oui" : "" })),
+      [{ key: "numero", header: "N° demande" }, { key: "objet", header: "Objet" }, { key: "total", header: "Total estimé" }, { key: "statut", header: "Statut" }, { key: "date", header: "Date" }, { key: "commande", header: "Convertie" }], "demandes-achat");
+  };
   const [convertPR, setConvertPR] = useState<any | null>(null);
   const { data: suppliers } = useSuppliers();
   const convertMutation = useConvertPRToPO();
@@ -324,7 +399,7 @@ export default function ProcurementTransactions() {
           <Button size="sm" className="gap-1.5" onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
-          <Button size="sm" variant="outline" className="gap-1.5"><Download className="w-3.5 h-3.5" />Export</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exportTab}><Download className="w-3.5 h-3.5" />Export</Button>
         </div>
       </div>
 
@@ -344,7 +419,7 @@ export default function ProcurementTransactions() {
         ))}
       </div>
 
-      <Tabs defaultValue="requisitions">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Requisitions ({prs.length})</TabsTrigger>
           <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Purchase Orders ({pos.length})</TabsTrigger>
@@ -378,7 +453,8 @@ export default function ProcurementTransactions() {
                     <TableCell><Badge className={`text-[10px] ${statusBadge(pr.status)}`} variant="outline">{pr.status}</Badge></TableCell>
                     <TableCell className="font-mono text-[10px]">{pr.po_id ? "→ PO" : "—"}</TableCell>
                     <TableCell>{pr.request_date}</TableCell>
-                    <TableCell>
+                    <TableCell className="space-x-1">
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "pr", doc: pr })}>Voir</Button>
                       {pr.status === "draft" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
                           onClick={() => approvePR.mutate({ id: pr.id, approved_by: user!.id })}
@@ -434,7 +510,8 @@ export default function ProcurementTransactions() {
                     <TableCell><Badge className={`text-[10px] ${statusBadge(po.status)}`} variant="outline">{po.status}</Badge></TableCell>
                     <TableCell className="text-[10px]">{po.lines?.length || 0} items</TableCell>
                     <TableCell>{po.order_date}</TableCell>
-                    <TableCell>
+                    <TableCell className="space-x-1">
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "po", doc: po })}>Voir</Button>
                       {po.status === "draft" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
                           onClick={() => approvePO.mutate({ id: po.id, approved_by: user!.id })}
@@ -476,7 +553,8 @@ export default function ProcurementTransactions() {
                     <TableCell>{gr.receipt_date}</TableCell>
                     <TableCell className="text-[10px]">{gr.lines?.length || 0} items</TableCell>
                     <TableCell><Badge className={`text-[10px] ${statusBadge(gr.status)}`} variant="outline">{gr.status}</Badge></TableCell>
-                    <TableCell>
+                    <TableCell className="space-x-1">
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "gr", doc: gr })}>Voir</Button>
                       {gr.status === "pending" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
                           onClick={() => completeGR.mutate(gr.id)}
@@ -520,6 +598,7 @@ export default function ProcurementTransactions() {
       <CreateRequisitionDialog open={showCreatePR} onOpenChange={setShowCreatePR} />
       <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
       <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} />
+      <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} />
 
       <Dialog open={!!convertPR} onOpenChange={(o) => { if (!o) { setConvertPR(null); setConvertSupplier(""); } }}>
         <DialogContent>

@@ -55,6 +55,23 @@ test("facture client à lignes → émission → encaissements par client", asyn
   testInfo.annotations.push({ type: "numéro", description: numero });
   expect.soft(numero, "numéro définitif attribué à l'émission").not.toMatch(/BROUILLON/);
 
+  obs.etape("détail de la facture : lignes, pied et écriture comptable");
+  await f.click();
+  const detail = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await expect(detail.getByRole("region", { name: "Lignes" })).toContainText("Frais de déplacement");
+  await expect(detail.getByRole("region", { name: "Lignes" })).toContainText("10 %");
+  await expect(detail.getByRole("region", { name: "Pied" })).toContainText("168 000");
+  const ecriture = detail.getByTestId("journal-entry-preview");
+  await expect(ecriture).toContainText("411");
+  await expect(ecriture).toContainText("701");
+  await expect(ecriture.locator("tfoot"), "écriture équilibrée").toContainText(/168\s000\s*168\s000/);
+  await fermerPanneau(page);
+
+  obs.etape("export des factures clients");
+  const telechargement = page.waitForEvent("download");
+  await page.getByTestId("btn-export-csv").click();
+  testInfo.annotations.push({ type: "export", description: (await telechargement).suggestedFilename() });
+
   obs.etape("facture d'un autre client");
   d = await facturer(page, autre, [["Formation", "1", "40000"]]);
   await d.getByRole("button", { name: "Créer" }).click();

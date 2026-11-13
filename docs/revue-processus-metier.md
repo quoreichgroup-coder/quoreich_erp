@@ -68,3 +68,31 @@ Légende : ✅ conforme et prouvé par un parcours · 🟡 présent mais incompl
 7. **Moyenne — avoirs client et fournisseur, acomptes et paiements non imputés absents.** → À planifier (Lot 3 bis).
 8. **Moyenne — échéance qui ignore les conditions du tiers ; coordonnées bancaires et identifiants fiscaux.** → Données de base, étape 4.
 9. **Faible — libellés anglais, exercice affiché, nom ComptaFlow.** → Lot à part (interface).
+
+## 5. Pièces : en-tête, lignes, pied — impression et export (vérifié le 14 novembre 2026)
+
+| Pièce | Saisie (en-tête / lignes / pied) | Vue de détail | Export de la liste | Impression de la pièce |
+|---|---|---|---|---|
+| Demande d'achat | ✅ grille de lignes, pied calculé (corrigé : une seule ligne et un total saisi) | ✅ « Voir » | ✅ | Lot 6 |
+| Commande fournisseur | ✅ idem (corrigé) | ✅ commandé, reçu, reste à recevoir | ✅ | Lot 6 |
+| Réception | ✅ fournisseur → commande → lignes ; pied quantité et valeur (ajouté) | ✅ | ✅ | Lot 6 |
+| Facture client | ✅ (V21) | ✅ lignes, pied, écriture comptable (ajouté ; avant : résumé sans lignes) | ✅ | Lot 6 |
+| Facture fournisseur | 🟡 en-tête seul → Lot 3 étape 4 | ✅ en-tête et pied ; lignes à l'étape 4 | ✅ (ajouté ; le bouton ne faisait rien) | Lot 6 |
+| Règlement (client, fournisseur) | ✅ tiers, ses pièces, répartition, pied imputé / reste (V36) | — | via les factures | Lot 6 |
+| Écritures, balance, résultat, bilan, SIG | — | ✅ | ✅ (ajouté : 5 boutons sans action) | Lot 6 |
+
+**Impression officielle des pièces** (modèles versionnés, rendu PDF côté serveur, PDF archivé, sécurité des modèles) : **Lot 6 — Documents et report management** du plan de bascule ; non refaite ici, comme convenu.
+
+**Écrans des lots 2 et 3 encore alimentés par des données de démonstration codées en dur** — à remplacer par les données réelles au Lot 3 (ajouté à son plan, étape 8) : Achats → Données de base (contrats et SLA), Rapports (dépenses par catégorie, délais, principaux fournisseurs), Paramètres (schéma de comptabilisation) et le circuit d'approbation affiché ; Grand livre → Contrôle (anomalies, rapprochements, contrôles d'intégrité, piste d'audit), Transactions (écritures manuelles, automatiques, récurrentes), Paramètres (journaux, périodes) ; Paramètres généraux → plan comptable, conditions de paiement, simulation, historique et délégations du workflow, journal d'audit ; AR → Rapports (modèles et rapports planifiés).
+
+## 6. Nuage et sur site (vérifié le 14 novembre 2026)
+
+| Chemin | Parcours | Résultat |
+|---|---|---|
+| Nuage : front → Supabase | `npm run test:e2e:parcours` — 9 parcours (tiers, achats, réceptions, fournisseurs, clients, comptabilité, exports) | 8 réussis + 1 échec attendu (écriture de la facture fournisseur, Lot 3 étape 3) ; aucune erreur serveur ni navigateur |
+| Sur site : front → API Java → PostgreSQL local | `npm run test:e2e:sur-site` — client, facture à lignes, détail, encaissement, export | réussi ; vérifié en base : la donnée est dans la base locale et **absente** de Supabase |
+
+Constats sur site :
+- **Corrigé** : les clients étaient lus et créés dans Supabase même en mode sur site, alors que les factures allaient dans la base locale. L'API expose désormais `POST` / `PUT /api/v1/customers` et la fiche complète.
+- **Périmètre** : seuls les clients, la facturation et les encaissements AR, le paramétrage comptable, l'analytique et les autorisations passent par l'API. Fournisseurs, achats, stocks et grand livre écrivent encore dans Supabase : ils seront portés aux Lots 3 à 5. D'ici là, un déploiement sur site complet n'est pas possible ; le parcours sur site vérifie qu'aucune écriture de SON périmètre ne part vers le nuage.
+- **Identité** : l'API valide les jetons du projet Supabase (ES256). Il faut déclarer `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWS_ALGORITHMS=ES256` : par défaut, Spring n'accepte que RS256. Keycloak sur site reste à faire (plan de bascule).

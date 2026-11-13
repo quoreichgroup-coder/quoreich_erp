@@ -113,6 +113,7 @@ Ordre : d'abord ce qui fausse les données ou ouvre une faille, ensuite les cont
    - Clôture d'exercice : report à nouveau et résultat, avec le calendrier V33 (GL-5).
 6. **API Java** : tranches AP et achats, avec tests de parité comme au Lot 2.
 7. **Recette** AP-REC, GL-REC, ACH-REC sur la copie réelle, puis procès-verbal.
+8. **Écrans sans données fictives** (ajouté le 14 nov. 2026, revue des processus) : les pages achats, fournisseurs et grand livre encore alimentées par des tableaux codés en dur passent sur les données réelles ou affichent explicitement « non disponible » — liste dans `docs/revue-processus-metier.md` §5.
 
 ## Décisions à prendre avant de coder
 

@@ -59,7 +59,7 @@ export function useCreateRequisition() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["purchase-requisitions"] });
-      toast.success("Requisition created");
+      toast.success("Demande d'achat créée");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -105,13 +105,14 @@ export function useCreatePurchaseOrder() {
     mutationFn: async (input: {
       po_number: string;
       supplier_id: string;
+      order_date?: string;
       total: number;
       tenant_id: string;
       created_by: string;
-      requisition_id?: string;
       lines: { description: string; quantity: number; unit_cost: number; item_id?: string }[];
     }) => {
-      const { lines, requisition_id, ...header } = input;
+      // En-tête puis lignes ; le total d'en-tête est recalculé par la base (recompute_po_total).
+      const { lines, ...header } = input;
       const { data, error } = await supabase
         .from("purchase_orders")
         .insert(header)
@@ -135,20 +136,15 @@ export function useCreatePurchaseOrder() {
         }
       }
 
-      // Link requisition to PO
-      if (requisition_id) {
-        await supabase
-          .from("purchase_requisitions")
-          .update({ po_id: data.id, status: "converted" })
-          .eq("id", requisition_id);
-      }
+      // Une demande devient commande par convert_pr_to_po (V35 : approbation vérifiée, lignes
+      // reprises, une seule conversion) — plus de rattachement après coup depuis ce formulaire.
 
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
       qc.invalidateQueries({ queryKey: ["purchase-requisitions"] });
-      toast.success("Purchase order created");
+      toast.success("Commande créée");
     },
     onError: (e: any) => toast.error(e.message),
   });

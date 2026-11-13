@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SettlementDialog } from "@/components/SettlementDialog";
+import { DocumentDetail } from "@/components/DocumentDetail";
+import { JournalEntryPreview } from "@/components/JournalEntryPreview";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
-  useARInvoices, useCreateARInvoice, useCustomers,
+  useARInvoices, useARInvoiceLines, useCreateARInvoice, useCustomers,
   type ARInvoice,
 } from "@/hooks/use-ar-data";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
@@ -214,9 +216,12 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
 }
 
 /* ──────── PAYMENT RECORDING DIALOG ──────── */
+const fmtNum = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
 /* ──────── SIDE PANEL ──────── */
 function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClose: () => void; onRecordPayment: () => void }) {
   const outstanding = inv.total - inv.amount_paid;
+  const lines = useARInvoiceLines(inv.id);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -233,30 +238,28 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
           </div>
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Résumé facture</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Date facture", inv.invoice_date],
-                ["Échéance", inv.due_date],
-                ["Montant total", fmtCurrency(inv.total)],
-                ["Solde restant", fmtCurrency(outstanding)],
-                ["Payé", fmtCurrency(inv.amount_paid)],
-                ["Statut", statusLabel(inv.status)],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-                  <p className="text-sm text-foreground mt-0.5 font-medium tabular-nums">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <DocumentDetail
+            header={[
+              ["Client", inv.customer?.name], ["Statut", statusLabel(inv.status)],
+              ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
+            ]}
+            columns={[{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" },
+              { label: "Remise", align: "right" }, { label: "TVA", align: "right" }, { label: "Montant HT", align: "right" }]}
+            rows={(lines.data ?? []).map((l) => [l.description, fmtNum(l.quantity), fmtNum(l.unit_price),
+              l.discount_pct ? `${fmtNum(l.discount_pct)} %` : "", l.tax_code ?? "—", fmtNum(l.net_amount)])}
+            emptyLines={lines.isLoading ? "Chargement des lignes…" : "Facture sans lignes (saisie en en-tête seul)."}
+            footer={[
+              ["Total HT", fmtCurrency(inv.subtotal)], ["TVA", fmtCurrency(inv.tax_amount)],
+              ["Total TTC", fmtCurrency(inv.total), true], ["Déjà réglé", fmtCurrency(inv.amount_paid)],
+              ["Reste à payer", fmtCurrency(outstanding), true],
+            ]}
+          />
+          <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2 flex-wrap">
           {inv.status !== "paid" && (
             <Button size="sm" className="text-xs gap-1.5" onClick={onRecordPayment}><CreditCard className="w-3.5 h-3.5" /> Enregistrer paiement</Button>
           )}
-          <Button variant="outline" size="sm" className="text-xs gap-1.5 ml-auto"><Eye className="w-3.5 h-3.5" /> Voir écriture GL</Button>
         </div>
       </div>
     </div>

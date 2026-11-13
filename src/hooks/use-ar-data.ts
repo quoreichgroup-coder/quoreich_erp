@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
-import { apiGet, apiPost, isApiEnabled } from "@/api/client";
+import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 import type { ApiSchemas } from "@/api";
 import { toARInvoice } from "@/lib/ar-api-mapping";
 
@@ -601,9 +601,16 @@ export function useRecordARPayment() {
 
 // ─── Customers ───
 export function useCustomers() {
+  // Sur site, la fiche client vient de l'API (base locale), comme les factures : sinon le front
+  // mêlait les clients du nuage et les factures de la base locale.
+  const source = isApiEnabled() ? "api" : "supabase";
   return useQuery({
-    queryKey: ["customers"],
+    queryKey: ["customers", source],
     queryFn: async () => {
+      if (source === "api") {
+        const rows = await apiGet<ApiSchemas["CustomerView"][]>("/api/v1/customers");
+        return rows.map(customerFromApi);
+      }
       const { data, error } = await supabase
         .from("customers")
         .select("*")
@@ -614,10 +621,26 @@ export function useCustomers() {
   });
 }
 
+function customerFromApi(c: ApiSchemas["CustomerView"]): Customer {
+  return {
+    id: c.id, tenant_id: "", name: c.name, email: c.email ?? null, phone: c.phone ?? null,
+    address: c.address ?? null, tax_id: c.taxId ?? null, credit_limit: Number(c.creditLimit ?? 0),
+    payment_terms: Number(c.paymentTerms ?? 30), status: c.status, created_at: "",
+  };
+}
+
+function customerToApi(c: Partial<Customer>) {
+  return {
+    name: c.name, email: c.email ?? null, phone: c.phone ?? null, address: c.address ?? null,
+    taxId: c.tax_id ?? null, creditLimit: c.credit_limit ?? 0, paymentTerms: c.payment_terms ?? 30,
+  };
+}
+
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (c: Omit<Customer, "id" | "tenant_id" | "created_at">) => {
+      if (isApiEnabled()) return apiPost("/api/v1/customers", customerToApi(c));
       const tenant_id = await fetchTenantId();
       const { data, error } = await supabase.from("customers").insert({
         ...c,
@@ -638,6 +661,7 @@ export function useUpdateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Customer> & { id: string }) => {
+      if (isApiEnabled()) { await apiPut(`/api/v1/customers/${id}`, customerToApi(updates)); return; }
       const { error } = await supabase.from("customers").update(updates).eq("id", id);
       if (error) throw error;
     },
@@ -653,6 +677,7 @@ export function useDeleteCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) throw new Error("Sur site, un client ne se supprime pas : ses pièces y restent rattachées.");
       const { error } = await supabase.from("customers").delete().eq("id", id);
       if (error) throw error;
     },
@@ -691,6 +716,46 @@ export function useARAging() {
         .order("days_overdue", { ascending: false });
       if (error) throw error;
       return (data || []) as ARAgingRow[];
+    },
+  });
+}
+
+// ── Lignes d'une facture client (vue de détail : en-tête, lignes, pied) ──
+export type ARInvoiceLineRow = {
+  line_no: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  discount_pct: number;
+  tax_code: string | null;
+  net_amount: number;
+  tax_amount: number;
+};
+
+export function useARInvoiceLines(invoiceId: string | undefined) {
+  return useQuery({
+    queryKey: ["ar-invoice-lines", invoiceId, isApiEnabled() ? "api" : "supabase"],
+    enabled: !!invoiceId,
+    queryFn: async (): Promise<ARInvoiceLineRow[]> => {
+      if (isApiEnabled()) {
+        const rows = await apiGet<ApiSchemas["ArInvoiceLineView"][]>(`/api/v1/ar/invoices/${invoiceId}/lines`);
+        return rows.map((r) => ({
+          line_no: Number(r.lineNo), description: r.description, quantity: Number(r.quantity),
+          unit_price: Number(r.unitPrice), discount_pct: Number(r.discountPct ?? 0), tax_code: r.taxCode ?? null,
+          net_amount: Number(r.netAmount), tax_amount: Number(r.taxAmount),
+        }));
+      }
+      const { data, error } = await (supabase as any)
+        .from("ar_invoice_lines")
+        .select("line_no, description, quantity, unit_price, discount_pct, net_amount, tax_amount, tax_code:tax_codes(code)")
+        .eq("invoice_id", invoiceId)
+        .order("line_no");
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        line_no: r.line_no, description: r.description, quantity: Number(r.quantity), unit_price: Number(r.unit_price),
+        discount_pct: Number(r.discount_pct ?? 0), tax_code: r.tax_code?.code ?? null,
+        net_amount: Number(r.net_amount), tax_amount: Number(r.tax_amount),
+      }));
     },
   });
 }

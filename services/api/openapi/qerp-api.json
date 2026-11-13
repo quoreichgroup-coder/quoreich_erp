@@ -32,6 +32,71 @@
     "description" : "Factures et encaissements AR de la société du porteur"
   } ],
   "paths" : {
+    "/api/v1/customers/{id}" : {
+      "put" : {
+        "tags" : [ "Clients" ],
+        "summary" : "Modifier un client",
+        "description" : "404 si le client n'appartient pas à la société de l'appelant.",
+        "operationId" : "updateCustomer",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CustomerInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/authorizations/roles/{role}" : {
       "put" : {
         "tags" : [ "Autorisations" ],
@@ -741,6 +806,109 @@
         }
       }
     },
+    "/api/v1/customers" : {
+      "get" : {
+        "tags" : [ "Clients" ],
+        "summary" : "Lister les clients visibles",
+        "description" : "Renvoie les clients de la société du porteur du jeton, triés par nom.\n\nAucun paramètre de société : le périmètre est résolu côté serveur depuis le profil de l'utilisateur et appliqué par les politiques RLS de PostgreSQL. Une requête portant le jeton d'une autre société renvoie les clients de cette autre société, jamais un élargissement.",
+        "operationId" : "listCustomers",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CustomerView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Clients" ],
+        "summary" : "Créer un client",
+        "description" : "Le client est créé dans la société du profil de l'appelant ; 400 si la saisie est invalide.",
+        "operationId" : "createCustomer",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CustomerInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/authorizations/roles" : {
       "post" : {
         "tags" : [ "Autorisations" ],
@@ -1310,55 +1478,6 @@
                   "type" : "object",
                   "additionalProperties" : {
                     "type" : "string"
-                  }
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Jeton absent, expiré ou invalide.",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { }
-                  },
-                  "required" : [ "error" ]
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { }
-                  },
-                  "required" : [ "error" ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/customers" : {
-      "get" : {
-        "tags" : [ "Clients" ],
-        "summary" : "Lister les clients visibles",
-        "description" : "Renvoie les clients de la société du porteur du jeton, triés par nom.\n\nAucun paramètre de société : le périmètre est résolu côté serveur depuis le profil de l'utilisateur et appliqué par les politiques RLS de PostgreSQL. Une requête portant le jeton d'une autre société renvoie les clients de cette autre société, jamais un élargissement.",
-        "operationId" : "listCustomers",
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/CustomerView"
                   }
                 }
               }
@@ -2012,6 +2131,33 @@
   },
   "components" : {
     "schemas" : {
+      "CustomerInput" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "address" : {
+            "type" : "string"
+          },
+          "taxId" : {
+            "type" : "string"
+          },
+          "creditLimit" : {
+            "type" : "number"
+          },
+          "paymentTerms" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "UpdateRole" : {
         "type" : "object",
         "properties" : {
@@ -2327,9 +2473,31 @@
           },
           "status" : {
             "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "address" : {
+            "type" : "string"
+          },
+          "taxId" : {
+            "type" : "string",
+            "description" : "Identifiant fiscal (IFU)"
+          },
+          "creditLimit" : {
+            "type" : "number",
+            "description" : "Plafond de crédit, XOF"
+          },
+          "paymentTerms" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Délai de paiement, jours"
           }
         },
-        "required" : [ "id", "name", "status" ]
+        "required" : [ "creditLimit", "id", "name", "paymentTerms", "status" ]
       },
       "AuthorizationsView" : {
         "type" : "object",

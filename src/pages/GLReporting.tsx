@@ -5,6 +5,7 @@ import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { exportToCSV } from "@/lib/csv-export";
 import { TrendingUp, Download, Scale, Layers, Loader2, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGLAccounts, useAccountBalances, useGLSig } from "@/hooks/use-gl-data";
@@ -93,7 +94,7 @@ export default function GLReporting() {
         <div className="bg-card border border-border rounded-lg">
           <div className="p-3 border-b border-border flex justify-between">
             <h3 className="text-sm font-semibold text-foreground">Balance de Vérification</h3>
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Download className="w-3 h-3" />Export</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-0" onClick={() => exportToCSV(rows.filter(r => r.debit > 0 || r.credit > 0).map(r => ({ ...r })), [{ key: "code", header: "Compte" }, { key: "name", header: "Nom" }, { key: "debit", header: "Débit (XOF)" }, { key: "credit", header: "Crédit (XOF)" }], "balance-de-verification")}><Download className="w-3 h-3" />Export</Button>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">
@@ -146,7 +147,7 @@ export default function GLReporting() {
           <div className="bg-card border border-border rounded-lg">
             <div className="p-3 border-b border-border flex justify-between">
               <h3 className="text-sm font-semibold text-foreground">Compte de Résultat</h3>
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Download className="w-3 h-3" />Export</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-1" onClick={() => exportToCSV([...revenueRows.filter(r => r.credit - r.debit !== 0).map(r => ({ section: "Produits", code: r.code, name: r.name, montant: r.credit - r.debit })), ...expenseRows.filter(r => r.debit - r.credit !== 0).map(r => ({ section: "Charges", code: r.code, name: r.name, montant: r.debit - r.credit })), { section: "Résultat net", code: "", name: "", montant: netIncome }], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "montant", header: "Montant (XOF)" }], "compte-de-resultat")}><Download className="w-3 h-3" />Export</Button>
             </div>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border bg-muted/30">
@@ -209,7 +210,7 @@ export default function GLReporting() {
           <div className="bg-card border border-border rounded-lg">
             <div className="p-3 border-b border-border flex justify-between">
               <h3 className="text-sm font-semibold text-foreground">Bilan</h3>
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Download className="w-3 h-3" />Export</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-2" onClick={() => exportToCSV([...assetRows.filter(r => r.balance !== 0).map(r => ({ section: "Actif", code: r.code, name: r.name, solde: r.debit - r.credit })), ...liabilityRows.filter(r => r.balance !== 0).map(r => ({ section: "Passif", code: r.code, name: r.name, solde: r.credit - r.debit })), ...equityRows.filter(r => r.balance !== 0).map(r => ({ section: "Capitaux propres", code: r.code, name: r.name, solde: r.credit - r.debit }))], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "solde", header: "Solde (XOF)" }], "bilan")}><Download className="w-3 h-3" />Export</Button>
             </div>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border bg-muted/30">
@@ -323,7 +324,7 @@ export default function GLReporting() {
                     <h3 className="text-sm font-semibold text-foreground">
                       Soldes Intermédiaires de Gestion {fromPeriod || toPeriod ? `(${fromPeriod || "—"} → ${toPeriod || "—"})` : "(toutes périodes)"}
                     </h3>
-                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Download className="w-3 h-3" />Export</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-3" onClick={() => exportToCSV(sigRows.map(r => ({ ...r })), [{ key: "period", header: "Période" }, { key: "chiffre_affaires", header: "CA" }, { key: "marge_commerciale", header: "Marge" }, { key: "valeur_ajoutee", header: "VA" }, { key: "ebe", header: "EBE" }, { key: "resultat_exploitation", header: "Résultat Expl." }, { key: "resultat_net", header: "Résultat Net" }], "soldes-intermediaires-de-gestion")}><Download className="w-3 h-3" />Export</Button>
                   </div>
                   <table className="w-full text-xs">
                     <tbody>

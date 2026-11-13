@@ -23,6 +23,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:parcours": "playwright test -c playwright.parcours.config.ts",
+    "test:e2e:sur-site": "playwright test -c playwright.sur-site.config.ts",
     "test:e2e:report": "playwright show-report",
     "dev:cloud": "vite --mode cloud"
   },

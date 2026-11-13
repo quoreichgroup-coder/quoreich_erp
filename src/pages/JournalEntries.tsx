@@ -1,3 +1,4 @@
+import { exportToCSV } from "@/lib/csv-export";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Plus, Trash2, Check, AlertCircle, X, Search, Download, Upload, RotateCcw, ChevronLeft, ChevronRight as ChevronRightIcon, ChevronsLeft, ChevronsRight, ArrowUpDown, Filter, Loader2 } from "lucide-react";
@@ -326,7 +327,10 @@ const JournalEntries = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8"><Upload className="w-3.5 h-3.5" /> Import Journal</Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8"><Download className="w-3.5 h-3.5" /> Export</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" data-testid="btn-export-csv" onClick={() => exportToCSV(
+            filtered.map((e: any) => ({ numero: e.entry_number, date: e.entry_date, libelle: e.description ?? "", source: e.source, statut: e.status, debit: e.debitTotal, credit: e.creditTotal })),
+            [{ key: "numero", header: "N° écriture" }, { key: "date", header: "Date" }, { key: "libelle", header: "Libellé" }, { key: "source", header: "Source" },
+             { key: "statut", header: "Statut" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" }], "ecritures-comptables")}><Download className="w-3.5 h-3.5" /> Export</Button>
           <Button size="sm" onClick={() => setShowNewEntry(true)} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> New Journal Entry</Button>
         </div>
       </div>

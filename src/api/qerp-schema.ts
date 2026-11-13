@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Modifier un client
+         * @description 404 si le client n'appartient pas à la société de l'appelant.
+         */
+        put: operations["updateCustomer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations/roles/{role}": {
         parameters: {
             query?: never;
@@ -164,6 +184,32 @@ export interface paths {
          */
         put: operations["assignPostingAccount"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister les clients visibles
+         * @description Renvoie les clients de la société du porteur du jeton, triés par nom.
+         *
+         *     Aucun paramètre de société : le périmètre est résolu côté serveur depuis le profil de l'utilisateur et appliqué par les politiques RLS de PostgreSQL. Une requête portant le jeton d'une autre société renvoie les clients de cette autre société, jamais un élargissement.
+         */
+        get: operations["listCustomers"];
+        put?: never;
+        /**
+         * Créer un client
+         * @description Le client est créé dans la société du profil de l'appelant ; 400 si la saisie est invalide.
+         */
+        post: operations["createCustomer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -340,28 +386,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["liveness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/customers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Lister les clients visibles
-         * @description Renvoie les clients de la société du porteur du jeton, triés par nom.
-         *
-         *     Aucun paramètre de société : le périmètre est résolu côté serveur depuis le profil de l'utilisateur et appliqué par les politiques RLS de PostgreSQL. Une requête portant le jeton d'une autre société renvoie les clients de cette autre société, jamais un élargissement.
-         */
-        get: operations["listCustomers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -599,6 +623,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CustomerInput: {
+            name?: string;
+            email?: string;
+            phone?: string;
+            address?: string;
+            taxId?: string;
+            creditLimit?: number;
+            /** Format: int32 */
+            paymentTerms?: number;
+        };
         UpdateRole: {
             name?: string;
             description?: string;
@@ -727,6 +761,18 @@ export interface components {
             id: string;
             name: string;
             status: string;
+            email?: string;
+            phone?: string;
+            address?: string;
+            /** @description Identifiant fiscal (IFU) */
+            taxId?: string;
+            /** @description Plafond de crédit, XOF */
+            creditLimit: number;
+            /**
+             * Format: int32
+             * @description Délai de paiement, jours
+             */
+            paymentTerms: number;
         };
         AuthorizationsView: {
             /** @description Administrateur de la société */
@@ -906,6 +952,54 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    updateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     updateRole: {
         parameters: {
             query?: never;
@@ -1426,6 +1520,94 @@ export interface operations {
             };
         };
     };
+    listCustomers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerView"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     createRole: {
         parameters: {
             query?: never;
@@ -1898,48 +2080,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
-                };
-            };
-            /** @description Jeton absent, expiré ou invalide. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: unknown;
-                    };
-                };
-            };
-            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listCustomers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CustomerView"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

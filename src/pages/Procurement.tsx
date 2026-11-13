@@ -1,3 +1,4 @@
+import { exportToCSV } from "@/lib/csv-export";
 import { useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -82,7 +83,9 @@ export default function Procurement() {
         <h1 className="text-lg font-semibold text-foreground">Procurement</h1>
         <div className="flex gap-2">
           <Button size="sm" className="gap-1.5" onClick={() => navigate("/procurement/transactions")}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
-          <Button size="sm" variant="outline" className="gap-1.5"><Download className="w-3.5 h-3.5" />Export</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={() => exportToCSV(
+            (purchaseOrders ?? []).map((p: any) => ({ numero: p.po_number, fournisseur: p.supplier?.name ?? "", date: p.order_date, total: p.total, statut: p.status })),
+            [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }], "commandes")}><Download className="w-3.5 h-3.5" />Export</Button>
         </div>
       </div>
 

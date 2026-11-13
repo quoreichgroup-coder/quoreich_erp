@@ -1,3 +1,4 @@
+import { exportToCSV } from "@/lib/csv-export";
 import { useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -12,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SettlementDialog } from "@/components/SettlementDialog";
+import { DocumentDetail } from "@/components/DocumentDetail";
+import { JournalEntryPreview } from "@/components/JournalEntryPreview";
 import { usePurchaseOrders } from "@/hooks/use-procurement-data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,32 +160,26 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
           </div>
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Détails</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Date facture", inv.invoice_date],
-                ["Échéance", inv.due_date],
-                ["Montant HT", fmtCurrency(inv.subtotal)],
-                ["TVA", fmtCurrency(inv.tax_amount)],
-                ["Total TTC", fmtCurrency(inv.total)],
-                ["Payé", fmtCurrency(inv.amount_paid)],
-                ["Restant", fmtCurrency(outstanding)],
-                ["Statut", statusLabel(inv.status)],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-                  <p className="text-sm text-foreground mt-0.5 font-medium tabular-nums">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <DocumentDetail
+            header={[
+              ["Fournisseur", inv.supplier?.name], ["Statut", `${statusLabel(inv.status)} · ${approvalLabel(inv.approval_status)}`],
+              ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
+            ]}
+            columns={[{ label: "Libellé" }, { label: "Montant HT", align: "right" }]}
+            rows={[]}
+            emptyLines="Facture saisie en en-tête seul : les lignes de facture fournisseur arrivent au Lot 3 (étape 4, avec le rapprochement commande / réception)."
+            footer={[
+              ["Total HT", fmtCurrency(inv.subtotal)], ["TVA déductible", fmtCurrency(inv.tax_amount)],
+              ["Total TTC", fmtCurrency(inv.total), true], ["Déjà payé", fmtCurrency(inv.amount_paid)],
+              ["Reste à payer", fmtCurrency(outstanding), true],
+            ]}
+          />
+          <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2">
           {inv.status !== "paid" && inv.approval_status === "approved" && (
-            <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Create Payment</Button>
+            <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Payer</Button>
           )}
-          <Button variant="outline" size="sm" className="text-xs gap-1.5 ml-auto"><Eye className="w-3.5 h-3.5" /> View GL Entry</Button>
         </div>
       </div>
     </div>
@@ -232,7 +229,12 @@ export default function APTransactions() {
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> New Supplier Invoice</Button>
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5"><Download className="w-3.5 h-3.5" /> Export</Button>
+          <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={() => exportToCSV(
+            filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
+              ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
+            [{ key: "numero", header: "N° facture" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "echeance", header: "Échéance" },
+             { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" }, { key: "paye", header: "Payé" }, { key: "reste", header: "Reste" },
+             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
       </div>
 

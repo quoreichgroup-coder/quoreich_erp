@@ -98,6 +98,37 @@ test("facture fournisseur → approbation → règlements par fournisseur", asyn
   await expect(ligne(page, ff2).getByRole("button", { name: /Pay/ })).toHaveCount(0);
   await expect(ligne(page, ffAutre).getByRole("button", { name: /Pay/ }), "la facture de l'autre fournisseur reste due").toBeVisible();
 
+  obs.etape("détail de la facture : en-tête, lignes, pied");
+  await ligne(page, ff1).locator("td").first().click();
+  const panneau = page.getByRole("dialog", { name: `Facture ${ff1}` });
+  await expect(panneau.getByRole("region", { name: "En-tête" })).toContainText(fournisseur);
+  await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("118 000");
+  await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Reste à payer");
+  await panneau.getByRole("button", { name: "Fermer" }).click();
+
+  obs.etape("export des factures fournisseurs");
+  const telechargement = page.waitForEvent("download");
+  await page.getByTestId("btn-export-csv").click();
+  expect((await telechargement).suggestedFilename()).toMatch(/^factures-fournisseurs.*\.csv$/);
+
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
+});
+
+/*
+ * Défaut connu, planifié au Lot 3 (étape 3 : comptabilisation par rôles, refus QG001) : la facture
+ * fournisseur approuvée ne passe aucune écriture (on_ap_invoice_posted cherche 4010 / 6010 et
+ * abandonne en silence ; le plan SYSCOHADA a 401 / 601). Marqué « échec attendu » : il reste
+ * visible dans chaque rapport et devient « réussite inattendue » dès qu'il est corrigé.
+ */
+test("la facture fournisseur approuvée porte son écriture comptable", async ({ page }) => {
+  test.fail(true, "Lot 3, étape 3 : la facture fournisseur ne passe aucune écriture");
+  const fournisseur = `${RUN} Fournisseur écriture`;
+  const numero = `FF-${RUN}-GL`;
+  await assurerPlanComptable(page);
+  await creerFournisseur(page, fournisseur);
+  const f = await saisirFacture(page, fournisseur, numero, "50000", "9000");
+  await f.locator("td").first().click();
+  const panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await expect(panneau.getByTestId("journal-entry-preview"), "écriture fournisseur / charge / TVA attendue").toBeVisible({ timeout: 10_000 });
 });
