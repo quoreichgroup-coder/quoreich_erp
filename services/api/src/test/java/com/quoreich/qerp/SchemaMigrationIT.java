@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "30";
+  private static final String DERNIERE_MIGRATION = "31";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -95,7 +95,9 @@ class SchemaMigrationIT {
           "erp_system_roles",
           "erp_system_role_permissions",
           "erp_role_permissions",
-          "erp_authorization_audit");
+          "erp_authorization_audit",
+          // V31 — invitations à rejoindre une société.
+          "tenant_invitations");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -132,10 +134,17 @@ class SchemaMigrationIT {
           "mirror_role_assignments",
           "guard_role_assignments",
           "guard_role_in_use",
-          "my_access");
+          "my_access",
+          // V31 — rôles des modules écrits dans la matrice ; invitations.
+          "module_role_tenant",
+          "module_role_held",
+          "module_role_set",
+          "create_tenant_invitation",
+          "revoke_tenant_invitation");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
+          "tenant_invitations/Administrateur de la société",
           "accounting_frameworks/Lecture du référentiel",
           "accounting_framework_accounts/Lecture du référentiel",
           "posting_roles/Lecture du référentiel",

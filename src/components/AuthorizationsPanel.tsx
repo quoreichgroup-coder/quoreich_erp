@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { History, KeyRound, Loader2, Lock, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
+import { Copy, History, KeyRound, Loader2, Lock, MailPlus, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,8 +9,10 @@ import {
   useRevokeRole, useSetRolePermissions, useUpdateRole,
 } from "@/hooks/use-authorizations";
 import { AUDIT_LABELS, MODULE_LABELS, catalogByModule, isLastAdmin, type Authorizations, type Role } from "@/lib/authorizations";
+import { useCreateInvitation, useInvitations, useRevokeInvitation } from "@/hooks/use-invitations";
+import { INVITATION_STATUS_LABELS, invitationStatus, sortInvitations } from "@/lib/invitations";
 
-type Tab = "roles" | "users" | "audit";
+type Tab = "roles" | "users" | "invitations" | "audit";
 
 /**
  * Rôles et autorisations de la société : le seul endroit où se décident les droits. La base les
@@ -37,7 +39,10 @@ export function AuthorizationsPanel() {
   const tabs: { id: Tab; label: string; icon: typeof KeyRound }[] = [
     { id: "roles", label: "Rôles", icon: KeyRound },
     { id: "users", label: "Utilisateurs", icon: Users },
-    ...(view.canManage ? [{ id: "audit" as Tab, label: "Journal", icon: History }] : []),
+    ...(view.canManage ? [
+      { id: "invitations" as Tab, label: "Invitations", icon: MailPlus },
+      { id: "audit" as Tab, label: "Journal", icon: History },
+    ] : []),
   ];
 
   return (
@@ -68,6 +73,7 @@ export function AuthorizationsPanel() {
 
       {tab === "roles" && <RolesTab view={view} />}
       {tab === "users" && <UsersTab view={view} />}
+      {tab === "invitations" && view.canManage && <InvitationsTab view={view} />}
       {tab === "audit" && view.canManage && <AuditTab />}
     </div>
   );
@@ -331,6 +337,115 @@ function AuditTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * Invitations (V31) : on ne rejoint plus une société en tapant son nom. L'administrateur émet un
+ * code à usage unique, daté, avec le rôle d'arrivée, et le transmet lui-même à la personne.
+ */
+function InvitationsTab({ view }: { view: Authorizations }) {
+  const invitations = useInvitations(true);
+  const create = useCreateInvitation();
+  const revoke = useRevokeInvitation();
+  const assignable = useMemo(() => view.roles.filter((r) => !r.needsReview), [view.roles]);
+  const viewer = assignable.find((r) => r.code === "viewer");
+  const [roleId, setRoleId] = useState<string>("");
+  const [validDays, setValidDays] = useState(7);
+  const [note, setNote] = useState("");
+  const [lastCode, setLastCode] = useState<string | null>(null);
+  const roleName = (id: string) => view.roles.find((r) => r.id === id)?.name ?? "Rôle supprimé";
+  const effectiveRole = roleId || viewer?.id || "";
+
+  const submit = () => create.mutate(
+    { roleId: effectiveRole, validDays, note },
+    { onSuccess: (r) => { setLastCode(r.code); setNote(""); } },
+  );
+  const copy = (code: string) => {
+    void navigator.clipboard?.writeText(code).catch(() => undefined);
+  };
+  const rows = sortInvitations(invitations.data ?? []);
+
+  return (
+    <div className="space-y-4" data-testid="invitations-tab">
+      <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+        <p className="text-xs text-muted-foreground max-w-3xl">
+          Pour faire entrer quelqu'un dans la société, créez une invitation et transmettez-lui le code. Le code sert une seule
+          fois, expire à la date choisie et donne le rôle d'arrivée indiqué ; les autres rôles s'affectent ensuite dans l'onglet
+          « Utilisateurs ». Seule une personne qui n'appartient encore à aucune société peut l'utiliser.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs space-y-1">
+            <span className="block text-muted-foreground">Rôle d'arrivée</span>
+            <select className="h-9 rounded-md border border-input bg-background px-2 text-sm min-w-[220px]" value={effectiveRole}
+              onChange={(e) => setRoleId(e.target.value)} data-testid="invitation-role">
+              {assignable.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs space-y-1">
+            <span className="block text-muted-foreground">Validité (jours)</span>
+            <Input type="number" min={1} max={30} value={validDays} className="h-9 w-24"
+              onChange={(e) => setValidDays(Math.max(1, Math.min(30, Number(e.target.value) || 1)))} data-testid="invitation-days" />
+          </label>
+          <label className="text-xs space-y-1 flex-1 min-w-[200px]">
+            <span className="block text-muted-foreground">Note (facultatif)</span>
+            <Input value={note} maxLength={200} className="h-9" placeholder="Ex. : comptable, arrivée le 1er décembre"
+              onChange={(e) => setNote(e.target.value)} data-testid="invitation-note" />
+          </label>
+          <Button size="sm" onClick={submit} disabled={!effectiveRole || create.isPending} data-testid="invitation-create">
+            {create.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailPlus className="w-4 h-4" />} Créer l'invitation
+          </Button>
+        </div>
+        {lastCode && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2" data-testid="invitation-last-code">
+            <span className="text-xs text-muted-foreground">Code à transmettre :</span>
+            <code className="font-mono text-sm font-semibold tracking-wider text-foreground">{lastCode}</code>
+            <Button size="sm" variant="ghost" className="h-7" onClick={() => copy(lastCode)} aria-label="Copier le code">
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg overflow-x-auto">
+        {invitations.isLoading ? (
+          <p className="p-4 text-sm text-muted-foreground">Chargement des invitations…</p>
+        ) : invitations.isError ? (
+          <p className="p-4 text-sm text-destructive" role="alert">Invitations illisibles : {(invitations.error as Error)?.message}</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-2 px-4 font-medium">Code</th><th className="py-2 px-4 font-medium">Rôle d'arrivée</th>
+                <th className="py-2 px-4 font-medium">Note</th><th className="py-2 px-4 font-medium">Expire le</th>
+                <th className="py-2 px-4 font-medium">Statut</th><th className="py-2 px-4 font-medium"><span className="sr-only">Action</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={6} className="py-4 px-4 text-muted-foreground">Aucune invitation.</td></tr>}
+              {rows.map((r) => {
+                const status = invitationStatus(r);
+                return (
+                  <tr key={r.id} className="border-b border-border last:border-0" data-testid={`invitation-row-${r.id}`}>
+                    <td className="py-2 px-4 font-mono">{r.code}</td>
+                    <td className="py-2 px-4">{roleName(r.role_id)}</td>
+                    <td className="py-2 px-4 text-muted-foreground">{r.note ?? ""}</td>
+                    <td className="py-2 px-4 tabular-nums text-muted-foreground whitespace-nowrap">{new Date(r.expires_at).toLocaleString("fr-FR")}</td>
+                    <td className="py-2 px-4">{INVITATION_STATUS_LABELS[status]}</td>
+                    <td className="py-2 px-4 text-right">
+                      {status === "active" && (
+                        <Button size="sm" variant="ghost" className="h-7 text-destructive" disabled={revoke.isPending}
+                          onClick={() => revoke.mutate(r.id)} data-testid={`invitation-revoke-${r.id}`}>Révoquer</Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

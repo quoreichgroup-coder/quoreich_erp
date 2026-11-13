@@ -118,12 +118,16 @@ export default function Onboarding() {
           <Card>
             <CardHeader>
               <CardTitle>Rejoindre une entreprise</CardTitle>
-              <CardDescription>Entrez le nom de l'entreprise à rejoindre</CardDescription>
+              <CardDescription>Entrez le code d'invitation transmis par l'administrateur de l'entreprise</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Nom de l'entreprise *</Label>
-                <Input value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Ex: QUOREICH CI" autoFocus />
+                <Label htmlFor="join-code">Code d'invitation *</Label>
+                <Input id="join-code" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX"
+                  autoComplete="off" spellCheck={false} className="font-mono tracking-wider" autoFocus />
+                <p className="text-xs text-muted-foreground">
+                  L'administrateur crée ce code dans Paramètres → Rôles et autorisations → Invitations. Il sert une seule fois.
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setMode("choose")} className="flex-1">Retour</Button>
