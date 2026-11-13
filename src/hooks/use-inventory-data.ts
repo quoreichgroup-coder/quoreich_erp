@@ -527,6 +527,11 @@ export function useCloseInventoryPeriod() {
 }
 
 
+/**
+ * Périodes de stock clôturées. Les colonnes s'appellent closed_at / closed_by et le module
+ * INVENTORY depuis V33 : la lecture précédente (locked_at, module « inventory ») ne renvoyait
+ * qu'une erreur.
+ */
 export type InventoryPeriodLock = { id: string; period: string; module: string; locked_at: string; locked_by: string | null };
 export function useInventoryPeriodLocks() {
   return useQuery({
@@ -534,9 +539,10 @@ export function useInventoryPeriodLocks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("period_locks" as never)
-        .select("id, period, module, locked_at, locked_by")
-        .eq("module", "inventory")
-        .order("locked_at", { ascending: false })
+        .select("id, period, module, locked_at:closed_at, locked_by:closed_by")
+        .eq("module", "INVENTORY")
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false })
         .limit(50);
       if (error) throw error;
       return (data as unknown as InventoryPeriodLock[]) || [];

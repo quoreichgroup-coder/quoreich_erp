@@ -21,6 +21,7 @@ export interface RawSystemRole { code: string; module: string }
 
 export const MODULE_LABELS: Record<string, string> = {
   general: "Général",
+  periods: "Exercices et périodes",
   crm: "CRM",
   hr: "RH / Paie",
   inventory: "Stocks",

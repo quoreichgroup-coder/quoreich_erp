@@ -7,7 +7,7 @@
  * V27) et chaque requête annexe de l'écran restaient sans réponse ou partaient vers la
  * production avec un jeton factice. Ce fond fournit :
  *   - profiles      → l'utilisateur E2E dans la société « t-1 » ;
- *   - my_access     → administrateur, les 43 droits du catalogue (V23) ;
+ *   - my_access     → administrateur, les 45 droits du catalogue (V23, V33) ;
  *   - auth/v1/user  → l'utilisateur E2E ;
  *   - toute autre lecture REST → aucune ligne ; toute autre RPC → null ;
  *   - le canal temps réel → une connexion simulée muette, sans serveur.
@@ -32,7 +32,7 @@ export const ALL_PERMISSIONS = [
   "crm.approve_discount", "crm.audit", "crm.convert", "crm.create", "crm.delete", "crm.edit", "crm.export", "crm.view",
   "crm.view_sensitive", "hr.approve_payroll_run", "hr.audit_payroll", "hr.create_payroll_run", "hr.execute_payroll",
   "hr.export", "hr.manage_employees", "hr.run_payroll", "hr.view_payroll", "hr.view_sensitive", "inventory.adjust",
-  "inventory.close", "inventory.count", "inventory.move", "inventory.post_count", "inventory.transfer", "procurement.3wm",
+  "inventory.close", "inventory.count", "inventory.move", "inventory.post_count", "inventory.transfer", "periods.close", "periods.reopen", "procurement.3wm",
   "procurement.approve_l1", "procurement.approve_l2", "procurement.approve_l3", "procurement.convert", "sales.confirm",
   "sales.create", "sales.deliver", "sales.invoice", "treasury.audit", "treasury.close_period", "treasury.create_txn",
   "treasury.edit_forecast", "treasury.export", "treasury.import_statement", "treasury.manage_accounts", "treasury.match",

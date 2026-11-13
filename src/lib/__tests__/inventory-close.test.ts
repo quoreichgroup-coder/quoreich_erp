@@ -65,7 +65,7 @@ describe("close_inventory_period — idempotence & lock", () => {
     expect(r.created).toBe(true);
     expect(store.closes).toHaveLength(1);
     expect(store.locks).toHaveLength(1);
-    expect(store.locks[0]).toMatchObject({ tenant_id: TENANT, period: "2026-06", module: "inventory", locked_by: USER });
+    expect(store.locks[0]).toMatchObject({ tenant_id: TENANT, period: "2026-06", module: "INVENTORY", status: "closed", closed_by: USER });
     expect(store.audit).toHaveLength(1);
     expect(store.audit[0]).toMatchObject({ action: "period_close", comment: "2026-06" });
   });

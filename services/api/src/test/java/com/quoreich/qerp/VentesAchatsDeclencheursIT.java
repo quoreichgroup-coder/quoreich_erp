@@ -50,7 +50,7 @@ class VentesAchatsDeclencheursIT {
     owner("INSERT INTO auth.users (id) VALUES ('" + SANS_DROIT + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + SANS_DROIT + "', '" + A + "', 'Sans droit CRM')"
         + " ON CONFLICT (id) DO NOTHING;"
-        + "DELETE FROM period_locks WHERE tenant_id = '" + A + "' AND module = 'Sales'");
+        + "DELETE FROM period_locks WHERE tenant_id = '" + A + "' AND module = 'SALES'");
   }
 
   @Test
@@ -67,12 +67,12 @@ class VentesAchatsDeclencheursIT {
     assertThat(count("SELECT count(*) FROM sales_orders WHERE so_number = 'CDE-IT-1'")).isEqualTo(1);
     assertThat(count("SELECT count(*) FROM delivery_notes WHERE dn_number = 'BL-IT-1'")).isEqualTo(1);
 
-    owner("INSERT INTO period_locks (tenant_id, module, period, status) VALUES ('" + A + "', 'Sales',"
+    owner("INSERT INTO period_locks (tenant_id, module, period, status) VALUES ('" + A + "', 'SALES',"
         + " to_char(CURRENT_DATE, 'YYYY-MM'), 'closed')");
     assertThatThrownBy(() -> owner("INSERT INTO sales_orders (tenant_id, so_number, customer_id, created_by) VALUES"
             + " ('" + A + "', 'CDE-IT-VERROU', '" + CLIENT + "', '" + ADMIN + "')"))
-        .hasMessageContaining("is closed");
-    owner("DELETE FROM period_locks WHERE tenant_id = '" + A + "' AND module = 'Sales'");
+        .hasMessageContaining("clôturée pour le module Ventes");
+    owner("DELETE FROM period_locks WHERE tenant_id = '" + A + "' AND module = 'SALES'");
   }
 
   @Test

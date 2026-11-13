@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "32";
+  private static final String DERNIERE_MIGRATION = "33";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -110,7 +110,12 @@ class SchemaMigrationIT {
           "erp_role_permissions",
           "erp_authorization_audit",
           // V31 — invitations à rejoindre une société.
-          "tenant_invitations");
+          "tenant_invitations",
+          // V33 — calendrier fiscal central.
+          "fiscal_modules",
+          "fiscal_years",
+          "fiscal_periods",
+          "fiscal_calendar_audit");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -144,11 +149,25 @@ class SchemaMigrationIT {
           "module_role_held",
           "module_role_set",
           "create_tenant_invitation",
-          "revoke_tenant_invitation");
+          "revoke_tenant_invitation",
+          // V33 — calendrier fiscal central.
+          "fiscal_module_label",
+          "assert_fiscal_period_open",
+          "enforce_fiscal_period",
+          "fiscal_period_set",
+          "set_period_status",
+          "fiscal_generate_periods",
+          "create_fiscal_year",
+          "open_fiscal_year",
+          "close_fiscal_year");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
           "tenant_invitations/Administrateur de la société",
+          "fiscal_modules/Lecture du référentiel",
+          "fiscal_years/Tenant isolation",
+          "fiscal_periods/Tenant isolation",
+          "fiscal_calendar_audit/Clôture des périodes",
           "accounting_frameworks/Lecture du référentiel",
           "accounting_framework_accounts/Lecture du référentiel",
           "posting_roles/Lecture du référentiel",
@@ -200,7 +219,15 @@ class SchemaMigrationIT {
           "erp_role_permissions/trg_audit_erp_role_permissions",
           "user_role_assignments/trg_audit_user_role_assignments",
           "user_role_assignments/trg_guard_role_assignments",
-          "erp_roles/trg_guard_role_in_use");
+          "erp_roles/trg_guard_role_in_use",
+          // V33 — contrôle du calendrier fiscal par module.
+          "ar_invoices/trg_fiscal_period_ar_invoices",
+          "ap_invoices/trg_fiscal_period_ap_invoices",
+          "payments/trg_fiscal_period_payments",
+          "purchase_orders/trg_fiscal_period_purchase_orders",
+          "bank_transactions/trg_fiscal_period_bank_transactions",
+          "payroll_runs/trg_fiscal_period_payroll_runs",
+          "depreciation_entries/trg_fiscal_period_depreciation_entries");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {

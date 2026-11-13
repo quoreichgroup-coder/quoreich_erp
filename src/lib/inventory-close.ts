@@ -53,8 +53,10 @@ export type InventoryCloseRow = {
 export type PeriodLockRow = {
   tenant_id: string;
   period: string;
-  module: "inventory";
-  locked_by: string;
+  /** Code du module dans le calendrier fiscal (V33). */
+  module: "INVENTORY";
+  status: "closed";
+  closed_by: string;
 };
 
 export type AuditRow = {
@@ -96,8 +98,8 @@ export function closeInventoryPeriod(
   }
 
   store.closes.push({ tenant_id: ctx.tenantId, period, closed_by: ctx.userId, closed_at: new Date().toISOString() });
-  if (!store.locks.find((l) => l.tenant_id === ctx.tenantId && l.period === period && l.module === "inventory")) {
-    store.locks.push({ tenant_id: ctx.tenantId, period, module: "inventory", locked_by: ctx.userId });
+  if (!store.locks.find((l) => l.tenant_id === ctx.tenantId && l.period === period && l.module === "INVENTORY")) {
+    store.locks.push({ tenant_id: ctx.tenantId, period, module: "INVENTORY", status: "closed", closed_by: ctx.userId });
   }
   store.audit.push({ tenant_id: ctx.tenantId, performed_by: ctx.userId, action: "period_close", comment: period });
   return { status: "ok", message: closeMessage("ok", period), period, created: true, audited: true };

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -83,6 +84,7 @@ export default function GLControl() {
   const { data: periods = [], isLoading: loadingPeriods } = useGLPeriods();
   const closePeriod = useCloseGLPeriod();
   const reopenPeriod = useReopenGLPeriod();
+  const [reopenReason, setReopenReason] = useState("");
   const openPeriodsCount = periods.filter((p: any) => p.status === "open").length;
 
   const criticalAnomalies = anomalies.filter(a => a.severity === "critical" && a.status === "unresolved").length;
@@ -287,12 +289,18 @@ export default function GLControl() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Ré-ouvrir la période {p.period} ?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  La période redeviendra modifiable. À utiliser uniquement pour corrections exceptionnelles.
+                                  La période redeviendra modifiable. À utiliser uniquement pour corrections exceptionnelles ;
+                                  le motif est enregistré au journal des clôtures.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
+                              <Textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} maxLength={500}
+                                placeholder="Motif de la réouverture (obligatoire)" aria-label="Motif de la réouverture" />
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => reopenPeriod.mutate(p.period)}>Ré-ouvrir</AlertDialogAction>
+                                <AlertDialogCancel onClick={() => setReopenReason("")}>Annuler</AlertDialogCancel>
+                                <AlertDialogAction disabled={!reopenReason.trim()}
+                                  onClick={() => { reopenPeriod.mutate({ period: p.period, reason: reopenReason.trim() }); setReopenReason(""); }}>
+                                  Ré-ouvrir
+                                </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>

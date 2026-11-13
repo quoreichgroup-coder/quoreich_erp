@@ -20,4 +20,6 @@
 - [ ] Réception métier du Lot 2 : confirmer l'application de V16–V32 par Lovable et la CI verte, puis recette au navigateur par un utilisateur autorisé.
 - [ ] Production : jouer `scripts/data/doublons-declencheurs/corriger.psql` à blanc, relire, appliquer.
 - [ ] Faire valider le référentiel SYSCOHADA par un expert-comptable (§ 138) ; décider de la reprise des factures historiques sans écriture.
-- [ ] Lot 3 : AP, GL, achats (AP-REC, GL-REC, ACH-REC).
+- [x] Calendrier fiscal central (V33) : exercices et périodes par société, statut par module, ordre de clôture bloquant, réouverture avec motif, journal ; écriture directe des verrous fermée ; clôtures de stock et de trésorerie réparées.
+- [x] Barre latérale rangée par processus métier ; `/settings` ouvre l'onglet demandé (`?tab=`).
+- [ ] Lot 3 : AP, GL, achats (AP-REC, GL-REC, ACH-REC), dont la clôture d'exercice comptable (report à nouveau, résultat).

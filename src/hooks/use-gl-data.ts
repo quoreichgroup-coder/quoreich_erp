@@ -259,21 +259,26 @@ export function useCloseGLPeriod() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gl-periods"] });
+      qc.invalidateQueries({ queryKey: ["fiscal-calendar"] });
       toast.success("Période clôturée");
     },
     onError: (e: any) => toast.error(e.message),
   });
 }
 
+/** Réouverture : motif obligatoire, par le calendrier fiscal central (V33). */
 export function useReopenGLPeriod() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (period: string) => {
-      const { error } = await (supabase as any).rpc("reopen_gl_period", { _period: period });
+    mutationFn: async ({ period, reason }: { period: string; reason: string }) => {
+      const { error } = await (supabase as any).rpc("set_period_status", {
+        _period: period, _module: "GL", _status: "open", _reason: reason,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gl-periods"] });
+      qc.invalidateQueries({ queryKey: ["fiscal-calendar"] });
       toast.success("Période ré-ouverte");
     },
     onError: (e: any) => toast.error(e.message),

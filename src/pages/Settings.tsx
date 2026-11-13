@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { HelpIcon } from "@/components/HelpIcon";
@@ -17,13 +18,14 @@ import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
 import { TaxCodesPanel } from "@/components/TaxCodesPanel";
 import { AuthorizationsPanel } from "@/components/AuthorizationsPanel";
 import { AiSchedulesSettings } from "@/components/AiSchedulesSettings";
+import { FiscalCalendarPanel } from "@/components/FiscalCalendarPanel";
 
 import { cn } from "@/lib/utils";
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 
 const tabs = [
-  { id: "fiscal", label: "Fiscal Years", icon: CalendarDays },
+  { id: "fiscal", label: "Exercices et périodes", icon: CalendarDays },
   { id: "accounts", label: "Chart of Accounts", icon: BookOpen },
   { id: "posting", label: "Comptabilisation", icon: Landmark },
   { id: "analytics", label: "Analytique", icon: Layers },
@@ -51,11 +53,7 @@ const chartOfAccounts = [
   { number: "5200", name: "Rent Expense", category: "Expenses", type: "Operating", status: "Inactive" },
 ];
 
-const fiscalYears = [
-  { year: "FY 2025–2026", start: "2025-01-01", end: "2025-12-31", status: "Active", periods: 12, closed: 1 },
-  { year: "FY 2024–2025", start: "2024-01-01", end: "2024-12-31", status: "Closed", periods: 12, closed: 12 },
-  { year: "FY 2023–2024", start: "2023-01-01", end: "2023-12-31", status: "Closed", periods: 12, closed: 12 },
-];
+
 
 
 const paymentTerms = [
@@ -236,9 +234,18 @@ const fmt = (n: number) => n.toLocaleString("fr-FR");
 // ── Component ───────────────────────────────────────────────────────────────
 
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState("fiscal");
+  // L'onglet suit l'URL (?tab=…) : la barre latérale et les modules y renvoient directement.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("tab");
+  const [activeTab, setActiveTabState] = useState(tabs.some((t) => t.id === requested) ? requested! : "fiscal");
+  useEffect(() => {
+    if (requested && tabs.some((t) => t.id === requested)) setActiveTabState(requested);
+  }, [requested]);
+  const setActiveTab = (id: string) => {
+    setActiveTabState(id);
+    setSearchParams((prev) => { const next = new URLSearchParams(prev); next.set("tab", id); return next; }, { replace: true });
+  };
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedFY, setExpandedFY] = useState<string | null>("FY 2025–2026");
   const [expandedWF, setExpandedWF] = useState<string | null>("WF-002");
   const [workflowSubTab, setWorkflowSubTab] = useState<"rules" | "simulation" | "delegations" | "history">("rules");
 
@@ -277,52 +284,8 @@ const Settings = () => {
         {/* Main Content */}
         <div className="flex-1">
           {/* ── Fiscal Years ── */}
-          {activeTab === "fiscal" && (
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-medium text-foreground">Fiscal Years</h3>
-                  <HelpIcon text="Define fiscal year boundaries and manage period closing." />
-                </div>
-                <Button size="sm" className="h-7 text-[11px] gap-1"><Plus className="w-3 h-3" /> New Fiscal Year</Button>
-              </div>
-              <div className="divide-y divide-border">
-                {fiscalYears.map((fy) => (
-                  <div key={fy.year}>
-                    <button onClick={() => setExpandedFY(expandedFY === fy.year ? null : fy.year)}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors">
-                      <div className="flex items-center gap-3">
-                        {expandedFY === fy.year ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
-                        <div className="text-left">
-                          <span className="text-xs font-medium text-foreground">{fy.year}</span>
-                          <span className="text-[11px] text-muted-foreground ml-3">{fy.start} → {fy.end}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[11px] text-muted-foreground">{fy.closed}/{fy.periods} periods closed</span>
-                        <StatusBadge status={fy.status} />
-                      </div>
-                    </button>
-                    {expandedFY === fy.year && (
-                      <div className="px-4 pb-3 pl-10">
-                        <div className="grid grid-cols-6 lg:grid-cols-12 gap-1.5">
-                          {Array.from({ length: fy.periods }, (_, i) => (
-                            <div key={i} className={`text-center py-1.5 rounded text-[10px] font-medium ${
-                              i < fy.closed ? "bg-muted text-muted-foreground" : "bg-card border border-border text-foreground"
-                            }`}>P{i + 1}</div>
-                          ))}
-                        </div>
-                        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-muted" /> Closed</span>
-                          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded border border-border bg-card" /> Open</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* ── Exercices et périodes (calendrier fiscal central, V33) ── */}
+          {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
 
           {/* ── Chart of Accounts ── */}
           {activeTab === "posting" && <div className="max-w-4xl"><PostingAccountsPanel /></div>}

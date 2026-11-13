@@ -214,24 +214,26 @@ export function usePeriodLocks(module?: string) {
   });
 }
 
+/**
+ * Clôture d'une période pour un module, par le calendrier fiscal central (V33) : la base vérifie
+ * le droit, l'exercice et l'ordre de clôture. La réouverture, qui exige un motif, se fait dans
+ * Paramètres → Exercices et périodes. (Avant V33 l'écran écrivait directement dans period_locks,
+ * ce que n'importe quel membre de la société pouvait faire.)
+ */
 export function useTogglePeriodLock() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ period, module, close }: { period: string; module: string; close: boolean }) => {
-      const tenant_id = await fetchTenantId();
-      const { error } = await sb.from("period_locks").upsert(
-        {
-          tenant_id, period, module,
-          status: close ? "closed" : "open",
-          closed_by: close ? user!.id : null,
-          closed_at: close ? new Date().toISOString() : null,
-        },
-        { onConflict: "tenant_id,period,module" }
-      );
+    mutationFn: async ({ period, module, close, reason }: { period: string; module: string; close: boolean; reason?: string }) => {
+      const { error } = await sb.rpc("set_period_status", {
+        _period: period, _module: module, _status: close ? "closed" : "open", _reason: reason ?? null,
+      });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["period-locks"] }); toast.success("Période mise à jour"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["period-locks"] });
+      qc.invalidateQueries({ queryKey: ["fiscal-calendar"] });
+      toast.success("Période mise à jour");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 }

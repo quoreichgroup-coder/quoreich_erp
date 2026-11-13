@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -284,12 +285,15 @@ export default function ARControl() {
       {activeTab === "locks" && (
         <div className="bg-card border border-border rounded-lg">
           <div className="p-3 border-b border-border flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-foreground">Period Lock Management — AR</h3>
-            <PeriodLockCreate />
+            <h3 className="text-sm font-semibold text-foreground">Clôtures de période — Comptes clients</h3>
+            <div className="flex items-center gap-3">
+              <PeriodLockCreate />
+              <Link to="/settings?tab=fiscal" className="text-xs text-primary hover:underline">Exercices et périodes →</Link>
+            </div>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">
-              {["Period", "Status", "Closed By", "Closed At", "Actions"].map(h => (
+              {["Période", "Statut", "Clôturée par", "Clôturée le", "Action"].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
               ))}
             </tr></thead>
@@ -299,13 +303,19 @@ export default function ARControl() {
               ) : locks.map(p => (
                 <tr key={p.id} className="border-b border-border hover:bg-muted/20">
                   <td className="px-3 py-2 font-medium">{p.period}</td>
-                  <td className="px-3 py-2"><StatusBadge status={p.status === "closed" ? "success" : "info"} label={p.status} /></td>
+                  <td className="px-3 py-2"><StatusBadge status={p.status === "closed" ? "success" : "info"} label={p.status === "closed" ? "Clôturée" : "Ouverte"} /></td>
                   <td className="px-3 py-2 text-muted-foreground">{p.closed_by || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{p.closed_at ? new Date(p.closed_at).toLocaleDateString("fr-FR") : "—"}</td>
                   <td className="px-3 py-2">
-                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => toggleLock.mutate({ period: p.period, module: "AR", close: p.status === "open" })}>
-                      {p.status === "open" ? "Close Period" : "Reopen"}
-                    </Button>
+                    {p.status === "open" ? (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={toggleLock.isPending}
+                        onClick={() => toggleLock.mutate({ period: p.period, module: "AR", close: true })}>
+                        Clôturer
+                      </Button>
+                    ) : (
+                      // Réouverture : motif obligatoire, dans le calendrier central.
+                      <Link to="/settings?tab=fiscal" className="text-[10px] text-primary hover:underline">Rouvrir (motif requis)</Link>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -322,8 +332,9 @@ function PeriodLockCreate() {
   const toggle = useTogglePeriodLock();
   return (
     <div className="flex gap-2 items-center">
-      <Input type="month" className="h-7 text-xs w-36" value={period} onChange={e => setPeriod(e.target.value)} />
-      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => toggle.mutate({ period, module: "AR", close: false })}>+ Add Period</Button>
+      <Input type="month" className="h-7 text-xs w-36" value={period} onChange={e => setPeriod(e.target.value)} aria-label="Période à clôturer" />
+      <Button size="sm" variant="outline" className="h-7 text-xs" disabled={toggle.isPending || !period}
+        onClick={() => toggle.mutate({ period, module: "AR", close: true })}>Clôturer la période</Button>
     </div>
   );
 }
