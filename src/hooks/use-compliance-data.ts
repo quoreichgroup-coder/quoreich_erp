@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
@@ -84,15 +85,9 @@ import {
 
 export function useMyComplianceRoles(): CompliancePerms {
   const { user } = _useAuthC();
-  const { data: roles = [] } = useQuery({
-    queryKey: ["my-compliance-roles", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => r.role as string);
-    },
-  });
+  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
+  // par has_role, d'où une logique encore par rôle.
+  const roles = useMyAccess().data?.roles ?? [];
   const has = (r: ComplianceRole) => roles.includes(r);
   const admin = has("compliance_admin") || roles.includes("admin");
   return {

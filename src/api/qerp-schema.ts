@@ -387,6 +387,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/authorizations/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mes rôles et mes droits dans la société courante
+         * @description Ce que les écrans utilisent pour activer ou verrouiller les actions ; la base vérifie de toute façon.
+         */
+        get: operations["getMyAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/authorizations/audit": {
         parameters: {
             query?: never;
@@ -738,6 +758,10 @@ export interface components {
             id: string;
             fullName: string;
             roleIds: string[];
+        };
+        MyAccessView: {
+            roles: string[];
+            permissions: string[];
         };
         AuthorizationAuditView: {
             /** Format: date-time */
@@ -1958,6 +1982,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthorizationsView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMyAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAccessView"];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

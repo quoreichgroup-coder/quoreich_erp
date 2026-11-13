@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
@@ -276,33 +277,22 @@ export function usePayrollRunAudit(
 // ────────── RBAC ──────────
 
 export function useMyHrRoles(): HrPerms {
-  const { user } = useAuth();
-  const { data: roles = [] } = useQuery({
-    queryKey: ["my-hr-roles", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => r.role as string);
-    },
-  });
-
-  const has = (r: HrRole) => roles.includes(r);
-  const admin = has("hr_admin") || roles.includes("admin");
+  // Droits dits par la base (my_access, V27). Création et modification de salariés suivent
+  // hr.manage_employees, comme la politique RLS (l'ancien calcul les ouvrait à hr_clerk, que la
+  // base refusait). Seul le paramétrage du module reste par rôle.
+  const { data: access } = useMyAccess();
+  const can = moduleCan(access, "hr");
+  const roles = access?.roles ?? [];
   return {
-    canCreateEmployee:    admin || has("hr_clerk"),
-    canEditEmployee:      admin || has("hr_clerk"),
-    canCreatePayrollRun:  admin || has("hr_clerk"),
-    canApprovePayrollRun: admin || has("hr_approver"),
-    canExecutePayroll:    admin || has("payroll_officer"),
-    canAuditPayroll:      admin || has("hr_auditor"),
-    canManageSettings:    admin,
-    canExport:            admin || has("hr_approver") || has("payroll_officer") || has("hr_auditor"),
-    canViewSensitive:
-      admin || has("hr_clerk") || has("hr_approver") || has("payroll_officer") || has("hr_auditor"),
+    canCreateEmployee:    can("manage_employees"),
+    canEditEmployee:      can("manage_employees"),
+    canCreatePayrollRun:  can("create_payroll_run"),
+    canApprovePayrollRun: can("approve_payroll_run"),
+    canExecutePayroll:    can("execute_payroll"),
+    canAuditPayroll:      can("audit_payroll"),
+    canManageSettings:    roles.includes("admin") || roles.includes("hr_admin"),
+    canExport:            can("export"),
+    canViewSensitive:     can("view_sensitive"),
   };
 }
 

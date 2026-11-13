@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { treasuryPermsFromCodes } from "@/lib/treasury-roles";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
@@ -261,23 +263,12 @@ export function useUpsertCashflowForecast() {
 const TREASURY_ROLES: TreasuryRole[] = ["treasury_clerk", "treasury_manager", "treasury_controller", "cash_admin"];
 
 export function useMyTreasuryRoles(): TreasuryPerms {
-  const { user } = useAuth();
-  const { data: roles = [] } = useQuery({
-    queryKey: ["my-treasury-roles", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => r.role as string);
-    },
-  });
-  // Stable memoisation: key on the sorted-distinct role set so equal inputs
-  // short-circuit to the same `TreasuryPerms` reference across renders.
-  const key = useMemo(() => permsCacheKey(roles), [roles]);
-  return useMemo<TreasuryPerms>(() => computeTreasuryPerms(roles), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Droits dits par la base (my_access, V27), dans la société courante : rôles sur mesure
+  // compris, et admin inclus (l'ancien calcul par rôle l'ignorait, la base lui donne tout).
+  const { data: access } = useMyAccess();
+  const codes = access?.permissions ?? [];
+  const key = useMemo(() => permsCacheKey(codes.filter((c) => c.startsWith("treasury."))), [codes]);
+  return useMemo<TreasuryPerms>(() => treasuryPermsFromCodes(codes), [key]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 export function useTenantTreasuryRoles() {

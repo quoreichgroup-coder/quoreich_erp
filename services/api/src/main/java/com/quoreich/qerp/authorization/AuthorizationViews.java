@@ -51,6 +51,11 @@ record AuthorizationAuditView(
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) String targetUser,
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) String permission) {}
 
+/** Rôles système détenus et droits accordés au porteur, dans sa société (my_access, V27). */
+record MyAccessView(
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> roles,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> permissions) {}
+
 record CreateRole(String name, String description, UUID copyFromRoleId) {
   String problem() {
     return name == null || name.isBlank() ? "name obligatoire" : null;

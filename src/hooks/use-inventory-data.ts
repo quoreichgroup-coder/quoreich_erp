@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
@@ -636,29 +637,28 @@ export const INVENTORY_ROLE_LABELS: Array<{ value: InventoryRole; label: string 
 const INV_ROLES: InventoryRole[] = ["inventory_clerk", "inventory_manager", "inventory_controller"];
 
 export function useMyInventoryRoles() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["my-inventory-roles", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user!.id);
-      if (error) throw error;
-      const roles = new Set((data ?? []).map((r) => r.role as string));
-      const isAdmin = roles.has("admin");
-      const has = (r: string) => isAdmin || roles.has(r);
-      return {
-        roles: Array.from(roles),
-        isAdmin,
-        canMove:      has("inventory_clerk") || has("inventory_manager") || has("inventory_controller"),
-        canAdjust:    has("inventory_manager") || has("inventory_controller"),
-        canTransfer:  has("inventory_clerk") || has("inventory_manager") || has("inventory_controller"),
-        canCount:     has("inventory_clerk") || has("inventory_manager") || has("inventory_controller"),
-        canPostCount: has("inventory_manager") || has("inventory_controller"),
-        canClose:     has("inventory_controller"),
-        canExport:    has("inventory_manager") || has("inventory_controller"),
-      };
+  // Droits dits par la base (my_access, V27). La clôture suit inventory.close (réservée de fait
+  // à admin, comme la base) ; l'export CSV, action du navigateur sans équivalent au catalogue,
+  // reste par rôle.
+  const q = useMyAccess();
+  const can = moduleCan(q.data, "inventory");
+  const roles = q.data?.roles ?? [];
+  const isAdmin = roles.includes("admin");
+  const hasRole = (r: string) => isAdmin || roles.includes(r);
+  return {
+    ...q,
+    data: q.data && {
+      roles,
+      isAdmin,
+      canMove:      can("move"),
+      canAdjust:    can("adjust"),
+      canTransfer:  can("transfer"),
+      canCount:     can("count"),
+      canPostCount: can("post_count"),
+      canClose:     can("close"),
+      canExport:    hasRole("inventory_manager") || hasRole("inventory_controller"),
     },
-  });
+  };
 }
 
 export function useTenantInventoryRoles() {

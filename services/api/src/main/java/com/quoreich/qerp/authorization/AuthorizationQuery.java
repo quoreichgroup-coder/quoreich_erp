@@ -67,6 +67,15 @@ public class AuthorizationQuery {
   }
 
   @Transactional(readOnly = true)
+  public MyAccessView me() {
+    return jdbc.queryForObject(
+        "SELECT ARRAY(SELECT jsonb_array_elements_text(a->'roles')), ARRAY(SELECT jsonb_array_elements_text(a->'permissions'))"
+            + " FROM (SELECT my_access() AS a) x",
+        (rs, i) -> new MyAccessView(
+            List.of((String[]) rs.getArray(1).getArray()), List.of((String[]) rs.getArray(2).getArray())));
+  }
+
+  @Transactional(readOnly = true)
   public List<AuthorizationAuditView> audit(int limit) {
     requireAdmin();
     return jdbc.query(

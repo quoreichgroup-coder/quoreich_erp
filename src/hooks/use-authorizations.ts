@@ -87,6 +87,8 @@ function useMatrixMutation<I>(run: (i: I) => Promise<unknown>, success: string) 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["authorizations"] });
       qc.invalidateQueries({ queryKey: ["authorizations-audit"] });
+      // Les boutons des modules suivent my_access : un changement de rôle doit s'y voir aussitôt.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
       toast.success(success);
     },
     onError: (e: Error) => toast.error(e.message),

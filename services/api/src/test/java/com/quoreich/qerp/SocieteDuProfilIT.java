@@ -71,6 +71,25 @@ class SocieteDuProfilIT {
     assertThat(asUser(NOUVEAU, "SELECT count(*)::text FROM customers WHERE tenant_id IN ('" + A + "', '" + B + "')")).isEqualTo("0");
   }
 
+  @Test
+  @DisplayName("un administrateur ne lit plus les rôles des utilisateurs d'une autre société (V27)")
+  void rolesDesAutresSocietesInvisibles() throws Exception {
+    owner("INSERT INTO user_roles (user_id, role, tenant_id) SELECT v.u::uuid, 'admin', v.t::uuid FROM (VALUES ('"
+        + PostgresFixture.ALPHA_USER + "', '" + A + "'), ('" + PostgresFixture.BETA_USER + "', '" + B + "')) AS v(u, t)"
+        + " WHERE NOT EXISTS (SELECT 1 FROM user_roles x WHERE x.user_id = v.u::uuid AND x.role = 'admin')");
+    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_roles WHERE tenant_id = '" + B + "'"))
+        .isEqualTo("0");
+    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM user_roles WHERE tenant_id = '" + A + "'"))
+        .isEqualTo("1");
+    // Journaux de rôles : ni lecture du journal risques d'une autre société, ni écriture au nom d'une autre.
+    owner("INSERT INTO risk_role_audit (tenant_id, actor_user_id, target_user_id, role, action) VALUES ('" + B + "', '"
+        + PostgresFixture.BETA_USER + "', '" + PostgresFixture.BETA_USER + "', 'risk_admin', 'grant')");
+    assertThat(asUser(PostgresFixture.ALPHA_USER, "SELECT count(*)::text FROM risk_role_audit")).isEqualTo("0");
+    assertThatThrownBy(() -> asUser(PostgresFixture.ALPHA_USER, "INSERT INTO budget_role_audit (tenant_id, actor_user_id,"
+            + " target_user_id, role, action) VALUES ('" + B + "', auth.uid(), auth.uid(), 'budget_admin', 'assign')"))
+        .hasMessageContaining("row-level security");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {

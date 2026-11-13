@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
@@ -188,33 +189,23 @@ export function useUpdateSalesSettings() {
 }
 
 export function useMySalesRoles() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["my-sales-roles", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      if (error) throw error;
-      const roles = new Set((data || []).map((r) => r.role as string));
-      return {
-        isAdmin: roles.has("admin"),
-        canCreate: roles.has("admin") || roles.has("sales_rep") || roles.has("sales_manager"),
-        canConfirm: roles.has("admin") || roles.has("sales_manager") || roles.has("sales_controller"),
-        canDeliver:
-          roles.has("admin") ||
-          roles.has("sales_rep") ||
-          roles.has("sales_manager") ||
-          roles.has("sales_controller"),
-        canInvoice: roles.has("admin") || roles.has("sales_manager") || roles.has("sales_controller"),
-        canExport: roles.has("admin") || roles.has("sales_manager") || roles.has("sales_controller"),
-        roles: Array.from(roles),
-      };
-
+  // Droits dits par la base (my_access, V27). L'export CSV, action du navigateur sans
+  // équivalent au catalogue, reste par rôle.
+  const q = useMyAccess();
+  const can = moduleCan(q.data, "sales");
+  const roles = new Set(q.data?.roles ?? []);
+  return {
+    ...q,
+    data: q.data && {
+      isAdmin: roles.has("admin"),
+      canCreate: can("create"),
+      canConfirm: can("confirm"),
+      canDeliver: can("deliver"),
+      canInvoice: can("invoice"),
+      canExport: roles.has("admin") || roles.has("sales_manager") || roles.has("sales_controller"),
+      roles: Array.from(roles),
     },
-  });
+  };
 }
 
 // ===== Mutations =====

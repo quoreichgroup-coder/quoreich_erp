@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
@@ -139,15 +140,9 @@ export function usePostAssetDisposal() {
 
 export function useMyFixedAssetRoles(): FixedAssetPerms {
   const { user } = useAuth();
-  const { data: roles = [] } = useQuery({
-    queryKey: ["my-fa-roles", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => r.role as string);
-    },
-  });
+  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
+  // par has_role, d'où une logique encore par rôle.
+  const roles = useMyAccess().data?.roles ?? [];
   const has = (r: FixedAssetRole | "admin") => roles.includes(r);
   const admin = has("asset_admin") || has("admin");
   const any = admin || has("asset_clerk") || has("asset_accountant") || has("asset_controller");

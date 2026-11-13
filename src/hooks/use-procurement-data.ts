@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -465,26 +466,20 @@ export function useProcurementAudit(filters?: { dateFrom?: string; dateTo?: stri
 // ── Current user procurement permissions ─────────────────────────────────
 
 export function useMyProcurementRoles() {
-  return useQuery({
-    queryKey: ["my-procurement-roles"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { roles: [], canApproveL1: false, canApproveL2: false, canApproveL3: false, canConvert: false, can3WM: false };
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      if (error) throw error;
-      const roles = (data ?? []).map((r: any) => r.role as string);
-      const isAdmin = roles.includes("admin");
-      const has = (r: string) => isAdmin || roles.includes(r);
-      return {
-        roles,
-        canApproveL1: has("procurement_l1") || has("procurement_l2") || has("procurement_l3"),
-        canApproveL2: has("procurement_l2") || has("procurement_l3"),
-        canApproveL3: has("procurement_l3"),
-        canConvert: has("procurement_controller") || has("procurement_l2") || has("procurement_l3"),
-        can3WM: has("procurement_3wm_approver") || has("procurement_controller"),
-      };
+  // Droits dits par la base (my_access, V27), dans la société courante.
+  const q = useMyAccess();
+  const can = moduleCan(q.data, "procurement");
+  return {
+    ...q,
+    data: q.data && {
+      roles: q.data.roles,
+      canApproveL1: can("approve_l1"),
+      canApproveL2: can("approve_l2"),
+      canApproveL3: can("approve_l3"),
+      canConvert: can("convert"),
+      can3WM: can("3wm"),
     },
-  });
+  };
 }
 
 // ── Procurement Role Management (admin) ──────────────────────────────────

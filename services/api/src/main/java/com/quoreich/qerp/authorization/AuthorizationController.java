@@ -45,6 +45,13 @@ public class AuthorizationController {
     return query.view();
   }
 
+  @GetMapping("/me")
+  @Operation(operationId = "getMyAccess", summary = "Mes rôles et mes droits dans la société courante",
+      description = "Ce que les écrans utilisent pour activer ou verrouiller les actions ; la base vérifie de toute façon.")
+  public MyAccessView me() {
+    return query.me();
+  }
+
   @GetMapping("/audit")
   @Operation(operationId = "listAuthorizationAudit", summary = "Journal des changements d'autorisations",
       description = "Administrateur de la société. Du plus récent au plus ancien.")

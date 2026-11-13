@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,18 +72,9 @@ export function useProjectKpis() {
 
 export function useMyProjectRoles(): ProjectPerms {
   const { user } = useAuth();
-  const { data: roles = [] } = useQuery({
-    queryKey: ["my-project-roles", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => r.role as string);
-    },
-  });
+  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
+  // par has_role, d'où une logique encore par rôle.
+  const roles = useMyAccess().data?.roles ?? [];
 
   const has = (r: ProjectRole) => roles.includes(r);
   const admin = has("project_admin") || roles.includes("admin");

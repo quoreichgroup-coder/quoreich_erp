@@ -1438,6 +1438,52 @@
         }
       }
     },
+    "/api/v1/authorizations/me" : {
+      "get" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Mes rôles et mes droits dans la société courante",
+        "description" : "Ce que les écrans utilisent pour activer ou verrouiller les actions ; la base vérifie de toute façon.",
+        "operationId" : "getMyAccess",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MyAccessView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/authorizations/audit" : {
       "get" : {
         "tags" : [ "Autorisations" ],
@@ -2385,6 +2431,24 @@
           }
         },
         "required" : [ "fullName", "id", "roleIds" ]
+      },
+      "MyAccessView" : {
+        "type" : "object",
+        "properties" : {
+          "roles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "permissions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "permissions", "roles" ]
       },
       "AuthorizationAuditView" : {
         "type" : "object",

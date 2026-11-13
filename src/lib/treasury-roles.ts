@@ -133,3 +133,33 @@ export function computeTreasuryPerms(roles: readonly string[]): TreasuryPerms {
 export function __resetTreasuryPermsCache(): void {
   PERMS_CACHE.clear();
 }
+
+// ---------------------------------------------------------------------------
+// Droits dits par la base (my_access, V27) : chaque drapeau suit le droit du catalogue
+// « treasury.<action> ». Même mémoïsation que computeTreasuryPerms : un même ensemble de droits
+// donne la même référence.
+// ---------------------------------------------------------------------------
+
+const CODES_CACHE = new Map<string, TreasuryPerms>();
+
+export function treasuryPermsFromCodes(codes: readonly string[]): TreasuryPerms {
+  const set = new Set(codes);
+  const key = permsCacheKey(codes.filter((c) => c.startsWith("treasury.")));
+  const cached = CODES_CACHE.get(key);
+  if (cached) return cached;
+  const can = (a: TreasuryAction) => set.has(`treasury.${a}`);
+  const perms: TreasuryPerms = {
+    canCreateTxn: can("create_txn"),
+    canImportStatement: can("import_statement"),
+    canMatch: can("match"),
+    canValidateRecon: can("validate_recon"),
+    canEditForecast: can("edit_forecast"),
+    canManageAccounts: can("manage_accounts"),
+    canExport: can("export"),
+    canViewSensitive: can("view_sensitive"),
+    canClosePeriod: can("close_period"),
+    canAudit: can("audit"),
+  };
+  CODES_CACHE.set(key, perms);
+  return perms;
+}

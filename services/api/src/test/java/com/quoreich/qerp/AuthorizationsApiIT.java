@@ -157,6 +157,29 @@ class AuthorizationsApiIT {
   }
 
   @Test
+  @Order(5)
+  @DisplayName("mes accès : rôles système et droits de la société, rôles sur mesure compris, hors rôles à revoir")
+  void mesAcces() throws Exception {
+    String caissier2 = "aaaaaaaa-0000-0000-0000-000000000007";
+    PostgresFixture.execute(PostgresFixture.urlOf(DATABASE),
+        "INSERT INTO auth.users (id) VALUES ('" + caissier2 + "') ON CONFLICT DO NOTHING;"
+            + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + caissier2 + "', '" + A + "', 'Caissière') ON CONFLICT (id) DO NOTHING");
+    send(post("/api/v1/authorizations/roles"), ADMIN, "{\"name\":\"Rapprocheur\"}");
+    String r = roleId("Rapprocheur");
+    send(put("/api/v1/authorizations/roles/" + r + "/permissions"), ADMIN, "{\"permissions\":[\"treasury.match\"]}");
+    send(post("/api/v1/authorizations/assignments"), ADMIN, "{\"userId\":\"" + caissier2 + "\",\"roleId\":\"" + r + "\"}");
+    send(post("/api/v1/authorizations/assignments"), ADMIN, "{\"userId\":\"" + caissier2 + "\",\"roleId\":\"" + systemRoleId("budget_planner") + "\"}");
+
+    mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(caissier2))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.contains("budget_planner")))
+        .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.contains("treasury.match")));
+    mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
+        .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
+        .andExpect(jsonPath("$.permissions.length()").value(43));
+  }
+
+  @Test
   @Order(4)
   @DisplayName("garde-fous : dernier administrateur intouchable, rôle affecté non supprimable ; journal tenu")
   void gardeFousEtJournal() throws Exception {
