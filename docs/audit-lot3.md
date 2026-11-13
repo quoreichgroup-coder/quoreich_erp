@@ -64,6 +64,30 @@ Date : 13 novembre 2026. Règle appliquée : avant chaque lot, auditer l'existan
 | Paiement en double évité | programme de paiement sur postes ouverts | — | contrôle des paiements en double | aucun (AP-5) |
 | Numéros de documents uniques | oui | oui | oui | AR depuis V22 ; AP non (AP-2) |
 
+## Principe transversal : en-tête, lignes, pied
+
+Demandé par le propriétaire (13 nov. 2026). Les références découpent toute pièce commerciale en trois zones qui n'ont pas le même rôle :
+
+| Zone | Contenu | Référence |
+|---|---|---|
+| **En-tête** | tiers, date de pièce et date comptable, référence externe (n° de facture fournisseur), devise, conditions de paiement (reprises de la commande, sinon du tiers), statut ; pour une facture fournisseur, **le montant TTC et la TVA annoncés par le fournisseur**, saisis comme montants de contrôle | SAP MIRO : « header data : invoice number and date, gross invoice amount and tax amount, invoicing party, terms of payment » ; conditions copiées de la commande, sinon de la fiche fournisseur |
+| **Lignes** | article ou compte, description, quantité, prix unitaire, remise de ligne, code TVA, montants calculés, analytique, lien vers la ligne d'origine (commande → réception → facture) | SAP : « item overview » ; Sage : lignes de pièce |
+| **Pied** | totaux **calculés** HT / TVA par code / TTC, éléments de facturation du pied (frais de port, remise ou escompte de pied), acomptes déduits, **net à payer**, échéancier ; pour la facture fournisseur, **l'écart** entre le TTC annoncé à l'en-tête et le total calculé | SAP : onglet « Tax » (TVA par code) et indicateur de solde, qui doit être à 0 pour comptabiliser ; Sage 100 / X3 : pied de pièce (frais, échéances), les frais du pied ne font pas partie de la valorisation des lignes |
+
+Règles qui en découlent pour QUOREICH :
+1. Les montants du pied sont **calculés** à partir des lignes et des éléments de pied, jamais saisis.
+2. Facture fournisseur : le montant annoncé à l'en-tête est un **contrôle** ; elle ne se valide que si l'écart du pied est nul (comme le solde de MIRO).
+3. Une pièce se crée en brouillon / en attente, reçoit ses lignes, puis se valide ; validée, ses trois zones sont figées ; une pièce validée sans ligne est refusée.
+4. À l'écran : bloc d'en-tête en haut, grille de lignes au milieu, pied en bas (totaux par taux de TVA, frais, net à payer, écart), en lecture seule.
+
+| Pièce | État |
+|---|---|
+| Facture client | en-tête + lignes depuis V21 (totaux = somme des lignes) ; pas encore d'éléments de pied ni d'échéancier |
+| Commande d'achat | lignes ; total recalculé par `recompute_po_total` ; pas de pied distinct |
+| Réception | en-tête puis lignes puis validation, figée, lignes rattachées à la commande : **V34** |
+| Facture fournisseur | **en-tête seul** → lignes, TVA par ligne, rattachement aux lignes de commande et de réception, montant de contrôle et écart au pied (étape 4) |
+| Paiement | une ligne par facture réglée aujourd'hui ; affectation à plusieurs factures à étudier avec l'idempotence (étape 4) |
+
 ## Plan proposé pour le Lot 3
 
 Ordre : d'abord ce qui fausse les données ou ouvre une faille, ensuite les contrôles métier, enfin l'API Java et la recette.
@@ -102,4 +126,5 @@ Ordre : d'abord ce qui fausse les données ou ouvre une faille, ensuite les cont
 - SAP : [Invoice tolerance keys](https://blogs.sap.com/?p=105339), [Entering invoices with variances](https://learning.sap.com/courses/invoice-verification-in-sap-s-4hana/entering-invoices-with-variances-1), [Variances and invoice block](https://learning.sap.com/courses/invoice-verification-in-sap-s-4hana-jp/variances-and-invoice-block-1), [Three-way invoice control](https://masteringsap.com/articles/use-a-three-way-invoice-control-assessment-to-reduce-the-risk-of-fraud-and-money-loss/).
 - Sage X3 : [Bon à payer](https://www.cleverence.com/articles/sage-dev-documentation/documentation-technique-bon-a-payer-sage-developer-4821/), [Saisir une facture d'achat](https://www.cleverence.com/articles/sage-documentation/saisir-une-facture-d-achat-7391/), [Doublon de référence fournisseur](https://communityhub.sage.com/us/sage_x3/f/general-discussion/101313/duplicate-source-document/282599).
 - Sage 300 : [Prévenir les factures en double](https://www.greytrix.com/blogs/sageaccpacerp/2018/03/12/prevent-duplicate-invoices-in-accounts-payable/), [Paiements en double](https://www.greytrix.com/blogs/sageaccpacerp/2023/01/13/control-duplicate-payment-entries-in-account-payable).
+- En-tête, lignes et pied : [SAP — Entering the Invoice](https://help.sap.com/saphelp_46c/helpdata/en/bf/cd275a8dfb11d383fc0000e8a5eb64/content.htm), [SAP Learning — Invoice entry](https://learning.sap.com/courses/invoice-verification-in-sap-s-4hana-jp/invoice-entry-1), [Sage 100 — pied de document d'achat](https://communityhub.sage.com/fr/sage-100/f/discussion-generale/250091/difference-affichage-total-pied-de-page-pied-de-document-d-achat/599621), [Sage X3 — éléments de facturation](https://communityhub.sage.com/fr/sage-x3/f/technique/215689/calcul-des-elements-de-facturation-sur-une-autre-base).
 - Rapprochement à trois voies (généralités) : [Spendesk](https://www.spendesk.com/fr/blog/rapprochement-a-trois-voies/).

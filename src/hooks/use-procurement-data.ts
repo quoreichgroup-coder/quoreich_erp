@@ -184,41 +184,55 @@ export function useGoodsReceipts() {
 export function useCreateGoodsReceipt() {
   const qc = useQueryClient();
   return useMutation({
+    // En-tête puis lignes (V34) : la réception naît « en attente », reçoit ses lignes, puis se
+    // valide si on le demande — la base refuse une réception créée d'emblée validée.
     mutationFn: async (input: {
       gr_number: string;
       po_id: string;
       tenant_id: string;
       received_by: string;
-      status: string;
-      lines: { po_line_id?: string; item_id?: string; quantity_received: number; quantity_rejected?: number }[];
+      receipt_date?: string;
+      complete?: boolean;
+      lines: { po_line_id: string; item_id?: string; quantity_received: number; quantity_rejected?: number }[];
     }) => {
-      const { lines, ...header } = input;
+      const { lines, complete, ...header } = input;
+      if (lines.length === 0) throw new Error("Une réception comporte au moins une ligne.");
       const { data, error } = await supabase
         .from("goods_receipts")
-        .insert(header)
+        .insert({ ...header, status: "pending" })
         .select()
         .single();
       if (error) throw error;
 
-      if (lines.length > 0) {
-        const lineRows = lines.map((l) => ({
-          gr_id: data.id,
-          po_line_id: l.po_line_id || null,
-          item_id: l.item_id || null,
-          quantity_received: l.quantity_received,
-          quantity_rejected: l.quantity_rejected || 0,
-        }));
-        const { error: lineErr } = await supabase.from("gr_lines").insert(lineRows);
-        if (lineErr) throw lineErr;
+      const lineRows = lines.map((l) => ({
+        gr_id: data.id,
+        po_line_id: l.po_line_id,
+        item_id: l.item_id || null,
+        quantity_received: l.quantity_received,
+        quantity_rejected: l.quantity_rejected || 0,
+      }));
+      const { error: lineErr } = await supabase.from("gr_lines").insert(lineRows);
+      if (lineErr) {
+        // Pas de réception sans lignes : l'en-tête en attente est retiré.
+        await supabase.from("goods_receipts").delete().eq("id", data.id);
+        throw lineErr;
       }
 
+      if (complete) {
+        const { error: doneErr } = await supabase
+          .from("goods_receipts")
+          .update({ status: "completed" })
+          .eq("id", data.id);
+        if (doneErr) throw new Error(`Réception enregistrée en attente, validation refusée : ${doneErr.message}`);
+      }
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["goods-receipts"] });
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
       qc.invalidateQueries({ queryKey: ["items"] });
-      toast.success("Goods receipt recorded");
+      qc.invalidateQueries({ queryKey: ["stock-movements"] });
+      toast.success("Réception enregistrée");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -228,18 +242,20 @@ export function useCompleteGoodsReceipt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("goods_receipts")
         .update({ status: "completed" })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Réception introuvable ou non modifiable.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["goods-receipts"] });
       qc.invalidateQueries({ queryKey: ["purchase-orders"] });
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["stock-movements"] });
-      toast.success("GR completed — stock updated & PO status changed");
+      toast.success("Réception validée : stock mis à jour, statut de la commande recalculé");
     },
     onError: (e: any) => toast.error(e.message),
   });

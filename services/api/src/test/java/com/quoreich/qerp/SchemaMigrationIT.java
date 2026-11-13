@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "33";
+  private static final String DERNIERE_MIGRATION = "34";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -78,7 +78,9 @@ class SchemaMigrationIT {
           "user_roles/Admins insert roles",
           "user_roles/Admins update roles",
           "user_roles/Admins view all roles",
-          "user_roles/Users can view own roles");
+          "user_roles/Users can view own roles",
+          // V34 — FOR ALL à tout membre, annulait les politiques comptable / administrateur.
+          "journal_lines/Access via entry");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -159,7 +161,9 @@ class SchemaMigrationIT {
           "fiscal_generate_periods",
           "create_fiscal_year",
           "open_fiscal_year",
-          "close_fiscal_year");
+          "close_fiscal_year",
+          "guard_goods_receipt",
+          "guard_gr_lines");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -227,7 +231,10 @@ class SchemaMigrationIT {
           "purchase_orders/trg_fiscal_period_purchase_orders",
           "bank_transactions/trg_fiscal_period_bank_transactions",
           "payroll_runs/trg_fiscal_period_payroll_runs",
-          "depreciation_entries/trg_fiscal_period_depreciation_entries");
+          "depreciation_entries/trg_fiscal_period_depreciation_entries",
+          // V34 — réception : en-tête puis lignes, figées une fois validée.
+          "goods_receipts/trg_guard_goods_receipt",
+          "gr_lines/trg_guard_gr_lines");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {
