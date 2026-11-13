@@ -26,6 +26,7 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V20__hierarchie_analytique_sans_boucle.sql` | écrit à la main | interdit les boucles dans la hiérarchie des sections (A → B → A) |
 | `V21__lignes_de_facture_et_codes_tva.sql` | écrit à la main | codes TVA par société (taux figé), lignes de facture aux montants calculés, comptabilisation regroupée par compte de vente et de TVA |
 | `V22__numerotation_des_factures.sql` | écrit à la main | numéro de facture unique par société, attribué à l'émission depuis la série, compteur par année, sans trou |
+| `V23__roles_centralises.sql` | écrit à la main | modèle d'autorisations unique (catalogue de droits, rôles système et sur mesure par société), lu par has_role / has_permission / has_*_perm, limité à la société ; anciennes fonctions gardées comme témoins legacy_* |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des

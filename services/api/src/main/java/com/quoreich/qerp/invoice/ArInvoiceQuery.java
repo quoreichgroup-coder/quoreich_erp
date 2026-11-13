@@ -57,9 +57,8 @@ public class ArInvoiceQuery {
    * détenu dans une autre société ne donne aucun droit ici.
    */
   private static final String CAN_WRITE =
-      "SELECT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = auth.uid()"
-          + " AND r.tenant_id = get_user_tenant_id(auth.uid())"
-          + " AND r.role IN ('admin', 'accountant'))";
+      // Modèle d'autorisations unique (V23) : rôle détenu dans la société courante.
+      "SELECT tenant_has_any_role(ARRAY['admin', 'accountant'])";
 
   private final JdbcTemplate jdbc;
 

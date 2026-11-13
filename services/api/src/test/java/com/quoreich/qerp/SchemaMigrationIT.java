@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "22";
+  private static final String DERNIERE_MIGRATION = "23";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -89,7 +89,12 @@ class SchemaMigrationIT {
           "tax_codes",
           "ar_invoice_lines",
           // V22 — numérotation des factures.
-          "document_counters");
+          "document_counters",
+          // V23 — rôles centralisés.
+          "erp_permission_catalog",
+          "erp_system_roles",
+          "erp_system_role_permissions",
+          "erp_role_permissions");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -108,7 +113,19 @@ class SchemaMigrationIT {
           "sum_ar_invoice_lines",
           "impute_ar_revenue_line",
           "next_document_number",
-          "assign_ar_invoice_number");
+          "assign_ar_invoice_number",
+          "has_permission",
+          "seed_tenant_system_roles",
+          "on_tenant_seed_system_roles",
+          "mirror_user_roles",
+          "guard_system_roles",
+          "legacy_has_role",
+          "legacy_has_crm_perm",
+          "legacy_has_hr_perm",
+          "legacy_has_inventory_perm",
+          "legacy_has_procurement_perm",
+          "legacy_has_sales_perm",
+          "legacy_has_treasury_perm");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -135,7 +152,13 @@ class SchemaMigrationIT {
           "tax_codes/Administrateur de la société",
           "ar_invoice_lines/Tenant isolation",
           "ar_invoice_lines/Gestion comptable",
-          "document_counters/Tenant isolation");
+          "document_counters/Tenant isolation",
+          "erp_permission_catalog/Lecture du référentiel",
+          "erp_system_roles/Lecture du référentiel",
+          "erp_system_role_permissions/Lecture du référentiel",
+          "erp_role_permissions/Tenant isolation",
+          "erp_role_permissions/Administrateur de la société",
+          "erp_roles/Administrateur de la société");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -147,7 +170,11 @@ class SchemaMigrationIT {
           "tax_codes/trg_guard_tax_code",
           "ar_invoice_lines/trg_compute_ar_invoice_line",
           "ar_invoice_lines/trg_sum_ar_invoice_lines",
-          "ar_invoices/trg_assign_ar_invoice_number");
+          "ar_invoices/trg_assign_ar_invoice_number",
+          "tenants/trg_seed_system_roles",
+          "user_roles/trg_mirror_user_roles",
+          "erp_roles/trg_guard_system_roles",
+          "erp_role_permissions/trg_guard_system_role_permissions");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
