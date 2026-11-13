@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "35";
+  private static final String DERNIERE_MIGRATION = "36";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -163,7 +163,9 @@ class SchemaMigrationIT {
           "open_fiscal_year",
           "close_fiscal_year",
           "guard_goods_receipt",
-          "guard_gr_lines");
+          "guard_gr_lines",
+          "record_settlement",
+          "guard_invoice_origin");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -234,7 +236,10 @@ class SchemaMigrationIT {
           "depreciation_entries/trg_fiscal_period_depreciation_entries",
           // V34 — réception : en-tête puis lignes, figées une fois validée.
           "goods_receipts/trg_guard_goods_receipt",
-          "gr_lines/trg_guard_gr_lines");
+          "gr_lines/trg_guard_gr_lines",
+          // V36 — une facture ne cite qu'une commande de son propre tiers.
+          "ap_invoices/trg_guard_ap_invoice_origin",
+          "ar_invoices/trg_guard_ar_invoice_origin");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {

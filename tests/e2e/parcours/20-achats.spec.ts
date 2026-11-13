@@ -59,7 +59,7 @@ test("demande d'achat → approbation → commande → approbation", async ({ pa
   }
 
   await obs.joindre(testInfo);
-  expect(obs.incidents.filter((i) => i.type !== "erreur-console"), JSON.stringify(obs.incidents, null, 1)).toEqual([]);
+  expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });
 
 test("commande directe → approbation → réception partielle refusée puis complète", async ({ page }, testInfo) => {
@@ -94,7 +94,12 @@ test("commande directe → approbation → réception partielle refusée puis co
   testInfo.annotations.push({ type: "commande", description: poNumero });
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
   let r = page.getByRole("dialog");
-  await r.getByLabel("Commande").selectOption({ label: `${poNumero} · ${fournisseur}` });
+  await expect(r.getByLabel("Commande"), "commande désactivée tant que le fournisseur n'est pas choisi").toBeDisabled();
+  await r.getByLabel("Fournisseur").selectOption({ label: fournisseur });
+  const options = r.getByLabel("Commande").locator("option");
+  await expect(options.filter({ hasText: poNumero })).toHaveCount(1);
+  expect(await options.count(), "seules les commandes de ce fournisseur (1) + « Sélectionner »").toBe(2);
+  await r.getByLabel("Commande").selectOption(await options.filter({ hasText: poNumero }).getAttribute("value") ?? "");
   await expect(r.getByLabel("Quantité reçue ligne 1"), "restant proposé par défaut = quantité commandée").toHaveValue("1");
   // Une seule unité commandée (le formulaire de commande crée une ligne de quantité 1) :
   // la sur-réception est refusée avant même d'appeler le serveur.
@@ -119,9 +124,10 @@ test("commande directe → approbation → réception partielle refusée puis co
   obs.etape("commande soldée : plus rien à réceptionner");
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
   r = page.getByRole("dialog");
-  await expect(r.getByLabel("Commande").locator("option", { hasText: poNumero })).toHaveCount(0);
+  await expect(r.getByLabel("Fournisseur").locator("option", { hasText: fournisseur }),
+    "fournisseur sans commande à réceptionner : plus proposé").toHaveCount(0);
   await r.getByRole("button", { name: "Close" }).click().catch(() => page.keyboard.press("Escape"));
 
   await obs.joindre(testInfo);
-  expect(obs.incidents.filter((i) => i.type !== "erreur-console"), JSON.stringify(obs.incidents, null, 1)).toEqual([]);
+  expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

@@ -184,16 +184,23 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
 }) {
   const { user } = useAuth();
   const createGR = useCreateGoodsReceipt();
+  const [supplierId, setSupplierId] = useState("");
   const [poId, setPoId] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [qty, setQty] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const receivable = pos.filter((p) => isReceivable(p.status));
+  // Fournisseur d'abord (SAP MIGO, Sage X3 réception) : on ne réceptionne que ses commandes.
+  const receivableAll = pos.filter((p) => isReceivable(p.status));
+  const supplierOptions = Array.from(
+    new Map(receivableAll.map((p) => [p.supplier_id, p.supplier?.name ?? "—"])).entries(),
+  ).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  const receivable = receivableAll.filter((p) => p.supplier_id === supplierId);
   const po = receivable.find((p) => p.id === poId);
   const lines = po ? linesToReceive(po.id, po.lines ?? [], grs) : [];
 
-  const reset = () => { setPoId(""); setQty({}); setError(null); };
+  const reset = () => { setSupplierId(""); setPoId(""); setQty({}); setError(null); };
+  const chooseSupplier = (id: string) => { setSupplierId(id); setPoId(""); setQty({}); setError(null); };
   const choosePo = (id: string) => {
     setPoId(id);
     const p = receivable.find((x) => x.id === id);
@@ -223,13 +230,21 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle className="text-sm">Nouvelle réception de marchandises</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs" htmlFor="gr-supplier">Fournisseur</Label>
+              <select id="gr-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={supplierId}
+                onChange={(e) => chooseSupplier(e.target.value)}>
+                <option value="">— Sélectionner —</option>
+                {supplierOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </div>
             <div>
               <Label className="text-xs" htmlFor="gr-po">Commande</Label>
               <select id="gr-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={poId}
-                onChange={(e) => choosePo(e.target.value)}>
-                <option value="">— Sélectionner —</option>
-                {receivable.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.supplier?.name ?? "—"}</option>)}
+                onChange={(e) => choosePo(e.target.value)} disabled={!supplierId}>
+                <option value="">{supplierId ? "— Sélectionner —" : "Choisissez d'abord le fournisseur"}</option>
+                {receivable.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date}</option>)}
               </select>
             </div>
             <div>
@@ -237,7 +252,7 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
               <Input id="gr-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
-          {receivable.length === 0 && <p className="text-xs text-muted-foreground">Aucune commande approuvée à réceptionner.</p>}
+          {receivableAll.length === 0 && <p className="text-xs text-muted-foreground">Aucune commande approuvée à réceptionner.</p>}
           {po && (
             <Table><TableHeader><TableRow className="bg-muted/30">
               <TableHead className="text-xs">Ligne</TableHead>

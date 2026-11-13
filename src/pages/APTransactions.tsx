@@ -11,12 +11,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { SettlementDialog } from "@/components/SettlementDialog";
+import { usePurchaseOrders } from "@/hooks/use-procurement-data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
-  useAPInvoices, useCreateAPInvoice, useUpdateAPInvoice, useRecordAPPayment, useSuppliers,
+  useAPInvoices, useCreateAPInvoice, useUpdateAPInvoice, useSuppliers,
   type APInvoice,
 } from "@/hooks/use-ap-data";
 
@@ -43,9 +45,11 @@ function approvalType(s: string) {
 /* ──────── CREATE INVOICE DIALOG ──────── */
 function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: suppliers = [] } = useSuppliers();
+  const { data: purchaseOrders = [] } = usePurchaseOrders();
   const createInvoice = useCreateAPInvoice();
   const [form, setForm] = useState({
     supplier_id: "",
+    po_id: "",
     invoice_number: `BILL-${Date.now().toString(36).toUpperCase()}`,
     invoice_date: new Date().toISOString().split("T")[0],
     due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
@@ -57,10 +61,18 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
   const tax = parseFloat(form.tax_amount) || 0;
   const total = subtotal + tax;
 
+  // Commandes du fournisseur choisi seulement (la base refuse une commande d'un autre, V36).
+  const supplierOrders = (purchaseOrders as any[]).filter((p) => p.supplier_id === form.supplier_id
+    && ["approved", "ordered", "partially_received", "received"].includes(p.status));
+
   const handleCreate = async () => {
     if (!form.supplier_id || subtotal <= 0) { toast.error("Remplissez tous les champs"); return; }
-    await createInvoice.mutateAsync({ ...form, subtotal, tax_amount: tax, total });
-    onClose();
+    try {
+      await createInvoice.mutateAsync({ ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total });
+      onClose();
+    } catch {
+      // Le refus est déjà affiché par le hook (toast) ; le formulaire reste ouvert pour corriger.
+    }
   };
 
   return (
@@ -72,9 +84,17 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Fournisseur *</Label>
-            <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value }))}>
+            <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "" }))}>
               <option value="">— Sélectionner —</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="ap-po">Commande d'origine</Label>
+            <select id="ap-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
+              onChange={e => setForm(f => ({ ...f, po_id: e.target.value }))} disabled={!form.supplier_id}>
+              <option value="">{form.supplier_id ? (supplierOrders.length ? "— Aucune —" : "Aucune commande de ce fournisseur") : "Choisissez d'abord le fournisseur"}</option>
+              {supplierOrders.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date} · {Number(p.total).toLocaleString("fr-FR")} XOF</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -119,76 +139,6 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
 }
 
 /* ──────── PAYMENT DIALOG ──────── */
-function PaymentDialog({ inv, open, onClose }: { inv: APInvoice; open: boolean; onClose: () => void }) {
-  const recordPayment = useRecordAPPayment();
-  const outstanding = inv.total - inv.amount_paid;
-  const [amount, setAmount] = useState(outstanding.toString());
-  const [reference, setReference] = useState("");
-  const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
-  const [method, setMethod] = useState("bank_transfer");
-  const parsedAmount = parseFloat(amount) || 0;
-  const isPartial = parsedAmount < outstanding && parsedAmount > 0;
-  const remaining = outstanding - parsedAmount;
-
-  const handlePay = async () => {
-    if (parsedAmount <= 0 || parsedAmount > outstanding) { toast.error("Montant invalide"); return; }
-    await recordPayment.mutateAsync({
-      ap_invoice_id: inv.id,
-      amount: parsedAmount,
-      payment_date: payDate,
-      payment_method: method,
-      reference,
-    });
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-sm flex items-center gap-2"><CreditCard className="w-4 h-4 text-primary" /> Paiement — {inv.invoice_number}</DialogTitle>
-          <DialogDescription className="text-xs">{inv.supplier?.name} · Restant: {fmtCurrency(outstanding)}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label className="text-xs">Date</Label><Input type="date" className="h-8 text-xs" value={payDate} onChange={e => setPayDate(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Méthode</Label>
-              <select className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={method} onChange={e => setMethod(e.target.value)}>
-                {["bank_transfer", "check", "cash", "wire"].map(m => <option key={m} value={m}>{m.replace("_", " ")}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Montant (XOF)</Label>
-            <Input type="number" className="h-8 text-xs tabular-nums" value={amount} onChange={e => setAmount(e.target.value)} />
-            <div className="flex items-center gap-2 mt-1">
-              <button className="text-[10px] px-2 py-0.5 rounded bg-muted hover:bg-muted/80 text-foreground" onClick={() => setAmount(outstanding.toString())}>Totalité</button>
-              <button className="text-[10px] px-2 py-0.5 rounded bg-muted hover:bg-muted/80 text-foreground" onClick={() => setAmount((outstanding / 2).toString())}>50%</button>
-            </div>
-          </div>
-          <div className="space-y-1.5"><Label className="text-xs">Référence</Label><Input className="h-8 text-xs" value={reference} onChange={e => setReference(e.target.value)} placeholder="ex: VIR-OUT-20260308" /></div>
-          <div className="bg-muted/30 rounded p-3 space-y-1.5 text-xs">
-            <div className="flex justify-between"><span className="text-muted-foreground">Total facture</span><span className="tabular-nums">{fmtCurrency(inv.total)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Déjà payé</span><span className="tabular-nums">{fmtCurrency(inv.amount_paid)}</span></div>
-            <div className="flex justify-between font-medium"><span>Ce paiement</span><span className="tabular-nums text-primary">{fmtCurrency(parsedAmount)}</span></div>
-            <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
-              <span className="font-medium">Restant</span>
-              <span className={cn("tabular-nums font-medium", remaining <= 0 ? "text-success" : "text-foreground")}>{fmtCurrency(Math.max(remaining, 0))}</span>
-            </div>
-            {isPartial && <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-1"><AlertTriangle className="w-3 h-3" /> Paiement partiel</p>}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
-          <Button size="sm" className="text-xs" onClick={handlePay} disabled={recordPayment.isPending}>
-            {recordPayment.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CheckCircle className="w-3 h-3 mr-1" /> Payer</>}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /* ──────── SIDE PANEL ──────── */
 function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClose: () => void; onCreatePayment: () => void }) {
   const outstanding = inv.total - inv.amount_paid;
@@ -242,12 +192,14 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
 /* ──────── MAIN ──────── */
 export default function APTransactions() {
   const { data: invoices = [], isLoading } = useAPInvoices();
+  const { data: suppliers = [] } = useSuppliers();
   const updateInvoice = useUpdateAPInvoice();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedInv, setSelectedInv] = useState<APInvoice | null>(null);
+  const [settlementOpen, setSettlementOpen] = useState(false);
   const [paymentInv, setPaymentInv] = useState<APInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
 
@@ -279,6 +231,7 @@ export default function APTransactions() {
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> New Supplier Invoice</Button>
+          <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>
           <Button variant="outline" size="sm" className="text-xs gap-1.5"><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
       </div>
@@ -372,7 +325,7 @@ export default function APTransactions() {
                             </Button>
                           )}
                           {inv.approval_status === "approved" && inv.status !== "paid" && (
-                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setPaymentInv(inv)}>
+                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setPaymentInv(inv); setSettlementOpen(true); }}>
                               <CreditCard className="w-3 h-3 mr-1" /> Pay
                             </Button>
                           )}
@@ -404,17 +357,19 @@ export default function APTransactions() {
         <InvoicePanel
           inv={selectedInv}
           onClose={() => setSelectedInv(null)}
-          onCreatePayment={() => { setPaymentInv(selectedInv); setSelectedInv(null); }}
+          onCreatePayment={() => { setPaymentInv(selectedInv); setSettlementOpen(true); setSelectedInv(null); }}
         />
       )}
 
-      {paymentInv && (
-        <PaymentDialog
-          inv={paymentInv}
-          open={!!paymentInv}
-          onClose={() => setPaymentInv(null)}
-        />
-      )}
+      <SettlementDialog
+        kind="ap"
+        open={settlementOpen}
+        onClose={() => { setSettlementOpen(false); setPaymentInv(null); }}
+        parties={suppliers}
+        invoices={invoices}
+        initialPartyId={paymentInv?.supplier_id}
+        initialInvoiceId={paymentInv?.id}
+      />
     </PageShell>
   );
 }

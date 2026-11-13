@@ -33,7 +33,7 @@ test("fournisseur : créer, retrouver, modifier", async ({ page }, testInfo) => 
   await expect(ligne(page, nom)).toBeVisible();
 
   await obs.joindre(testInfo);
-  expect(obs.incidents.filter((i) => i.type !== "erreur-console"), JSON.stringify(obs.incidents, null, 1)).toEqual([]);
+  expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });
 
 test("client : créer, retrouver, modifier", async ({ page }, testInfo) => {
@@ -62,5 +62,5 @@ test("client : créer, retrouver, modifier", async ({ page }, testInfo) => {
   await expect(page.getByRole("dialog")).toBeHidden();
 
   await obs.joindre(testInfo);
-  expect(obs.incidents.filter((i) => i.type !== "erreur-console"), JSON.stringify(obs.incidents, null, 1)).toEqual([]);
+  expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

@@ -130,6 +130,7 @@ export function useCreateAPInvoice() {
       subtotal: number;
       tax_amount: number;
       total: number;
+      po_id?: string | null;
     }) => {
       const tenant_id = await fetchTenantId();
       const { data, error } = await supabase.from("ap_invoices").insert({
