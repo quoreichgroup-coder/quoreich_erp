@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 // ===== Types =====
 export interface Quotation {
@@ -374,23 +375,7 @@ export const SALES_ROLE_LABELS: { value: SalesRole; label: string }[] = [
 ];
 
 export function useTenantSalesRoles() {
-  return useQuery({
-    queryKey: ["tenant-sales-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", SALES_ROLES as unknown as readonly ("sales_rep" | "sales_manager" | "sales_controller")[]);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-sales-roles", SALES_ROLES);
 }
 
 export function useSalesRoleAudit() {
@@ -429,7 +414,9 @@ export function useAssignSalesRole() {
       qc.invalidateQueries({ queryKey: ["sales-audit"] });
       qc.invalidateQueries({ queryKey: ["sales-role-audit"] });
       qc.invalidateQueries({ queryKey: ["tenant-sales-roles"] });
-      qc.invalidateQueries({ queryKey: ["my-sales-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(v.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: Error) => toast.error(e.message),

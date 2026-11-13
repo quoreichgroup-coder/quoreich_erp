@@ -5,6 +5,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { FixedAssetPerms, FixedAssetRole } from "@/lib/fixed-assets-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 const FA_ROLES: FixedAssetRole[] = ["asset_clerk", "asset_accountant", "asset_controller", "asset_admin"];
 
@@ -159,23 +160,7 @@ export function useMyFixedAssetRoles(): FixedAssetPerms {
 }
 
 export function useTenantFixedAssetRoles() {
-  return useQuery({
-    queryKey: ["tenant-fa-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", FA_ROLES as unknown as ("asset_clerk" | "asset_accountant" | "asset_controller" | "asset_admin")[]);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role as string);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-fa-roles", FA_ROLES);
 }
 
 export function useAssignFixedAssetRole() {
@@ -193,7 +178,9 @@ export function useAssignFixedAssetRole() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["tenant-fa-roles"] });
       qc.invalidateQueries({ queryKey: ["fa-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-fa-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(vars.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: Error) => toast.error(e.message),

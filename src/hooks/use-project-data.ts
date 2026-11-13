@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { ProjectPerms, ProjectRole } from "@/lib/project-roles";
 import { ALL_PROJECT_ROLES } from "@/lib/project-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useProjects() {
   return useQuery({
@@ -92,23 +93,7 @@ export function useMyProjectRoles(): ProjectPerms {
 }
 
 export function useTenantProjectRoles() {
-  return useQuery({
-    queryKey: ["tenant-project-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ALL_PROJECT_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-project-roles", ALL_PROJECT_ROLES);
 }
 
 export function useProjectRoleAudit() {
@@ -168,7 +153,9 @@ export function useAssignProjectRole() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tenant-project-roles"] });
       qc.invalidateQueries({ queryKey: ["project-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-project-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }

@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { CrmPerms, CrmRole, CrmStage } from "@/lib/crm-roles";
 import { ALL_CRM_ROLES } from "@/lib/crm-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export type CrmContact = {
   id: string;
@@ -355,23 +356,7 @@ export function useMyCrmRoles(): CrmPerms {
 }
 
 export function useTenantCrmRoles() {
-  return useQuery({
-    queryKey: ["tenant-crm-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ALL_CRM_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-crm-roles", ALL_CRM_ROLES);
 }
 
 export function useAssignCrmRole() {
@@ -389,7 +374,9 @@ export function useAssignCrmRole() {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["tenant-crm-roles"] });
       qc.invalidateQueries({ queryKey: ["crm-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-crm-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(v.action === "grant" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: Error) => {

@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { HrPerms, HrRole } from "@/lib/hr-roles";
 import { ALL_HR_ROLES } from "@/lib/hr-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export type Employee = {
   id: string;
@@ -297,23 +298,7 @@ export function useMyHrRoles(): HrPerms {
 }
 
 export function useTenantHrRoles() {
-  return useQuery({
-    queryKey: ["tenant-hr-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ALL_HR_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-hr-roles", ALL_HR_ROLES);
 }
 
 // ────────── Assign role (SoD enforced server-side) ──────────
@@ -333,7 +318,9 @@ export function useAssignHrRole() {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["tenant-hr-roles"] });
       qc.invalidateQueries({ queryKey: ["hr-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-hr-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(v.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: Error) => {

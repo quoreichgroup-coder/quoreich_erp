@@ -82,6 +82,7 @@ import { useAuth as _useAuthC } from "@/contexts/AuthContext";
 import {
   ALL_COMPLIANCE_ROLES, type CompliancePerms, type ComplianceRole,
 } from "@/lib/compliance-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useMyComplianceRoles(): CompliancePerms {
   const { user } = _useAuthC();
@@ -103,21 +104,7 @@ export function useMyComplianceRoles(): CompliancePerms {
 }
 
 export function useTenantComplianceRoles() {
-  return useQuery({
-    queryKey: ["tenant-compliance-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles").select("user_id, role")
-        .in("role", ALL_COMPLIANCE_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role); map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-compliance-roles", ALL_COMPLIANCE_ROLES);
 }
 
 export function useComplianceRoleAudit() {
@@ -179,7 +166,9 @@ export function useAssignComplianceRole() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tenant-compliance-roles"] });
       qc.invalidateQueries({ queryKey: ["compliance-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-compliance-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }

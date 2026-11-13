@@ -7,6 +7,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { computeTreasuryPerms, permsCacheKey, type TreasuryPerms, type TreasuryRole } from "@/lib/treasury-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useBankAccounts() {
   const { data: tenantId } = useTenantId();
@@ -272,23 +273,7 @@ export function useMyTreasuryRoles(): TreasuryPerms {
 }
 
 export function useTenantTreasuryRoles() {
-  return useQuery({
-    queryKey: ["tenant-treasury-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", TREASURY_ROLES as unknown as ("treasury_clerk" | "treasury_manager" | "treasury_controller" | "cash_admin")[]);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role as string);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-treasury-roles", TREASURY_ROLES);
 }
 
 export function useAssignTreasuryRole() {
@@ -306,7 +291,9 @@ export function useAssignTreasuryRole() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["tenant-treasury-roles"] });
       qc.invalidateQueries({ queryKey: ["treasury-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-treasury-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(vars.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: Error) => toast.error(e.message),

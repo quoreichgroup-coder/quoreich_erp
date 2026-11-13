@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 // ── Requisitions ──────────────────────────────────────────────────────────
 
@@ -493,23 +494,7 @@ export const PROCUREMENT_ROLES = [
 ] as const;
 
 export function useTenantProcurementRoles() {
-  return useQuery({
-    queryKey: ["tenant-procurement-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", PROCUREMENT_ROLES.map((r) => r.value) as any);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: any) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-procurement-roles", PROCUREMENT_ROLES.map((r) => r.value));
 }
 
 export function useAssignProcurementRole() {
@@ -527,7 +512,9 @@ export function useAssignProcurementRole() {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["tenant-procurement-roles"] });
       qc.invalidateQueries({ queryKey: ["procurement-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-procurement-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success(v.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
     },
     onError: (e: any) => toast.error(e.message),

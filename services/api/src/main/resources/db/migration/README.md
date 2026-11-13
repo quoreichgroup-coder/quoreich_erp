@@ -32,6 +32,8 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V26__regles_de_la_matrice.sql` | écrit à la main | règles de la matrice dans la base : jamais de société sans administrateur, rôle à revoir non affectable, rôle affecté non supprimable |
 | `V27__mes_acces.sql` | écrit à la main | `my_access()` : rôles et droits de l'utilisateur dans sa société, lus par les écrans ; condition de société ajoutée à trois politiques qui fuyaient entre sociétés |
 | `V28__ordre_du_journal_des_autorisations.sql` | écrit à la main | numéro d'ordre `seq` (identité) dans `erp_authorization_audit` : les événements d'une même transaction partageaient `created_at` et sortaient dans le désordre |
+| `V29__conversion_opportunite_droit_du_catalogue.sql` | écrit à la main | `convert_opportunity_to_quote` vérifie `has_permission(…, 'crm.convert')` au lieu de `user_roles` (crm_manager/crm_admin) : l'administrateur voyait le bouton actif puis était refusé |
+| `V30__declencheurs_ventes_achats_repares.sql` | écrit à la main | `enforce_sales_period_lock` et `seed_procurement_approval_queue` lisaient dans une même expression des colonnes propres à chaque table : devis, commandes clients, bons de livraison et soumissions à approbation des achats échouaient tous |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des

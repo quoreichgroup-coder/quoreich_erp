@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 /* ============================================================
  * Items
@@ -667,23 +668,7 @@ export function useMyInventoryRoles() {
 }
 
 export function useTenantInventoryRoles() {
-  return useQuery({
-    queryKey: ["tenant-inventory-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", INV_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      for (const r of (data ?? []) as Array<{ user_id: string; role: string }>) {
-        const arr = map.get(r.user_id) ?? [];
-        arr.push(r.role);
-        map.set(r.user_id, arr);
-      }
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-inventory-roles", INV_ROLES);
 }
 
 export function useInventoryRoleAudit() {
@@ -713,7 +698,9 @@ export function useAssignInventoryRole() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tenant-inventory-roles"] });
       qc.invalidateQueries({ queryKey: ["inventory-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-inventory-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
       toast.success("Rôle mis à jour");
     },
     onError: (e: Error) => toast.error(e.message),

@@ -55,6 +55,7 @@ export function useRiskKpis() {
 
 // ---------- RBAC ----------
 import { ALL_RISK_ROLES, type RiskPerms, type RiskRole } from "@/lib/risk-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useMyRiskRoles(): RiskPerms {
   const { user } = useAuth();
@@ -76,21 +77,7 @@ export function useMyRiskRoles(): RiskPerms {
 }
 
 export function useTenantRiskRoles() {
-  return useQuery({
-    queryKey: ["tenant-risk-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles").select("user_id, role")
-        .in("role", ALL_RISK_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role); map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-risk-roles", ALL_RISK_ROLES);
 }
 
 export function useRiskRoleAudit() {
@@ -152,7 +139,9 @@ export function useAssignRiskRole() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tenant-risk-roles"] });
       qc.invalidateQueries({ queryKey: ["risk-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-risk-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }

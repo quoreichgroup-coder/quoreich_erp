@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { ALL_EXPENSE_ROLES, type ExpensePerms, type ExpenseRole } from "@/lib/expense-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useExpenseReports() {
   return useQuery({
@@ -110,23 +111,7 @@ export function useMyExpenseRoles(): ExpensePerms {
 }
 
 export function useTenantExpenseRoles() {
-  return useQuery({
-    queryKey: ["tenant-expense-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ALL_EXPENSE_ROLES as unknown as never);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r: { user_id: string; role: string }) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-expense-roles", ALL_EXPENSE_ROLES);
 }
 
 export function useExpenseRoleAudit() {
@@ -184,7 +169,9 @@ export function useAssignExpenseRole() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tenant-expense-roles"] });
       qc.invalidateQueries({ queryKey: ["expense-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-expense-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }

@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { BudgetRole, BudgetPerms } from "@/lib/budget-roles";
 import { REQUIRED_ROLES, ALL_BUDGET_ROLES } from "@/lib/budget-roles";
+import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 
 export function useBudgets() {
@@ -81,23 +82,7 @@ export function useMyBudgetRoles(): BudgetPerms {
 }
 
 export function useTenantBudgetRoles() {
-  return useQuery({
-    queryKey: ["tenant-budget-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ALL_BUDGET_ROLES as unknown as ("budget_planner" | "budget_approver" | "budget_controller" | "budget_admin")[]);
-      if (error) throw error;
-      const map = new Map<string, string[]>();
-      (data ?? []).forEach((r) => {
-        const list = map.get(r.user_id) ?? [];
-        list.push(r.role as string);
-        map.set(r.user_id, list);
-      });
-      return map;
-    },
-  });
+  return useTenantRoleMembers("tenant-budget-roles", ALL_BUDGET_ROLES);
 }
 
 export function useBudgetRoleAudit() {
@@ -155,7 +140,9 @@ export function useAssignBudgetRole() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tenant-budget-roles"] });
       qc.invalidateQueries({ queryKey: ["budget-role-audit"] });
-      qc.invalidateQueries({ queryKey: ["my-budget-roles"] });
+      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      qc.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }
