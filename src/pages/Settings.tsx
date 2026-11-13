@@ -15,16 +15,10 @@ import {
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
 import { TaxCodesPanel } from "@/components/TaxCodesPanel";
+import { AuthorizationsPanel } from "@/components/AuthorizationsPanel";
 import { AiSchedulesSettings } from "@/components/AiSchedulesSettings";
-import { ProcurementRolesPanel } from "@/components/ProcurementRolesPanel";
-import { SalesRolesPanel } from "@/components/SalesRolesPanel";
 
 import { cn } from "@/lib/utils";
-import {
-  useERPRoles, useERPPermissions, useUserRoleAssignments, useTenantProfiles,
-  useCreateRole, useDeleteRole, useTogglePermission, useAssignRole, useUnassignRole,
-  buildPermissionMatrix, ERP_MODULES, ERP_PERMISSIONS,
-} from "@/hooks/use-rbac-data";
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +30,7 @@ const tabs = [
   { id: "tax", label: "Codes TVA", icon: Receipt },
   { id: "payment", label: "Payment Terms", icon: CreditCard },
   { id: "workflow", label: "Workflow Engine", icon: GitBranch },
-  { id: "roles", label: "Permissions Matrix", icon: Users },
+  { id: "roles", label: "Rôles et autorisations", icon: Users },
   { id: "audit", label: "Audit & Compliance", icon: ShieldCheck },
   { id: "ai", label: "Planification IA", icon: Bot },
 ];
@@ -220,20 +214,9 @@ const delegations = [
   { original: "Treasury Manager", substitute: "Senior Treasury Analyst", from: "2026-03-15", until: "2026-03-22", reason: "Conference", status: "Scheduled" },
 ];
 
-// ── Permissions – now driven by live data from use-rbac-data.ts ─────────────
-
-const modules = ERP_MODULES;
-const permissions = ERP_PERMISSIONS;
 
 // ── SoD Conflicts (static reference data) ──────────────────────────────────
 
-const sodConflicts = [
-  { conflict: "Create Invoice + Validate Payment", severity: "Critical", modules: "AP + Treasury", mitigation: "Separate roles required" },
-  { conflict: "Create Journal Entry + Close Period", severity: "High", modules: "GL", mitigation: "4-eye principle enforced" },
-  { conflict: "Create Credit Note + Delete Invoice", severity: "Critical", modules: "AR", mitigation: "Cannot assign both to same user" },
-  { conflict: "Edit Chart of Accounts + Validate Journal", severity: "High", modules: "GL + Settings", mitigation: "Supervisor override required" },
-  { conflict: "Create Payment + Reconcile Bank", severity: "Medium", modules: "Treasury", mitigation: "Audit trail enforced" },
-];
 
 // ── Audit Logs ──────────────────────────────────────────────────────────────
 
@@ -257,23 +240,8 @@ const Settings = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFY, setExpandedFY] = useState<string | null>("FY 2025–2026");
   const [expandedWF, setExpandedWF] = useState<string | null>("WF-002");
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [workflowSubTab, setWorkflowSubTab] = useState<"rules" | "simulation" | "delegations" | "history">("rules");
-  const [newRoleName, setNewRoleName] = useState("");
-  const [showNewRole, setShowNewRole] = useState(false);
 
-  // RBAC live data
-  const { data: erpRoles = [] } = useERPRoles();
-  const { data: erpPermissions = [] } = useERPPermissions();
-  const { data: assignments = [] } = useUserRoleAssignments();
-  const { data: tenantUsers = [] } = useTenantProfiles();
-  const createRole = useCreateRole();
-  const deleteRole = useDeleteRole();
-  const togglePerm = useTogglePermission();
-  const assignRole = useAssignRole();
-  const unassignRole = useUnassignRole();
-
-  const permMatrix = buildPermissionMatrix(erpPermissions);
 
   const filteredAccounts = chartOfAccounts.filter(
     (a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -702,276 +670,8 @@ const Settings = () => {
           )}
 
           {/* ── Granular Permissions Matrix ── */}
-          {activeTab === "roles" && (
-            <div className="space-y-4">
-              {/* User Management — live from profiles + assignments */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-medium text-foreground">User Management</h3>
-                    <HelpIcon text="Assign users to roles. Each user can have multiple roles across modules." />
-                  </div>
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">User</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Roles</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Assign Role</th>
-                  </tr></thead>
-                  <tbody>
-                    {tenantUsers.length === 0 && (
-                      <tr><td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">Aucun utilisateur dans l'organisation</td></tr>
-                    )}
-                    {tenantUsers.map(user => {
-                      const userAssignments = assignments.filter(a => a.user_id === user.id);
-                      const userRoles = userAssignments.map(a => erpRoles.find(r => r.id === a.role_id)).filter(Boolean);
-                      const unassignedRoles = erpRoles.filter(r => !userAssignments.some(a => a.role_id === r.id));
-                      const initials = (user.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2);
-                      return (
-                        <tr key={user.id} className="border-b border-border/50 hover:bg-muted/20">
-                          <td className="px-4 py-2.5 font-medium text-foreground">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold">
-                                {initials}
-                              </div>
-                              {user.full_name || "Sans nom"}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex flex-wrap gap-1">
-                              {userRoles.map(r => r && (
-                                <span key={r.id} className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/10 text-primary inline-flex items-center gap-1">
-                                  {r.name}
-                                  <button onClick={() => unassignRole.mutate({ userId: user.id, roleId: r.id })} className="hover:text-destructive">
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </span>
-                              ))}
-                              {userRoles.length === 0 && <span className="text-muted-foreground italic">Aucun rôle</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {unassignedRoles.length > 0 && (
-                              <select
-                                className="h-7 text-xs rounded border border-input bg-background px-2"
-                                defaultValue=""
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    assignRole.mutate({ userId: user.id, roleId: e.target.value });
-                                    e.target.value = "";
-                                  }
-                                }}
-                              >
-                                <option value="">+ Ajouter...</option>
-                                {unassignedRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                              </select>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          {activeTab === "roles" && <AuthorizationsPanel />}
 
-              {/* Procurement Roles assignment (RBAC, audited) */}
-              <ProcurementRolesPanel />
-
-              {/* Sales Roles assignment (RBAC, audited) */}
-              <SalesRolesPanel />
-
-
-
-
-              {/* Permissions Matrix — live */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-medium text-foreground">Granular Permissions Matrix</h3>
-                    <HelpIcon text="Define role-based access controls per module with Segregation of Duties (SoD) enforcement." />
-                  </div>
-                  <Button size="sm" className="h-7 text-[11px] gap-1" onClick={() => setShowNewRole(true)}><Plus className="w-3 h-3" /> Nouveau rôle</Button>
-                </div>
-
-                {showNewRole && (
-                  <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-                    <Input
-                      placeholder="Nom du rôle..."
-                      value={newRoleName}
-                      onChange={(e) => setNewRoleName(e.target.value)}
-                      className="h-7 text-xs w-48"
-                    />
-                    <Button size="sm" className="h-7 text-[11px]" disabled={!newRoleName.trim()} onClick={() => {
-                      createRole.mutate({ name: newRoleName.trim() });
-                      setNewRoleName("");
-                      setShowNewRole(false);
-                    }}>Créer</Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => { setShowNewRole(false); setNewRoleName(""); }}>Annuler</Button>
-                  </div>
-                )}
-
-                {/* Role Selector */}
-                <div className="px-4 py-3 border-b border-border flex flex-wrap gap-1.5">
-                  {erpRoles.map((role) => {
-                    const userCount = assignments.filter(a => a.role_id === role.id).length;
-                    return (
-                      <button key={role.id} onClick={() => setSelectedRole(selectedRole === role.id ? null : role.id)}
-                        className={cn("h-7 px-3 rounded text-xs font-medium transition-colors",
-                          selectedRole === role.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
-                        )}>
-                        {role.name} <span className="opacity-60 ml-1">({userCount})</span>
-                      </button>
-                    );
-                  })}
-                  {erpRoles.length === 0 && <p className="text-xs text-muted-foreground">Aucun rôle créé. Cliquez sur "Nouveau rôle" pour commencer.</p>}
-                </div>
-
-                {/* Permission Matrix */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50">
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider w-32">Module</th>
-                        {permissions.map(p => (
-                          <th key={p} className="text-center px-3 py-2 font-medium text-muted-foreground uppercase tracking-wider w-20">
-                            <div className="flex flex-col items-center gap-0.5">
-                              {p === "Read" && <Eye className="w-3 h-3" />}
-                              {p === "Create" && <Plus className="w-3 h-3" />}
-                              {p === "Edit" && <Pencil className="w-3 h-3" />}
-                              {p === "Validate" && <Check className="w-3 h-3" />}
-                              {p === "Delete" && <Trash2 className="w-3 h-3" />}
-                              {p === "Export" && <Download className="w-3 h-3" />}
-                              {p}
-                            </div>
-                          </th>
-                        ))}
-                        <th className="w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedRole && modules.map(mod => {
-                        const rolePerms = permMatrix[selectedRole]?.[mod] || [];
-                        return (
-                          <tr key={mod} className="border-b border-border/50 hover:bg-muted/20">
-                            <td className="px-4 py-2.5 font-medium text-foreground">{mod}</td>
-                            {permissions.map(p => {
-                              const has = rolePerms.includes(p);
-                              return (
-                                <td key={p} className="text-center px-3 py-2.5">
-                                  <button
-                                    onClick={() => togglePerm.mutate({ roleId: selectedRole, module: mod, permission: p, enabled: !has })}
-                                    className="mx-auto block"
-                                  >
-                                    {has ? (
-                                      <div className="w-5 h-5 rounded bg-success/20 flex items-center justify-center">
-                                        <Check className="w-3 h-3 text-success" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center hover:bg-muted/80">
-                                        <X className="w-3 h-3 text-muted-foreground/40" />
-                                      </div>
-                                    )}
-                                  </button>
-                                </td>
-                              );
-                            })}
-                            <td></td>
-                          </tr>
-                        );
-                      })}
-                      {selectedRole && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-2 text-right">
-                            <Button variant="destructive" size="sm" className="h-7 text-[11px] gap-1"
-                              onClick={() => { deleteRole.mutate(selectedRole); setSelectedRole(null); }}>
-                              <Trash2 className="w-3 h-3" /> Supprimer ce rôle
-                            </Button>
-                          </td>
-                        </tr>
-                      )}
-                      {!selectedRole && (
-                        <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Sélectionnez un rôle ci-dessus pour voir/modifier sa matrice de permissions</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* SoD Conflicts */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center gap-1.5">
-                  <h3 className="text-sm font-medium text-foreground">Segregation of Duties (SoD) — Conflict Matrix</h3>
-                  <HelpIcon text="SOX-compliant SoD controls. Critical conflicts are blocked at the system level. High conflicts require supervisor override." />
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Conflict</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Modules</th>
-                    <th className="text-center px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Severity</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Mitigation</th>
-                  </tr></thead>
-                  <tbody>
-                    {sodConflicts.map((c, i) => (
-                      <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-2.5 font-medium text-foreground">{c.conflict}</td>
-                        <td className="px-4 py-2.5 text-muted-foreground">{c.modules}</td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
-                            c.severity === "Critical" ? "bg-destructive/10 text-destructive" :
-                            c.severity === "High" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                          )}>{c.severity}</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground">{c.mitigation}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* All Roles Summary — live */}
-              <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <h3 className="text-sm font-medium text-foreground">All Roles Overview</h3>
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Users</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Modules</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Max Permission</th>
-                  </tr></thead>
-                  <tbody>
-                    {erpRoles.map(role => {
-                      const roleMatrix = permMatrix[role.id] || {};
-                      const activeModules = Object.keys(roleMatrix).filter(m => roleMatrix[m].length > 0);
-                      const hasDelete = Object.values(roleMatrix).some(perms => perms.includes("Delete"));
-                      const hasValidate = Object.values(roleMatrix).some(perms => perms.includes("Validate"));
-                      const maxPerm = hasDelete ? "Full (incl. Delete)" : hasValidate ? "Validate" : activeModules.length > 0 ? "Read/Write" : "—";
-                      const userCount = assignments.filter(a => a.role_id === role.id).length;
-                      return (
-                        <tr key={role.id} className="border-b border-border/50 hover:bg-muted/20">
-                          <td className="px-4 py-2.5 text-foreground font-medium">{role.name}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums">{userCount}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground">{activeModules.join(", ") || "—"}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={cn("text-xs px-1.5 py-0.5 rounded",
-                              hasDelete ? "bg-destructive/10 text-destructive" :
-                              hasValidate ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                            )}>{maxPerm}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {erpRoles.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Aucun rôle configuré</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ── Audit & Compliance ── */}
           {activeTab === "audit" && (
             <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
