@@ -17,6 +17,9 @@
     "test:watch": "vitest",
     "api:types": "openapi-typescript services/api/openapi/qerp-api.json -o src/api/qerp-schema.ts",
     "api:check": "node scripts/api/check-openapi-client.mjs",
+    "db:check-twins": "node scripts/schema/check-migration-twins.mjs",
+    "db:deploy-supabase": "bash scripts/schema/deploy-supabase.sh",
+    "db:supabase-bundle": "bash scripts/schema/deploy-supabase.sh --print-bundle",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"

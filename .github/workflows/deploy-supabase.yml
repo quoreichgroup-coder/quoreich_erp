@@ -1,0 +1,79 @@
+# Déploiement du schéma sur Supabase (nuage).
+#
+# QUOREICH se livre sur site (API Java + PostgreSQL, schéma appliqué par Flyway au démarrage de
+# l'API) ou dans le nuage (Supabase). Les deux bases doivent être identiques en permanence :
+#   - la CI vérifie que chaque migration a sa jumelle au même SQL (npm run db:check-twins) ;
+#   - ce workflow applique sur Supabase, après une CI verte sur main, les migrations qui n'y
+#     sont pas encore (scripts/schema/deploy-supabase.sh, registre qerp_deploy.applied_migrations).
+# Sans lui, une migration poussée sur main n'atteint pas Supabase : Lovable n'exécute pas les
+# fichiers de supabase/migrations écrits hors de son éditeur.
+#
+# Prérequis (une fois) : dans GitHub → Settings → Environments, créer l'environnement
+# « supabase-production » (avec, au choix, une validation manuelle avant chaque déploiement) et
+# y déclarer le secret SUPABASE_DB_URL : chaîne de connexion Supabase (Settings → Database →
+# Connection string, connexion directe ou pooler en mode session), rôle postgres. Tant que ce
+# secret manque, le workflow échoue : c'est le signal que le nuage n'est pas à jour.
+
+name: Déploiement Supabase
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Lister les migrations en attente sans les appliquer"
+        type: boolean
+        default: false
+
+# Un seul déploiement à la fois, jamais interrompu en cours de route.
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrations Supabase
+    # Après une CI réussie sur main, ou à la demande.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: supabase-production
+    steps:
+      - name: Récupération du dépôt (commit validé par la CI)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Client PostgreSQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null && psql --version
+
+      - name: Secret présent
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL absent de l'environnement supabase-production : Supabase n'est pas mis à jour."
+            exit 1
+          fi
+
+      - name: Migrations en attente
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/schema/deploy-supabase.sh --dry-run
+
+      - name: Application
+        if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/schema/deploy-supabase.sh

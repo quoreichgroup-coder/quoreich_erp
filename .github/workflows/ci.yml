@@ -84,6 +84,13 @@ jobs:
       - name: Dérive du client d'API
         run: npm run api:check
 
+      # Les deux bases (PostgreSQL sur site par Flyway, Supabase en nuage) doivent rester
+      # identiques : chaque migration a sa jumelle au même SQL, dans le même ordre, dans les
+      # deux sens. Une migration créée d'un seul côté (par exemple par Lovable) fait échouer
+      # la chaîne avant tout déploiement.
+      - name: Migrations synchronisées (sur site / nuage)
+        run: npm run db:check-twins
+
       # Aucune variable `VITE_*` n'est fournie, et c'est voulu : la construction
       # ne doit dépendre d'aucune configuration. Les valeurs de `.env` sont lues
       # à l'exécution dans le navigateur, pas à la compilation.

@@ -134,6 +134,17 @@ docker compose -f infra/compose.dev.yml down -v    # -v wipes the data volume
 - `QERP_MIGRATION_DB_*` points at `postgres` here. Production uses a dedicated `qerp_migrate`
   owner role that **does not exist yet** — see `application.yml`, which names it.
 
+### Two deployment targets, one schema — kept in sync automatically
+
+QUOREICH ships **on-premise** (Java API + PostgreSQL, schema applied by Flyway when the API starts) or **in the cloud** (Supabase). Both databases must be identical at all times; three mechanisms enforce it:
+
+- `npm run db:check-twins` (`scripts/schema/check-migration-twins.mjs`, run by CI in `client-web`): every Flyway migration from V16 has a Supabase twin with **the same executable SQL** (comment lines may differ) in the same order, and every Supabase migration after 12 Nov 2026 has its Flyway twin — a migration created on one side only (e.g. by Lovable) fails CI. Write both files for every schema change.
+- `.github/workflows/deploy-supabase.yml` runs **after a green CI on `main`** (or on demand, with a dry-run option): `scripts/schema/deploy-supabase.sh` applies pending migrations to Supabase, each in its own transaction together with its row in the ledger `qerp_deploy.applied_migrations` (filename, SHA-256 of the executable SQL); a deployed migration whose SQL changed is refused. It needs the secret `SUPABASE_DB_URL` in the GitHub environment `supabase-production`; without it the workflow fails on purpose (the cloud is then out of date). Lovable does **not** run migration files pushed from this repo.
+- `npm run db:supabase-bundle` prints one transaction with every post-baseline migration plus its ledger row, to paste once into Supabase → SQL Editor when catching up by hand; it refuses to run if any of them is already in the ledger. Tested against a database rebuilt from V1..V15 (= production): apply, re-run (nothing to do), edited migration refused, bundle then script.
+- On-premise: start the API (or the `api` service of `infra/compose.dev.yml`); Flyway applies what is missing before anything else. The local real-data copy `qerp_reel` is at V33 since 13 Nov 2026.
+
+State on 13 Nov 2026: production Supabase had **none** of V16..V33 (probed with the publishable key: tables 404, `user_roles` still there), so the front pushed since V27 runs against an older schema until the catch-up bundle is applied.
+
 ### Continuous integration (`.github/workflows/ci.yml`)
 
 Three jobs: `client-web` (Node from `.nvmrc`, `npm ci`, lint, both `tsc` configs, `npm test`,
