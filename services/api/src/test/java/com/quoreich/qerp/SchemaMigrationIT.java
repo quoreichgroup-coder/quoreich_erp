@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "23";
+  private static final String DERNIERE_MIGRATION = "24";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -125,7 +125,8 @@ class SchemaMigrationIT {
           "legacy_has_inventory_perm",
           "legacy_has_procurement_perm",
           "legacy_has_sales_perm",
-          "legacy_has_treasury_perm");
+          "legacy_has_treasury_perm",
+          "guard_profile_tenant");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -174,7 +175,8 @@ class SchemaMigrationIT {
           "tenants/trg_seed_system_roles",
           "user_roles/trg_mirror_user_roles",
           "erp_roles/trg_guard_system_roles",
-          "erp_role_permissions/trg_guard_system_role_permissions");
+          "erp_role_permissions/trg_guard_system_role_permissions",
+          "profiles/trg_guard_profile_tenant");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
