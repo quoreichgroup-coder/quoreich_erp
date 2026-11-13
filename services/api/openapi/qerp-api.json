@@ -25,10 +25,196 @@
     "name" : "Clients",
     "description" : "Comptes clients de la société du porteur du jeton"
   }, {
+    "name" : "Autorisations",
+    "description" : "Rôles, droits et affectations de la société du porteur"
+  }, {
     "name" : "Factures clients",
     "description" : "Factures et encaissements AR de la société du porteur"
   } ],
   "paths" : {
+    "/api/v1/authorizations/roles/{role}" : {
+      "put" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Renommer un rôle sur mesure, ou l'activer",
+        "description" : "Administrateur. 409 pour un rôle système.",
+        "operationId" : "updateRole",
+        "parameters" : [ {
+          "name" : "role",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateRole"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Supprimer un rôle sur mesure",
+        "description" : "409 s'il est encore affecté, ou pour un rôle système.",
+        "operationId" : "deleteRole",
+        "parameters" : [ {
+          "name" : "role",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationsView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations/roles/{role}/permissions" : {
+      "put" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Fixer les droits d'un rôle sur mesure",
+        "description" : "Remplace la liste. 409 pour un rôle système, 422 si un droit est inconnu du catalogue.",
+        "operationId" : "setRolePermissions",
+        "parameters" : [ {
+          "name" : "role",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetRolePermissions"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/values/{value}" : {
       "put" : {
         "tags" : [ "Analytique" ],
@@ -510,6 +696,118 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/AssignPostingAccount"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations/roles" : {
+      "post" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Créer un rôle sur mesure",
+        "description" : "Administrateur. copyFromRoleId recopie les droits d'un rôle existant. 409 si le nom existe.",
+        "operationId" : "createRole",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRole"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations/assignments" : {
+      "post" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Affecter un rôle à un utilisateur de la société",
+        "description" : "Administrateur. 404 si l'utilisateur n'est pas de la société, 409 pour un rôle à revoir.",
+        "operationId" : "assignRole",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignRole"
               }
             }
           },
@@ -1095,6 +1393,110 @@
         }
       }
     },
+    "/api/v1/authorizations" : {
+      "get" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Lire la matrice : catalogue, rôles, utilisateurs",
+        "operationId" : "getAuthorizations",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationsView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorizations/audit" : {
+      "get" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Journal des changements d'autorisations",
+        "description" : "Administrateur de la société. Du plus récent au plus ancien.",
+        "operationId" : "listAuthorizationAudit",
+        "parameters" : [ {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuthorizationAuditView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ar/invoices/{id}" : {
       "get" : {
         "tags" : [ "Factures clients" ],
@@ -1497,10 +1899,98 @@
           }
         }
       }
+    },
+    "/api/v1/authorizations/assignments/{user}/{role}" : {
+      "delete" : {
+        "tags" : [ "Autorisations" ],
+        "summary" : "Retirer un rôle à un utilisateur",
+        "description" : "409 pour le dernier administrateur de la société.",
+        "operationId" : "revokeRole",
+        "parameters" : [ {
+          "name" : "user",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "role",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationsView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
     "schemas" : {
+      "UpdateRole" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SetRolePermissions" : {
+        "type" : "object",
+        "properties" : {
+          "permissions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "UpdateAnalyticValue" : {
         "type" : "object",
         "properties" : {
@@ -1575,6 +2065,34 @@
         "type" : "object",
         "properties" : {
           "glAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "CreateRole" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "copyFromRoleId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "AssignRole" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "roleId" : {
             "type" : "string",
             "format" : "uuid"
           }
@@ -1766,6 +2284,132 @@
           }
         },
         "required" : [ "id", "name", "status" ]
+      },
+      "AuthorizationsView" : {
+        "type" : "object",
+        "properties" : {
+          "canManage" : {
+            "type" : "boolean",
+            "description" : "Administrateur de la société"
+          },
+          "catalog" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PermissionView"
+            }
+          },
+          "roles" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RoleView"
+            }
+          },
+          "users" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserView"
+            }
+          }
+        },
+        "required" : [ "canManage", "catalog", "roles", "users" ]
+      },
+      "PermissionView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "module" : {
+            "type" : "string"
+          },
+          "action" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "action", "code", "label", "module" ]
+      },
+      "RoleView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "system" : {
+            "type" : "boolean"
+          },
+          "needsReview" : {
+            "type" : "boolean"
+          },
+          "permissions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "memberCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "id", "memberCount", "name", "needsReview", "permissions", "system" ]
+      },
+      "UserView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "roleIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        },
+        "required" : [ "fullName", "id", "roleIds" ]
+      },
+      "AuthorizationAuditView" : {
+        "type" : "object",
+        "properties" : {
+          "at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "action" : {
+            "type" : "string"
+          },
+          "roleName" : {
+            "type" : "string"
+          },
+          "targetUser" : {
+            "type" : "string"
+          },
+          "permission" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "action", "at" ]
       },
       "ArInvoiceView" : {
         "type" : "object",

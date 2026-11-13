@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/api/v1/authorizations/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Renommer un rôle sur mesure, ou l'activer
+         * @description Administrateur. 409 pour un rôle système.
+         */
+        put: operations["updateRole"];
+        post?: never;
+        /**
+         * Supprimer un rôle sur mesure
+         * @description 409 s'il est encore affecté, ou pour un rôle système.
+         */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorizations/roles/{role}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Fixer les droits d'un rôle sur mesure
+         * @description Remplace la liste. 409 pour un rôle système, 422 si un droit est inconnu du catalogue.
+         */
+        put: operations["setRolePermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/values/{value}": {
         parameters: {
             query?: never;
@@ -120,6 +164,46 @@ export interface paths {
          */
         put: operations["assignPostingAccount"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorizations/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Créer un rôle sur mesure
+         * @description Administrateur. copyFromRoleId recopie les droits d'un rôle existant. 409 si le nom existe.
+         */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorizations/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Affecter un rôle à un utilisateur de la société
+         * @description Administrateur. 404 si l'utilisateur n'est pas de la société, 409 pour un rôle à revoir.
+         */
+        post: operations["assignRole"];
         delete?: never;
         options?: never;
         head?: never;
@@ -286,6 +370,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lire la matrice : catalogue, rôles, utilisateurs */
+        get: operations["getAuthorizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorizations/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journal des changements d'autorisations
+         * @description Administrateur de la société. Du plus récent au plus ancien.
+         */
+        get: operations["listAuthorizationAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ar/invoices/{id}": {
         parameters: {
             query?: never;
@@ -434,10 +555,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/authorizations/assignments/{user}/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retirer un rôle à un utilisateur
+         * @description 409 pour le dernier administrateur de la société.
+         */
+        delete: operations["revokeRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpdateRole: {
+            name?: string;
+            description?: string;
+            active?: boolean;
+        };
+        SetRolePermissions: {
+            permissions?: string[];
+        };
         UpdateAnalyticValue: {
             name?: string;
             /** Format: uuid */
@@ -470,6 +619,18 @@ export interface components {
         AssignPostingAccount: {
             /** Format: uuid */
             glAccountId?: string;
+        };
+        CreateRole: {
+            name?: string;
+            description?: string;
+            /** Format: uuid */
+            copyFromRoleId?: string;
+        };
+        AssignRole: {
+            /** Format: uuid */
+            userId?: string;
+            /** Format: uuid */
+            roleId?: string;
         };
         CreateArInvoice: {
             invoiceNumber?: string;
@@ -546,6 +707,46 @@ export interface components {
             id: string;
             name: string;
             status: string;
+        };
+        AuthorizationsView: {
+            /** @description Administrateur de la société */
+            canManage: boolean;
+            catalog: components["schemas"]["PermissionView"][];
+            roles: components["schemas"]["RoleView"][];
+            users: components["schemas"]["UserView"][];
+        };
+        PermissionView: {
+            code: string;
+            module: string;
+            action: string;
+            label: string;
+        };
+        RoleView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description?: string;
+            code?: string;
+            system: boolean;
+            needsReview: boolean;
+            permissions: string[];
+            /** Format: int32 */
+            memberCount: number;
+        };
+        UserView: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            roleIds: string[];
+        };
+        AuthorizationAuditView: {
+            /** Format: date-time */
+            at: string;
+            actor?: string;
+            action: string;
+            roleName?: string;
+            targetUser?: string;
+            permission?: string;
         };
         ArInvoiceView: {
             /** Format: uuid */
@@ -681,6 +882,146 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRole"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationsView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRolePermissions"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     updateAnalyticValue: {
         parameters: {
             query?: never;
@@ -1025,6 +1366,98 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssignPostingAccount"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRole"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    assignRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRole"];
             };
         };
         responses: {
@@ -1509,6 +1942,92 @@ export interface operations {
             };
         };
     };
+    getAuthorizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationsView"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listAuthorizationAudit: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationAuditView"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     getArInvoice: {
         parameters: {
             query?: never;
@@ -1825,6 +2344,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountingFrameworkView"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    revokeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationsView"];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

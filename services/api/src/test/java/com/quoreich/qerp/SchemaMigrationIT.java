@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "24";
+  private static final String DERNIERE_MIGRATION = "25";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -94,7 +94,8 @@ class SchemaMigrationIT {
           "erp_permission_catalog",
           "erp_system_roles",
           "erp_system_role_permissions",
-          "erp_role_permissions");
+          "erp_role_permissions",
+          "erp_authorization_audit");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -126,7 +127,9 @@ class SchemaMigrationIT {
           "legacy_has_procurement_perm",
           "legacy_has_sales_perm",
           "legacy_has_treasury_perm",
-          "guard_profile_tenant");
+          "guard_profile_tenant",
+          "audit_authorizations",
+          "mirror_role_assignments");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -159,7 +162,8 @@ class SchemaMigrationIT {
           "erp_system_role_permissions/Lecture du référentiel",
           "erp_role_permissions/Tenant isolation",
           "erp_role_permissions/Administrateur de la société",
-          "erp_roles/Administrateur de la société");
+          "erp_roles/Administrateur de la société",
+          "erp_authorization_audit/Administrateur de la société");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -176,7 +180,11 @@ class SchemaMigrationIT {
           "user_roles/trg_mirror_user_roles",
           "erp_roles/trg_guard_system_roles",
           "erp_role_permissions/trg_guard_system_role_permissions",
-          "profiles/trg_guard_profile_tenant");
+          "profiles/trg_guard_profile_tenant",
+          "erp_roles/trg_audit_erp_roles",
+          "erp_role_permissions/trg_audit_erp_role_permissions",
+          "user_role_assignments/trg_audit_user_role_assignments",
+          "user_role_assignments/trg_mirror_role_assignments");
 
   /** Référence (manifeste du dump) plus les ajouts déclarés. */
   private static Set<String> avec(Set<String> reference, Set<String> ajouts) {
