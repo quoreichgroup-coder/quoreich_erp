@@ -4,7 +4,7 @@
  *   - de-duplicate / cap stacked toasts (no excessive duplicates);
  *   - keep the history table and per-row buttons fully operational.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

@@ -15,7 +15,7 @@
  * project docs). The dev server must be running on PORT.
  */
 
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;
@@ -71,7 +71,7 @@ test("CSV export uses URL filters, shows progress, downloads file", async ({ pag
       status: 206,
       headers: {
         "content-type": "application/json",
-        "content-range": `${start}-${end}/${rows.length}`,
+        "access-control-expose-headers": "content-range", "content-range": `${start}-${end}/${rows.length}`,
       },
       body: JSON.stringify(slice),
     });
@@ -97,8 +97,9 @@ test("CSV export uses URL filters, shows progress, downloads file", async ({ pag
 
   // Progress toast appears while export streams.
   // (May complete fast; allow either intermediate or success state.)
+  // Le toast, pas le bouton « Export CSV » qui porte le même libellé.
   await expect(
-    page.getByText(/Export CSV/i),
+    page.locator("[data-sonner-toast]").getByText(/Export CSV/i),
   ).toBeVisible({ timeout: 5_000 });
 
   expect(download.suggestedFilename()).toMatch(/historique-clotures-stock\.csv$/);
@@ -111,7 +112,7 @@ test("PDF export honours URL filters and downloads a .pdf", async ({ page, conte
       status: 206,
       headers: {
         "content-type": "application/json",
-        "content-range": `0-${rows.length - 1}/${rows.length}`,
+        "access-control-expose-headers": "content-range", "content-range": `0-${rows.length - 1}/${rows.length}`,
       },
       body: JSON.stringify(rows),
     });

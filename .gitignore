@@ -53,3 +53,8 @@ secrets/
 *.njsproj
 *.sln
 *.sw?
+
+# Sorties Playwright (rapports, traces, captures)
+playwright-report/
+test-results/
+blob-report/

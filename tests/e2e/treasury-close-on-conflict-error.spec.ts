@@ -6,7 +6,7 @@
  *   - NOT add a duplicate row to the visible history.
  *   - Keep the history table accessible and the close button re-enabled.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

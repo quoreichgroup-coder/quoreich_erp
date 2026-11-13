@@ -11,7 +11,7 @@
  *
  * Run: pnpm exec playwright test tests/e2e/cfo-consolidated.spec.ts
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;
@@ -46,6 +46,8 @@ async function stubBase(page: import("@playwright/test").Page) {
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "Acme", currency: "XOF" }) }));
   await page.route(/\/rest\/v1\/notification_preferences/, (r: Route) =>
     r.fulfill({ status: 200, contentType: "application/json", body: "null" }));
+  await page.route(/\/rest\/v1\/rpc\/get_consolidated_cfo_trends/, (r: Route) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.route(/\/rest\/v1\/(payments|bank_accounts)/, (r: Route) =>
     r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
 }
@@ -77,8 +79,8 @@ test("CFO Consolidé — scoping, loading, export, drill-down", async ({ page })
   await page.goto(`${BASE}/cockpit/consolidated`, { waitUntil: "domcontentloaded" });
 
   // 1. Sociétés visibles = scope autorisé
-  await expect(page.getByText("Acme SARL")).toBeVisible();
-  await expect(page.getByText("Beta SA")).toBeVisible();
+  await expect(page.getByText("Acme SARL", { exact: true })).toBeVisible();
+  await expect(page.getByText("Beta SA", { exact: true })).toBeVisible();
   await expect(page.getByText("Gamma Corp")).toHaveCount(0);
 
   // 2. RPC KPI a été appelée avec uniquement les ids autorisés
@@ -100,7 +102,7 @@ test("CFO Consolidé — scoping, loading, export, drill-down", async ({ page })
 
   // 5. Export CSV déclenche un téléchargement
   const dl = page.waitForEvent("download");
-  await page.getByRole("button", { name: /CSV/i }).click();
+  await page.getByRole("button", { name: "CSV", exact: true }).click();
   const download = await dl;
   expect(download.suggestedFilename()).toMatch(/cfo-consolidated-/);
 
@@ -132,5 +134,5 @@ test("CFO Consolidé — erreur RPC + bouton réessayer", async ({ page }) => {
   await page.goto(`${BASE}/cockpit/consolidated`, { waitUntil: "domcontentloaded" });
   await expect(page.getByText(/Impossible de charger les sociétés/i)).toBeVisible();
   await page.getByRole("button", { name: /Réessayer/i }).first().click();
-  await expect(page.getByText("Acme SARL")).toBeVisible();
+  await expect(page.getByText("Acme SARL", { exact: true })).toBeVisible();
 });

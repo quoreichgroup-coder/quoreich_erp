@@ -8,7 +8,7 @@
  * mapping the SECURITY DEFINER function applies server-side), so the
  * test exercises the contract end-to-end without a live database.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 import { periodBounds } from "@/lib/treasury-close";
 
 const PORT = process.env.PORT ?? "8080";

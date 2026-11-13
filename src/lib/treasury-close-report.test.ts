@@ -16,28 +16,36 @@ const row: TreasuryCloseHistoryRow = {
 };
 
 describe("safeExportTreasuryCloseReport", () => {
-  it("renvoie true et appelle l'impl quand la génération réussit", () => {
+  it("renvoie true et appelle l'impl quand la génération réussit", async () => {
     const impl = vi.fn();
     const onError = vi.fn();
-    expect(safeExportTreasuryCloseReport(row, onError, impl)).toBe(true);
+    await expect(safeExportTreasuryCloseReport(row, onError, impl)).resolves.toBe(true);
     expect(impl).toHaveBeenCalledWith(row);
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("attrape les erreurs, prévient via onError et ne propage rien", () => {
+  it("attrape les erreurs, prévient via onError et ne propage rien", async () => {
     const onError = vi.fn();
     const impl = vi.fn(() => { throw new Error("jsPDF boom"); });
-    expect(() => safeExportTreasuryCloseReport(row, onError, impl)).not.toThrow();
-    expect(safeExportTreasuryCloseReport(row, onError, impl)).toBe(false);
+    await expect(safeExportTreasuryCloseReport(row, onError, impl)).resolves.toBe(false);
+    await expect(safeExportTreasuryCloseReport(row, onError, impl)).resolves.toBe(false);
     expect(onError).toHaveBeenCalledTimes(2);
     expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
     expect((onError.mock.calls[0][0] as Error).message).toMatch(/jsPDF boom/);
   });
 
-  it("normalise les valeurs jetées non-Error en Error", () => {
+  it("normalise les valeurs jetées non-Error en Error", async () => {
     const onError = vi.fn();
-    safeExportTreasuryCloseReport(row, onError, () => { throw "string-failure"; });
+    await safeExportTreasuryCloseReport(row, onError, () => { throw "string-failure"; });
     expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
     expect((onError.mock.calls[0][0] as Error).message).toBe("string-failure");
+  });
+
+  it("une promesse rejetée (jsPDF chargé à la demande) arrive aussi à onError, sans rejet non géré", async () => {
+    const onError = vi.fn();
+    const impl = vi.fn(() => Promise.reject(new Error("synthetic Blob failure")));
+    await expect(safeExportTreasuryCloseReport(row, onError, impl)).resolves.toBe(false);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0][0] as Error).message).toBe("synthetic Blob failure");
   });
 });

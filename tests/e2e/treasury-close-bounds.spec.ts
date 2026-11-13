@@ -4,7 +4,7 @@
  * RPC is invoked, and `period_start` / `period_end` it receives match
  * `periodBounds(period)`.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 import { periodBounds } from "@/lib/treasury-close";
 
 const PORT = process.env.PORT ?? "8080";

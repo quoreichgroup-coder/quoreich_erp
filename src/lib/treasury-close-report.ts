@@ -4,7 +4,7 @@ import type { TreasuryCloseHistoryRow } from "@/hooks/use-treasury-close";
 
 type ReportRow = { label: string; value: string };
 
-export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): void {
+export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): Promise<void> {
   const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
   const closedAt = row.closed_at ? new Date(row.closed_at).toLocaleString("fr-FR") : "—";
 
@@ -24,7 +24,7 @@ export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): void {
     { key: "value", header: "Valeur" },
   ];
 
-  exportToPDF<ReportRow>({
+  return exportToPDF<ReportRow>({
     filename: `treasury-close-${row.period}.pdf`,
     title: `Clôture Trésorerie — ${row.period}`,
     subtitle: `Statut : ${row.status} · Généré depuis l'historique des clôtures`,
@@ -37,15 +37,20 @@ export function exportTreasuryCloseReport(row: TreasuryCloseHistoryRow): void {
 /**
  * Defensive wrapper: never lets a PDF generation crash bubble up to the
  * caller. The history table stays mounted and interactive; the `onError`
- * callback can surface a toast. Returns `true` on success.
+ * callback can surface a toast. Resolves `true` on success.
+ *
+ * Asynchrone depuis que jsPDF est chargé à la demande (exportToPDF renvoie une promesse) : un
+ * try/catch synchrone ne voyait plus l'échec, qui devenait un rejet non géré — aucun message
+ * pour l'utilisateur. Les deux formes d'échec (exception immédiate, promesse rejetée) arrivent
+ * désormais à `onError`, et la promesse renvoyée ne rejette jamais.
  */
-export function safeExportTreasuryCloseReport(
+export async function safeExportTreasuryCloseReport(
   row: TreasuryCloseHistoryRow,
   onError: (err: Error) => void,
-  impl: (r: TreasuryCloseHistoryRow) => void = exportTreasuryCloseReport,
-): boolean {
+  impl: (r: TreasuryCloseHistoryRow) => void | Promise<void> = exportTreasuryCloseReport,
+): Promise<boolean> {
   try {
-    impl(row);
+    await impl(row);
     return true;
   } catch (e) {
     onError(e instanceof Error ? e : new Error(String(e)));

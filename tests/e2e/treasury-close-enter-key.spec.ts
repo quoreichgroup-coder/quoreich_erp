@@ -3,7 +3,7 @@
  * validation as the click path: invalid periods never reach the RPC and
  * surface the localized error message.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

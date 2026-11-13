@@ -11,7 +11,7 @@
  *
  * Run: pnpm exec playwright test tests/e2e/alerts-page.spec.ts
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;
@@ -84,7 +84,8 @@ test("Alerts page — filtres, tri, pagination, bulk actions", async ({ page }) 
     await route.fulfill({
       status: 206,
       contentType: "application/json",
-      headers: { "content-range": `${from}-${Math.min(to, total - 1)}/${total}` },
+      // Comme le vrai Supabase : sans « expose », le navigateur cache content-range au JS (origine croisée).
+      headers: { "content-range": `${from}-${Math.min(to, total - 1)}/${total}`, "access-control-expose-headers": "content-range" },
       body: JSON.stringify(slice),
     });
   });

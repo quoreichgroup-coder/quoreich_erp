@@ -8,7 +8,7 @@
  *   - validation error visible
  *   - `close_treasury_period` route never hit
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

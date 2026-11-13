@@ -10,7 +10,7 @@
  * Run with:
  *   pnpm exec playwright test tests/e2e/treasury-close-error.spec.ts
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

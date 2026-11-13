@@ -1,10 +1,16 @@
 /**
- * E2E — A second close attempt for the same period must:
- *   - emit a `period_close_idempotent` audit row carrying period_start,
- *     period_end and actor_id;
- *   - NOT create a new row in the history table.
+ * E2E — Une période déjà clôturée ne se reclôture pas depuis l'écran :
+ *   - la première clôture appelle la RPC une fois (audit period_close_completed avec
+ *     period_start, period_end et actor_id) ;
+ *   - ensuite, le bouton est verrouillé avec « Période déjà clôturée », la RPC n'est plus
+ *     appelée et l'historique ne se duplique pas.
+ *
+ * L'écran bloque désormais ce second envoi (TreasuryControl : `alreadyClosed`). La version
+ * Lovable de cette spec recliquait et attendait l'audit `period_close_idempotent` : c'est le
+ * comportement de la RPC appelée deux fois, qui reste vrai côté base mais que l'écran
+ * n'expose plus.
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 import { periodBounds } from "@/lib/treasury-close";
 
 const PORT = process.env.PORT ?? "8080";
@@ -70,17 +76,20 @@ test("Treasury close — idempotent retry audits start/end/actor and does not du
   await page.getByTestId("treasury-close-button").click();
   await expect(page.getByText(`Période ${PERIOD} clôturée`)).toBeVisible({ timeout: 5000 });
 
-  // 2nd click — idempotent
+  // Seconde tentative : verrouillée par l'écran, aucun nouvel appel.
   await page.getByTestId("treasury-close-period").fill(PERIOD);
-  await page.getByTestId("treasury-close-button").click();
+  await expect(page.getByTestId("treasury-close-button")).toBeDisabled();
+  await expect(page.getByTestId("treasury-close-error")).toContainText(/déjà clôturée/i);
+  await page.getByTestId("treasury-close-period").press("Enter");
   await page.waitForTimeout(500);
 
-  expect(audit).toHaveLength(2);
-  const last = audit[1];
-  expect(last.action).toBe("period_close_idempotent");
-  expect(last.period_start).toBe(bounds.start);
-  expect(last.period_end).toBe(bounds.end);
-  expect(last.actor_id).toBe(FAKE_USER);
+  expect(rpcCalls).toBe(1);
+  expect(audit).toHaveLength(1);
+  const first = audit[0];
+  expect(first.action).toBe("period_close_completed");
+  expect(first.period_start).toBe(bounds.start);
+  expect(first.period_end).toBe(bounds.end);
+  expect(first.actor_id).toBe(FAKE_USER);
 
   // History must not duplicate the row.
   expect(history).toHaveLength(1);

@@ -73,7 +73,7 @@ export default function TreasuryControl() {
   const canSubmit = canClose && periodValid && periodInRange && !alreadyClosed && !closeMut.isPending;
 
   const handleExportReport = (h: TreasuryCloseHistoryRow) => {
-    safeExportTreasuryCloseReport(h, (err) => {
+    void safeExportTreasuryCloseReport(h, (err) => {
       // Stable toast id → sonner replaces the existing toast on bursts instead
       // of stacking N duplicates. Buttons remain enabled and re-clickable.
       toast.error("Impossible de générer le rapport PDF", {

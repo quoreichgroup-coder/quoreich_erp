@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "./use-tenant";
 
@@ -102,19 +102,21 @@ export interface AiHistoryRow {
 export function useAiHistory(filter?: { type?: AiHistoryRow["analysis_type"]; limit?: number }) {
   const { tenantId } = useTenant();
   const qc = useQueryClient();
+  // Un canal par composant (voir useRealtimeAlerts) : un nom partagé fait planter le second abonné.
+  const instance = useId();
   const queryKey = ["ai-history", tenantId, filter?.type ?? "all", filter?.limit ?? 50];
 
   useEffect(() => {
     if (!tenantId) return;
     const ch = supabase
-      .channel(`ai-history-${tenantId}`)
+      .channel(`ai-history-${tenantId}-${instance}`)
       .on("postgres_changes", {
         event: "*", schema: "public", table: "ai_analysis_history",
         filter: `tenant_id=eq.${tenantId}`,
       }, () => qc.invalidateQueries({ queryKey: ["ai-history", tenantId] }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [tenantId, qc]);
+  }, [tenantId, qc, instance]);
 
   return useQuery({
     queryKey,
@@ -141,6 +143,7 @@ export function useAiHistoryInfinite(filter?: {
   dateTo?: string;   // ISO string (inclusive)
 }) {
   const { tenantId } = useTenant();
+  const instance = useId();
   const qc = useQueryClient();
   const pageSize = filter?.pageSize ?? 25;
   const queryKey = [
@@ -155,14 +158,14 @@ export function useAiHistoryInfinite(filter?: {
   useEffect(() => {
     if (!tenantId) return;
     const ch = supabase
-      .channel(`ai-history-inf-${tenantId}`)
+      .channel(`ai-history-inf-${tenantId}-${instance}`)
       .on("postgres_changes", {
         event: "*", schema: "public", table: "ai_analysis_history",
         filter: `tenant_id=eq.${tenantId}`,
       }, () => qc.invalidateQueries({ queryKey: ["ai-history-infinite", tenantId] }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [tenantId, qc]);
+  }, [tenantId, qc, instance]);
 
   return useInfiniteQuery({
     queryKey,

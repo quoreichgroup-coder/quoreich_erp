@@ -8,7 +8,7 @@
  *   - the history table is still mounted and the row remains visible
  *     and interactive (button can be clicked again).
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;

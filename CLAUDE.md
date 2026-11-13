@@ -26,14 +26,16 @@ npx vitest run -t "CFO"  # tests whose name matches
 
 `vite.config.ts` reads `process.env.PORT` with 8080 as the default, and Vite falls through to the next free port when 8080 is taken. On this workstation 8080 is permanently held by the Docker container `frappe_docker_official_latest-frontend-1`, so `npm run dev` silently serves QERP on **8081** — and the 17 e2e specs default to `process.env.PORT ?? "8080"`, i.e. to the *other* application. Always pin the port explicitly for both sides: `PORT=8081 npm run dev` and `PORT=8081 npx playwright test …`.
 
-E2E specs in `tests/e2e/*.spec.ts` are Playwright and sit outside Vitest's `include`:
+E2E specs in `tests/e2e/*.spec.ts` are Playwright (`@playwright/test` pinned to 1.64.1, Chromium only) and sit outside Vitest's `include`:
 
 ```bash
-npm run dev   # keep running
-npx playwright test tests/e2e/cfo-consolidated.spec.ts
+npx playwright install chromium          # once per workstation
+npm run test:e2e                         # whole suite; starts its own Vite on 8082
+npm run test:e2e -- tests/e2e/cfo-consolidated.spec.ts
+npm run test:e2e:report                  # last HTML report
 ```
 
-Playwright is not declared in `package.json` and there is no `playwright.config.ts`; specs assume a runner on PATH (headers say `pnpm exec playwright test ...`) and read `process.env.PORT ?? "8080"` (or `E2E_BASE_URL`). Most specs fully stub Supabase with `page.route` regexes and need no session. `treasury-rbac-*.spec.ts` and `treasury-realtime.spec.ts` are live: they need `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`, `E2E_AUTH_EMAIL_ADMIN`/`E2E_AUTH_PASSWORD_ADMIN`, `E2E_AUTH_EMAIL_NOROLE`/`E2E_AUTH_PASSWORD_NOROLE`, seed rows tagged `E2E-<runId>` and auto-skip when credentials are absent. `tests/e2e/fixtures/clock.ts` freezes time via `page.clock` — call `freezeClock` before `goto`.
+`playwright.config.ts` starts a dedicated Vite on **8082** (`E2E_PORT` overrides) with `VITE_QERP_API_URL` emptied, because the stubbed specs simulate Supabase and the 8081 dev server is often wired to the Java API; it sets `process.env.PORT`/`E2E_BASE_URL` before the specs load. Two fixtures make the Lovable-era specs runnable locally: `fixtures/session.ts` puts a fake, unsigned Supabase session in localStorage (without it every private route redirects to `/login`), and `fixtures/test.ts` — the `test` that stubbed specs import instead of `@playwright/test` — installs a context-level backend baseline (profile in tenant `t-1`, `my_access` = admin with the 43 catalogue rights, empty rows for any other REST read, `null` for any other RPC, a silent realtime socket), so nothing reaches Supabase. A spec's own `page.route`/`context.route` always wins over the baseline. One worker, 60 s timeout: this workstation crashes Chromium workers under memory pressure (`Target crashed`, exit `3221225794`) — read that as the machine, not the code. State (13 Nov 2026): 23 passed, 17 skipped (live), 0 failed in 1.2 min. Two things the stubs must do like the real Supabase: send `access-control-expose-headers: content-range` with any `content-range` (cross-origin, otherwise the browser hides it and every count reads 0), and scope text assertions (`exact: true`, or inside `[data-sonner-toast]`) because buttons and toasts share labels. `treasury-rbac-*.spec.ts` and `treasury-realtime.spec.ts` are live and keep importing `@playwright/test`: they need `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`, `E2E_AUTH_EMAIL_ADMIN`/`E2E_AUTH_PASSWORD_ADMIN`, `E2E_AUTH_EMAIL_NOROLE`/`E2E_AUTH_PASSWORD_NOROLE`, seed rows tagged `E2E-<runId>` and auto-skip when credentials are absent. `tests/e2e/fixtures/clock.ts` freezes time via `page.clock` — call `freezeClock` before `goto`.
 
 Connected read-only regression (real session, no fixtures written):
 
@@ -167,6 +169,8 @@ they are read in the browser at runtime.
 - The default QueryClient retry is 3 (`new QueryClient()` in `App.tsx`); treasury and all consolidated-CFO hooks opt out with `retry: false` so failures surface for explicit recovery.
 - Pagination: `.limit(200)` / `.limit(500)` is common in list hooks and silently truncates. For any aggregation or export, exhaust pages (`useBankTransactions`'s `.range()` loop at `use-treasury-data.ts:32-46`, or `fetchAllInventoryCloses` at `use-inventory-data.ts:391-425`) or use server-side `{ rows, total }` pagination.
 - `useRealtimeInvalidation` is one global channel with hard-coded table→query-key mappings; a new hook's key will not auto-refresh unless added there.
+- A realtime hook that can be mounted twice must name its channel per instance (`useId()`, see `useRealtimeAlerts`): supabase-js returns the already-subscribed channel for a reused name and `.on()` then throws, which blanked `/alerts` (the bell and the page both subscribe).
+- `exportToPDF` is async: a synchronous `try/catch` around it does not see a failure, which becomes an unhandled rejection with no message to the user. `safeExportTreasuryCloseReport` awaits it; the other call sites still ignore the promise.
 - Client-side table UX is `useTableFeatures` (`src/hooks/use-table-features.ts`): in-memory sort/filter/page over already-fetched rows, default page size 10, optional localStorage persistence via `persistKey`. Render with `SortableHead` / `FilterBar` / `PaginationBar` from `DataTableControls.tsx`. Every call site uses a page size of 10–15, so only that many rows reach the DOM — no virtualization library is used; `use-table-features.test.tsx` guards the 2 000-row sort/filter path instead. Growing the page size to "all rows" would reintroduce the problem.
 
 ### Backend is the database
@@ -255,7 +259,8 @@ All green; keep them that way:
 | `npm run lint` | **0 erreur**, 467 avertissements (essentiellement `no-explicit-any`, 9 `react-refresh/only-export-components`, 7 `react-hooks/exhaustive-deps`) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 erreur |
 | `npx tsc --noEmit -p tsconfig.node.json` | 0 erreur |
-| `npm test` | 54 fichiers, 410 tests |
+| `npm test` | 55 fichiers, 412 tests |
+| `npm run test:e2e` | 23 réussis, 17 ignorés (specs connectées), 0 échec |
 | `npm run api:check` | `src/api/qerp-schema.ts correspond au contrat OpenAPI.` |
 | `cd services/api && ./mvnw verify` | 103 tests (11 unitaires + 92 d'intégration), BUILD SUCCESS |
 | `bash scripts/schema/verify-lot0.sh <dump>` | `LOT 0 : CRITÈRE DE SORTIE ATTEINT` |

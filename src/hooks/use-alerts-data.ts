@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -132,11 +132,16 @@ export function useUnreadAlertsCount(opts?: { modules?: string[]; severities?: s
 export function useRealtimeAlerts() {
   const qc = useQueryClient();
   const { data: tenantId } = useTenantId();
+  // Un nom de canal par composant : la cloche (en-tête de chaque page) et la page Alertes
+  // s'abonnent en même temps. Sous un nom commun, supabase-js rend au second le canal déjà
+  // abonné, et `.on()` lève « cannot add postgres_changes callbacks after subscribe() » :
+  // l'erreur remontait hors de l'effet et la page /alerts restait blanche.
+  const instance = useId();
 
   useEffect(() => {
     if (!tenantId) return;
     const channel = supabase
-      .channel(`erp-alerts-${tenantId}`)
+      .channel(`erp-alerts-${tenantId}-${instance}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "erp_alerts", filter: `tenant_id=eq.${tenantId}` },
@@ -158,7 +163,7 @@ export function useRealtimeAlerts() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [qc, tenantId]);
+  }, [qc, tenantId, instance]);
 }
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {

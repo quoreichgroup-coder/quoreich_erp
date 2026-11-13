@@ -387,7 +387,8 @@ export type FetchAllOpts = {
 
 /**
  * Streams every row matching the server-side filters in chunks (default 500/req).
- * No artificial cap — pull all results. Aborts cooperatively via `signal`.
+ * No artificial cap — pull all results. `signal` interrompt aussi la requête en cours : vérifié
+ * seulement entre deux pages, un export d'une seule page ne pouvait jamais être annulé.
  */
 export async function fetchAllInventoryCloses(
   p: Omit<PagedClosesParams, "page" | "pageSize">,
@@ -405,19 +406,23 @@ export async function fetchAllInventoryCloses(
     if (p.from) q = q.gte("closed_at", `${p.from}T00:00:00`);
     if (p.to)   q = q.lte("closed_at", `${p.to}T23:59:59`);
     if (p.periodSearch?.trim()) q = q.ilike("period", `%${p.periodSearch.trim()}%`);
+    if (opts.signal) q = q.abortSignal(opts.signal);
     return q;
   };
+  const stopIfAborted = () => { if (opts.signal?.aborted) throw new Error("Export annulé"); };
 
-  if (opts.signal?.aborted) throw new Error("Export annulé");
+  stopIfAborted();
   const first = await build(true).range(0, chunkSize - 1);
+  stopIfAborted();
   if (first.error) throw first.error;
   const total = first.count ?? 0;
   const all: InventoryPeriodClose[] = (first.data as unknown as InventoryPeriodClose[]) ?? [];
   opts.onProgress?.(all.length, total);
 
   while (all.length < total) {
-    if (opts.signal?.aborted) throw new Error("Export annulé");
+    stopIfAborted();
     const next = await build(false).range(all.length, all.length + chunkSize - 1);
+    stopIfAborted();
     if (next.error) throw next.error;
     const rows = (next.data as unknown as InventoryPeriodClose[]) ?? [];
     if (rows.length === 0) break;

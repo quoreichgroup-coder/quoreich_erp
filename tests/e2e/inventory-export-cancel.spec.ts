@@ -10,7 +10,7 @@
  * Run with:
  *   pnpm exec playwright test tests/e2e/inventory-export-cancel.spec.ts
  */
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect, type Route } from "./fixtures/test";
 
 const PORT = process.env.PORT ?? "8080";
 const BASE = `http://localhost:${PORT}`;
@@ -53,7 +53,7 @@ test("cancelling an in-flight export shows the cancel toast and logs export_abor
     if (!isInitial) await new Promise((r) => setTimeout(r, 1500));
     await route.fulfill({
       status: 206,
-      headers: { "content-type": "application/json", "content-range": `${start}-${end}/${rows.length}` },
+      headers: { "content-type": "application/json", "access-control-expose-headers": "content-range", "content-range": `${start}-${end}/${rows.length}` },
       body: JSON.stringify(rows.slice(start, end + 1)),
     });
   });
