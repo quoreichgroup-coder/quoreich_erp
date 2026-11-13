@@ -4,84 +4,51 @@ import { supabase } from "@/integrations/supabase/client";
 import { GLBatchHistory, GLPostingKPIs, GLAuditHistory, type GLBatch } from "@/components/GLPostingConfig";
 import { useGLAuditLogs } from "@/hooks/use-gl-audit";
 
-const SOURCE_TO_MODULE: Record<string, string> = {
-  manual: "GL",
-  ar_receipt: "AR",
-  ar_invoice: "AR",
-  ap_payment: "AP",
-  ap_invoice: "AP",
-  sales: "Sales",
-  procurement: "Procurement",
-  inventory: "Inventory",
-  treasury: "Treasury",
-  expense: "Expenses",
-  asset: "Assets",
-  depreciation: "Assets",
-  budget: "Budget",
-  project: "Projects",
+// Lots réels du grand livre (V38) : un lot par société, journal et mois, alimenté à l'insertion de
+// chaque écriture des livres auxiliaires. Avant V38, ces écrans regroupaient dans le navigateur les
+// 200 dernières écritures par module et par jour, avec des numéros de lot et des journaux inventés.
+// Le journal de banque (BQ) reçoit les encaissements comme les paiements : il est montré côté
+// clients, fournisseurs et trésorerie.
+const MODULE_JOURNALS: Record<string, string[]> = {
+  AR: ["VT", "BQ"],
+  AP: ["AC", "BQ"],
+  Procurement: ["AC"],
+  Treasury: ["BQ"],
+  Payroll: ["PA"],
 };
+const JOURNAL_MODULE: Record<string, string> = { VT: "AR", AC: "AP", BQ: "Treasury", PA: "Payroll", OD: "GL" };
 
-function mapStatus(s: string): GLBatch["status"] {
-  if (s === "posted") return "Posted";
-  if (s === "draft") return "Pending";
-  if (s === "validated") return "Validated";
-  if (s === "rejected") return "Rejected";
-  if (s === "cancelled") return "Cancelled";
-  if (s === "reversed") return "Reversed";
-  return "Pending";
-}
+type BatchRow = {
+  id: string; batch_number: string; journal_code: string; journal_label: string; period: string;
+  entry_count: number; total_debit: number; total_credit: number; first_piece: string | null;
+  last_piece: string | null; status: "open" | "closed"; created_at: string;
+};
 
 export function useGLBatches(moduleFilter?: string) {
   return useQuery({
-    queryKey: ["gl-batches", moduleFilter],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("journal_entries")
-        .select("id, entry_number, entry_date, description, source, status, created_by, posted_at, posted_by, lines:journal_lines(debit, credit)")
-        .order("entry_date", { ascending: false })
-        .limit(200);
-
+    queryKey: ["gl-batches", moduleFilter ?? "all"],
+    queryFn: async (): Promise<GLBatch[]> => {
+      let q = (supabase as any).from("journal_batch_summary").select("*").order("period", { ascending: false });
+      const journals = moduleFilter ? MODULE_JOURNALS[moduleFilter] : undefined;
+      if (journals) q = q.in("journal_code", journals);
+      const { data, error } = await q;
       if (error) throw error;
-
-      const grouped: Record<string, { entries: typeof data; source: string; date: string }> = {};
-      for (const je of data || []) {
-        const module = SOURCE_TO_MODULE[je.source] || "GL";
-        const key = `${module}-${je.entry_date}`;
-        if (!grouped[key]) grouped[key] = { entries: [], source: je.source, date: je.entry_date };
-        grouped[key].entries.push(je);
-      }
-
-      const batches: GLBatch[] = Object.entries(grouped).map(([key, g]) => {
-        const module = key.split("-")[0];
-        const totalDebit = g.entries.reduce((s, e) => s + (e.lines?.reduce((ls: number, l: any) => ls + Number(l.debit), 0) || 0), 0);
-        const totalCredit = g.entries.reduce((s, e) => s + (e.lines?.reduce((ls: number, l: any) => ls + Number(l.credit), 0) || 0), 0);
-        const firstPosted = g.entries.find(e => e.posted_at);
-        const statuses = g.entries.map(e => e.status);
-        const batchStatus = statuses.every(s => s === "posted") ? "Posted"
-          : statuses.some(s => s === "posted") ? "Validated"
-          : statuses.every(s => s === "draft") ? "Pending"
-          : mapStatus(statuses[0]);
-
-        return {
-          id: `GLB-${module}-${g.date}`,
-          date: g.date,
-          module,
-          type: g.source.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-          entries: g.entries.length,
-          totalDebit,
-          totalCredit,
-          journal: module === "AR" ? "VJ" : module === "AP" ? "AJ" : module === "Treasury" ? "CJ" : "GJ",
-          status: batchStatus,
-          createdBy: "System",
-          approvedBy: firstPosted ? "System" : undefined,
-          postedAt: firstPosted?.posted_at || undefined,
-        };
-      });
-
-      if (moduleFilter) {
-        return batches.filter(b => b.module === moduleFilter);
-      }
-      return batches;
+      return ((data ?? []) as BatchRow[]).map((b) => ({
+        id: b.batch_number,
+        date: b.period,
+        module: JOURNAL_MODULE[b.journal_code] ?? "GL",
+        type: `${b.journal_label}${b.first_piece ? ` · ${b.first_piece} → ${b.last_piece}` : ""}`,
+        entries: Number(b.entry_count),
+        totalDebit: Number(b.total_debit),
+        totalCredit: Number(b.total_credit),
+        journal: b.journal_code,
+        // Les écritures des livres auxiliaires sont comptabilisées à la source : le lot est
+        // « comptabilisé » ; il est clôturé avec la période du grand livre.
+        status: "Posted",
+        createdBy: "Livres auxiliaires",
+        approvedBy: b.status === "closed" ? "Période clôturée" : undefined,
+        postedAt: b.created_at,
+      }));
     },
   });
 }
@@ -105,7 +72,7 @@ export function GLPostingKPIsLive({ module }: { module: string }) {
 
 export function GLBatchHistoryLive({ module }: { module: string }) {
   const { data: batches = [] } = useGLBatches(module);
-  return React.createElement(GLBatchHistory, { batches });
+  return React.createElement(GLBatchHistory, { batches, readOnly: true });
 }
 
 export function GLAuditHistoryLive({ module }: { module?: string }) {

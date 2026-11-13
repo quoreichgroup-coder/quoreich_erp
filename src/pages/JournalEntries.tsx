@@ -85,7 +85,7 @@ const JournalEntries = () => {
   const filtered = useMemo(() => enriched
     .filter(e => {
       const q = search.toLowerCase();
-      const matchSearch = !q || e.entry_number.toLowerCase().includes(q) ||
+      const matchSearch = !q || e.entry_number.toLowerCase().includes(q) || (e.piece_number ?? "").toLowerCase().includes(q) ||
         (e.description || "").toLowerCase().includes(q) ||
         e.source.toLowerCase().includes(q);
       const matchStatus = filterStatus === "All" || e.status.toLowerCase() === filterStatus.toLowerCase();
@@ -328,8 +328,8 @@ const JournalEntries = () => {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8"><Upload className="w-3.5 h-3.5" /> Import Journal</Button>
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" data-testid="btn-export-csv" onClick={() => exportToCSV(
-            filtered.map((e: any) => ({ numero: e.entry_number, date: e.entry_date, libelle: e.description ?? "", source: e.source, statut: e.status, debit: e.debitTotal, credit: e.creditTotal })),
-            [{ key: "numero", header: "N° écriture" }, { key: "date", header: "Date" }, { key: "libelle", header: "Libellé" }, { key: "source", header: "Source" },
+            filtered.map((e: any) => ({ piece: e.piece_number ?? "", journal: e.journal_code ?? "", numero: e.entry_number, date: e.entry_date, libelle: e.description ?? "", source: e.source, statut: e.status, debit: e.debitTotal, credit: e.creditTotal })),
+            [{ key: "piece", header: "N° pièce" }, { key: "journal", header: "Journal" }, { key: "numero", header: "Référence interne" }, { key: "date", header: "Date" }, { key: "libelle", header: "Libellé" }, { key: "source", header: "Source" },
              { key: "statut", header: "Statut" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" }], "ecritures-comptables")}><Download className="w-3.5 h-3.5" /> Export</Button>
           <Button size="sm" onClick={() => setShowNewEntry(true)} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> New Journal Entry</Button>
         </div>
@@ -416,7 +416,7 @@ const JournalEntries = () => {
                     ) : paged.map(e => (
                       <tr key={e.id} onClick={() => setSelectedEntry(e)}
                         className={cn("cursor-pointer", selectedEntry?.id === e.id && "bg-muted/40")}>
-                        <td className="font-medium text-foreground tabular-nums">{e.entry_number}</td>
+                        <td className="font-medium text-foreground tabular-nums" title={e.entry_number}>{e.piece_number ?? e.entry_number}<span className="ml-1 text-[10px] text-muted-foreground">{e.journal_code}</span></td>
                         <td className="tabular-nums">{e.entry_date}</td>
                         <td className="max-w-[200px] truncate">{e.description || "—"}</td>
                         <td>
@@ -478,7 +478,7 @@ const JournalEntries = () => {
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Entry #</p><p className="text-sm font-medium tabular-nums">{selectedEntry.entry_number}</p></div>
+                <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">N° pièce · journal</p><p className="text-sm font-medium tabular-nums">{selectedEntry.piece_number ?? selectedEntry.entry_number} · {selectedEntry.journal_code ?? "—"}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</p><p className="text-sm tabular-nums">{selectedEntry.entry_date}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Source</p><p className="text-sm"><span className={cn("text-[10px] px-2 py-0.5 rounded font-medium", sourceColors[selectedEntry.source])}>{sourceLabel(selectedEntry.source)}</span></p></div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p><StatusBadge status={statusLabel(selectedEntry.status)} /></div>

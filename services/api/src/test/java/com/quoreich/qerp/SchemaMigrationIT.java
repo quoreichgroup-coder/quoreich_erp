@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "37";
+  private static final String DERNIERE_MIGRATION = "38";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -117,7 +117,11 @@ class SchemaMigrationIT {
           "fiscal_modules",
           "fiscal_years",
           "fiscal_periods",
-          "fiscal_calendar_audit");
+          "fiscal_calendar_audit",
+          // V38 — journaux, lots et compteurs de pièces.
+          "accounting_journals",
+          "journal_batches",
+          "journal_piece_counters");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -166,11 +170,15 @@ class SchemaMigrationIT {
           "guard_gr_lines",
           "record_settlement",
           "guard_invoice_origin",
-          "ap_invoice_journal_entry");
+          "ap_invoice_journal_entry",
+          "journal_for_source",
+          "assign_journal_batch");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
           "tenant_invitations/Administrateur de la société",
+          "accounting_journals/Lecture du référentiel",
+          "journal_batches/Tenant isolation",
           "fiscal_modules/Lecture du référentiel",
           "fiscal_years/Tenant isolation",
           "fiscal_periods/Tenant isolation",
@@ -240,7 +248,12 @@ class SchemaMigrationIT {
           "gr_lines/trg_guard_gr_lines",
           // V36 — une facture ne cite qu'une commande de son propre tiers.
           "ap_invoices/trg_guard_ap_invoice_origin",
-          "ar_invoices/trg_guard_ar_invoice_origin");
+          "ar_invoices/trg_guard_ar_invoice_origin",
+          // V38 — journal, lot et numéro de pièce attribués à l'insertion.
+          "journal_entries/trg_assign_journal_batch");
+
+  /** V38 — synthèse des lots du grand livre. */
+  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {
@@ -332,7 +345,7 @@ class SchemaMigrationIT {
   @Test
   @DisplayName("les vues, fonctions, déclencheurs, politiques, séquences et clés étrangères correspondent au manifeste")
   void lesAutresObjetsCorrespondentAuManifeste() {
-    memeEnsemble(MANIFESTE.colonne("views", 0), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(MANIFESTE.colonne("views", 0), VUES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT c.relname FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')

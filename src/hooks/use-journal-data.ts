@@ -8,6 +8,9 @@ export interface JournalEntry {
   id: string;
   tenant_id: string;
   entry_number: string;
+  /** V38 : journal (VT, AC, BQ, PA, OD) et numéro de pièce continu par journal et exercice. */
+  journal_code?: string;
+  piece_number?: string;
   entry_date: string;
   description: string | null;
   source: string;

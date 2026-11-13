@@ -204,10 +204,12 @@ export function GLPostingConfigPanel({ config, onSave }: { config: GLPostingSett
 }
 
 /* ─── GL Batch History Table (for Transaction pages) ─── */
-export function GLBatchHistory({ batches, onPost, onCancel }: {
+export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: {
   batches: GLBatch[];
   onPost?: (id: string) => void;
   onCancel?: (id: string) => void;
+  /** Lots réels (V38) : consultation seule ; une écriture se contre-passe une à une, pas un lot. */
+  readOnly?: boolean;
 }) {
   const [filter, setFilter] = useState<string>("all");
 
@@ -273,6 +275,7 @@ export function GLBatchHistory({ batches, onPost, onCancel }: {
                   <td className="px-3 py-2 text-muted-foreground">{b.approvedBy || "—"}</td>
                   <td className="px-3 py-2"><StatusBadge status={statusBadge(b.status)} label={b.status} /></td>
                   <td className="px-3 py-2">
+                    {readOnly ? <span className="text-[10px] text-muted-foreground">{b.approvedBy ? "clôturé" : "ouvert"}</span> : (
                     <div className="flex items-center gap-1">
                       {b.status === "Validated" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={() => onPost?.(b.id)}>
@@ -293,6 +296,7 @@ export function GLBatchHistory({ batches, onPost, onCancel }: {
                         <History className="w-3 h-3" /> Audit
                       </Button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}
