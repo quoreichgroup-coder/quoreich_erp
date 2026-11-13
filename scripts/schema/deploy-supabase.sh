@@ -60,6 +60,7 @@ if [[ "$MODE" == "bundle" ]]; then
   echo "-- Les migrations déjà inscrites au registre qerp_deploy.applied_migrations sont sautées."
   echo "-- Produit par scripts/schema/deploy-supabase.sh --print-bundle ($(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo '?'))."
   echo "BEGIN;"
+  echo "SET LOCAL search_path TO public, extensions;"
   echo "$LEDGER_DDL"
   for f in "${FILES[@]}"; do
     sha="$(fingerprint "$DIR/$f")"
@@ -103,7 +104,11 @@ for f in "${FILES[@]}"; do
     continue
   fi
   echo "application : $f"
-  { cat "$DIR/$f"; echo; echo "INSERT INTO qerp_deploy.applied_migrations (filename, sha256) VALUES ('$f', '$sha');"; } \
+  # search_path fixé dans la transaction, comme Flyway en local : une connexion du pooler peut
+  # hériter d'un search_path vide laissé par un script précédent (pg_dump commence par
+  # set_config('search_path', '', false)), et un type non qualifié serait alors introuvable.
+  { echo "SET LOCAL search_path TO public, extensions;"; cat "$DIR/$f"; echo
+    echo "INSERT INTO qerp_deploy.applied_migrations (filename, sha256) VALUES ('$f', '$sha');"; } \
     | "${PSQL[@]}" --single-transaction -f - >/dev/null
   applied=$((applied + 1))
 done
@@ -111,5 +116,7 @@ done
 if [[ "$MODE" == "dry-run" ]]; then
   echo "$pending migration(s) en attente sur Supabase."
 else
+  # Réglages propres à Supabase (publication temps réel), rejouables sans effet.
+  "${PSQL[@]}" --single-transaction -f "$ROOT/scripts/schema/supabase-platform.sql" >/dev/null
   echo "Supabase à jour : $applied migration(s) appliquée(s), ${#FILES[@]} au total depuis la base de référence."
 fi
