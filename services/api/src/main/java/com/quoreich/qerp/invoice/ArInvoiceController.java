@@ -116,6 +116,12 @@ public class ArInvoiceController {
         return ResponseEntity.status(422).body(Map.of("error", premiereLigne(sql)));
       }
     }
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      if (t instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("error", "Ce numéro de facture existe déjà dans la société"));
+      }
+    }
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(Map.of("error", "Opération refusée par les règles comptables"));
   }

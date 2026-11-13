@@ -119,6 +119,9 @@ public final class PostgresFixture {
   public static synchronized void loadReferenceDatasetOnce(String databaseName) {
     if (LOADED_DATABASES.add(databaseName)) {
       execute(urlOf(databaseName), readClasspath("fixtures/reference-dataset.sql"));
+      // Numérotation automatique (V22) coupée pour les sociétés de recette : les tests
+      // désignent leurs factures par numéro. NumerotationFacturesIT la rallume et la teste.
+      execute(urlOf(databaseName), "UPDATE ar_general_settings SET auto_numbering = false");
     }
   }
 

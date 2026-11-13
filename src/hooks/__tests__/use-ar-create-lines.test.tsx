@@ -58,6 +58,13 @@ describe("useCreateARInvoice — facture à lignes, chemin Supabase", () => {
     expect(lines.map((l) => [l.line_no, l.description, l.tax_code_id])).toEqual([[1, "Licence", "t18"], [2, "Formation", null]]);
   });
 
+  it("sans numéro saisi : brouillon au numéro provisoire unique, le définitif vient de la base", async () => {
+    const { result } = renderHook(() => useCreateARInvoice(), { wrapper });
+    await result.current.mutateAsync({ ...invoice, invoice_number: "  " });
+    const draft = mocks.calls.find((c) => c.op === "insert")!.args[0] as any;
+    expect(draft.invoice_number).toMatch(/^BROUILLON-[0-9A-F]{8}$/);
+  });
+
   it("émission refusée : le brouillon est retiré et l'erreur d'origine remonte", async () => {
     mocks.errors["ar_invoices.update"] = { message: "Paramétrage comptable incomplet" };
     const { result } = renderHook(() => useCreateARInvoice(), { wrapper });

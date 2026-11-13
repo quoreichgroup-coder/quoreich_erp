@@ -436,12 +436,18 @@ export function useCreateARInvoice() {
       /** Lignes (V21) : la base calcule HT et TVA ; l'en-tête devient leur somme. */
       lines?: { description: string; quantity: number; unit_price: number; discount_pct: number; tax_code_id?: string }[];
     }) => {
-      const { analytics: chosen = {}, lines = [], ...fields } = inv;
+      const { analytics: chosen = {}, lines = [], ...given } = inv;
+      // Numéro facultatif (V22) : en numérotation automatique, la base attribue le définitif à
+      // l'émission ; un brouillon sans numéro reçoit un numéro provisoire unique.
+      const fields = {
+        ...given,
+        invoice_number: given.invoice_number.trim() || `BROUILLON-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      };
       const analytics = Object.entries(chosen).filter(([, valueId]) => Boolean(valueId));
       if (isApiEnabled()) {
         // Le total est recalculé côté base (HT + TVA) : on n'envoie que les composantes.
         return apiPost("/api/v1/ar/invoices", {
-          invoiceNumber: inv.invoice_number,
+          invoiceNumber: inv.invoice_number.trim() || null,
           customerId: inv.customer_id,
           invoiceDate: inv.invoice_date,
           dueDate: inv.due_date,

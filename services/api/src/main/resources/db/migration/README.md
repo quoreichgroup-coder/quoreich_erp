@@ -25,6 +25,7 @@ n'existe que dans `drizzle/migrations/`. Le dump est la seule source vérifiable
 | `V19__axes_analytiques.sql` | écrit à la main | axes analytiques par société (sections datées, règles obligatoire/interdit par préfixe de compte, défauts par client, imputation des lignes), contrôle `QG002` à la comptabilisation, contre-passation qui recopie l'analytique |
 | `V20__hierarchie_analytique_sans_boucle.sql` | écrit à la main | interdit les boucles dans la hiérarchie des sections (A → B → A) |
 | `V21__lignes_de_facture_et_codes_tva.sql` | écrit à la main | codes TVA par société (taux figé), lignes de facture aux montants calculés, comptabilisation regroupée par compte de vente et de TVA |
+| `V22__numerotation_des_factures.sql` | écrit à la main | numéro de facture unique par société, attribué à l'émission depuis la série, compteur par année, sans trou |
 
 **`V1..V15` = la base de référence**, identique au dump : c'est ce que
 `verify-lot0.sh` compare, et il s'arrête à V15. **À partir de V16, ce sont des

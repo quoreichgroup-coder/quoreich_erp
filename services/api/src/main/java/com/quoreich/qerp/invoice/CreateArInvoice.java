@@ -51,7 +51,8 @@ public record CreateArInvoice(
   }
 
   public String problem() {
-    if (invoiceNumber == null || invoiceNumber.isBlank()) return "invoiceNumber obligatoire";
+    // invoiceNumber facultatif : en numérotation automatique, la base attribue le numéro
+    // définitif à l'émission (V22) ; sans numéro, le brouillon reçoit un numéro provisoire.
     if (customerId == null) return "customerId obligatoire";
     if (dueDate == null) return "dueDate obligatoire";
     if (linesOrEmpty().isEmpty()) {

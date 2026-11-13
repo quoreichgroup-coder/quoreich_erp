@@ -54,7 +54,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
   const createInvoice = useCreateARInvoice();
   const [form, setForm] = useState({
     customer_id: "",
-    invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
+    invoice_number: "",
     invoice_date: new Date().toISOString().split("T")[0],
     due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
   });
@@ -125,8 +125,9 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">N° Facture</Label>
-              <Input className="h-8 text-xs" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
+              <Label className="text-xs" htmlFor="invoice-number">N° Facture</Label>
+              <Input id="invoice-number" className="h-8 text-xs" placeholder="Attribué à l'émission" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
+              <p className="text-[11px] text-muted-foreground">En numérotation automatique, la série de la société fixe le numéro à l'émission.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Date</Label>

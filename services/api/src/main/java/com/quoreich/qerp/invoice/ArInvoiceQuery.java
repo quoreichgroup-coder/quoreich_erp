@@ -104,7 +104,9 @@ public class ArInvoiceQuery {
                 + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, COALESCE(?, CURRENT_DATE), ?, ?,"
                 + " COALESCE(?, 0), 'draft', auth.uid()) RETURNING id",
             UUID.class,
-            in.invoiceNumber(),
+            in.invoiceNumber() == null || in.invoiceNumber().isBlank()
+                ? "BROUILLON-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase()
+                : in.invoiceNumber().strip(),
             in.customerId(),
             in.invoiceDate(),
             in.dueDate(),
