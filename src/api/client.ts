@@ -31,6 +31,15 @@ export class ApiHttpError extends Error {
   }
 }
 
+/** Message quand le serveur n'en donne pas un à lui : dire à l'utilisateur quoi faire, pas le code. */
+export function defaultMessage(status: number): string {
+  if (status === 401) return "Session non reconnue par le serveur : reconnectez-vous";
+  if (status === 403) return "Accès refusé : droits insuffisants dans la société courante";
+  if (status === 404) return "Élément introuvable, ou non visible dans la société courante";
+  if (status >= 500) return "Le serveur a rencontré une erreur : réessayez, ou contactez l'administrateur";
+  return `Erreur ${status}`;
+}
+
 async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -44,15 +53,18 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
   if (!response.ok) {
     // Message par défaut quand le serveur n'en donne pas (401 et 403 de la couche sécurité
     // arrivent sans corps) : dire à l'utilisateur quoi faire, pas seulement le code.
-    let message =
-      response.status === 401
-        ? "Session non reconnue par le serveur : reconnectez-vous"
-        : response.status === 403
-          ? "Accès refusé : droits insuffisants dans la société courante"
-          : `Erreur ${response.status}`;
+    let message = defaultMessage(response.status);
     try {
-      const body = (await response.json()) as { error?: string };
-      if (body.error) message = body.error;
+      const body = (await response.json()) as { error?: string; status?: number; path?: string };
+      // Seuls les refus rédigés par l'API ({"error": "…"}) sont affichés tels quels. Le corps
+      // d'erreur par défaut de Spring ({"status", "error": "Not Found", "path"}) n'est qu'un
+      // libellé HTTP en anglais : on garde le message par défaut, qui dit quoi faire.
+      if (body.error && body.path === undefined && body.status === undefined) message = body.error;
+      // 404 au format Spring : c'est la ROUTE qui n'existe pas (un élément introuvable renvoie
+      // un 404 sans corps). Cas typique : API lancée sur une version plus ancienne que l'écran.
+      else if (response.status === 404 && body.path !== undefined) {
+        message = "Service introuvable sur le serveur : l'API est plus ancienne que l'application, redémarrez-la";
+      }
     } catch {
       /* corps absent ou non JSON : on garde le message par défaut */
     }
