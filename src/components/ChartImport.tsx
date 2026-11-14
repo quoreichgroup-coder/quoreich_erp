@@ -19,7 +19,7 @@ import {
 } from "@/hooks/use-chart-import";
 
 /*
- * Import guidé du plan comptable (V65, lot PC-4) : fichier → profil et colonnes → préparation
+ * Import guidé du plan comptable (V65, simplifié V68) : fichier (format standard, colonnes reconnues) → préparation
  * (contrôle ligne à ligne par la base) → corrections → validation par une personne habilitée (une
  * autre que l'auteur si la société l'exige), tout ou rien.
  */
@@ -92,28 +92,32 @@ function ImportSettingsCard({ canEdit }: { canEdit: boolean }) {
 
 function NewImport({ onPrepared }: { onPrepared: (id: string) => void }) {
   const { data: profiles = [] } = useImportProfiles();
-  const [profileId, setProfileId] = useState("");
-  const profile = profiles.find((p) => p.id === profileId) ?? profiles[0];
+  // Format standard unique (V68) : colonnes reconnues automatiquement, aucun profil à choisir.
+  const standard = profiles.find((p) => !p.tenant_id && p.code === "QUOREICH");
   const [file, setFile] = useState<{ name: string; headers: string[]; records: Record<string, string>[] } | null>(null);
   const [mapping, setMapping] = useState<Mapping>({});
+  const [showColumns, setShowColumns] = useState(false);
   const prepare = usePrepareImport();
   const missing = missingRequired(mapping);
   const rows = useMemo(() => (file ? mapRows(file.records, mapping) : []), [file, mapping]);
+  const recognised = IMPORT_FIELDS.filter((f) => mapping[f.key]).map((f) => `${f.label} = « ${mapping[f.key]} »`);
 
   const read = (f: File) => {
     Papa.parse<Record<string, string>>(f, {
       header: true, skipEmptyLines: true,
       complete: (res) => {
         const headers = res.meta.fields ?? [];
+        const m = standard ? detectMapping(headers, standard.column_map) : {};
         setFile({ name: f.name, headers, records: res.data });
-        setMapping(profile ? detectMapping(headers, profile.column_map) : {});
+        setMapping(m);
+        setShowColumns(missingRequired(m).length > 0);
       },
       error: (e) => toast.error(`Fichier illisible : ${e.message}`),
     });
   };
   const template = () => exportToCSV([
     { code: "6056", intitule: "Achats de petit matériel", type: "Charges", parent: "", regroupement: "oui", sens: "Débit" },
-    { code: "605610", intitule: "Petit matériel informatique", type: "Charges", parent: "6056", regroupement: "non", sens: "Débit" },
+    { code: "605610", intitule: "Petit matériel informatique", type: "", parent: "6056", regroupement: "non", sens: "" },
   ], [{ key: "code", header: "Code" }, { key: "intitule", header: "Intitulé" }, { key: "type", header: "Type" }, { key: "parent", header: "Parent" },
     { key: "regroupement", header: "Regroupement" }, { key: "sens", header: "Sens" }], "modele-import-plan-comptable");
 
@@ -123,32 +127,28 @@ function NewImport({ onPrepared }: { onPrepared: (id: string) => void }) {
         <h2 className="text-sm font-semibold">Nouvel import</h2>
         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={template}>Télécharger le modèle</Button>
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1"><Label className="text-xs" htmlFor="imp-profile">Profil</Label>
-          <select id="imp-profile" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={profile?.id ?? ""}
-            onChange={(e) => { setProfileId(e.target.value); const p = profiles.find((x) => x.id === e.target.value); if (file && p) setMapping(detectMapping(file.headers, p.column_map)); }}>
-            {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}{p.tenant_id ? " (société)" : ""}</option>)}
-          </select></div>
-        <div className="space-y-1"><Label className="text-xs" htmlFor="imp-file">Fichier CSV</Label>
-          <Input id="imp-file" type="file" accept=".csv,.txt,text/csv" className="h-8 text-xs w-72" onChange={(e) => { const f = e.target.files?.[0]; if (f) read(f); }} /></div>
-      </div>
-      {profile?.notes && <p className="text-[11px] text-muted-foreground">{profile.notes}</p>}
+      <p className="text-[11px] text-muted-foreground">Un fichier CSV avec au moins les colonnes Code et Intitulé (Type, Parent, Regroupement et Sens sont facultatifs ; le type se déduit de la classe du compte). Le fichier « Exporter le plan » se réimporte tel quel ; les en-têtes usuels (Sage, SAP, anglais) sont reconnus.</p>
+      <div className="space-y-1"><Label className="text-xs" htmlFor="imp-file">Fichier CSV</Label>
+        <Input id="imp-file" type="file" accept=".csv,.txt,text/csv" className="h-8 text-xs w-72" onChange={(e) => { const f = e.target.files?.[0]; if (f) read(f); }} /></div>
       {file && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {IMPORT_FIELDS.map((f) => (
-              <div key={f.key} className="space-y-1"><Label className="text-xs" htmlFor={`imp-col-${f.key}`}>Colonne « {f.label} »{f.required ? " *" : ""}</Label>
-                <select id={`imp-col-${f.key}`} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={mapping[f.key] ?? ""}
-                  onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}>
-                  <option value="">— aucune —</option>
-                  {file.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select></div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground" data-testid="import-file-summary">{file.name} · {rows.length} ligne(s) lue(s)
-            {missing.length > 0 && <span className="text-destructive"> · colonne(s) obligatoire(s) à choisir : {missing.join(", ")}</span>}</p>
-          <Button size="sm" className="h-8 text-xs" disabled={!profile || missing.length > 0 || rows.length === 0 || prepare.isPending}
-            onClick={() => prepare.mutate({ profileId: profile!.id, fileName: file.name, rows }, { onSuccess: (id) => { setFile(null); onPrepared(String(id)); } })}>
+          <p className="text-xs text-muted-foreground" data-testid="import-file-summary">{file.name} · {rows.length} ligne(s) lue(s) · colonnes reconnues : {recognised.join(", ") || "aucune"}
+            {missing.length > 0 && <span className="text-destructive"> · à indiquer : {missing.join(", ")}</span>}
+            {" "}<button type="button" className="underline" onClick={() => setShowColumns(!showColumns)}>{showColumns ? "Masquer les colonnes" : "Modifier les colonnes"}</button></p>
+          {showColumns && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {IMPORT_FIELDS.map((f) => (
+                <div key={f.key} className="space-y-1"><Label className="text-xs" htmlFor={`imp-col-${f.key}`}>Colonne « {f.label} »{f.required ? " *" : ""}</Label>
+                  <select id={`imp-col-${f.key}`} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={mapping[f.key] ?? ""}
+                    onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}>
+                    <option value="">— aucune —</option>
+                    {file.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                  </select></div>
+              ))}
+            </div>
+          )}
+          <Button size="sm" className="h-8 text-xs" disabled={missing.length > 0 || rows.length === 0 || prepare.isPending}
+            onClick={() => prepare.mutate({ profileId: null, fileName: file.name, rows }, { onSuccess: (id) => { setFile(null); onPrepared(String(id)); } })}>
             Préparer l'import
           </Button>
         </>

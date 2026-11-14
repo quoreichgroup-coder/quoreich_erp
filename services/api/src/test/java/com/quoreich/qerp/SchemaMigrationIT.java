@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "66";
+  private static final String DERNIERE_MIGRATION = "68";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -202,7 +202,9 @@ class SchemaMigrationIT {
           // V66 — correspondances et plans secondaires.
           "secondary_chart_accounts",
           "chart_mappings",
-          "chart_mapping_lines");
+          "chart_mapping_lines",
+          // V67 — migration du plan opérationnel.
+          "chart_migrations");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -379,7 +381,14 @@ class SchemaMigrationIT {
           "compare_chart_mapping",
           "validate_chart_mapping",
           "archive_chart_mapping",
-          "mapped_trial_balance");
+          "mapped_trial_balance",
+          // V67 — migration du plan opérationnel.
+          "chart_migration_plan",
+          "chart_migration_mapping",
+          "chart_migration_plan_json",
+          "simulate_chart_migration",
+          "apply_chart_migration",
+          "cancel_chart_migration");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -474,6 +483,8 @@ class SchemaMigrationIT {
           "secondary_chart_accounts/Administration habilitée",
           "chart_mappings/Lecture société",
           "chart_mapping_lines/Lecture société",
+          // V67 — migration du plan opérationnel.
+          "chart_migrations/Lecture société",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",

@@ -48,7 +48,7 @@ class ImportPlanComptableIT {
   }
 
   private static String preparer(String user, String lignes) throws SQLException {
-    return asUser(user, "SELECT prepare_chart_import((SELECT id FROM import_profiles WHERE code = 'QUOREICH' AND tenant_id IS NULL), 'plan.csv', '"
+    return asUser(user, "SELECT prepare_chart_import(NULL, 'plan.csv', '"
         + lignes + "'::jsonb)::text");
   }
 
@@ -65,6 +65,8 @@ class ImportPlanComptableIT {
         + "{\"code\":\"605620\",\"name\":\"Doublon\"},"
         + "{\"code\":\"701\",\"name\":\"Ventes de marchandises\",\"type\":\"Produits\"}]");
     assertThat(etat(run)).isEqualTo("1:create:ok 2:create:ok 3:create:error 4:create:error 5:skip:ok");
+    assertThat(texte("SELECT string_agg(code || ':' || name, ' ') FROM import_profiles WHERE tenant_id IS NULL"))
+        .as("V68 : un seul format standard, aucun profil à choisir").isEqualTo("QUOREICH:Format standard");
 
     assertThatThrownBy(() -> asUser(VALIDEUR, "SELECT validate_chart_import('" + run + "')::text")).hasMessageContaining("ligne(s) en erreur");
     String ligne4 = texte("SELECT id::text FROM chart_import_rows WHERE run_id = '" + run + "' AND line_no = 4");

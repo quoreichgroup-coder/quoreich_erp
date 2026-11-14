@@ -180,9 +180,9 @@ plateforme, une société le copie pour l'adapter.
 | **PC-1** ✅ V62 | Objet `charts` + rattachement des comptes existants ; attributs de compte (sens, nature, mode d'imputation, TVA par défaut, analytique, attributs personnalisés) ; historique des modifications ; droits §4 | V60 | tests de non-régression sur écritures, imputations, analytique |
 | **PC-2** ✅ V63 | États par rubriques (bilan, compte de résultat, SIG) affectés par règles ; `gl_sig_view` reconstruite dessus ; correction de la paie par rôles (C-3) | PC-1 | comparaison avant / après sur la copie des données réelles |
 | **PC-3** ✅ V64 | Référentiels versionnés et règles en données ; SYSCOHADA révisé complet, PCG ; moteur de qualité générique (remplace les fonctions propres à SYSCOHADA) | PC-1 | jeux d'essai par référentiel |
-| **PC-4** ✅ V65 | Import guidé, profils, modèles (SYSCOHADA, Sage 300, Sage X3, SAP), aperçu, rapport d'erreurs, validation par un tiers ; exports | PC-3 | import en transaction, tout ou rien |
+| **PC-4** ✅ V65, simplifié V68 | Import guidé, format standard unique à colonnes reconnues (V68 : plus de profil à choisir, à la demande du propriétaire), aperçu, rapport d'erreurs, validation par un tiers ; exports | PC-3 | import en transaction, tout ou rien |
 | **PC-5** ✅ V66 | Correspondances, comparaison de plans, plans secondaires, export Sage / SAP | PC-3 | jamais d'application sans validation |
-| **PC-6** | Migration de plan opérationnel (lot de remplacements + reclassements datés) ; modèles réutilisables entre sociétés | PC-5 | simulation obligatoire, OD nouvelles uniquement |
+| **PC-6** ✅ V67 | Migration de plan opérationnel (lot de remplacements + reclassements datés) ; modèles réutilisables entre sociétés | PC-5 | simulation obligatoire, OD nouvelles uniquement |
 
 ## 7. Décisions attendues
 

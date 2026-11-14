@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { useFrameworks } from "@/hooks/use-chart-frameworks";
-import { useImportProfiles, useImportSettings, useSaveImportSettings } from "@/hooks/use-chart-import";
+import { useImportSettings, useSaveImportSettings } from "@/hooks/use-chart-import";
 import { Switch } from "@/components/ui/switch";
 import { exportToCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ import {
 /*
  * Correspondances entre plans (V66, lot PC-5) : plan opérationnel → référentiel ou plan secondaire.
  * Proposition automatique jamais validée d'office ; décision par une autre personne ; balance convertie
- * et export au format d'un profil (Sage, SAP…).
+ * et export.
  */
 const LINE_STATUS: Record<string, [string, string]> = { proposed: ["warning", "Proposée"], validated: ["success", "Validée"], rejected: ["error", "Refusée"] };
 const MAP_STATUS: Record<string, [string, string]> = { draft: ["warning", "Brouillon"], validated: ["success", "Validée"], archived: ["neutral", "Archivée"] };
@@ -137,7 +137,6 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
   const { user } = useAuth();
   const { data: rows = [], isLoading } = useCompareMapping(mapping.id);
   const { data: authors = [] } = useMappingLineAuthors(mapping.id);
-  const { data: profiles = [] } = useImportProfiles();
   const propose = useProposeMapping();
   const decide = useDecideMappingLines();
   const validate = useValidateMapping();
@@ -157,14 +156,10 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
   const decidable = shown.filter((r) => r.line_id && r.status === "proposed" && !mine.has(r.line_id)).map((r) => r.line_id!);
   const selection = [...checked].filter((id) => decidable.includes(id));
   const count = (f: (r: CompareRow) => boolean) => rows.filter(f).length;
-  const exportMapping = (profileCode: string) => {
-    const p = profiles.find((x) => x.code === profileCode);
-    const h = (k: "code" | "name", d: string) => (p?.column_map?.[k]?.[0] ?? d);
-    exportToCSV(rows.filter((r) => r.status === "validated").map((r) => ({ src: r.source_code, srcName: r.source_name, tgt: r.target_code ?? "", tgtName: r.target_name ?? "", ratio: r.ratio ?? "" })),
-      [{ key: "src", header: "Compte source" }, { key: "srcName", header: "Intitulé source" }, { key: "tgt", header: h("code", "Compte cible") },
-        { key: "tgtName", header: h("name", "Intitulé cible") }, { key: "ratio", header: "Clé (%)" }], `correspondance-${profileCode.toLowerCase()}`);
-  };
-
+  const exportMapping = () => exportToCSV(
+    rows.filter((r) => r.status === "validated").map((r) => ({ src: r.source_code, srcName: r.source_name, tgt: r.target_code ?? "", tgtName: r.target_name ?? "", ratio: r.ratio ?? "" })),
+    [{ key: "src", header: "Compte source" }, { key: "srcName", header: "Intitulé source" }, { key: "tgt", header: "Compte cible" },
+      { key: "tgtName", header: "Intitulé cible" }, { key: "ratio", header: "Clé (%)" }], "correspondance");
   return (
     <section aria-label="Détail de la correspondance" className="card-elevated p-4 space-y-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -226,11 +221,7 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
             onClick={() => exportToCSV(balance.map((b) => ({ code: b.target_code, name: b.target_name, debit: b.debit, credit: b.credit, balance: b.balance, sources: b.sources })),
               [{ key: "code", header: "Compte" }, { key: "name", header: "Intitulé" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" },
                 { key: "balance", header: "Solde" }, { key: "sources", header: "Comptes source" }], "balance-convertie")}>Exporter la balance</Button>
-          <select aria-label="Exporter la correspondance au format" className="h-8 rounded-md border border-input bg-background px-2 text-xs ml-auto" value=""
-            onChange={(e) => { if (e.target.value) exportMapping(e.target.value); }}>
-            <option value="">Exporter la correspondance…</option>
-            {profiles.filter((p) => !p.tenant_id).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
-          </select>
+          <Button size="sm" variant="outline" className="h-8 text-xs ml-auto" disabled={!rows.some((r) => r.status === "validated")} onClick={exportMapping}>Exporter la correspondance</Button>
         </div>
         {period.show && (isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : (
           <table className="w-full text-xs" data-testid="mapped-balance">

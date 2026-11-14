@@ -96,8 +96,8 @@ class AccountingSetupApiIT {
         .andExpect(jsonPath("$.roles[?(@.ready == true)]").isEmpty());
     mockMvc
         .perform(get("/api/v1/accounting/frameworks").with(admin()))
-        .andExpect(jsonPath("$[0].code").value("SYSCOHADA_REVISE"))
-        .andExpect(jsonPath("$[0].validated").value(false));
+        .andExpect(jsonPath("$.length()").value(2)) // SYSCOHADA révisé, PCG (V64)
+        .andExpect(jsonPath("$[?(@.code == 'SYSCOHADA_REVISE')].validated").value(false));
   }
 
   @Test
@@ -108,7 +108,7 @@ class AccountingSetupApiIT {
         .perform(post("/api/v1/accounting/frameworks/SYSCOHADA_REVISE/apply").with(as(ALPHA_LECTEUR)))
         .andExpect(status().isForbidden());
     mockMvc
-        .perform(post("/api/v1/accounting/frameworks/PCG_FR/apply").with(admin()))
+        .perform(post("/api/v1/accounting/frameworks/INCONNU/apply").with(admin()))
         .andExpect(status().isNotFound());
     assertThat(PostgresFixture.countAsAdmin(DATABASE,
             "SELECT count(*) FROM tenant_posting_accounts WHERE tenant_id = '" + A + "'"))

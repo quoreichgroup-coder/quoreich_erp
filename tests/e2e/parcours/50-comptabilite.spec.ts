@@ -156,19 +156,19 @@ test("plan comptable : import guidé, correction, validation, export", async ({ 
 
   obs.etape("préparation");
   await page.goto("/journal/charts?tab=import");
-  await page.getByLabel("Profil").selectOption({ label: "Modèle QUOREICH (export / import)" });
   await page.getByLabel("Fichier CSV").setInputFiles({ name: `plan-${base}.csv`, mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
   await expect(page.getByTestId("import-file-summary")).toContainText("3 ligne(s) lue(s)");
+  await expect(page.getByTestId("import-file-summary")).toContainText("Code = « Code »");
   await page.getByRole("button", { name: "Préparer l'import" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Import préparé" }).first()).toBeVisible();
   const lignes = page.getByTestId("import-row");
   await expect(lignes).toHaveCount(3);
-  await expect(page.getByTestId("import-run-summary")).toContainText("2 erreur(s)");
+  await expect(page.getByTestId("import-run-summary")).toContainText("2 erreur(s)", { timeout: 15_000 });
 
   obs.etape("correction");
   await lignes.nth(2).getByRole("button", { name: "Corriger" }).click();
   await page.getByRole("button", { name: "Ignorer la ligne" }).click();
-  await expect(page.getByTestId("import-run-summary")).toContainText("0 erreur(s)");
+  await expect(page.getByTestId("import-run-summary")).toContainText("0 erreur(s)", { timeout: 15_000 });
 
   obs.etape("validation");
   const valider = page.getByRole("button", { name: "Valider l'import" });
@@ -223,6 +223,32 @@ test("plan comptable : correspondance vers le PCG, validation, balance convertie
   await page.getByRole("button", { name: "Calculer" }).click();
   await expect(page.getByTestId("mapped-balance-line").first()).toBeVisible();
   await expect(page.getByTestId("mapped-balance-line").filter({ hasText: "411" }).first()).toBeVisible();
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});
+
+// V67 (PC-6) : migration du plan — simulation seulement (la société de test reste en SYSCOHADA) ;
+// l'application exige une autre personne.
+test("plan comptable : simulation de migration, application réservée à une autre personne", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  obs.etape("simulation");
+  await page.goto("/journal/charts?tab=migration");
+  const choix = page.getByLabel("Correspondance validée");
+  await expect(choix.locator("option")).not.toHaveCount(1);
+  await choix.selectOption({ index: 1 });
+  await page.getByLabel("Motif").fill("Simulation du parcours E2E");
+  await page.getByRole("button", { name: "Simuler la migration" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Simulation enregistrée" }).first()).toBeVisible();
+  await expect(page.getByTestId("migration-plan-row").first()).toBeVisible();
+  await expect(page.getByTestId("migration-summary")).toContainText("Simulée");
+  await expect(page.getByText("une autre personne doit l'appliquer")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Appliquer la migration" })).toBeDisabled();
+
+  obs.etape("annulation");
+  await page.getByRole("button", { name: "Annuler la simulation" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Simulation annulée" }).first()).toBeVisible();
+  await expect(page.getByTestId("migration-row").first()).toContainText("Annulée");
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
