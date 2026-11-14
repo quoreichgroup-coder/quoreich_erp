@@ -24,10 +24,9 @@ Le référentiel SYSCOHADA de QUOREICH est marqué `is_validated = false` : il d
 | Facture fournisseur approuvée | PURCHASES (HT) ; VAT_INPUT (TVA si > 0) | AP_PAYABLE (TTC) | approved + open ; QG001 si rôle manquant | AC | `ap_invoice_journal_entry` (V37) | ✅ |
 | Paiement fournisseur | AP_PAYABLE | BANK | INSERT de `payments` (ap_payment), facture approuvée | BQ | `on_ap_payment_recorded` | ✅ création ; 🔴 suppression / modification |
 | Paiement en espèces | — | — | `payment_method = 'cash'` passe quand même en BANK | BQ | idem | 🔴 caisse (571) absente 🧮 |
-| Réception de marchandises | Stock **3100** (codé en dur) | **4010** (codé en dur — compte fournisseur) | Mouvement « posted », valeur > 0, comptes existants, sinon **rien, en silence** | OD | `on_stock_movement_je` | 🔴 latent : crédite la dette en double avec la facture ; à remplacer par stock / 408 « factures non parvenues » 🧮 |
-| Livraison client (sortie) | **6010** (codé en dur, coût des ventes) | 3100 | Valeur > 0 — or la livraison est au coût 0 → rien | OD | idem | 🔴 aucun coût des ventes 🧮 (SYSCOHADA : 6031 variation de stock en inventaire intermittent) |
-| Ajustement / inventaire | **6580** (codé en dur) | 3100 (ou inverse) | idem | OD | idem | 🔴 |
-| Transfert entre dépôts | 3100 / **4010** puis 4010 / 3100 | idem | Les deux mouvements tombent dans la branche « autre » | OD | idem | 🔴 deux écritures parasites sur le compte fournisseur |
+| Entrée en stock (réception, retour client, ajustement +) | INVENTORY (311) | STOCK_VARIATION (6031) | Mouvement « posted », valeur > 0, inventaire permanent ; QG001 si rôle manquant | OD | `on_stock_movement_je` (V51) | ✅ plus de crédit fournisseur ; la facture reste DR 601 / CR 401 |
+| Sortie de stock (livraison, ajustement −) | STOCK_VARIATION (6031) | INVENTORY (311) | Valeur au coût moyen (V42) | OD | idem | ✅ 601 + 6031 = coût des marchandises vendues |
+| Transfert entre dépôts | — | — | Aucune écriture (même compte de stock) | — | idem | ✅ |
 | Paie comptabilisée | **6610** salaires (+ 6630 charges patronales = brut × **16,4 %** codé en dur) | **4210** net ; **4310** organismes sociaux ; 4470 État | Cycle approuvé, droit `hr.execute_payroll` | PA | `post_payroll_run` | 🟡 🧮 comptes et taux non paramétrables (SYSCOHADA : 661, 664, 422, 431, 447) |
 | Dotation aux amortissements | compte charge de la catégorie | compte d'amortissement de la catégorie | Immobilisation en service | OD | `post_monthly_depreciation` | 🔴 ne s'exécute pas (colonnes inexistantes), pas de contrôle de société |
 | Cession d'immobilisation | — | — | — | OD | `post_asset_disposal` | 🔴 idem |
@@ -57,7 +56,7 @@ Le référentiel SYSCOHADA de QUOREICH est marqué `is_validated = false` : il d
 | Déclencheurs en double (paiements ×3 avant V16) | Supprimés en V16, historique corrigé par script | ✅ |
 | Réception comptée deux fois en stock | V34 | ✅ |
 | Livraison comptée deux fois en stock | — | 🔴 G-06 |
-| Dette fournisseur à la réception **et** à la facture | Latent (pas de compte 3100) | 🔴 G-19 |
+| Dette fournisseur à la réception **et** à la facture | V51 | ✅ |
 | Paiement supprimé, écriture conservée | — | 🔴 G-02 |
 | Budget imputé deux fois par la même commande | — | 🔴 G-08 |
 | Paiement rejoué (double clic) | Reste à payer ≥ montant | 🟡 pas de clé d'idempotence |

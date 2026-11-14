@@ -3,11 +3,12 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
 import { InventoryRolesPanel } from "@/components/InventoryRolesPanel";
+import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Settings, Calculator } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   useInventorySettings,
@@ -45,7 +46,7 @@ export default function InventorySettings() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Inventory Control", href: "/inventory" }, { label: "Settings" }]} />
+      <Breadcrumb items={[{ label: "Stocks" }, { label: "Gestion des stocks", href: "/inventory" }, { label: "Paramètres" }]} />
       <GuidanceBanner title="Paramètres Stock" description="Entrepôt par défaut, méthode de valorisation (CMP/FIFO), comptabilisation automatique, rôles RBAC." />
 
       <h1 className="text-lg font-semibold text-foreground">Paramètres Stock</h1>
@@ -69,11 +70,17 @@ export default function InventorySettings() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Comptabilisation automatique (JE)</Label>
+              <Label className="text-xs" htmlFor="inventory-permanent">Suivi comptable des stocks</Label>
               <div className="flex items-center gap-2 h-9">
-                <Switch checked={autoGL} onCheckedChange={setAutoGL} />
-                <span className="text-xs text-muted-foreground">{autoGL ? "Mouvements auto-comptabilisés" : "Comptabilisation manuelle"}</span>
+                <Switch id="inventory-permanent" checked={autoGL} onCheckedChange={setAutoGL} />
+                <span className="text-xs text-muted-foreground">{autoGL
+                  ? "Inventaire permanent : écriture Stocks / Variation des stocks à chaque mouvement"
+                  : "Inventaire intermittent : variation constatée à l'inventaire de clôture"}</span>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                En inventaire permanent, une entrée débite le compte de stock et crédite la variation des stocks (une sortie, l'inverse) ;
+                les factures fournisseurs restent en achats. Sans les deux comptes ci-contre, les mouvements valorisés sont refusés.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Stock négatif autorisé</Label>
@@ -86,23 +93,9 @@ export default function InventorySettings() {
           </CardContent>
         </Card>
 
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><Calculator className="w-4 h-4 text-primary" />Mapping comptes GL</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-2 space-y-2.5">
-            {[
-              { label: "Inventory Asset", account: "1200", desc: "Stock disponible" },
-              { label: "COGS", account: "5000", desc: "Coût des marchandises vendues" },
-              { label: "Inventory Adjustment", account: "5900", desc: "Écarts / pertes" },
-              { label: "Goods in Transit", account: "1210", desc: "En transit" },
-              { label: "Accounts Payable (GR)", account: "2010", desc: "Réception non facturée" },
-            ].map(m => (
-              <div key={m.account} className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/20 text-xs">
-                <div><div className="font-medium">{m.label}</div><div className="text-[10px] text-muted-foreground">{m.desc}</div></div>
-                <span className="font-mono text-primary font-medium">{m.account}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <div>
+          <PostingAccountsPanel modules={["STK"]} />
+        </div>
       </div>
 
       <InventoryRolesPanel />
