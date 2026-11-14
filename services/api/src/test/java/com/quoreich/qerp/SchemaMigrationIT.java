@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "42";
+  private static final String DERNIERE_MIGRATION = "43";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -198,7 +198,11 @@ class SchemaMigrationIT {
           "reverse_settlement",
           "guard_ar_invoice_lifecycle",
           "guard_ar_invoice_lines",
-          "draft_invoice_from_delivery");
+          "draft_invoice_from_delivery",
+          // V43 — pièces commerciales complètes (TVA et remise par ligne, crédit bloquant).
+          "sales_line_tax_rate",
+          "sales_check_lines",
+          "customer_credit_exposure");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(

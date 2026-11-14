@@ -1,0 +1,165 @@
+package com.quoreich.qerp;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+/**
+ * V43 — pièces commerciales complètes : remise et code TVA par ligne de devis, de commande et de
+ * livraison, totaux HT / TVA / TTC calculés par la base, repris jusqu'à la facture brouillon ; devis
+ * expiré non convertible ; limite de crédit bloquante, levée par un utilisateur habilité avec motif.
+ */
+@SpringBootTest
+class VentesPiecesCompletesIT {
+
+  private static final String DATABASE = "qerp_it_ventes_pieces";
+  private static final String A = PostgresFixture.ALPHA_TENANT;
+  private static final String ADMIN = PostgresFixture.ALPHA_USER;
+  private static final String CONTROLEUR = "aaaaaaaa-0000-0000-0000-0000000004c3";
+  private static final String CLIENT = "c0000002-0000-0000-0000-000000000000";
+  private static final String TVA18 = "00000000-0000-0000-0000-0000000a4318";
+  private static final String TVA_BETA = "00000000-0000-0000-0000-0000000b4318";
+
+  @DynamicPropertySource
+  static void proprietes(DynamicPropertyRegistry registry) {
+    PostgresFixture.configureContext(DATABASE, registry);
+  }
+
+  @BeforeEach
+  void preparer() {
+    PostgresFixture.loadReferenceDatasetOnce(DATABASE);
+    PostgresFixture.applySyscohada(DATABASE, A);
+    owner("INSERT INTO auth.users (id) VALUES ('" + CONTROLEUR + "') ON CONFLICT DO NOTHING;"
+        + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + CONTROLEUR + "', '" + A + "', 'Contrôleur ventes')"
+        + " ON CONFLICT (id) DO NOTHING;"
+        + "INSERT INTO tax_codes (id, tenant_id, code, name, rate) VALUES ('" + TVA18 + "', '" + A
+        + "', 'TVA18_V43', 'TVA 18 %', 18) ON CONFLICT (id) DO NOTHING;"
+        + "INSERT INTO tax_codes (id, tenant_id, code, name, rate) VALUES ('" + TVA_BETA + "', '"
+        + PostgresFixture.BETA_TENANT + "', 'TVA18_B43', 'TVA 18 % Beta', 18) ON CONFLICT (id) DO NOTHING;"
+        + "INSERT INTO sales_settings (tenant_id, auto_invoice_on_delivery) VALUES ('" + A + "', true)"
+        + " ON CONFLICT (tenant_id) DO UPDATE SET auto_invoice_on_delivery = true;"
+        + "UPDATE customers SET credit_limit = NULL WHERE id = '" + CLIENT + "'");
+    PostgresFixture.grantRoles(DATABASE, ADMIN, "admin", A, CONTROLEUR, "sales_controller", A);
+  }
+
+  private static final String LIGNES =
+      "'[{\"description\":\"Conseil\",\"quantity\":2,\"unit_price\":50000,\"discount_pct\":10,\"tax_code_id\":\""
+          + TVA18 + "\"},{\"description\":\"Frais\",\"quantity\":1,\"unit_price\":20000}]'";
+
+  private static String devis(String validite) throws SQLException {
+    return asUser(ADMIN, "SELECT create_sales_quotation('" + CLIENT + "', CURRENT_DATE, " + validite + ", " + LIGNES
+        + "::jsonb)::text");
+  }
+
+  @Test
+  @DisplayName("devis → commande → livraison → facture brouillon : remise et TVA par ligne, HT / TVA / TTC calculés")
+  void remiseEtTvaJusquALaFacture() throws SQLException {
+    String devis = devis("CURRENT_DATE + 30");
+    assertThat(texte("SELECT total::text || ' ' || tax_amount::text || ' ' || total_ttc::text FROM quotations WHERE id = '"
+            + devis + "'"))
+        .as("2 × 50 000 − 10 % = 90 000 (TVA 16 200) + 20 000 sans TVA")
+        .isEqualTo("110000.00 16200.00 126200.00");
+
+    String commande = asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis + "')::text");
+    assertThat(texte("SELECT total_ttc::text FROM sales_orders WHERE id = '" + commande + "'")).isEqualTo("126200.00");
+    asUser(ADMIN, "SELECT confirm_so('" + commande + "')::text");
+    asUser(ADMIN, "SELECT post_delivery('" + commande + "', (SELECT jsonb_agg(jsonb_build_object('so_line_id', id,"
+        + " 'quantity', quantity)) FROM so_lines WHERE so_id = '" + commande + "'))::text");
+
+    assertThat(texte("SELECT status || ' ' || subtotal::text || ' ' || tax_amount::text || ' ' || total::text"
+            + " FROM ar_invoices WHERE so_id = '" + commande + "'"))
+        .as("la facture préparée depuis la livraison arrive avec sa TVA")
+        .isEqualTo("draft 110000.00 16200.00 126200.00");
+  }
+
+  @Test
+  @DisplayName("contrôles des lignes : remise hors bornes, code TVA d'une autre société refusés")
+  void controlesDesLignes() {
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT create_sales_order('" + CLIENT + "', CURRENT_DATE,"
+            + " '[{\"description\":\"X\",\"quantity\":1,\"unit_price\":10,\"discount_pct\":120}]'::jsonb)::text"))
+        .hasMessageContaining("remise");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT create_sales_order('" + CLIENT + "', CURRENT_DATE,"
+            + " '[{\"description\":\"X\",\"quantity\":1,\"unit_price\":10,\"tax_code_id\":\"" + TVA_BETA + "\"}]'::jsonb)::text"))
+        .hasMessageContaining("Code TVA inconnu");
+  }
+
+  @Test
+  @DisplayName("un devis expiré ne se convertit pas")
+  void devisExpire() throws SQLException {
+    String devis = devis("CURRENT_DATE + 30");
+    owner("UPDATE quotations SET quote_date = CURRENT_DATE - 40, valid_until = CURRENT_DATE - 1 WHERE id = '" + devis + "'");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis + "')::text"))
+        .hasMessageContaining("expiré");
+  }
+
+  @Test
+  @DisplayName("limite de crédit : refus sans motif, refus sans droit, levée motivée et tracée ; une seule confirmation")
+  void limiteDeCredit() throws SQLException {
+    owner("UPDATE customers SET credit_limit = 100000 WHERE id = '" + CLIENT + "'");
+    String commande = asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis("CURRENT_DATE + 30") + "')::text");
+
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT confirm_so('" + commande + "')::text"))
+        .hasMessageContaining("Limite de crédit dépassée");
+    assertThatThrownBy(() -> asUser(CONTROLEUR, "SELECT confirm_so('" + commande + "', 'Client historique')::text"))
+        .hasMessageContaining("Droit insuffisant");
+    asUser(ADMIN, "SELECT confirm_so('" + commande + "', 'Client historique, garantie bancaire')::text");
+    assertThat(texte("SELECT status || ' | ' || credit_override_reason || ' | ' || (credit_override_by = '" + ADMIN
+            + "')::text FROM sales_orders WHERE id = '" + commande + "'"))
+        .isEqualTo("confirmed | Client historique, garantie bancaire | true");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT confirm_so('" + commande + "')::text"))
+        .hasMessageContaining("brouillon");
+
+    owner("UPDATE customers SET credit_limit = 1000000 WHERE id = '" + CLIENT + "'");
+    String dansLaLimite = asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis("CURRENT_DATE + 30") + "')::text");
+    asUser(CONTROLEUR, "SELECT confirm_so('" + dansLaLimite + "')::text");
+    assertThat(texte("SELECT status FROM sales_orders WHERE id = '" + dansLaLimite + "'")).isEqualTo("confirmed");
+  }
+
+  // ─── Outils ───
+
+  private static String asUser(String user, String sql) throws SQLException {
+    try (Connection c = DriverManager.getConnection(
+            PostgresFixture.urlOf(DATABASE), PostgresFixture.API_USER, PostgresFixture.API_PASSWORD)) {
+      c.setAutoCommit(false);
+      try (PreparedStatement claims = c.prepareStatement("SELECT set_config('request.jwt.claims', ?, true)")) {
+        claims.setString(1, "{\"sub\":\"" + user + "\",\"role\":\"authenticated\"}");
+        claims.execute();
+      }
+      try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+        String r = rs.next() ? rs.getString(1) : null;
+        c.commit();
+        return r;
+      } catch (SQLException e) {
+        c.rollback();
+        throw e;
+      }
+    }
+  }
+
+  private static void owner(String sql) {
+    PostgresFixture.execute(PostgresFixture.urlOf(DATABASE), sql);
+  }
+
+  private static String texte(String sql) {
+    try (Connection c = DriverManager.getConnection(
+            PostgresFixture.urlOf(DATABASE), PostgresFixture.ADMIN_USER, PostgresFixture.ADMIN_PASSWORD);
+        Statement st = c.createStatement();
+        var rs = st.executeQuery(sql)) {
+      return rs.next() ? rs.getString(1) : null;
+    } catch (SQLException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+}

@@ -67,10 +67,17 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await page.goto("/sales/transactions");
   await page.getByRole("button", { name: "New Quote" }).click();
   let dialog = page.getByRole("dialog");
-  await dialog.locator("select").selectOption({ label: client });
-  await dialog.getByLabel("Désignation").fill("Prestation de conseil");
-  await dialog.locator('input[type="number"]').nth(0).fill("1");
-  await dialog.locator('input[type="number"]').nth(1).fill("125000");
+  await dialog.locator("select").first().selectOption({ label: client });
+  // V43 : devis à lignes, remise par ligne, pied HT / TVA / TTC calculé.
+  await dialog.getByLabel("Libellé ligne 1").fill("Prestation de conseil");
+  await dialog.getByLabel("Quantité ligne 1").fill("2");
+  await dialog.getByLabel("Prix unitaire ligne 1").fill("50000");
+  await dialog.getByLabel("Remise ligne 1").fill("10");
+  await dialog.getByTestId("btn-add-line").click();
+  await dialog.getByLabel("Libellé ligne 2").fill("Frais de dossier");
+  await dialog.getByLabel("Quantité ligne 2").fill("1");
+  await dialog.getByLabel("Prix unitaire ligne 2").fill("35000");
+  await expect(dialog.getByTestId("sales-totals"), "2 × 50 000 − 10 % + 35 000 = 125 000 HT").toContainText("125");
   await dialog.getByRole("button", { name: "Créer" }).click();
   await expect(dialog).toBeHidden();
   const quoteRow = page.getByRole("row").filter({ hasText: client });
@@ -85,10 +92,10 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   obs.etape("créer une commande numérotée par la base");
   await page.getByRole("button", { name: "New Order" }).click();
   dialog = page.getByRole("dialog");
-  await dialog.locator("select").selectOption({ label: client });
-  await dialog.getByLabel("Désignation").fill("Prestation de conseil");
-  await dialog.locator('input[type="number"]').nth(0).fill("1");
-  await dialog.locator('input[type="number"]').nth(1).fill("125000");
+  await dialog.locator("select").first().selectOption({ label: client });
+  await dialog.getByLabel("Libellé ligne 1").fill("Prestation de conseil");
+  await dialog.getByLabel("Quantité ligne 1").fill("1");
+  await dialog.getByLabel("Prix unitaire ligne 1").fill("125000");
   await dialog.getByRole("button", { name: "Créer" }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole("tab", { name: /Sales Orders/ }).click();

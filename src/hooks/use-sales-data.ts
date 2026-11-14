@@ -273,7 +273,7 @@ export function useCreateQuotation() {
       customer_id: string;
       quote_date: string;
       valid_until: string;
-      lines: Array<{ description: string; quantity: number; unit_price: number }>;
+      lines: Array<{ description: string; quantity: number; unit_price: number; discount_pct?: number; tax_code_id?: string | null }>;
     }) => {
       const { error } = await supabase.rpc("create_sales_quotation" as never, {
         _customer_id: input.customer_id,
@@ -297,7 +297,7 @@ export function useCreateSalesOrder() {
     mutationFn: async (input: {
       customer_id: string;
       order_date: string;
-      lines: Array<{ description: string; quantity: number; unit_price: number }>;
+      lines: Array<{ description: string; quantity: number; unit_price: number; discount_pct?: number; tax_code_id?: string | null }>;
     }) => {
       const { error } = await supabase.rpc("create_sales_order" as never, {
         _customer_id: input.customer_id,
@@ -335,8 +335,9 @@ export function useConvertQuoteToSO() {
 export function useConfirmSO() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (soId: string) => {
-      const { error } = await supabase.rpc("confirm_so", { _so_id: soId });
+    // V43 : au-delà de la limite de crédit, refus QG010 ; un motif lève le blocage (droit requis).
+    mutationFn: async ({ soId, reason }: { soId: string; reason?: string }) => {
+      const { error } = await (supabase as any).rpc("confirm_so", { _so_id: soId, _override_reason: reason ?? null });
       if (error) throw error;
     },
     onSuccess: () => {

@@ -89,7 +89,9 @@ class NumerotationVentesIT {
     String orderId = UUID.randomUUID().toString();
     owner("INSERT INTO sales_orders (id, tenant_id, so_number, customer_id, order_date, total, created_by)"
         + " VALUES ('" + orderId + "', '" + TENANT + "', 'SO-SERVICE', '" + CUSTOMER
-        + "', CURRENT_DATE, 100, '" + PostgresFixture.ALPHA_USER + "')");
+        + "', CURRENT_DATE, 100, '" + PostgresFixture.ALPHA_USER + "');"
+        // V43 : une commande sans ligne ne se confirme pas ; ligne de prestation, sans article.
+        + "INSERT INTO so_lines (so_id, description, quantity, unit_price) VALUES ('" + orderId + "', 'Prestation', 1, 100)");
     asUser("SELECT public.confirm_so('" + orderId + "')");
 
     assertThat(rows("SELECT status FROM sales_orders WHERE id = '" + orderId + "'"))

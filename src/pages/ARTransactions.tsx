@@ -33,6 +33,7 @@ import { useAccountingSetup } from "@/hooks/use-accounting-setup";
 import { requiredAxisIds } from "@/lib/analytics-setup";
 import { useTaxCodes } from "@/hooks/use-tax-codes";
 import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
+import { CommercialLinesEditor, CommercialTotals } from "@/components/CommercialLinesEditor";
 
 /* ──────── HELPERS ──────── */
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -56,6 +57,11 @@ function statusType(s: string) {
   return map[s] || "info";
 }
 const today = () => new Date().toISOString().split("T")[0];
+const addDays = (iso: string, days: number) => {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+};
 
 /* ──────── CREATE INVOICE DIALOG ──────── */
 function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -70,10 +76,8 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   // Lignes (V21) : l'aperçu reproduit le calcul de la base, qui fait foi.
   const { data: taxCodes = [] } = useTaxCodes();
-  const activeTaxCodes = taxCodes.filter((t) => t.active);
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
-  const { amounts, subtotal, tax, total, allValid } = invoiceTotals(lines, taxCodes);
-  const setLine = (i: number, patch: Partial<DraftLine>) => setLines((ls) => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const { subtotal, tax, total, allValid } = invoiceTotals(lines, taxCodes);
 
   // Analytique : sections par défaut du client, puis choix de l'utilisateur (prioritaire).
   const analyticsSetup = useAnalyticsSetup();
@@ -127,7 +131,12 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Client *</Label>
-            <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.customer_id} onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}>
+            <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.customer_id} onChange={e => {
+              const id = e.target.value;
+              // Échéance = date de facture + conditions de paiement du client (modifiable).
+              const terms = Number(customers.find(c => c.id === id)?.payment_terms ?? 30) || 30;
+              setForm(f => ({ ...f, customer_id: id, due_date: addDays(f.invoice_date, terms) }));
+            }}>
               <option value="">— Sélectionner —</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -149,51 +158,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
               <Input type="date" className="h-8 text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
           </div>
-          <div className="space-y-2" data-testid="invoice-lines">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="py-1.5 pr-2 font-medium">Libellé</th>
-                    <th className="py-1.5 pr-2 font-medium text-right w-20">Qté</th>
-                    <th className="py-1.5 pr-2 font-medium text-right w-28">Prix unitaire</th>
-                    <th className="py-1.5 pr-2 font-medium text-right w-20">Remise %</th>
-                    <th className="py-1.5 pr-2 font-medium w-32">TVA</th>
-                    <th className="py-1.5 pr-2 font-medium text-right w-28">HT</th>
-                    <th className="w-8"><span className="sr-only">Retirer</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l, i) => (
-                    <tr key={i} className="border-b border-border/50" data-testid={`invoice-line-${i + 1}`}>
-                      <td className="py-1 pr-2"><Input aria-label={`Libellé ligne ${i + 1}`} className="h-8 text-xs" value={l.description} onChange={e => setLine(i, { description: e.target.value })} /></td>
-                      <td className="py-1 pr-2"><Input aria-label={`Quantité ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.quantity} onChange={e => setLine(i, { quantity: e.target.value })} /></td>
-                      <td className="py-1 pr-2"><Input aria-label={`Prix unitaire ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.unitPrice} onChange={e => setLine(i, { unitPrice: e.target.value })} /></td>
-                      <td className="py-1 pr-2"><Input aria-label={`Remise ligne ${i + 1}`} inputMode="decimal" placeholder="0" className="h-8 text-xs text-right" value={l.discountPct} onChange={e => setLine(i, { discountPct: e.target.value })} /></td>
-                      <td className="py-1 pr-2">
-                        <select aria-label={`Code TVA ligne ${i + 1}`} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={l.taxCodeId} onChange={e => setLine(i, { taxCodeId: e.target.value })}>
-                          <option value="">Sans TVA</option>
-                          {activeTaxCodes.map(t => <option key={t.id} value={t.id}>{t.code} · {t.rate} %</option>)}
-                        </select>
-                      </td>
-                      <td className="py-1 pr-2 text-right tabular-nums">{amounts[i].valid ? fmt(amounts[i].net) : "—"}</td>
-                      <td className="py-1 text-right">
-                        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" aria-label={`Retirer la ligne ${i + 1}`}
-                          disabled={lines.length === 1} onClick={() => setLines(ls => ls.filter((_, k) => k !== i))}>×</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1" data-testid="btn-add-line"
-              onClick={() => setLines(ls => [...ls, emptyLine(ls[ls.length - 1]?.taxCodeId ?? "")])}>
-              <Plus className="w-3 h-3" /> Ajouter une ligne
-            </Button>
-            {activeTaxCodes.length === 0 && (
-              <p className="text-xs text-muted-foreground">Aucun code TVA actif : créez-en dans Paramètres → Codes TVA pour facturer de la TVA.</p>
-            )}
-          </div>
+          <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} />
           <AnalyticSelectors
             date={form.invoice_date}
             value={analytics}
@@ -204,11 +169,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
               setAnalytics((a) => ({ ...a, [axisId]: valueId }));
             }}
           />
-          <div className="bg-muted/30 rounded p-3 text-xs">
-            <div className="flex justify-between"><span>Sous-total</span><span className="tabular-nums">{fmtCurrency(subtotal)}</span></div>
-            <div className="flex justify-between"><span>TVA</span><span className="tabular-nums">{fmtCurrency(tax)}</span></div>
-            <div className="flex justify-between font-medium border-t border-border mt-1.5 pt-1.5"><span>Total TTC</span><span className="tabular-nums">{fmtCurrency(total)}</span></div>
-          </div>
+          <CommercialTotals lines={lines} taxCodes={taxCodes} />
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>

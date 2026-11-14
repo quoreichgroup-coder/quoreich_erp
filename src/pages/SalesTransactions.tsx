@@ -62,6 +62,10 @@ import {
   useSoLines,
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
+import { useTaxCodes } from "@/hooks/use-tax-codes";
+import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
+import { CommercialLinesEditor, CommercialTotals, toSalesLines } from "@/components/CommercialLinesEditor";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
@@ -102,29 +106,28 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
     customer_id: "",
     quote_date: new Date().toISOString().split("T")[0],
     valid_until: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    description: "",
-    quantity: "1",
-    unit_price: "",
   });
-  const total = Number(form.quantity) * Number(form.unit_price);
+  const { data: taxCodes = [] } = useTaxCodes();
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  const { allValid } = invoiceTotals(lines, taxCodes);
 
   const handleCreate = async () => {
-    if (!form.customer_id || !form.description.trim() || Number(form.quantity) <= 0 || Number(form.unit_price) <= 0) {
-      toast.error("Remplissez tous les champs");
+    if (!form.customer_id || !allValid) {
+      toast.error("Choisissez le client et complétez chaque ligne (désignation, quantité, prix, remise 0–100 %)");
       return;
     }
     await create.mutateAsync({
       customer_id: form.customer_id,
       quote_date: form.quote_date,
       valid_until: form.valid_until,
-      lines: [{ description: form.description.trim(), quantity: Number(form.quantity), unit_price: Number(form.unit_price) }],
+      lines: toSalesLines(lines),
     });
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">Nouveau devis</DialogTitle>
         </DialogHeader>
@@ -174,21 +177,8 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
               />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Désignation</Label>
-            <Input aria-label="Désignation" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-xs" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Quantité</Label>
-              <Input type="number" className="h-8 text-xs" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Prix unitaire (XOF)</Label>
-              <Input type="number" className="h-8 text-xs" value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))} />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Total HT : {fmt(total)} XOF</p>
+          <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} testId="sales-lines" linePrefix="sales-line" />
+          <CommercialTotals lines={lines} taxCodes={taxCodes} testId="sales-totals" />
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>
@@ -209,28 +199,27 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const [form, setForm] = useState({
     customer_id: "",
     order_date: new Date().toISOString().split("T")[0],
-    description: "",
-    quantity: "1",
-    unit_price: "",
   });
-  const total = Number(form.quantity) * Number(form.unit_price);
+  const { data: taxCodes = [] } = useTaxCodes();
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  const { allValid } = invoiceTotals(lines, taxCodes);
 
   const handleCreate = async () => {
-    if (!form.customer_id || !form.description.trim() || Number(form.quantity) <= 0 || Number(form.unit_price) <= 0) {
-      toast.error("Remplissez tous les champs");
+    if (!form.customer_id || !allValid) {
+      toast.error("Choisissez le client et complétez chaque ligne (désignation, quantité, prix, remise 0–100 %)");
       return;
     }
     await create.mutateAsync({
       customer_id: form.customer_id,
       order_date: form.order_date,
-      lines: [{ description: form.description.trim(), quantity: Number(form.quantity), unit_price: Number(form.unit_price) }],
+      lines: toSalesLines(lines),
     });
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">Nouvelle commande</DialogTitle>
         </DialogHeader>
@@ -269,21 +258,8 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Désignation</Label>
-            <Input aria-label="Désignation" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-xs" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Quantité</Label>
-              <Input type="number" className="h-8 text-xs" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Prix unitaire (XOF)</Label>
-              <Input type="number" className="h-8 text-xs" value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))} />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Total HT : {fmt(total)} XOF</p>
+          <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} testId="sales-lines" linePrefix="sales-line" />
+          <CommercialTotals lines={lines} taxCodes={taxCodes} testId="sales-totals" />
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>
@@ -398,6 +374,10 @@ export default function SalesTransactions() {
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [confirmConvertId, setConfirmConvertId] = useState<string | null>(null);
   const [confirmSoId, setConfirmSoId] = useState<string | null>(null);
+  const [creditBlock, setCreditBlock] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+  const { data: myAccess } = useMyAccess();
+  const canOverride = (myAccess?.permissions ?? []).includes("sales.credit_override");
   const [deliverSoId, setDeliverSoId] = useState<string | null>(null);
   const [confirmInvoiceDnId, setConfirmInvoiceDnId] = useState<string | null>(null);
 
@@ -431,7 +411,7 @@ export default function SalesTransactions() {
     quoteId: q.id,
     date: q.quote_date,
     customer: q.customer?.name || "—",
-    total: q.total,
+    total: Number((q as { total_ttc?: number }).total_ttc ?? q.total),
     validUntil: q.valid_until || "—",
     status: q.status,
   }));
@@ -443,7 +423,7 @@ export default function SalesTransactions() {
     date: o.order_date,
     customer: o.customer?.name || "—",
     qtRef: o.quotation?.quote_number || "—",
-    total: o.total,
+    total: Number((o as { total_ttc?: number }).total_ttc ?? o.total),
     status: o.status,
   }));
 
@@ -802,7 +782,7 @@ export default function SalesTransactions() {
                       <SortableHead label="Quote #" sortKey="id" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Customer" sortKey="customer" sort={qtTable.sort} onSort={qtTable.toggleSort} />
-                      <SortableHead label="Total (XOF)" sortKey="total" sort={qtTable.sort} onSort={qtTable.toggleSort} className="text-right" />
+                      <SortableHead label="Total TTC (XOF)" sortKey="total" sort={qtTable.sort} onSort={qtTable.toggleSort} className="text-right" />
                       <SortableHead label="Valid Until" sortKey="validUntil" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Status" sortKey="status" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <TableCell className="text-[11px] font-medium text-muted-foreground">Actions</TableCell>
@@ -814,7 +794,7 @@ export default function SalesTransactions() {
                         <TableCell className="font-mono text-primary">{q.id}</TableCell>
                         <TableCell>{q.date}</TableCell>
                         <TableCell className="font-medium">{q.customer}</TableCell>
-                        <TableCell className="text-right font-mono">{fmt(q.total)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(Number((q as { total_ttc?: number }).total_ttc ?? q.total))}</TableCell>
                         <TableCell className="text-muted-foreground">{q.validUntil}</TableCell>
                         <TableCell>
                           <Badge className={`text-[10px] ${statusStyle(q.status)}`} variant="outline">
@@ -904,7 +884,7 @@ export default function SalesTransactions() {
                       <SortableHead label="Date" sortKey="date" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Customer" sortKey="customer" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Quote Ref" sortKey="qtRef" sort={soTable.sort} onSort={soTable.toggleSort} />
-                      <SortableHead label="Total (XOF)" sortKey="total" sort={soTable.sort} onSort={soTable.toggleSort} className="text-right" />
+                      <SortableHead label="Total TTC (XOF)" sortKey="total" sort={soTable.sort} onSort={soTable.toggleSort} className="text-right" />
                       <SortableHead label="Status" sortKey="status" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <TableCell className="text-[11px] font-medium text-muted-foreground">Actions</TableCell>
                     </TableRow>
@@ -916,7 +896,7 @@ export default function SalesTransactions() {
                         <TableCell>{so.date}</TableCell>
                         <TableCell className="font-medium">{so.customer}</TableCell>
                         <TableCell className="font-mono text-muted-foreground">{so.qtRef}</TableCell>
-                        <TableCell className="text-right font-mono">{fmt(so.total)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(Number((so as { total_ttc?: number }).total_ttc ?? so.total))}</TableCell>
                         <TableCell>
                           <Badge className={`text-[10px] ${statusStyle(so.status)}`} variant="outline">
                             {so.status}
@@ -1124,19 +1104,44 @@ export default function SalesTransactions() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer cette commande ?</AlertDialogTitle>
             <AlertDialogDescription>
-              La commande passera au statut « confirmed » et pourra être livrée.
+              La commande passera au statut « confirmed » et pourra être livrée. La limite de crédit du client
+              est contrôlée : au-delà, seul un utilisateur habilité peut confirmer, en donnant un motif.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {creditBlock && (
+            <div className="space-y-1.5" data-testid="credit-block">
+              <p className="text-xs text-destructive">{creditBlock}</p>
+              {canOverride ? (
+                <>
+                  <Label className="text-xs" htmlFor="credit-override-reason">Motif du dépassement (obligatoire)</Label>
+                  <Input id="credit-override-reason" className="h-8 text-xs" value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} />
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Demandez la levée à un responsable habilité (droit « dépassement de crédit »).</p>
+              )}
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogCancel onClick={() => { setCreditBlock(null); setOverrideReason(""); }}>Annuler</AlertDialogCancel>
+            <Button
+              size="sm"
+              disabled={confirmSo.isPending || (!!creditBlock && (!canOverride || !overrideReason.trim()))}
               onClick={async () => {
-                if (confirmSoId) await confirmSo.mutateAsync(confirmSoId);
-                setConfirmSoId(null);
+                if (!confirmSoId) return;
+                try {
+                  await confirmSo.mutateAsync({ soId: confirmSoId, reason: creditBlock ? overrideReason.trim() : undefined });
+                  setConfirmSoId(null);
+                  setCreditBlock(null);
+                  setOverrideReason("");
+                } catch (e) {
+                  const err = e as { code?: string; message?: string };
+                  if (err.code === "QG010" && /Limite de crédit/.test(err.message ?? "")) setCreditBlock(err.message ?? "");
+                  else setConfirmSoId(null);
+                }
               }}
             >
-              {confirmSo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirmer"}
-            </AlertDialogAction>
+              {confirmSo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : creditBlock ? "Confirmer malgré le dépassement" : "Confirmer"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
