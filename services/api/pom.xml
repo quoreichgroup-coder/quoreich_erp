@@ -29,6 +29,9 @@
 
   <properties>
     <java.version>25</java.version>
+    <!-- Tests d'intégration : voir la configuration de maven-failsafe-plugin. -->
+    <qerp.it.contextCache>4</qerp.it.contextCache>
+    <qerp.it.heap>1g</qerp.it.heap>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -239,6 +242,19 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
+        <!--
+          Mémoire : chaque classe IT a sa propre base (PostgresFixture), donc son contexte Spring
+          n'est jamais réutilisé par une autre classe. Le cache par défaut (32 contextes, chacun avec
+          son pool Hikari) ne sert à rien et faisait grossir la JVM jusqu'à plusieurs Go sur ce poste ;
+          4 suffisent (un contexte évincé est fermé, pool compris). Tas plafonné pour la même raison.
+          Surcharge : -Dqerp.it.contextCache=… / -Dqerp.it.heap=…
+        -->
+        <configuration>
+          <argLine>-Xmx${qerp.it.heap} -XX:+UseSerialGC</argLine>
+          <systemPropertyVariables>
+            <spring.test.context.cache.maxSize>${qerp.it.contextCache}</spring.test.context.cache.maxSize>
+          </systemPropertyVariables>
+        </configuration>
         <executions>
           <execution>
             <goals>

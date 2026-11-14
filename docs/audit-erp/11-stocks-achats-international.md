@@ -176,13 +176,13 @@ transit passés en charges sans lien avec la marchandise.
 | **A3** | Contrats-cadres, évaluation fournisseurs | A2 | P3 |
 | — | Lots / numéros de série / péremption ; unités de conversion | R1 | P2 (selon les clients : pharmacie, agro-alimentaire) |
 
-## 7. Décisions à prendre (propriétaire et expert-comptable) 🧮
+## 7. Décisions adoptées (propriétaire, 14 nov. 2026 : « règles de la BCEAO et pratique africaine et internationale »)
 
-| # | Question | Proposition |
+| # | Question | Règle retenue |
 |---|---|---|
-| D-S1 | Inventaire permanent par défaut pour les nouvelles sociétés ? | Oui (V51 le permet) ; intermittent sur demande |
-| D-I1 | Source des taux de change | Table de taux datés, saisie ou import BCEAO ; EUR à parité fixe pré-rempli |
-| D-I2 | Base de répartition des frais d'approche par défaut | Valeur (la plus courante en SYSCOHADA), poids pour le fret si renseigné |
-| D-I3 | Comptes des frais d'approche : incorporation directe au stock (inventaire permanent) ou 6015 « frais sur achats » puis variation | À trancher par l'expert-comptable |
-| D-I4 | Utilisation du compte 38 (en cours de route) | Uniquement pour les Incoterms qui transfèrent la propriété avant l'arrivée |
-| D-I5 | Pays et taux douaniers à paramétrer en premier | Pays des sociétés clientes actuelles (Burkina Faso, Côte d'Ivoire, Sénégal ?) |
+| D-S1 | Mode de suivi des stocks | Inventaire **permanent** par défaut pour une nouvelle société (V51) ; intermittent sur demande |
+| D-I1 | Taux de change | **BCEAO** : EUR à parité fixe 655,957 XOF ; autres devises au cours de référence publié par la BCEAO, table de taux datés (saisie ou import). Conversion au **cours du jour de l'opération** (facture, règlement) ; écart réalisé au règlement en **676 / 776** ; à la clôture, dettes et créances en devises réévaluées au cours de clôture : perte latente en **478** avec provision pour risque de change, gain latent en **479** sans produit (SYSCOHADA révisé, prudence) |
+| D-I2 | Répartition des frais d'approche | **Valeur** par défaut ; fret et assurance au **poids** ou au **volume** quand ils sont saisis sur les lignes (pratique SAP / Sage / Odoo) |
+| D-I3 | Comptabilisation des frais d'approche | Factures du transitaire, du transporteur, de l'assureur et de la douane à leur nature en **6015 « frais sur achats »** (droits et prélèvements non récupérables compris) ; **TVA à l'importation en 4452** (récupérable) ; acomptes d'impôt prélevés en douane en créance fiscale ; en inventaire permanent, l'entrée en stock (311 / 6031) est **revalorisée au coût complet** (prix + frais répartis), ce qui donne le coût d'acquisition SYSCOHADA |
+| D-I4 | Compte 38 | Utilisé seulement quand l'Incoterm transfère la propriété avant l'arrivée (EXW, FCA, FAS, FOB, CFR, CIF, CPT, CIP) **et** que la facture précède la réception ; soldé en 31 à la réception |
+| D-I5 | Douane | Paramètres par pays, en **données** (jamais en code) : catégories du TEC UEMOA (0 / 5 / 10 / 20 / 35 %), redevance statistique 1 %, PCS UEMOA 1 %, PC CEDEAO 0,5 %, TVA import au taux national ; acomptes et redevances propres à chaque pays ajoutés par pays. Premiers pays : **Burkina Faso** et **Côte d'Ivoire** (sociétés existantes), taux à confirmer par le transitaire avant mise en service |
