@@ -2,6 +2,12 @@
 
 Gravité : **Critique** (fausse les comptes, ouvre une faille ou bloque un processus légal) · **Haute** · **Moyenne** · **Faible**. Priorité : P0 → P3 (voir 09). Preuves : [Sn] = sonde d'écriture annulée (README), [Code] = lecture de la fonction en base, [IT]/[E2E] = test exécuté.
 
+## Suivi des corrections
+
+| Lot | Date | Écarts fermés | Preuves | Reste dans le périmètre |
+|---|---|---|---|---|
+| V42 — Ventes et clients (sécurisation) | 14 nov. 2026 | **G-01** (paiement inter-sociétés), **G-02** (paiement modifiable / supprimable → annulation par contre-passation), **G-03** (facture client émise figée), **G-06** (livraison : stock une fois, au CMP), **G-07** (facture issue de livraison en brouillon avec lignes, numéro légal à l'émission) ; G-23 partiel (échéance selon conditions du client pour les factures issues de livraison) | `VentesClientsSecurisationIT`, sondes S1, S3, S4, S12, S13 refusées ; parcours 40-clients, 60-crm-ventes, sur site ; Java 132, nuage 11/11, sur site 2/2 | G-12 avoirs, G-14 acomptes, G-23 (saisie manuelle), G-24 crédit, TVA / remise par ligne sur devis et commandes (R-O2C-06), validité du devis (R-O2C-02), lettrage G-15 |
+
 ## P0 — Sécurité, intégrité comptable et des données
 
 | # | Module | Processus | Existant | Problème | Impact métier | Gravité | Recommandation | Prio |
