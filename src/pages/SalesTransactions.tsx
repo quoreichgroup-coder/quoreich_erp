@@ -63,6 +63,7 @@ import {
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
 import { exportToCSV } from "@/lib/csv-export";
+import { exportToPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { SALES_ROLE_HINTS } from "@/lib/sales-roles";
 import { SalesEmptyState } from "@/components/SalesEmptyState";
@@ -99,18 +100,25 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
   const create = useCreateQuotation();
   const [form, setForm] = useState({
     customer_id: "",
-    quote_number: `QT-${Date.now().toString(36).toUpperCase()}`,
     quote_date: new Date().toISOString().split("T")[0],
     valid_until: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    total: "",
+    description: "",
+    quantity: "1",
+    unit_price: "",
   });
+  const total = Number(form.quantity) * Number(form.unit_price);
 
   const handleCreate = async () => {
-    if (!form.customer_id || !parseFloat(form.total)) {
+    if (!form.customer_id || !form.description.trim() || Number(form.quantity) <= 0 || Number(form.unit_price) <= 0) {
       toast.error("Remplissez tous les champs");
       return;
     }
-    await create.mutateAsync({ ...form, total: parseFloat(form.total) });
+    await create.mutateAsync({
+      customer_id: form.customer_id,
+      quote_date: form.quote_date,
+      valid_until: form.valid_until,
+      lines: [{ description: form.description.trim(), quantity: Number(form.quantity), unit_price: Number(form.unit_price) }],
+    });
     onClose();
   };
 
@@ -141,8 +149,8 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
               <Label className="text-xs">N° Devis</Label>
               <Input
                 className="h-8 text-xs"
-                value={form.quote_number}
-                onChange={(e) => setForm((f) => ({ ...f, quote_number: e.target.value }))}
+                readOnly
+                placeholder="Attribué à la création"
               />
             </div>
             <div className="space-y-1.5">
@@ -165,16 +173,22 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
                 onChange={(e) => setForm((f) => ({ ...f, valid_until: e.target.value }))}
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Désignation</Label>
+            <Input aria-label="Désignation" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-xs" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Montant (XOF)</Label>
-              <Input
-                type="number"
-                className="h-8 text-xs"
-                value={form.total}
-                onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-              />
+              <Label className="text-xs">Quantité</Label>
+              <Input type="number" className="h-8 text-xs" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Prix unitaire (XOF)</Label>
+              <Input type="number" className="h-8 text-xs" value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))} />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">Total HT : {fmt(total)} XOF</p>
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>
@@ -194,17 +208,23 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const create = useCreateSalesOrder();
   const [form, setForm] = useState({
     customer_id: "",
-    so_number: `SO-${Date.now().toString(36).toUpperCase()}`,
     order_date: new Date().toISOString().split("T")[0],
-    total: "",
+    description: "",
+    quantity: "1",
+    unit_price: "",
   });
+  const total = Number(form.quantity) * Number(form.unit_price);
 
   const handleCreate = async () => {
-    if (!form.customer_id || !parseFloat(form.total)) {
+    if (!form.customer_id || !form.description.trim() || Number(form.quantity) <= 0 || Number(form.unit_price) <= 0) {
       toast.error("Remplissez tous les champs");
       return;
     }
-    await create.mutateAsync({ ...form, total: parseFloat(form.total) });
+    await create.mutateAsync({
+      customer_id: form.customer_id,
+      order_date: form.order_date,
+      lines: [{ description: form.description.trim(), quantity: Number(form.quantity), unit_price: Number(form.unit_price) }],
+    });
     onClose();
   };
 
@@ -235,8 +255,8 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               <Label className="text-xs">N° Commande</Label>
               <Input
                 className="h-8 text-xs"
-                value={form.so_number}
-                onChange={(e) => setForm((f) => ({ ...f, so_number: e.target.value }))}
+                readOnly
+                placeholder="Attribué à la création"
               />
             </div>
             <div className="space-y-1.5">
@@ -250,14 +270,20 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Montant (XOF)</Label>
-            <Input
-              type="number"
-              className="h-8 text-xs"
-              value={form.total}
-              onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-            />
+            <Label className="text-xs">Désignation</Label>
+            <Input aria-label="Désignation" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-xs" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Quantité</Label>
+              <Input type="number" className="h-8 text-xs" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Prix unitaire (XOF)</Label>
+              <Input type="number" className="h-8 text-xs" value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: e.target.value }))} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Total HT : {fmt(total)} XOF</p>
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>
@@ -538,6 +564,47 @@ export default function SalesTransactions() {
     }
   };
 
+  const handleExportPdf = () => {
+    if (!perms?.canExport) {
+      toast.error("Export refusé — rôle Manager ou Controller requis");
+      return;
+    }
+    const rowsByTab = {
+      quotations: qtTable.processedData,
+      orders: soTable.processedData,
+      deliveries: dnTable.processedData,
+    } as const;
+    const columnsByTab = {
+      quotations: [
+        { key: "id", header: "Devis" }, { key: "date", header: "Date" },
+        { key: "customer", header: "Client" }, { key: "total", header: "Total XOF" },
+        { key: "validUntil", header: "Valide jusqu'au" }, { key: "status", header: "Statut" },
+      ],
+      orders: [
+        { key: "id", header: "Commande" }, { key: "date", header: "Date" },
+        { key: "customer", header: "Client" }, { key: "qtRef", header: "Devis" },
+        { key: "total", header: "Total XOF" }, { key: "status", header: "Statut" },
+      ],
+      deliveries: [
+        { key: "id", header: "Bon de livraison" }, { key: "date", header: "Date" },
+        { key: "customer", header: "Client" }, { key: "soRef", header: "Commande" },
+        { key: "status", header: "Statut" }, { key: "invoiced", header: "Facturé" },
+      ],
+    };
+    const rows = rowsByTab[activeTab];
+    if (rows.length === 0) {
+      toast.info("Aucune donnée à exporter (vérifiez les filtres)");
+      return;
+    }
+    exportToPDF({
+      filename: `${activeTab}-${dateFrom}-${dateTo}.pdf`,
+      title: activeTab === "quotations" ? "Devis clients" : activeTab === "orders" ? "Commandes de vente" : "Bons de livraison",
+      subtitle: `${rows.length} document(s) · ${filterSummary()}`,
+      columns: columnsByTab[activeTab],
+      rows: rows as unknown as Record<string, unknown>[],
+    });
+  };
+
 
   return (
     <PageShell>
@@ -600,6 +667,17 @@ export default function SalesTransactions() {
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
             )}
             Export CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={handleExportPdf}
+            disabled={!perms?.canExport}
+            aria-label="Exporter l'onglet actif en PDF"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            Export PDF
           </Button>
           {!perms?.canExport && (
             <span id={EXPORT_HINT_ID} className="sr-only">

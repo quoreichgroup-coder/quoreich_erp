@@ -63,9 +63,14 @@ class VentesAchatsDeclencheursIT {
         + " ('00000000-0000-0000-0000-00000000a002', '" + A + "', 'CDE-IT-1', '" + CLIENT + "', '" + ADMIN + "');"
         + "INSERT INTO delivery_notes (tenant_id, dn_number, so_id, customer_id, created_by) VALUES"
         + " ('" + A + "', 'BL-IT-1', '00000000-0000-0000-0000-00000000a002', '" + CLIENT + "', '" + ADMIN + "')");
-    assertThat(count("SELECT count(*) FROM quotations WHERE quote_number = 'DEV-IT-1' AND status = 'sent'")).isEqualTo(1);
-    assertThat(count("SELECT count(*) FROM sales_orders WHERE so_number = 'CDE-IT-1'")).isEqualTo(1);
-    assertThat(count("SELECT count(*) FROM delivery_notes WHERE dn_number = 'BL-IT-1'")).isEqualTo(1);
+    // Depuis V40, le numéro est attribué par la base (série de la société) : on retrouve les pièces
+    // par leur identifiant, et le numéro saisi n'est pas retenu.
+    assertThat(count("SELECT count(*) FROM quotations WHERE id = '00000000-0000-0000-0000-00000000a001'"
+        + " AND status = 'sent' AND quote_number <> 'DEV-IT-1'")).isEqualTo(1);
+    assertThat(count("SELECT count(*) FROM sales_orders WHERE id = '00000000-0000-0000-0000-00000000a002'"
+        + " AND so_number <> 'CDE-IT-1'")).isEqualTo(1);
+    assertThat(count("SELECT count(*) FROM delivery_notes WHERE so_id = '00000000-0000-0000-0000-00000000a002'"
+        + " AND dn_number <> 'BL-IT-1'")).isEqualTo(1);
 
     owner("INSERT INTO period_locks (tenant_id, module, period, status) VALUES ('" + A + "', 'SALES',"
         + " to_char(CURRENT_DATE, 'YYYY-MM'), 'closed')");

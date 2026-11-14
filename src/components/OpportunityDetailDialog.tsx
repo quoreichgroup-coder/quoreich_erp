@@ -17,6 +17,8 @@ import {
   useUpsertOpportunity, useCreateActivity, useDeleteOpportunity,
   useMyCrmRoles, useConvertOpportunityToQuote, useConvertQuoteToSo, useQuoteForOpportunity, useLogCrmExport,
 } from "@/hooks/use-crm-data";
+import { useMySalesRoles } from "@/hooks/use-sales-data";
+import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import {
   CRM_STAGES, STAGE_LABELS, STAGE_DEFAULT_PROBABILITY,
@@ -34,6 +36,8 @@ type Props = {
 
 export default function OpportunityDetailDialog({ opportunityId, open, onClose }: Props) {
   const perms = useMyCrmRoles();
+  const salesPerms = useMySalesRoles();
+  const { data: tenantId } = useTenantId();
   const { data: opps = [] } = useCrmOpportunities();
   const { data: contacts = [] } = useCrmContacts();
   const { data: activities = [] } = useCrmActivities(opportunityId);
@@ -47,17 +51,18 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
   const convert = useConvertOpportunityToQuote();
 
   const { data: customers = [] } = useQuery({
-    queryKey: ["crm-conversion-customers"],
+    queryKey: ["crm-conversion-customers", tenantId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("id,name")
+        .eq("tenant_id", tenantId!)
         .order("name", { ascending: true })
         .limit(500);
       if (error) throw error;
       return (data ?? []) as { id: string; name: string }[];
     },
-    enabled: open,
+    enabled: Boolean(open && tenantId),
   });
 
 
@@ -311,8 +316,10 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
                 <p className="text-[11px] text-muted-foreground">
                   Bon de commande <strong>{quoteBundle.salesOrder.so_number}</strong> — statut {quoteBundle.salesOrder.status}.
                 </p>
-              ) : !perms.canConvert ? (
-                <p className="text-[11px] text-amber-600">Permission CRM `convert` requise.</p>
+              ) : salesPerms.isLoading ? (
+                <p className="text-[11px] text-muted-foreground">Vérification des droits ventes…</p>
+              ) : !salesPerms.data?.canConfirm ? (
+                <p className="text-[11px] text-amber-600">Droit ventes `confirm` requis pour convertir le devis en commande.</p>
               ) : (
                 <Button
                   size="sm"

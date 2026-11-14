@@ -73,10 +73,12 @@ export type CrmRoleAuditRow = {
 
 // ───── Contacts ─────
 export function useCrmContacts(search = "") {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-contacts", search],
+    queryKey: ["crm-contacts", tenantId, search],
+    enabled: !!tenantId,
     queryFn: async () => {
-      let q = supabase.from("crm_contacts" as never).select("*").order("created_at", { ascending: false }).limit(500);
+      let q = supabase.from("crm_contacts" as never).select("*").eq("tenant_id", tenantId!).order("created_at", { ascending: false }).limit(500);
       if (search.trim()) {
         const s = `%${search.trim()}%`;
         q = q.or(`full_name.ilike.${s},email.ilike.${s},company.ilike.${s},phone.ilike.${s}`);
@@ -127,12 +129,15 @@ export function useDeleteContact() {
 
 // ───── Opportunities ─────
 export function useCrmOpportunities() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-opportunities"],
+    queryKey: ["crm-opportunities", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_opportunities" as never)
         .select("*")
+        .eq("tenant_id", tenantId!)
         .order("expected_close_date", { ascending: true, nullsFirst: false })
         .limit(500);
       if (error) throw error;
@@ -199,13 +204,15 @@ export function useDeleteOpportunity() {
 
 // ───── Activities ─────
 export function useCrmActivities(opportunityId: string | null) {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-activities", opportunityId],
-    enabled: !!opportunityId,
+    queryKey: ["crm-activities", tenantId, opportunityId],
+    enabled: Boolean(tenantId && opportunityId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_activities" as never)
         .select("*")
+        .eq("tenant_id", tenantId!)
         .eq("opportunity_id", opportunityId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -229,7 +236,7 @@ export function useCreateActivity() {
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["crm-activities", v.opportunity_id ?? null] });
+      qc.invalidateQueries({ queryKey: ["crm-activities"] });
       toast.success("Activité enregistrée");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -282,12 +289,15 @@ export function useBulkInsertContacts() {
 
 // ───── Reminders (activities with due_at, tenant-wide) ─────
 export function useCrmReminders() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-reminders"],
+    queryKey: ["crm-reminders", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_activities" as never)
         .select("*")
+        .eq("tenant_id", tenantId!)
         .not("due_at", "is", null)
         .order("due_at", { ascending: true })
         .limit(500);
@@ -319,12 +329,15 @@ export function useCompleteActivity() {
 // ───── Stage-change audit (tenant-wide) ─────
 export type CrmStageAuditRow = CrmActivity;
 export function useCrmStageAudit() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-stage-audit"],
+    queryKey: ["crm-stage-audit", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_activities" as never)
         .select("*")
+        .eq("tenant_id", tenantId!)
         .eq("type", "stage_change")
         .order("created_at", { ascending: false })
         .limit(500);
@@ -391,12 +404,15 @@ export function useAssignCrmRole() {
 }
 
 export function useCrmRoleAudit() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["crm-role-audit"],
+    queryKey: ["crm-role-audit", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_role_audit" as never)
         .select("*")
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -481,7 +497,7 @@ export function useLogCrmExport() {
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["crm-activities", v.opportunityId ?? null] });
+      qc.invalidateQueries({ queryKey: ["crm-activities"] });
       qc.invalidateQueries({ queryKey: ["crm-stage-audit"] });
     },
   });
@@ -489,13 +505,15 @@ export function useLogCrmExport() {
 
 // ───── Lecture devis liés à une opportunité ─────
 export function useQuoteForOpportunity(opportunityId: string | null) {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    enabled: !!opportunityId,
-    queryKey: ["crm-opp-quote", opportunityId],
+    enabled: Boolean(tenantId && opportunityId),
+    queryKey: ["crm-opp-quote", tenantId, opportunityId],
     queryFn: async () => {
       const { data: opp, error: e1 } = await supabase
         .from("crm_opportunities" as never)
         .select("converted_quotation_id")
+        .eq("tenant_id", tenantId!)
         .eq("id", opportunityId!)
         .maybeSingle();
       if (e1) throw e1;
@@ -504,6 +522,7 @@ export function useQuoteForOpportunity(opportunityId: string | null) {
       const { data: quote, error: e2 } = await supabase
         .from("quotations")
         .select("id, quote_number, customer_id, quote_date, valid_until, total, status")
+        .eq("tenant_id", tenantId!)
         .eq("id", qid)
         .maybeSingle();
       if (e2) throw e2;

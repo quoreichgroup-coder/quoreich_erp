@@ -23,8 +23,10 @@ import {
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
 import OpportunityDetailDialog from "@/components/OpportunityDetailDialog";
+import { useTenantId } from "@/hooks/use-tenant";
 
 export default function CrmOpportunities() {
+  const { data: tenantId } = useTenantId();
   const perms = useMyCrmRoles();
   const { data: opps = [], isLoading } = useCrmOpportunities();
   const { data: contacts = [] } = useCrmContacts();
@@ -53,12 +55,13 @@ export default function CrmOpportunities() {
     [opps],
   );
   const { data: soSet } = useQuery({
-    queryKey: ["crm-opp-so-ids", quoteIds.sort().join(",")],
-    enabled: quoteIds.length > 0,
+    queryKey: ["crm-opp-so-ids", tenantId, quoteIds.sort().join(",")],
+    enabled: Boolean(tenantId && quoteIds.length > 0),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales_orders")
         .select("quotation_id")
+        .eq("tenant_id", tenantId!)
         .in("quotation_id", quoteIds);
       if (error) throw error;
       return new Set((data ?? []).map((r) => r.quotation_id as string));

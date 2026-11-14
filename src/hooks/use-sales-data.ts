@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
@@ -53,12 +52,15 @@ export type SalesRole = (typeof SALES_ROLES)[number];
 
 // ===== Queries =====
 export function useQuotations() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["quotations"],
+    queryKey: ["quotations", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotations")
         .select("*, customer:customers(name)")
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as Quotation[];
@@ -67,12 +69,15 @@ export function useQuotations() {
 }
 
 export function useSalesOrders() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["sales-orders"],
+    queryKey: ["sales-orders", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales_orders")
         .select("*, customer:customers(name), quotation:quotations(quote_number)")
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as SalesOrder[];
@@ -93,12 +98,15 @@ export function useSoLines(soId?: string) {
 }
 
 export function useDeliveryNotes() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["delivery-notes"],
+    queryKey: ["delivery-notes", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("delivery_notes")
         .select("*, customer:customers(name), sales_order:sales_orders(so_number)")
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as DeliveryNote[];
@@ -176,14 +184,62 @@ export function useUpdateSalesSettings() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("sales_settings")
-        .upsert({ tenant_id: tenantId!, ...updates, updated_at: new Date().toISOString() });
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("tenant_id", tenantId!)
+        .select("tenant_id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Seul un administrateur peut modifier ces paramètres, ou la société n'a pas de configuration.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales-settings"] });
       toast.success("Paramètres enregistrés");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export type SalesNumberingSeries = {
+  tenant_id: string;
+  doc_type: "quotation" | "sales_order" | "delivery_note";
+  prefix: string;
+  format: string;
+  next_number: number;
+  reset_frequency: "yearly" | "never";
+};
+
+export function useSalesNumberingSeries() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["sales-numbering-series", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sales_numbering_series" as never)
+        .select("tenant_id, doc_type, prefix, format, next_number, reset_frequency")
+        .eq("tenant_id", tenantId)
+        .order("doc_type");
+      if (error) throw error;
+      return (data ?? []) as SalesNumberingSeries[];
+    },
+  });
+}
+
+export function useUpdateSalesNumberingSeries() {
+  const qc = useQueryClient();
+  const { data: tenantId } = useTenantId();
+  return useMutation({
+    mutationFn: async (series: Pick<SalesNumberingSeries, "doc_type" | "prefix" | "format" | "reset_frequency">) => {
+      const { error } = await supabase.from("sales_numbering_series" as never)
+        .update({ prefix: series.prefix.trim(), format: series.format.trim(), reset_frequency: series.reset_frequency, updated_at: new Date().toISOString() } as never)
+        .eq("tenant_id", tenantId)
+        .eq("doc_type", series.doc_type);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sales-numbering-series", tenantId] });
+      toast.success("Série de numérotation enregistrée");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -212,19 +268,19 @@ export function useMySalesRoles() {
 // ===== Mutations =====
 export function useCreateQuotation() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: {
       customer_id: string;
-      quote_number: string;
       quote_date: string;
       valid_until: string;
-      total: number;
+      lines: Array<{ description: string; quantity: number; unit_price: number }>;
     }) => {
-      const { error } = await supabase
-        .from("quotations")
-        .insert({ ...input, tenant_id: tenantId!, created_by: user!.id });
+      const { error } = await supabase.rpc("create_sales_quotation" as never, {
+        _customer_id: input.customer_id,
+        _quote_date: input.quote_date,
+        _valid_until: input.valid_until,
+        _lines: input.lines,
+      } as never);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -235,59 +291,24 @@ export function useCreateQuotation() {
   });
 }
 
-export function useUpdateQuotation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; total?: number }) => {
-      const { error } = await supabase.from("quotations").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["quotations"] });
-      toast.success("Devis mis à jour");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
 export function useCreateSalesOrder() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: {
       customer_id: string;
-      so_number: string;
       order_date: string;
-      total: number;
-      quotation_id?: string;
+      lines: Array<{ description: string; quantity: number; unit_price: number }>;
     }) => {
-      const { error } = await supabase.from("sales_orders").insert({
-        ...input,
-        tenant_id: tenantId!,
-        created_by: user!.id,
-        quotation_id: input.quotation_id || null,
-      });
+      const { error } = await supabase.rpc("create_sales_order" as never, {
+        _customer_id: input.customer_id,
+        _order_date: input.order_date,
+        _lines: input.lines,
+      } as never);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales-orders"] });
       toast.success("Commande créée");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function useUpdateSalesOrder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string }) => {
-      const { error } = await supabase.from("sales_orders").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sales-orders"] });
-      toast.success("Commande mise à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });

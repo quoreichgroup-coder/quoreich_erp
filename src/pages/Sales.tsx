@@ -10,16 +10,19 @@ import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGri
 import { useQuotations, useSalesOrders } from "@/hooks/use-sales-data";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantId } from "@/hooks/use-tenant";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 export default function Sales() {
+  const { data: tenantId } = useTenantId();
   const { data: quotes = [], isLoading: lq } = useQuotations();
   const { data: orders = [], isLoading: lo } = useSalesOrders();
   const { data: arInvoices = [], isLoading: li } = useQuery({
-    queryKey: ["ar-invoices-for-sales-dash"],
+    queryKey: ["ar-invoices-for-sales-dash", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("ar_invoices").select("total, amount_paid, status, invoice_date, customer:customers(name)").order("invoice_date", { ascending: false });
+      const { data, error } = await supabase.from("ar_invoices").select("total, amount_paid, status, invoice_date, customer:customers(name)").eq("tenant_id", tenantId!).order("invoice_date", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -30,7 +33,8 @@ export default function Sales() {
   const pendingOrders = orders.filter(o => o.status === "draft" || o.status === "confirmed");
   const quotePipeline = openQuotes.reduce((s, q) => s + Number(q.total), 0);
   const orderPipeline = pendingOrders.reduce((s, o) => s + Number(o.total), 0);
-  const totalRevenue = arInvoices.reduce((s, i: any) => s + Number(i.total), 0);
+  const issuedInvoices = arInvoices.filter((invoice: any) => !["draft", "cancelled"].includes(invoice.status));
+  const totalRevenue = issuedInvoices.reduce((s, i: any) => s + Number(i.total), 0);
   const deliveredOrders = orders.filter(o => o.status === "delivered").length;
   const fulfillmentRate = orders.length > 0 ? Math.round((deliveredOrders / orders.length) * 100) : 0;
   const avgOrderValue = orders.length > 0 ? Math.round(orders.reduce((s, o) => s + Number(o.total), 0) / orders.length) : 0;
@@ -38,7 +42,7 @@ export default function Sales() {
   const kpis = [
     { label: "Open Quotes", value: String(openQuotes.length), icon: FileText, color: "text-primary", change: `${fmt(quotePipeline)} XOF pipeline` },
     { label: "Pending Orders", value: String(pendingOrders.length), icon: ShoppingBag, color: "text-amber-600", change: `${fmt(orderPipeline)} XOF` },
-    { label: "Total Revenue", value: fmt(totalRevenue), sub: "XOF", icon: TrendingUp, color: "text-success", change: `${arInvoices.length} invoices` },
+    { label: "Factures émises", value: fmt(totalRevenue), sub: "XOF", icon: TrendingUp, color: "text-success", change: `${issuedInvoices.length} factures` },
     { label: "Fulfillment Rate", value: `${fulfillmentRate}%`, icon: Truck, color: "text-primary", change: `${deliveredOrders}/${orders.length} delivered` },
     { label: "Avg Order Value", value: fmt(avgOrderValue), sub: "XOF", icon: CreditCard, color: "text-success", change: `${orders.length} orders total` },
     { label: "Total Quotes", value: String(quotes.length), icon: Clock, color: "text-amber-600", change: `${quotes.filter(q => q.status === "accepted" || q.status === "converted").length} accepted` },
@@ -46,19 +50,27 @@ export default function Sales() {
 
   // Revenue by month from AR invoices
   const revenueByMonth = useMemo(() => {
-    const monthMap: Record<string, number> = {};
-    for (const inv of arInvoices as any[]) {
-      const d = new Date(inv.invoice_date);
-      const key = d.toLocaleDateString("en", { month: "short", year: "2-digit" });
-      monthMap[key] = (monthMap[key] || 0) + Number(inv.total);
+    const monthTotals: Record<string, number> = {};
+    for (const inv of issuedInvoices as any[]) {
+      const key = inv.invoice_date.slice(0, 7);
+      monthTotals[key] = (monthTotals[key] || 0) + Number(inv.total);
     }
-    return Object.entries(monthMap).map(([month, revenue]) => ({ month, revenue: Math.round(revenue / 1000) })).slice(-6);
-  }, [arInvoices]);
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date();
+      date.setDate(1);
+      date.setMonth(date.getMonth() - 5 + index);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      return {
+        month: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date),
+        revenue: Math.round((monthTotals[key] || 0) / 1000),
+      };
+    });
+  }, [issuedInvoices]);
 
   // Top customers
   const topCustomers = useMemo(() => {
     const map: Record<string, { revenue: number; orders: number }> = {};
-    for (const inv of arInvoices as any[]) {
+    for (const inv of issuedInvoices as any[]) {
       const name = inv.customer?.name || "Unknown";
       if (!map[name]) map[name] = { revenue: 0, orders: 0 };
       map[name].revenue += Number(inv.total);
@@ -68,7 +80,7 @@ export default function Sales() {
       .map(([name, d]) => ({ name, ...d, avgValue: Math.round(d.revenue / d.orders) }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-  }, [arInvoices]);
+  }, [issuedInvoices]);
 
   if (isLoading) {
     return (
@@ -103,7 +115,7 @@ export default function Sales() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">Revenue Trend (K XOF)</h3>
+          <h3 className="text-sm font-medium text-foreground mb-3">Facturation mensuelle (milliers XOF)</h3>
           <div className="h-52">
             {revenueByMonth.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -111,8 +123,11 @@ export default function Sales() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                   <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid hsl(var(--border))" }} />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Revenue (K XOF)" />
+                  <Tooltip
+                    contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid hsl(var(--border))" }}
+                    formatter={(value: number) => [`${fmt(value)} milliers XOF`, "Factures émises"]}
+                  />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Factures émises" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

@@ -158,8 +158,10 @@ class CalendrierFiscalIT {
   // ─── Outils ───
 
   private static void devisBeta(String date) throws SQLException {
-    asUser(ADMIN_B, "INSERT INTO quotations (tenant_id, quote_number, customer_id, quote_date, created_by) VALUES ('" + B
-        + "', 'DEV-" + date + "', '" + CLIENT_B + "', '" + date + "', auth.uid()) RETURNING id::text");
+    // Depuis V40, un devis se crée par la fonction contrôlée (plus d'écriture directe) ; le contrôle
+    // de période s'y applique de même.
+    asUser(ADMIN_B, "SELECT create_sales_quotation('" + CLIENT_B + "', '" + date + "', '" + date + "'::date + 30,"
+        + " '[{\"description\": \"Article\", \"quantity\": 1, \"unit_price\": 100}]'::jsonb)::text");
   }
 
   private static String asUser(String user, String sql) throws SQLException {
