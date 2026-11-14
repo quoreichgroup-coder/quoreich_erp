@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "63";
+  private static final String DERNIERE_MIGRATION = "64";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -186,7 +186,14 @@ class SchemaMigrationIT {
           "report_lines",
           "report_line_rules",
           "tenant_report_line_accounts",
-          "hr_payroll_settings");
+          "hr_payroll_settings",
+          // V64 — référentiels versionnés et règles de qualité.
+          "framework_versions",
+          "framework_reference_accounts",
+          "framework_keyword_hints",
+          "framework_role_expectations",
+          "framework_quality_rules",
+          "tenant_quality_rules");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -338,7 +345,11 @@ class SchemaMigrationIT {
           // V63 — états par rubriques.
           "report_line_of_account",
           "report_compute",
-          "financial_statement");
+          "financial_statement",
+          // V64 — moteur de qualité générique.
+          "chart_framework",
+          "quality_rule_severity",
+          "framework_reference_of");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -413,6 +424,14 @@ class SchemaMigrationIT {
           "tenant_report_line_accounts/Paramétrage habilité",
           "hr_payroll_settings/Lecture société",
           "hr_payroll_settings/Paramétrage habilité",
+          // V64 — référentiels versionnés et règles de qualité.
+          "framework_versions/Lecture du référentiel",
+          "framework_reference_accounts/Lecture du référentiel",
+          "framework_keyword_hints/Lecture du référentiel",
+          "framework_role_expectations/Lecture du référentiel",
+          "framework_quality_rules/Lecture du référentiel",
+          "tenant_quality_rules/Lecture société",
+          "tenant_quality_rules/Paramétrage habilité",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",

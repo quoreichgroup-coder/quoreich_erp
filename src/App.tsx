@@ -38,6 +38,7 @@ const APControl = lazy(() => import("./pages/APControl"));
 const APSettings = lazy(() => import("./pages/APSettings"));
 const GLTransactions = lazy(() => import("./pages/GLTransactions"));
 const GLMasterData = lazy(() => import("./pages/GLMasterData"));
+const ChartFrameworks = lazy(() => import("./pages/ChartFrameworks"));
 const GLReporting = lazy(() => import("./pages/GLReporting"));
 const GLControl = lazy(() => import("./pages/GLControl"));
 const GLSettings = lazy(() => import("./pages/GLSettings"));
@@ -174,6 +175,7 @@ const App = () => (
               <Route path="/journal" element={<P><JournalEntries /></P>} />
               <Route path="/journal/transactions" element={<P><GLTransactions /></P>} />
               <Route path="/journal/master-data" element={<P><GLMasterData /></P>} />
+              <Route path="/journal/charts" element={<P><ChartFrameworks /></P>} />
               <Route path="/journal/reporting" element={<P><GLReporting /></P>} />
               <Route path="/journal/control" element={<P><GLControl /></P>} />
               <Route path="/journal/settings" element={<P><GLSettings /></P>} />

@@ -118,3 +118,31 @@ test("plan comptable : attributs de compte, historique ; bilan SYSCOHADA équili
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });
+
+// V64 (PC-3) : référentiels versionnés, règles de qualité réglables par société.
+test("plans et référentiels : référentiel appliqué, règle désactivée puis rétablie", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  obs.etape("référentiels");
+  await page.goto("/journal/charts");
+  await expect(page.getByTestId("framework-row").filter({ hasText: "appliqué" })).toContainText("SYSCOHADA");
+  await expect(page.getByTestId("framework-row").filter({ hasText: "PCG" })).toContainText("2025");
+
+  obs.etape("règle de qualité");
+  await page.getByRole("tab", { name: "Règles de qualité" }).click();
+  const interrupteur = page.getByRole("switch", { name: "Activer la règle Doublon d'intitulé" });
+  await expect(interrupteur).toBeChecked();
+  await interrupteur.click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Règle de qualité enregistrée" }).first()).toBeVisible();
+  await expect(interrupteur).not.toBeChecked();
+  await page.goto("/journal/master-data");
+  await expect(page.getByTestId("chart-issues-summary")).not.toHaveText("Analyse…");
+  await expect(page.getByTestId("chart-issue-row").filter({ hasText: "Doublon d'intitulé" })).toHaveCount(0);
+
+  obs.etape("rétablir");
+  await page.goto("/journal/charts?tab=rules");
+  await page.getByTestId("quality-rule-row").filter({ hasText: "Doublon d'intitulé" }).getByRole("button", { name: "Rétablir" }).click();
+  await expect(page.getByRole("switch", { name: "Activer la règle Doublon d'intitulé" })).toBeChecked();
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});

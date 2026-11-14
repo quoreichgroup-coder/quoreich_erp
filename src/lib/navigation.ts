@@ -108,7 +108,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "finance", label: "Comptabilité et finance",
     modules: [
-      { title: "Grand livre", icon: "BookOpen", basePath: "/journal", moduleKey: "General Ledger", items: standard("/journal") },
+      { title: "Grand livre", icon: "BookOpen", basePath: "/journal", moduleKey: "General Ledger", items: standard("/journal", [{ title: "Plans et référentiels", url: "/journal/charts" }]) },
       { title: "Trésorerie", icon: "Wallet", basePath: "/treasury", moduleKey: "Treasury", items: standard("/treasury") },
       { title: "Immobilisations", icon: "Landmark", basePath: "/assets", moduleKey: "Fixed Assets", items: standard("/assets") },
       { title: "Budget et prévisions", icon: "Target", basePath: "/budget", moduleKey: "Budget & Forecast", items: standard("/budget") },

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTaxCodes } from "@/hooks/use-tax-codes";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { useTenantId } from "@/hooks/use-tenant";
+import { useCodePattern } from "@/hooks/use-chart-frameworks";
 import { ACCOUNT_TYPES, POSTING_MODES, ANALYTIC_POLICIES, defaultNormalBalance, validateCustomAttributes, type AttributeDefinition } from "@/lib/gl-account";
 
 /*
@@ -59,6 +60,7 @@ export function GLAccountFormDialog({ open, onClose, account, accounts, mode, on
 }) {
   const { data: taxCodes = [] } = useTaxCodes();
   const { data: defs = [] } = useAttributeDefinitions();
+  const codePattern = useCodePattern();
   const active = defs.filter((d) => d.is_active);
   const [f, setF] = useState<any>(() => account ? { ...account, custom_attributes: account.custom_attributes ?? {} } : {
     code: "", name: "", account_type: "asset", parent_id: null, is_active: true, is_header: false, normal_balance: "debit",
@@ -67,7 +69,7 @@ export function GLAccountFormDialog({ open, onClose, account, accounts, mode, on
   const set = (k: string, v: unknown) => setF((p: any) => ({ ...p, [k]: v }));
   const used = mode === "edit" && (Number(account?.debit_total ?? 0) > 0 || Number(account?.credit_total ?? 0) > 0);
   const attrError = validateCustomAttributes(active, f.custom_attributes ?? {}, f.is_header);
-  const error = !f.code?.trim() || !f.name?.trim() ? "Code et intitulé requis." : !/^[1-9][0-9]*$/.test(f.code.trim()) ? "Code : chiffres uniquement, commençant par la classe." : attrError;
+  const error = !f.code?.trim() || !f.name?.trim() ? "Code et intitulé requis." : codePattern && !codePattern.test(f.code.trim()) ? "Code : format du référentiel non respecté (règle « Format du code de compte »)." : attrError;
 
   const save = () => {
     if (error) return;

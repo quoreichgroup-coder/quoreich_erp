@@ -9,11 +9,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { exportToCSV } from "@/lib/csv-export";
+import { effectiveFramework, useCodePattern, useFrameworks, useOperationalChart } from "@/hooks/use-chart-frameworks";
 
 /*
- * Contrôle SYSCOHADA du plan comptable (V60) : anomalies calculées par la base (code hors plan,
+ * Contrôle du plan comptable (V60, générique depuis V64) : anomalies calculées par la base contre le
+ * référentiel du plan opérationnel, selon les règles de qualité activées pour la société (code hors plan,
  * classe / type, intitulé, doublon, parent, imputation automatique) et corrections non destructives :
- * remplacer par le compte SYSCOHADA (l'ancien reste, désactivé, relié ; imputations redirigées),
+ * remplacer par le compte du référentiel (l'ancien reste, désactivé, relié ; imputations redirigées),
  * reclasser le solde par une écriture OD nouvelle, créer les regroupements, rattacher les sous-comptes.
  */
 type Issue = {
@@ -28,6 +30,12 @@ export function ChartOfAccountsAudit() {
   const qc = useQueryClient();
   const { data: access } = useMyAccess();
   const canFix = (access?.permissions ?? []).includes("accounting.chart");
+  const { data: chart } = useOperationalChart();
+  const { data: fw } = useFrameworks();
+  const framework = fw?.frameworks.find((f) => f.code === effectiveFramework(chart));
+  const label = framework?.short_label ?? framework?.name ?? "du référentiel";
+  const codePattern = useCodePattern();
+  const codeOk = (c: string) => c.length > 0 && (!codePattern || codePattern.test(c));
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ["chart-issues"],
     queryFn: async () => {
@@ -53,15 +61,15 @@ export function ChartOfAccountsAudit() {
   const count = (s: string) => issues.filter((i) => i.severity === s).length;
 
   return (
-    <section aria-label="Contrôle SYSCOHADA du plan comptable" className="card-elevated p-4 space-y-3">
+    <section aria-label="Contrôle du plan comptable" className="card-elevated p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h2 className="text-sm font-semibold">Contrôle SYSCOHADA du plan comptable</h2>
+          <h2 className="text-sm font-semibold">Contrôle {label} du plan comptable</h2>
           <p className="text-xs text-muted-foreground" data-testid="chart-issues-summary">
             {isLoading ? "Analyse…" : issues.length === 0 ? "Aucune anomalie : plan conforme au référentiel."
               : `${count("error")} erreur(s), ${count("warning")} point(s) à revoir, ${count("info")} information(s)`}
           </p>
-          <p className="text-[11px] text-muted-foreground">Référentiel SYSCOHADA révisé intégré, à valider par l'expert-comptable. Aucun compte n'est supprimé ; aucune écriture passée n'est modifiée.</p>
+          <p className="text-[11px] text-muted-foreground">Référentiel {framework ? `${framework.name}${chart?.framework_version ? ` (version ${chart.framework_version})` : ""}` : "…"}{framework && !framework.is_validated ? ", à valider par l'expert-comptable" : ""}. Règles : Grand livre → Plans et référentiels. Aucun compte n'est supprimé ; aucune écriture passée n'est modifiée.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {canFix && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={run.isPending}
@@ -106,12 +114,12 @@ export function ChartOfAccountsAudit() {
             <DialogHeader>
               <DialogTitle className="text-sm">Remplacer le compte {replace.code} « {replace.name} »</DialogTitle>
               <DialogDescription className="text-xs">
-                Le compte SYSCOHADA est créé (ou repris s'il existe), les imputations automatiques y sont redirigées, et l'ancien compte est
+                Le compte du référentiel est créé (ou repris s'il existe), les imputations automatiques y sont redirigées, et l'ancien compte est
                 conservé, désactivé et relié à son remplaçant. {replace.lines > 0 ? `Il porte ${replace.lines} ligne(s) d'écriture : leur solde pourra être reclassé ensuite par une écriture OD.` : "Il n'a aucune écriture."}
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5"><Label className="text-xs" htmlFor="repl-code">Code SYSCOHADA</Label>
+              <div className="space-y-1.5"><Label className="text-xs" htmlFor="repl-code">Code {label}</Label>
                 <Input id="repl-code" className="h-8 text-xs font-mono" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.trim() })} /></div>
               <div className="col-span-2 space-y-1.5"><Label className="text-xs" htmlFor="repl-name">Intitulé</Label>
                 <Input id="repl-name" className="h-8 text-xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
@@ -122,9 +130,9 @@ export function ChartOfAccountsAudit() {
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => setReplace(null)}>Annuler</Button>
-              <Button size="sm" disabled={!/^[1-9][0-9]*$/.test(form.code) || run.isPending}
+              <Button size="sm" disabled={!codeOk(form.code) || run.isPending}
                 onClick={() => run.mutate({ fn: "replace_gl_account", args: { _account_id: replace.account_id, _new_code: form.code, _new_name: form.name, _new_type: form.type },
-                  ok: `Compte ${replace.code} remplacé par ${form.code}` }, { onSuccess: () => { const i = replace; setReplace(null); if (i.lines > 0) { setReclass(i); setReason("Mise en conformité SYSCOHADA"); } } })}>
+                  ok: `Compte ${replace.code} remplacé par ${form.code}` }, { onSuccess: () => { const i = replace; setReplace(null); if (i.lines > 0) { setReclass(i); setReason(`Mise en conformité ${label}`); } } })}>
                 Remplacer
               </Button>
             </DialogFooter>

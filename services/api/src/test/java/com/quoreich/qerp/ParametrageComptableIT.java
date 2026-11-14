@@ -155,7 +155,7 @@ class ParametrageComptableIT {
   @Test
   @DisplayName("un référentiel inconnu est refusé ; les référentiels sont en lecture seule")
   void referentielInconnuEtLectureSeule() throws Exception {
-    assertThatThrownBy(() -> asUser(ALPHA_ADMIN, "SELECT apply_accounting_framework('PCG_FR')::text"))
+    assertThatThrownBy(() -> asUser(ALPHA_ADMIN, "SELECT apply_accounting_framework('INCONNU')::text"))
         .hasMessageContaining("Référentiel comptable inconnu");
     assertThat(asUser(ALPHA_ADMIN, "SELECT count(*)::text FROM posting_roles")).isEqualTo("15"); // + CUSTOMER_ADVANCE (V49), INVENTORY et STOCK_VARIATION (V51), PAYROLL_* (V63)
     assertThatThrownBy(

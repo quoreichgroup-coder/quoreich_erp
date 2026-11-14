@@ -73,7 +73,7 @@ class PlanComptableSyscohadaIT {
     assertThat(asUser(ADMIN_B, "UPDATE gl_accounts SET name = 'Ventes de marchandises V60' WHERE id = '" + vente + "' RETURNING name"))
         .as("l'intitulé reste modifiable").isEqualTo("Ventes de marchandises V60");
     assertThatThrownBy(() -> asUser(ADMIN_B, "INSERT INTO gl_accounts (tenant_id, code, name, account_type) VALUES ('" + B + "', 'ABC', 'x', 'asset') RETURNING id::text"))
-        .hasMessageContaining("chiffres uniquement");
+        .hasMessageContaining("format du référentiel");
     assertThatThrownBy(() -> asUser(ADMIN_B, "INSERT INTO gl_accounts (tenant_id, code, name, account_type) VALUES ('" + B + "', '9', 'x', 'bizarre') RETURNING id::text"))
         .hasMessageContaining("account_type_check");
     String tete = asUser(ADMIN_B, "INSERT INTO gl_accounts (tenant_id, code, name, account_type, is_header) VALUES ('" + B + "', '52" + suffixe
