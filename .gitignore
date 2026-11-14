@@ -64,3 +64,6 @@ playwright-report-parcours/
 test-results-parcours/
 playwright-report-sur-site/
 test-results-sur-site/
+# Exécutions isolées des parcours (copies .tmp_*, sorties séparées)
+playwright-report-*/
+test-results-*/

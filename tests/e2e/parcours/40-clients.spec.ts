@@ -165,6 +165,33 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await expect(vueAvoir).toBeHidden();
   await fermerPanneau(page);
 
+  // Le livre auxiliaire clients : relevé du compte du client.
+  obs.etape("relevé de compte client : facture, encaissements, annulation, avoir, solde");
+  await page.getByRole("button", { name: "Relevé de compte" }).click();
+  const releve = page.getByRole("dialog", { name: "Relevé de compte client" });
+  await releve.getByLabel("Client").selectOption({ label: client });
+  await expect(releve.getByRole("region", { name: "Lignes" })).toContainText(numero);
+  await expect(releve.getByRole("region", { name: "Lignes" })).toContainText("Annulation d'encaissement");
+  await expect(releve.getByRole("region", { name: "Lignes" })).toContainText("Avoir sur");
+  await expect(releve.getByRole("region", { name: "Pied" }), "168 000 − 100 000 − 68 000 + 68 000 − 18 000").toContainText("50 000");
+  const relevePdf = page.waitForEvent("download");
+  await releve.getByTestId("btn-document-pdf").click();
+  expect((await relevePdf).suggestedFilename()).toMatch(/^releve-.*\.pdf$/);
+  await page.keyboard.press("Escape");
+
+  // Ces pièces se retrouvent au grand livre, avec journal, numéro de pièce et lot (V38).
+  obs.etape("grand livre → transactions : écritures de la facture, des encaissements et de l'avoir");
+  await page.goto("/journal/transactions");
+  await page.getByLabel("Rechercher une écriture").fill(numero);
+  const ecritures = page.getByTestId("gl-entry-row");
+  await expect(ecritures.filter({ hasText: "Facture client" })).toHaveCount(1);
+  await expect(ecritures.filter({ hasText: "Avoir client" })).toHaveCount(1);
+  await ecritures.filter({ hasText: "Facture client" }).click();
+  const detailEcriture = page.getByRole("dialog", { name: /^Écriture VT-/ });
+  await expect(detailEcriture.getByRole("region", { name: "Lignes" })).toContainText("411");
+  await expect(detailEcriture.getByRole("region", { name: "Pied" })).toContainText("168 000");
+  await page.keyboard.press("Escape");
+
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

@@ -403,6 +403,41 @@ export function useCreateOrderFromQuote() {
   });
 }
 
+/** V46 : modifier / supprimer un devis ou une commande tant qu'ils ne sont pas engagés. */
+type SalesLineInput = { description: string; quantity: number; unit_price: number; discount_pct?: number; tax_code_id?: string | null };
+
+function salesMutation<T>(fn: (input: T) => Promise<void>, success: string, keys: string[]) {
+  return function useIt() {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: fn,
+      onSuccess: () => {
+        for (const k of keys) qc.invalidateQueries({ queryKey: [k] });
+        toast.success(success);
+      },
+      onError: (e: Error) => toast.error(e.message),
+    });
+  };
+}
+
+const rpc = async (name: string, args: Record<string, unknown>) => {
+  const { error } = await (supabase as any).rpc(name, args);
+  if (error) throw error;
+};
+
+export const useUpdateQuotation = salesMutation(
+  (i: { id: string; customer_id: string; quote_date: string; valid_until: string; lines: SalesLineInput[] }) =>
+    rpc("update_sales_quotation", { _quote_id: i.id, _customer_id: i.customer_id, _quote_date: i.quote_date, _valid_until: i.valid_until, _lines: i.lines }),
+  "Devis modifié", ["quotations", "quote-lines"]);
+export const useDeleteQuotation = salesMutation(
+  (id: string) => rpc("delete_sales_quotation", { _quote_id: id }), "Devis supprimé", ["quotations"]);
+export const useUpdateSalesOrder = salesMutation(
+  (i: { id: string; order_date: string; lines: SalesLineInput[] }) =>
+    rpc("update_sales_order", { _so_id: i.id, _order_date: i.order_date, _lines: i.lines }),
+  "Commande modifiée", ["sales-orders", "so-lines"]);
+export const useDeleteSalesOrder = salesMutation(
+  (id: string) => rpc("delete_sales_order", { _so_id: id }), "Commande supprimée", ["sales-orders", "quotations", "quote-lines"]);
+
 // ===== Secured RPCs =====
 export function useConvertQuoteToSO() {
   const qc = useQueryClient();

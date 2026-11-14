@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "45";
+  private static final String DERNIERE_MIGRATION = "47";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -209,7 +209,14 @@ class SchemaMigrationIT {
           // V44 — commande depuis les lignes d'un devis.
           "create_sales_order_from_quote",
           // V45 — avoirs clients.
-          "create_ar_credit_note");
+          "create_ar_credit_note",
+          // V46 — modifier / supprimer devis et commandes non engagés.
+          "update_sales_quotation",
+          "delete_sales_quotation",
+          "update_sales_order",
+          "delete_sales_order",
+          // V47 — identité légale de la société.
+          "set_company_identity");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(

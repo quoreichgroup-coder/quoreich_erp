@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -64,6 +64,10 @@ import {
   useDnLines,
   useCustomerExposure,
   useCreateOrderFromQuote,
+  useUpdateQuotation,
+  useDeleteQuotation,
+  useUpdateSalesOrder,
+  useDeleteSalesOrder,
   type SalesLine,
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
@@ -211,6 +215,96 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
           emptyLines="Chargement des lignes…" />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ──────── MODIFIER UN DEVIS OU UNE COMMANDE LIBRE (V46) ──────── */
+type EditTarget = { kind: "qt"; doc: any } | { kind: "so"; doc: any } | null;
+
+function EditSalesDocDialog({ target, onClose }: { target: EditTarget; onClose: () => void }) {
+  const { data: customers = [] } = useCustomers();
+  const { data: taxCodes = [] } = useTaxCodes();
+  const qtLines = useQuoteLines(target?.kind === "qt" ? target.doc.id : undefined);
+  const soLines = useSoLines(target?.kind === "so" ? target.doc.id : undefined);
+  const updQ = useUpdateQuotation();
+  const updO = useUpdateSalesOrder();
+  const [form, setForm] = useState({ customer_id: "", date: "", valid_until: "" });
+  const [lines, setLines] = useState<DraftLine[] | null>(null);
+  const source = (target?.kind === "qt" ? qtLines.data : soLines.data) as SalesLine[] | undefined;
+  useEffect(() => {
+    if (!target) { setLines(null); return; }
+    setForm({
+      customer_id: target.doc.customer_id,
+      date: target.kind === "qt" ? target.doc.quote_date : target.doc.order_date,
+      valid_until: target.kind === "qt" ? target.doc.valid_until ?? "" : "",
+    });
+  }, [target]);
+  useEffect(() => {
+    if (target && source && lines === null) {
+      setLines(source.map((l) => ({
+        description: l.description, quantity: String(l.quantity), unitPrice: String(l.unit_price),
+        discountPct: Number(l.discount_pct) ? String(Number(l.discount_pct)) : "", taxCodeId: l.tax_code_id ?? "",
+      })));
+    }
+  }, [target, source, lines]);
+  if (!target) return null;
+  const current = lines ?? [];
+  const { allValid } = invoiceTotals(current, taxCodes);
+  const pending = updQ.isPending || updO.isPending;
+  const title = target.kind === "qt" ? `Modifier le devis ${target.doc.quote_number}` : `Modifier la commande ${target.doc.so_number}`;
+  const save = async () => {
+    if (!allValid) { toast.error("Complétez chaque ligne (désignation, quantité, prix, remise 0–100 %)"); return; }
+    if (target.kind === "qt") {
+      await updQ.mutateAsync({ id: target.doc.id, customer_id: form.customer_id, quote_date: form.date,
+        valid_until: form.valid_until, lines: toSalesLines(current) });
+    } else {
+      await updO.mutateAsync({ id: target.doc.id, order_date: form.date, lines: toSalesLines(current) });
+    }
+    setLines(null);
+    onClose();
+  };
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) { setLines(null); onClose(); } }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="edit-customer">Client</Label>
+              <select id="edit-customer" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+                value={form.customer_id} disabled={target.kind === "so"}
+                onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value }))}>
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="edit-date">Date</Label>
+              <Input id="edit-date" type="date" className="h-8 text-xs" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+            </div>
+            {target.kind === "qt" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="edit-validity">Validité</Label>
+                <Input id="edit-validity" type="date" className="h-8 text-xs" value={form.valid_until} onChange={(e) => setForm((f) => ({ ...f, valid_until: e.target.value }))} />
+              </div>
+            )}
+          </div>
+          {lines === null ? (
+            <p className="text-xs text-muted-foreground">Chargement des lignes…</p>
+          ) : (
+            <>
+              <CommercialLinesEditor lines={current} onChange={setLines} taxCodes={taxCodes} testId="sales-lines" linePrefix="sales-line" />
+              <CommercialTotals lines={current} taxCodes={taxCodes} testId="sales-totals" />
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => { setLines(null); onClose(); }}>Annuler</Button>
+          <Button size="sm" className="text-xs" disabled={pending || lines === null} onClick={save}>
+            {pending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Enregistrer"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -535,6 +629,9 @@ export default function SalesTransactions() {
   const canOverride = (myAccess?.permissions ?? []).includes("sales.credit_override");
   const [deliverSoId, setDeliverSoId] = useState<string | null>(null);
   const [salesView, setSalesView] = useState<SalesView>(null);
+  const [editTarget, setEditTarget] = useState<EditTarget>(null);
+  const deleteQuote = useDeleteQuotation();
+  const deleteOrder = useDeleteSalesOrder();
   const [confirmInvoiceDnId, setConfirmInvoiceDnId] = useState<string | null>(null);
 
   // Global filters: période + client + onglet actif (pour export CSV)
@@ -958,6 +1055,14 @@ export default function SalesTransactions() {
                           </Badge>
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-1">
+                          {perms?.canCreate && ["draft", "sent", "accepted"].includes(q.status) && (
+                            <>
+                              <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditTarget({ kind: "qt", doc: q.raw })}>Modifier</Button>
+                              <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={deleteQuote.isPending}
+                                onClick={() => { if (window.confirm(`Supprimer le devis ${q.id} ?`)) deleteQuote.mutate(q.quoteId); }}>Supprimer</Button>
+                            </>
+                          )}
                           {q.status !== "converted" && q.status !== "expired" ? (
                             canConfirm ? (
                               <Button
@@ -978,6 +1083,7 @@ export default function SalesTransactions() {
                           ) : (
                             <span className="text-[10px] text-muted-foreground">—</span>
                           )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1060,6 +1166,15 @@ export default function SalesTransactions() {
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1">
+                            {so.status === "draft" && perms?.canCreate && (
+                              <>
+                                {!so.raw.quotation_id && (
+                                  <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditTarget({ kind: "so", doc: so.raw })}>Modifier</Button>
+                                )}
+                                <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={deleteOrder.isPending}
+                                  onClick={() => { if (window.confirm(`Supprimer la commande ${so.id} ?` + (so.raw.quotation_id ? " Les quantités reviennent au devis." : ""))) deleteOrder.mutate(so.soId); }}>Supprimer</Button>
+                              </>
+                            )}
                             {so.status === "draft" &&
                               (canConfirm ? (
                                 <Button
@@ -1232,6 +1347,7 @@ export default function SalesTransactions() {
       <CreateOrderDialog open={showNewOrder} onClose={() => setShowNewOrder(false)} />
       <DeliverDialog soId={deliverSoId} onClose={() => setDeliverSoId(null)} />
       <SalesDocDialog view={salesView} onClose={() => setSalesView(null)} />
+      <EditSalesDocDialog target={editTarget} onClose={() => setEditTarget(null)} />
 
       <AlertDialog open={!!confirmConvertId} onOpenChange={(o) => !o && setConfirmConvertId(null)}>
         <AlertDialogContent>

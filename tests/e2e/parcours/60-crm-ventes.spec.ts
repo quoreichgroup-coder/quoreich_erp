@@ -34,8 +34,11 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
 
   obs.etape("créer une opportunité CRM et vérifier les exports");
   await page.goto("/crm/opportunities");
-  page.once("dialog", (dialog) => dialog.accept(opportunity));
   await page.getByRole("button", { name: "Nouvelle", exact: true }).click();
+  const createDialog = page.getByRole("dialog");
+  await createDialog.locator("#crm-opportunity-name").fill(opportunity);
+  await createDialog.getByRole("button", { name: "Créer l’opportunité" }).click();
+  await expect(createDialog).toBeHidden();
   await expect(page.getByText(opportunity, { exact: true })).toBeVisible();
   const crmCsv = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV", exact: true }).click();
@@ -89,12 +92,22 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await page.getByRole("button", { name: "Exporter l'onglet actif en PDF" }).click();
   await verifierPdf(await quotePdf, /quotations-.*\.pdf/);
 
+  const numeroDevis = (await quoteRow.locator("td").first().innerText()).trim();
+
+  // V46 : un devis non encore commandé se modifie.
+  obs.etape("modifier le devis (libellé d'une ligne)");
+  await quoteRow.getByRole("button", { name: "Modifier" }).click();
+  const edition = page.getByRole("dialog", { name: `Modifier le devis ${numeroDevis}` });
+  await expect(edition.getByLabel("Libellé ligne 2")).toHaveValue("Frais de dossier");
+  await edition.getByLabel("Libellé ligne 2").fill("Frais de dossier et déplacement");
+  await edition.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(edition).toBeHidden();
+
   // Vue d'une pièce : clic sur la ligne → en-tête, lignes, pied ; exporter et imprimer.
   obs.etape("détail du devis : lignes, pied, export et impression");
-  const numeroDevis = (await quoteRow.locator("td").first().innerText()).trim();
   await quoteRow.click();
   const vue = page.getByRole("dialog", { name: `Devis ${numeroDevis}` });
-  await expect(vue.getByRole("region", { name: "Lignes" })).toContainText("Frais de dossier");
+  await expect(vue.getByRole("region", { name: "Lignes" }), "modification enregistrée").toContainText("Frais de dossier et déplacement");
   await expect(vue.getByRole("region", { name: "Lignes" })).toContainText("10 %");
   await expect(vue.getByRole("region", { name: "Pied" })).toContainText("125 000");
   const devisCsv = page.waitForEvent("download");

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
+import { CompanyIdentityPanel } from "@/components/CompanyIdentityPanel";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { HelpIcon } from "@/components/HelpIcon";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -11,8 +12,7 @@ import {
   CalendarDays, BookOpen, Receipt, CreditCard, GitBranch, Users, ShieldCheck,
   Plus, Pencil, Search, ChevronDown, ChevronRight, Trash2, Check, X,
   Clock, AlertTriangle, ArrowUp, Eye, FileText, Download, Play, UserMinus, RefreshCw,
-  Zap, Shield, Hash, Bot, Landmark, Layers,
-} from "lucide-react";
+  Zap, Shield, Hash, Bot, Landmark, Layers, Building2 } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
 import { TaxCodesPanel } from "@/components/TaxCodesPanel";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 // ── Tabs ────────────────────────────────────────────────────────────────────
 
 const tabs = [
+  { id: "company", label: "Société", icon: Building2 },
   { id: "fiscal", label: "Exercices et périodes", icon: CalendarDays },
   { id: "accounts", label: "Chart of Accounts", icon: BookOpen },
   { id: "posting", label: "Comptabilisation", icon: Landmark },
@@ -285,6 +286,7 @@ const Settings = () => {
         <div className="flex-1">
           {/* ── Fiscal Years ── */}
           {/* ── Exercices et périodes (calendrier fiscal central, V33) ── */}
+          {activeTab === "company" && <CompanyIdentityPanel />}
           {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
 
           {/* ── Chart of Accounts ── */}

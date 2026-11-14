@@ -26,6 +26,7 @@ import {
 } from "@/hooks/use-ar-data";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { CreditNoteDialog, CreditNotesList } from "@/components/ARCreditNotes";
+import { CustomerStatementDialog } from "@/components/CustomerStatement";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
@@ -368,6 +369,7 @@ export default function ARTransactions() {
   const [settlementOpen, setSettlementOpen] = useState(false);
   const [paymentInv, setPaymentInv] = useState<ARInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const statusOptions = ["all", "draft", "sent", "partially_paid", "paid", "overdue"];
   const { data: access } = useMyAccess();
@@ -442,6 +444,7 @@ export default function ARTransactions() {
         <div className="flex items-center gap-2">
           {isWriter && <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>}
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
+          <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setStatementOpen(true)}><BookOpen className="w-3.5 h-3.5" /> Relevé de compte</Button>
           <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={handleExport}><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
       </div>
@@ -530,6 +533,7 @@ export default function ARTransactions() {
 
       {/* Dialogs */}
       <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
+      <CustomerStatementDialog open={statementOpen} onClose={() => setStatementOpen(false)} />
 
       {selectedInv && (
         <InvoicePanel

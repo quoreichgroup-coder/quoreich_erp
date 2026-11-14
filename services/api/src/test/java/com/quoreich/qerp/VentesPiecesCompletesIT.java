@@ -163,6 +163,60 @@ class VentesPiecesCompletesIT {
         .hasMessageContaining("plus de ligne à commander");
   }
 
+  @Test
+  @DisplayName("V46 — devis et commande modifiables et supprimables tant qu'ils ne sont pas engagés")
+  void modificationDesPieces() throws SQLException {
+    String devis = devis("CURRENT_DATE + 30");
+    asUser(ADMIN, "SELECT update_sales_quotation('" + devis + "', '" + CLIENT + "', CURRENT_DATE, CURRENT_DATE + 15,"
+        + " '[{\"description\":\"Conseil révisé\",\"quantity\":3,\"unit_price\":40000}]'::jsonb)::text");
+    assertThat(texte("SELECT total::text || ' ' || (valid_until - quote_date)::text || ' '"
+            + " || (SELECT string_agg(description, ',') FROM quote_lines WHERE quotation_id = q.id) FROM quotations q WHERE id = '" + devis + "'"))
+        .isEqualTo("120000.00 15 Conseil révisé");
+
+    // Commande reprise du devis : le devis ne se modifie plus ; supprimer la commande le libère.
+    String ligne = texte("SELECT id::text FROM quote_lines WHERE quotation_id = '" + devis + "'");
+    String commande = asUser(ADMIN, "SELECT create_sales_order_from_quote('" + devis + "', '[{\"quote_line_id\":\"" + ligne
+        + "\",\"quantity\":1}]'::jsonb)::text");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT update_sales_quotation('" + devis + "', '" + CLIENT
+            + "', CURRENT_DATE, CURRENT_DATE + 15, '[{\"description\":\"X\",\"quantity\":1,\"unit_price\":1}]'::jsonb)::text"))
+        .hasMessageContaining("ne se modifie plus");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT delete_sales_quotation('" + devis + "')::text"))
+        .hasMessageContaining("ne se supprime pas");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT update_sales_order('" + commande + "', CURRENT_DATE,"
+            + " '[{\"description\":\"X\",\"quantity\":1,\"unit_price\":1}]'::jsonb)::text"))
+        .hasMessageContaining("reprise du devis");
+    asUser(ADMIN, "SELECT delete_sales_order('" + commande + "')::text");
+    assertThat(texte("SELECT q.status || ' ' || ql.quantity_ordered::text FROM quotations q JOIN quote_lines ql"
+            + " ON ql.quotation_id = q.id WHERE q.id = '" + devis + "'"))
+        .isEqualTo("sent 0");
+    asUser(ADMIN, "SELECT delete_sales_quotation('" + devis + "')::text");
+    assertThat(texte("SELECT count(*)::text FROM quotations WHERE id = '" + devis + "'")).isEqualTo("0");
+
+    // Commande libre : modifiable en brouillon, figée une fois confirmée.
+    String libre = asUser(ADMIN, "SELECT create_sales_order('" + CLIENT + "', CURRENT_DATE,"
+        + " '[{\"description\":\"Libre\",\"quantity\":1,\"unit_price\":1000}]'::jsonb)::text");
+    asUser(ADMIN, "SELECT update_sales_order('" + libre + "', CURRENT_DATE, '[{\"description\":\"Libre\",\"quantity\":2,"
+        + "\"unit_price\":1000,\"discount_pct\":50}]'::jsonb)::text");
+    assertThat(texte("SELECT total::text FROM sales_orders WHERE id = '" + libre + "'")).isEqualTo("1000.00");
+    asUser(ADMIN, "SELECT confirm_so('" + libre + "')::text");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT delete_sales_order('" + libre + "')::text"))
+        .hasMessageContaining("brouillon");
+  }
+
+  @Test
+  @DisplayName("V47 — identité légale de la société : l'administrateur seul la renseigne")
+  void identiteLegale() throws SQLException {
+    assertThatThrownBy(() -> asUser(CONTROLEUR, "SELECT set_company_identity('{\"rccm\":\"BF-OUA-01\"}'::jsonb)::text"))
+        .hasMessageContaining("Droit insuffisant");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT set_company_identity('{\"email\":\"pas-une-adresse\"}'::jsonb)::text"))
+        .hasMessageContaining("invalide");
+    asUser(ADMIN, "SELECT set_company_identity('{\"legal_name\":\"Alpha SA\",\"rccm\":\"BF-OUA-2026-B-0001\","
+        + "\"tax_id\":\"00012345X\",\"tax_regime\":\"RNI\",\"tax_office\":\"DME Centre\"}'::jsonb)::text");
+    assertThat(texte("SELECT legal_name || ' ' || rccm || ' ' || tax_id || ' ' || tax_regime || ' ' || tax_office"
+            + " FROM tenants WHERE id = '" + A + "'"))
+        .isEqualTo("Alpha SA BF-OUA-2026-B-0001 00012345X RNI DME Centre");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {

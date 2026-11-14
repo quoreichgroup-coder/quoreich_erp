@@ -2,7 +2,10 @@ import { isValidElement, type ReactNode } from "react";
 import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportToCSV } from "@/lib/csv-export";
-import { exportToPDF } from "@/lib/pdf-export";
+import { printDocumentPDF, type CompanyIdentity } from "@/lib/document-pdf";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchTenantId } from "@/hooks/use-tenant";
+import { isApiEnabled } from "@/api/client";
 
 export type DetailColumn = { label: string; align?: "left" | "right" };
 
@@ -45,12 +48,28 @@ function exporter(kind: "csv" | "pdf", title: string, fileName: string, header: 
       keys.map((k, i) => ({ key: k, header: columns[i].label })), fileName);
     return;
   }
-  void exportToPDF({
-    filename: fileName, title, orientation: "portrait",
-    subtitle: header.map(([l, v]) => `${l} : ${texte(v) || "—"}`).join("   ·   "),
-    columns: keys.map((k, i) => ({ key: k, header: columns[i].label })),
-    rows: [...data, ...extra(footer.map(([l, v]) => [l, v]))],
-  });
+  void (async () => {
+    void printDocumentPDF({
+      title, fileName, company: await companyIdentity(),
+      header: header.map(([l, v]) => [l, texte(v)]),
+      columns,
+      rows: rows.map((r) => columns.map((_, i) => texte(r[i]))),
+      footer: footer.map(([l, v, strong]) => [l, texte(v), strong]),
+    });
+  })();
+}
+
+/** Identité légale de la société (V47) pour l'en-tête imprimé ; sans elle, mentions « à renseigner ». */
+async function companyIdentity(): Promise<CompanyIdentity | null> {
+  if (isApiEnabled()) return null;
+  try {
+    const tenantId = await fetchTenantId();
+    const { data } = await (supabase as any).from("tenants")
+      .select("name, legal_name, address, phone, email, rccm, tax_id, tax_regime, tax_office, bank_details").eq("id", tenantId).single();
+    return (data as CompanyIdentity) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Aucune ligne.", title, fileName }: {
