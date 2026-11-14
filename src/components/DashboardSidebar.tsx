@@ -50,7 +50,9 @@ function CollapsibleModule({ module }: { module: NavModule }) {
               key={item.url}
               to={item.url}
               end
-              className="block px-3 py-1.5 text-[12px] text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 rounded transition-colors"
+              className={cn("block px-3 py-1.5 text-[12px] text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 rounded transition-colors",
+                // Onglets de Transactions répartis sur plusieurs pages : l'entrée reste allumée.
+                item.also?.includes(location.pathname) && "text-sidebar-accent-foreground bg-sidebar-accent font-medium")}
               activeClassName="text-sidebar-accent-foreground bg-sidebar-accent font-medium"
             >
               {item.title}

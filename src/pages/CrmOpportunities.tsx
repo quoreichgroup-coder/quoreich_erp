@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from "react";
+import { TransactionTabsBar } from "@/components/TransactionTabsBar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/PageShell";
@@ -187,7 +188,8 @@ export default function CrmOpportunities() {
   return (
     <PageShell>
       <div className="space-y-3">
-        <Breadcrumb items={[{ label: "CRM", href: "/crm" }, { label: "Opportunités" }]} />
+        <Breadcrumb items={[{ label: "CRM", href: "/crm" }, { label: "Transactions" }, { label: "Opportunités" }]} />
+        <TransactionTabsBar module="/crm" />
         <GuidanceBanner
           title="Pipeline des opportunités"
           description="Glissez-déposez une carte pour changer son étape (action soumise au RBAC). Cliquez pour voir le détail."

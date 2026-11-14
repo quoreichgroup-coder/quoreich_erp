@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TransactionTabsBar } from "@/components/TransactionTabsBar";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -39,7 +40,8 @@ export default function HrTransactions() {
   return (
     <PageShell>
       <div className="space-y-3">
-        <Breadcrumb items={[{ label: "RH / Paie", href: "/hr" }, { label: "Saisie paie" }]} />
+        <Breadcrumb items={[{ label: "RH et paie", href: "/hr" }, { label: "Transactions" }, { label: "Saisie de paie" }]} />
+        <TransactionTabsBar module="/hr" />
         <GuidanceBanner
           title="Saisie de la paie"
           description="Créer un cycle mensuel, générer les lignes par employé, soumettre à approbation puis à comptabilisation."

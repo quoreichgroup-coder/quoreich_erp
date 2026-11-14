@@ -13,6 +13,8 @@ const allUrls = NAV_SECTIONS.flatMap((s) => [
   ...(s.links ?? []).map((l) => l.url),
   ...(s.modules ?? []).flatMap((m) => m.items.map((i) => i.url)),
 ]);
+// Pages atteintes par les onglets de Transactions (standard de présentation) : toujours accessibles.
+const tabUrls = NAV_SECTIONS.flatMap((s) => (s.modules ?? []).flatMap((m) => m.items.flatMap((i) => i.also ?? [])));
 
 describe("navigation principale", () => {
   it("sections dans l'ordre des processus, administration en dernier", () => {
@@ -23,7 +25,7 @@ describe("navigation principale", () => {
   });
 
   it("chaque lien mène à une route déclarée dans App.tsx", () => {
-    const missing = allUrls.map((u) => u.split("?")[0]).filter((path) => !routes.has(path));
+    const missing = [...allUrls, ...tabUrls].map((u) => u.split("?")[0]).filter((path) => !routes.has(path));
     expect(missing).toEqual([]);
   });
 
@@ -35,7 +37,7 @@ describe("navigation principale", () => {
       "/reports", "/admin/modules", "/admin/import", "/audit/projects", "/settings?tab=audit", "/settings",
       "/settings?tab=roles", "/docs",
     ];
-    expect(anciennes.filter((u) => !allUrls.includes(u))).toEqual([]);
+    expect(anciennes.filter((u) => !allUrls.includes(u) && !tabUrls.includes(u))).toEqual([]);
   });
 
   it("chaque module suit le standard de présentation (Tableau de bord, Transactions, Données de base, Rapports, Contrôle … Paramètres)", () => {

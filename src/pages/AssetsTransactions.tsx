@@ -1,3 +1,5 @@
+import { useSearchParams } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -44,6 +46,8 @@ function useDepreciationEntries() {
 
 export default function AssetsTransactions() {
   const perms = useMyFixedAssetRoles();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "posting" ? "posting" : "documents";
   const { data: assets = [], isLoading: la } = useAssets();
   const { data: depEntries = [], isLoading: ld } = useDepreciationEntries();
   const { data: disposals = [], isLoading: ldis } = useAssetDisposals();
@@ -111,6 +115,14 @@ export default function AssetsTransactions() {
     <PageShell>
       <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Transactions" }]} />
       <GuidanceBanner title="Transactions Immobilisations" description="Acquisitions, dotations et cessions live, avec filtres et contrôles RBAC SYSCOHADA." />
+
+      {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start mb-4">
+          <TabsTrigger value="documents">Mouvements d'immobilisations</TabsTrigger>
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
+        </TabsList>
+        <TabsContent value="documents">
 
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <h1 className="text-lg font-semibold text-foreground">Transactions</h1>
@@ -208,7 +220,9 @@ export default function AssetsTransactions() {
         )}
       </CardContent></Card>
 
-      <div className="space-y-4 mt-6">
+        </TabsContent>
+        <TabsContent value="posting">
+      <div className="space-y-4">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Comptabilisation GL — Immobilisations</h2>
@@ -216,6 +230,8 @@ export default function AssetsTransactions() {
         <GLPostingKPIsLive module="Assets" />
         <GLBatchHistoryLive module="Assets" />
       </div>
+        </TabsContent>
+      </Tabs>
     </PageShell>
   );
 }

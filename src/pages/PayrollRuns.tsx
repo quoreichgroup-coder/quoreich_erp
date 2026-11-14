@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { TransactionTabsBar } from "@/components/TransactionTabsBar";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -99,7 +100,8 @@ export default function PayrollRuns() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "RH" }, { label: "Cycles de paie" }]} />
+      <Breadcrumb items={[{ label: "RH et paie", href: "/hr" }, { label: "Transactions" }, { label: "Cycles de paie" }]} />
+        <TransactionTabsBar module="/hr" />
       <GuidanceBanner
         title="Tableau de bord — Paie"
         description="KPI, derniers cycles et prochaines échéances. Montants masqués sans rôle hr_*."

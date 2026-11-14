@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { TransactionTabsBar } from "@/components/TransactionTabsBar";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -96,7 +97,8 @@ export default function CrmReminders() {
   return (
     <PageShell>
       <div className="space-y-3">
-        <Breadcrumb items={[{ label: "CRM", href: "/crm" }, { label: "Rappels" }]} />
+        <Breadcrumb items={[{ label: "CRM", href: "/crm" }, { label: "Transactions" }, { label: "Rappels et activités" }]} />
+        <TransactionTabsBar module="/crm" />
         <GuidanceBanner
           title="Rappels d'activités"
           description="Suivez vos rappels d'activités CRM par état. Une activité avec une échéance dépassée est marquée en retard."

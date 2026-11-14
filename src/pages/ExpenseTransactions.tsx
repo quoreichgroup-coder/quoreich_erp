@@ -1,3 +1,5 @@
+import { useSearchParams } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -41,6 +43,8 @@ const statusColor = (s: string) => {
 
 export default function ExpenseTransactions() {
   const perms = useMyExpenseRoles();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "posting" ? "posting" : "documents";
   const canCreate = canDo(perms, "create_report");
   const canExport = canDo(perms, "export");
   const table = useTableFeatures({
@@ -59,8 +63,16 @@ export default function ExpenseTransactions() {
       <Breadcrumb items={[{ label: "Finance" }, { label: "Expenses", href: "/expenses" }, { label: "Transactions" }]} />
       <GuidanceBanner title="Expense Transactions" description="Employee expense submissions with lifecycle: Draft → Submitted → Manager Approval → Accounting Review → Approved → Reimbursed." />
 
+      {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start mb-4">
+          <TabsTrigger value="documents">Notes de frais</TabsTrigger>
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
+        </TabsList>
+        <TabsContent value="documents">
+
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Expense Submissions</h1>
+        <h1 className="text-lg font-semibold text-foreground">Notes de frais</h1>
         <div className="flex gap-2">
           <Button size="sm" className="gap-1.5" disabled={!canCreate}
             aria-label={actionTooltip(perms, "create_report", "Nouvelle note de frais")}
@@ -106,11 +118,15 @@ export default function ExpenseTransactions() {
         <PaginationBar page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} pageSize={table.pageSize} onPageChange={table.setPage} />
       </CardContent></Card>
 
-      <div className="space-y-4 mt-6">
-        <div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /><h2 className="text-sm font-semibold text-foreground">GL Posting — Expenses</h2></div>
+        </TabsContent>
+        <TabsContent value="posting">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /><h2 className="text-sm font-semibold text-foreground">Comptabilisation — notes de frais</h2></div>
         <GLPostingKPIsLive module="Expenses" />
         <GLBatchHistoryLive module="Expenses" />
       </div>
+        </TabsContent>
+      </Tabs>
     </PageShell>
   );
 }

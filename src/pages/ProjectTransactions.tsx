@@ -1,3 +1,5 @@
+import { useSearchParams } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -21,6 +23,8 @@ export default function ProjectTransactions() {
   const { data: costs = [], isLoading: loadingCosts } = useProjectCosts();
   const { data: projects = [], isLoading: loadingProjects } = useProjects();
   const perms = useMyProjectRoles();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "posting" ? "posting" : "documents";
   const isLoading = loadingCosts || loadingProjects;
 
   const rows = useMemo(() => {
@@ -64,8 +68,16 @@ export default function ProjectTransactions() {
       <Breadcrumb items={[{ label: "Finance" }, { label: "Projects", href: "/projects" }, { label: "Transactions" }]} />
       <GuidanceBanner title="Project Transactions" description="Cost entries by project, linked to GL." />
 
+      {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start mb-4">
+          <TabsTrigger value="documents">Coûts de projet</TabsTrigger>
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
+        </TabsList>
+        <TabsContent value="documents">
+
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Project Transactions</h1>
+        <h1 className="text-lg font-semibold text-foreground">Coûts de projet</h1>
         <div className="flex gap-2">
           <Button size="sm" className="gap-1.5"
             disabled={!canDo(perms, "post_cost")}
@@ -115,14 +127,18 @@ export default function ProjectTransactions() {
         <PaginationBar page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} pageSize={table.pageSize} onPageChange={table.setPage} />
       </CardContent></Card>
 
-      <div className="space-y-4 mt-6">
+        </TabsContent>
+        <TabsContent value="posting">
+      <div className="space-y-4">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Project Accounting</h2>
+          <h2 className="text-sm font-semibold text-foreground">Comptabilisation — comptabilité de projets</h2>
         </div>
         <GLPostingKPIsLive module="Projects" />
         <GLBatchHistoryLive module="Projects" />
       </div>
+        </TabsContent>
+      </Tabs>
     </PageShell>
   );
 }

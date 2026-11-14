@@ -4,7 +4,28 @@
  * finance (record-to-report), ressources humaines, gouvernance, puis administration en dernier.
  * Données pures : la barre latérale les affiche, les tests vérifient qu'aucune page ne se perd.
  */
-export interface NavItem { title: string; url: string }
+export interface NavItem {
+  title: string;
+  url: string;
+  /** Autres pages qui allument cette entrée (onglets de Transactions répartis sur plusieurs pages). */
+  also?: string[];
+}
+
+/**
+ * Onglets de la page Transactions quand les pièces d'un module vivent sur plusieurs pages
+ * existantes : la barre d'onglets (TransactionTabsBar) les relie, l'entrée « Transactions » du
+ * menu reste allumée sur chacune.
+ */
+export const TRANSACTION_TABS: Record<string, NavItem[]> = {
+  "/crm": [
+    { title: "Opportunités", url: "/crm/opportunities" },
+    { title: "Rappels et activités", url: "/crm/reminders" },
+  ],
+  "/hr": [
+    { title: "Saisie de paie", url: "/hr/transactions" },
+    { title: "Cycles de paie", url: "/hr/payroll" },
+  ],
+};
 export interface NavModule {
   title: string;
   /** Nom d'icône lucide, résolu par la barre latérale. */
@@ -28,7 +49,10 @@ export interface NavSection { id: string; label: string; modules?: NavModule[]; 
 const standard = (base: string, extras: NavItem[] = [],
   urls: { transactions?: string; masterData?: string } = {}): NavItem[] => [
   { title: "Tableau de bord", url: base },
-  { title: "Transactions", url: urls.transactions ?? `${base}/transactions` },
+  {
+    title: "Transactions", url: urls.transactions ?? `${base}/transactions`,
+    also: (TRANSACTION_TABS[base] ?? []).map((t) => t.url).filter((u) => u !== (urls.transactions ?? `${base}/transactions`)),
+  },
   { title: "Données de base", url: urls.masterData ?? `${base}/master-data` },
   { title: "Rapports", url: `${base}/reporting` },
   { title: "Contrôle", url: `${base}/control` },
@@ -53,8 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         title: "CRM", icon: "Handshake", basePath: "/crm",
         // Transactions = opportunités (pipeline) ; Données de base = contacts.
-        items: standard("/crm", [{ title: "Rappels", url: "/crm/reminders" }],
-          { transactions: "/crm/opportunities", masterData: "/crm/contacts" }),
+        // Transactions = onglets Opportunités, Rappels et activités ; Données de base = contacts.
+        items: standard("/crm", [], { transactions: "/crm/opportunities", masterData: "/crm/contacts" }),
       },
       { title: "Commandes de vente", icon: "ShoppingBag", basePath: "/sales", moduleKey: "Sales Orders", items: standard("/sales") },
       {
@@ -99,8 +123,8 @@ export const NAV_SECTIONS: NavSection[] = [
     modules: [
       {
         title: "RH et paie", icon: "UsersRound", basePath: "/hr",
-        items: standard("/hr", [{ title: "Cycles de paie", url: "/hr/payroll" }, { title: "Historique des rôles", url: "/audit/hr" }],
-          { masterData: "/hr/employees" }),
+        // Transactions = onglets Saisie de paie, Cycles de paie ; Données de base = employés.
+        items: standard("/hr", [{ title: "Historique des rôles", url: "/audit/hr" }], { masterData: "/hr/employees" }),
       },
     ],
   },
