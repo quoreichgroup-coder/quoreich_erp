@@ -37,6 +37,7 @@ Légende utilisée dans tous les livrables :
 | 09 | [09-feuille-de-route.md](09-feuille-de-route.md) | Recommandations classées P0 → P3, plan progressif |
 | 10 | [10-inventaire-ventes-clients.md](10-inventaire-ventes-clients.md) | CRUD et actions groupées, écran par écran, ventes et comptes clients |
 | 11 | [11-stocks-achats-international.md](11-stocks-achats-international.md) | Stocks, réapprovisionnement, inventaires, achats et achats internationaux comparés aux références ; lots S / R / A / I proposés |
+| 12 | [12-plan-comptable-multi-referentiels.md](12-plan-comptable-multi-referentiels.md) | Plan comptable multi-référentiels : audit de l'existant, diagnostic ROXGOLD, architecture, modèle de données, droits et rôles, écrans, plan PC-0 à PC-6 |
 
 ## Synthèse pour la direction
 
