@@ -40,6 +40,7 @@ import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
+import { ReplenishmentProposalsPanel } from "@/components/Replenishment";
 import { useSupplierReturns } from "@/hooks/use-supplier-returns";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
@@ -459,6 +460,7 @@ export default function ProcurementTransactions() {
           <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Purchase Orders ({pos.length})</TabsTrigger>
           <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Goods Receipt ({grs.length})</TabsTrigger>
           <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
+          <TabsTrigger value="replenishment">Réapprovisionnement</TabsTrigger>
           <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Approval Workflow</TabsTrigger>
         </TabsList>
 
@@ -601,6 +603,11 @@ export default function ProcurementTransactions() {
           <Card className="border-border"><CardContent className="p-0">
             <SupplierReturnsList />
           </CardContent></Card>
+        </TabsContent>
+
+        {/* Réapprovisionnement (V54) */}
+        <TabsContent value="replenishment">
+          <Card className="border-border"><CardContent className="p-4"><ReplenishmentProposalsPanel /></CardContent></Card>
         </TabsContent>
 
         {/* Approval Workflow Tab */}

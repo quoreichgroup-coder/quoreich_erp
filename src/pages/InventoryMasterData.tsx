@@ -17,6 +17,7 @@ import { useCreateItem, useCreateWarehouse, useItems, useUpdateItem, useUpdateWa
 import { useMyAccess } from "@/hooks/use-my-access";
 import { StatusBadge } from "@/components/StatusBadge";
 import { exportToCSV } from "@/lib/csv-export";
+import { ReplenishmentRulesPanel } from "@/components/Replenishment";
 
 /*
  * Stocks → Données de base : articles et dépôts réels de la société. La quantité en stock et le
@@ -164,7 +165,7 @@ export default function InventoryMasterData() {
   const { data: access } = useMyAccess();
   const canEdit = (access?.permissions ?? []).includes("inventory.move");
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "warehouses" ? "warehouses" : "items";
+  const tab = ["warehouses", "replenishment"].includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "items";
   const [itemDialog, setItemDialog] = useState<{ item: any | null } | null>(null);
   const [whDialog, setWhDialog] = useState<{ wh: any | null } | null>(null);
 
@@ -204,6 +205,7 @@ export default function InventoryMasterData() {
         <TabsList className="mb-4">
           <TabsTrigger value="items" className="gap-1.5"><Package className="w-3.5 h-3.5" />Articles ({items.length})</TabsTrigger>
           <TabsTrigger value="warehouses" className="gap-1.5"><Warehouse className="w-3.5 h-3.5" />Dépôts ({warehouses.length})</TabsTrigger>
+          <TabsTrigger value="replenishment">Réapprovisionnement</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items">
@@ -266,6 +268,9 @@ export default function InventoryMasterData() {
               ))}
             </TableBody></Table>
           </CardContent></Card>
+        </TabsContent>
+        <TabsContent value="replenishment">
+          <Card className="border-border"><CardContent className="p-4"><ReplenishmentRulesPanel /></CardContent></Card>
         </TabsContent>
       </Tabs>
 

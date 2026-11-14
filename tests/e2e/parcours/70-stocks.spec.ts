@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { identifiants, RUN, surveiller, dernierToast } from "./outils";
 import { ligne } from "./champs";
+import { creerFournisseur } from "./actions";
 
 /*
  * Stocks (V53) : référentiel réel (article, dépôts), ajustement motivé comptabilisé, transfert sans
@@ -91,6 +92,51 @@ test("stocks : article, dépôts, ajustement comptabilisé, transfert, exports",
   await expect(page.getByTestId("item-row").filter({ hasText: code })).toContainText("10 sac");
   await expect(ligne(page, code)).toContainText("40 000");
   testInfo.annotations.push({ type: "export articles", description: await exporter(page, /^articles.*\.csv$/) });
+
+  // V54 : réapprovisionnement — catalogue, règle min / max, calcul, conversion en demande d'achat.
+  obs.etape("catalogue fournisseur : préféré, multiple de 12");
+  const fournisseur = `${RUN} Fournisseur stock`;
+  await creerFournisseur(page, fournisseur);
+  await page.goto("/procurement/master-data");
+  await page.getByRole("button", { name: "Nouvelle ligne de catalogue" }).click();
+  const ca = page.getByRole("dialog");
+  await ca.getByLabel("Fournisseur", { exact: true }).selectOption({ label: fournisseur });
+  await ca.getByLabel("Article", { exact: true }).selectOption({ label: await ca.getByLabel("Article", { exact: true }).locator("option", { hasText: code }).innerText() });
+  await ca.getByLabel("Prix unitaire").fill("3500");
+  await ca.getByLabel("Délai (jours)").fill("5");
+  await ca.getByLabel("Multiple de commande").fill("12");
+  await ca.getByLabel(/Fournisseur préféré/).check();
+  await ca.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(ca).toBeHidden();
+  await expect(page.getByTestId("supplier-item-row").filter({ hasText: code })).toContainText("Préféré");
+
+  obs.etape("règle min / max : point 20, maximum 50 → à commander");
+  await page.goto("/inventory/master-data?tab=replenishment");
+  await page.getByRole("button", { name: "Nouvelle règle" }).click();
+  const rg = page.getByRole("dialog");
+  await rg.getByLabel("Article").selectOption({ label: await rg.getByLabel("Article").locator("option", { hasText: code }).innerText() });
+  await rg.getByLabel("Point de commande").fill("20");
+  await rg.getByLabel("Stock de sécurité").fill("25");
+  await expect(rg.getByRole("alert"), "sécurité ≤ point de commande").toContainText("sécurité");
+  await rg.getByLabel("Stock de sécurité").fill("5");
+  await rg.getByLabel("Stock maximum").fill("50");
+  await rg.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(rg).toBeHidden();
+  const regle = page.getByTestId("replenishment-rule-row").filter({ hasText: code });
+  await expect(regle).toContainText("À commander");
+
+  obs.etape("calcul des besoins : 50 − 10 = 40 → 48 (multiple 12), puis demande d'achat");
+  await page.goto("/procurement/transactions");
+  await page.getByRole("tab", { name: "Réapprovisionnement" }).click();
+  await page.getByRole("button", { name: "Calculer les besoins" }).click();
+  testInfo.annotations.push({ type: "calcul", description: await dernierToast(page) });
+  const prop = page.getByTestId("replenishment-proposal-row").filter({ hasText: code }).filter({ hasText: "Proposée" });
+  await expect(prop).toContainText("48");
+  await expect(prop).toContainText(fournisseur);
+  await prop.getByRole("checkbox").check();
+  await page.getByRole("button", { name: /Convertir en demandes d'achat/ }).click();
+  testInfo.annotations.push({ type: "conversion", description: await dernierToast(page) });
+  await expect(page.getByTestId("replenishment-proposal-row").filter({ hasText: code }).first()).toContainText(/Convertie · PR-/);
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
