@@ -69,6 +69,10 @@ import {
   useUpdateSalesOrder,
   useDeleteSalesOrder,
   useBulkSales,
+  useCustomerReturns,
+  useCreateCustomerReturn,
+  useCreditCustomerReturn,
+  type CustomerReturn,
   type SalesLine,
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
@@ -218,6 +222,143 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
           emptyLines="Chargement des lignes…" />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ──────── RETOUR CLIENT SUR LIVRAISON (V50) ──────── */
+function ReturnDialog({ dn, onClose }: { dn: any | null; onClose: () => void }) {
+  const { data: lines = [] } = useDnLines(dn?.id);
+  const create = useCreateCustomerReturn();
+  const { data: access } = useMyAccess();
+  const canCredit = (access?.permissions ?? []).includes("ar.credit_note");
+  const [reason, setReason] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [qtys, setQtys] = useState<Record<string, string>>({});
+  const [withCredit, setWithCredit] = useState(true);
+  if (!dn) return null;
+  const rest = (l: SalesLine) => Number(l.quantity) - Number(l.quantity_returned ?? 0);
+  const chosen = lines.map((l) => ({ dn_line_id: l.id, quantity: Number(String(qtys[l.id] ?? "").replace(",", ".")) || 0 })).filter((l) => l.quantity > 0);
+  const invoiced = !!dn.ar_invoice_id;
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="text-sm">Retour client sur la livraison {dn.dn_number}</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Les articles stockés reviennent en stock au coût de leur sortie. {invoiced
+            ? "La livraison est facturée : un avoir lié peut être émis sur les lignes retournées."
+            : "La livraison n'est pas encore facturée : la facture ne reprendra que le livré non retourné."}
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs" htmlFor="return-reason">Motif (obligatoire)</Label>
+            <Input id="return-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, erreur de livraison, non conforme…" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="return-date">Date du retour</Label>
+            <Input id="return-date" type="date" className="h-8 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <table className="w-full text-xs">
+          <thead><tr className="text-muted-foreground border-b border-border">
+            <th className="text-left py-1">Libellé</th><th className="text-right">Livré</th><th className="text-right">Déjà retourné</th><th className="text-right w-28">À retourner</th>
+          </tr></thead>
+          <tbody>
+            {lines.map((l, i) => (
+              <tr key={l.id} className="border-b border-border/50">
+                <td className="py-1">{l.description}</td>
+                <td className="text-right tabular-nums">{fmt(Number(l.quantity))}</td>
+                <td className="text-right tabular-nums">{fmt(Number(l.quantity_returned ?? 0))}</td>
+                <td className="text-right">
+                  <Input aria-label={`Quantité retournée ligne ${i + 1}`} inputMode="decimal" className="h-7 text-xs text-right" placeholder="0"
+                    disabled={rest(l) <= 0} value={qtys[l.id] ?? ""} onChange={(e) => setQtys({ ...qtys, [l.id]: e.target.value })} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {invoiced && (
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={withCredit && canCredit} disabled={!canCredit} onChange={(e) => setWithCredit(e.target.checked)} />
+            Émettre l'avoir lié maintenant {canCredit ? "" : "(droit « avoir client » requis : le comptable l'émettra depuis l'onglet Retours)"}
+          </label>
+        )}
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
+          <Button size="sm" className="text-xs" disabled={!reason.trim() || chosen.length === 0 || create.isPending}
+            onClick={() => create.mutate({ dnId: dn.id, reason: reason.trim(), date, lines: chosen, withCreditNote: invoiced && withCredit && canCredit },
+              { onSuccess: () => { setReason(""); setQtys({}); onClose(); } })}>
+            {create.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Enregistrer le retour"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReturnsTab() {
+  const { data: returns = [], isLoading } = useCustomerReturns();
+  const credit = useCreditCustomerReturn();
+  const { data: access } = useMyAccess();
+  const canCredit = (access?.permissions ?? []).includes("ar.credit_note");
+  const [view, setView] = useState<CustomerReturn | null>(null);
+  return (
+    <Card className="border-border">
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
+        ) : returns.length === 0 ? (
+          <p className="p-6 text-center text-xs text-muted-foreground">Aucun retour client. Un retour s'enregistre depuis une livraison validée (bouton « Retour »).</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableCell className="text-[11px] font-medium text-muted-foreground">N° retour</TableCell>
+                <TableCell className="text-[11px] font-medium text-muted-foreground">Date</TableCell>
+                <TableCell className="text-[11px] font-medium text-muted-foreground">Client</TableCell>
+                <TableCell className="text-[11px] font-medium text-muted-foreground">Livraison</TableCell>
+                <TableCell className="text-[11px] font-medium text-muted-foreground">Motif</TableCell>
+                <TableCell className="text-[11px] font-medium text-muted-foreground">Avoir</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {returns.map((r) => (
+                <TableRow key={r.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="return-row" onClick={() => setView(r)}>
+                  <TableCell className="font-mono text-primary">{r.return_number}</TableCell>
+                  <TableCell>{r.return_date}</TableCell>
+                  <TableCell className="font-medium">{r.customer?.name}</TableCell>
+                  <TableCell className="font-mono text-muted-foreground">{r.delivery?.dn_number}</TableCell>
+                  <TableCell className="truncate max-w-[16rem]">{r.reason}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {r.credit_note ? <span className="font-mono">{r.credit_note.credit_note_number}</span>
+                      : r.delivery?.ar_invoice_id && canCredit ? (
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" disabled={credit.isPending} onClick={() => credit.mutate(r.id)}>Émettre l'avoir</Button>
+                      ) : <span className="text-muted-foreground">{r.delivery?.ar_invoice_id ? "à établir" : "non facturée"}</span>}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      {view && (
+        <Dialog open onOpenChange={(o) => { if (!o) setView(null); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader><DialogTitle className="text-sm">Retour {view.return_number}</DialogTitle></DialogHeader>
+            <DocumentDetail title={`Retour client ${view.return_number}`} fileName={documentFileName(`retour-${view.return_number}`)}
+              header={[["Client", view.customer?.name], ["Livraison", view.delivery?.dn_number], ["Date", view.return_date],
+                ["Motif", view.reason], ["Avoir", view.credit_note?.credit_note_number ?? "—"]]}
+              columns={[{ label: "Libellé" }, { label: "Qté retournée", align: "right" }, { label: "P.U. vente", align: "right" },
+                { label: "Coût de rentrée", align: "right" }, { label: "Valeur vente HT", align: "right" }]}
+              rows={(view.lines ?? []).map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)), fmt(Number(l.unit_cost)),
+                fmt(Number(l.quantity) * Number(l.unit_price))])}
+              footer={[["Quantité retournée", fmt((view.lines ?? []).reduce((s, l) => s + Number(l.quantity), 0))],
+                ["Valeur de vente HT", `${fmt((view.lines ?? []).reduce((s, l) => s + Number(l.quantity) * Number(l.unit_price), 0))} XOF`, true]]} />
+          </DialogContent>
+        </Dialog>
+      )}
+    </Card>
   );
 }
 
@@ -650,6 +791,7 @@ export default function SalesTransactions() {
   const canOverride = (myAccess?.permissions ?? []).includes("sales.credit_override");
   const [deliverSoId, setDeliverSoId] = useState<string | null>(null);
   const [salesView, setSalesView] = useState<SalesView>(null);
+  const [returnDn, setReturnDn] = useState<any | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const deleteQuote = useDeleteQuotation();
   const bulk = useBulkSales();
@@ -1017,6 +1159,10 @@ export default function SalesTransactions() {
           <TabsTrigger value="deliveries" className="gap-1.5">
             <Truck className="w-3.5 h-3.5" />
             Deliveries ({fDeliveries.length})
+          </TabsTrigger>
+          <TabsTrigger value="returns" className="gap-1.5">
+            <Truck className="w-3.5 h-3.5 rotate-180" />
+            Retours
           </TabsTrigger>
         </TabsList>
 
@@ -1387,6 +1533,10 @@ export default function SalesTransactions() {
                           </Badge>
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-1 items-center">
+                          {d.status === "completed" && canDeliver && (
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setReturnDn(d.raw)}>Retour</Button>
+                          )}
                           {d.invoiced ? (
                             <Badge variant="outline" className="text-[10px] gap-1">
                               <Receipt className="w-3 h-3" />
@@ -1412,6 +1562,7 @@ export default function SalesTransactions() {
                           ) : (
                             <span className="text-[10px] text-muted-foreground">—</span>
                           )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1428,6 +1579,9 @@ export default function SalesTransactions() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="returns">
+          <ReturnsTab />
+        </TabsContent>
       </Tabs>
 
       <div className="space-y-4 mt-6">
@@ -1443,6 +1597,7 @@ export default function SalesTransactions() {
       <CreateOrderDialog open={showNewOrder} onClose={() => setShowNewOrder(false)} />
       <DeliverDialog soId={deliverSoId} onClose={() => setDeliverSoId(null)} />
       <SalesDocDialog view={salesView} onClose={() => setSalesView(null)} />
+      <ReturnDialog dn={returnDn} onClose={() => setReturnDn(null)} />
       <EditSalesDocDialog target={editTarget} onClose={() => setEditTarget(null)} />
 
       <AlertDialog open={!!confirmConvertId} onOpenChange={(o) => !o && setConfirmConvertId(null)}>

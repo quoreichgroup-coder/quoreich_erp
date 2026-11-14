@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "49";
+  private static final String DERNIERE_MIGRATION = "50";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -140,7 +140,10 @@ class SchemaMigrationIT {
           "ar_customer_advances",
           "ar_customer_refunds",
           "ar_letterings",
-          "ar_lettering_counters");
+          "ar_lettering_counters",
+          // V50 — retours clients.
+          "customer_returns",
+          "customer_return_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -235,7 +238,11 @@ class SchemaMigrationIT {
           "refund_customer_credit",
           "lettering_code_of",
           "letter_ar_invoice",
-          "on_ar_invoice_lettering");
+          "on_ar_invoice_lettering",
+          // V50 — retours clients.
+          "create_customer_return",
+          "credit_customer_return",
+          "release_delivery_on_draft_delete");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -248,6 +255,8 @@ class SchemaMigrationIT {
           "ar_customer_advances/Tenant isolation",
           "ar_customer_refunds/Tenant isolation",
           "ar_letterings/Tenant isolation",
+          "customer_returns/Tenant isolation",
+          "customer_return_lines/Tenant isolation",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -351,7 +360,9 @@ class SchemaMigrationIT {
           "ar_invoices/trg_guard_ar_invoice_lifecycle",
           "ar_invoice_lines/trg_guard_ar_invoice_lines",
           // V49 — lettrage automatique des factures soldées.
-          "ar_invoices/trg_ar_invoice_lettering");
+          "ar_invoices/trg_ar_invoice_lettering",
+          // V50 — supprimer un brouillon issu d'une livraison libère la livraison.
+          "ar_invoices/trg_release_delivery_on_draft_delete");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

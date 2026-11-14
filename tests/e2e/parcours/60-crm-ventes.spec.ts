@@ -190,6 +190,30 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   testInfo.annotations.push({ type: "numéro", description: numero });
   expect(numero, "numéro légal attribué à l'émission").not.toMatch(/BROUILLON/);
 
+  // V50 : retour client sur la livraison facturée → avoir lié, imputé sur la facture.
+  obs.etape("retour client sur la livraison : avoir lié");
+  await page.goto("/sales/transactions");
+  await page.getByRole("tab", { name: /Deliveries/ }).click();
+  await page.getByRole("row").filter({ hasText: client }).getByRole("button", { name: "Retour" }).click();
+  const retour = page.getByRole("dialog", { name: /Retour client sur la livraison/ });
+  await retour.getByLabel("Motif (obligatoire)").fill("Prestation partiellement refusée");
+  await retour.getByLabel("Quantité retournée ligne 1").fill("1");
+  await expect(retour.getByRole("checkbox"), "avoir lié proposé (livraison facturée)").toBeChecked();
+  await retour.getByRole("button", { name: "Enregistrer le retour" }).click();
+  testInfo.annotations.push({ type: "retour", description: await dernierToast(page) });
+  await expect(retour).toBeHidden();
+  await page.getByRole("tab", { name: "Retours" }).click();
+  const ligneRetour = page.getByTestId("return-row").filter({ hasText: client });
+  await expect(ligneRetour).toContainText(/RET-\d{4}-\d{4}/);
+  await expect(ligneRetour, "numéro de l'avoir lié").toContainText(/(CN|AV)-\d{4}-\d{4}/);
+  await ligneRetour.click();
+  const vueRetour = page.getByRole("dialog", { name: /^Retour RET-/ });
+  await expect(vueRetour.getByRole("region", { name: "Lignes" })).not.toContainText("Aucune ligne");
+  const retourPdf = page.waitForEvent("download");
+  await vueRetour.getByTestId("btn-document-pdf").click();
+  await verifierPdf(await retourPdf, /^retour-.*\.pdf$/);
+  await page.keyboard.press("Escape");
+
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

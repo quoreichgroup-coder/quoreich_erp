@@ -10,7 +10,7 @@ où il en faut, un CRUD complet et des actions groupées. Légende : ✅ fait et
 |---|---|---|---|---|---|
 | Devis | ✅ lignes, remise, TVA (V43) | ✅ clic → en-tête / lignes / pied, CSV, PDF A4 | ✅ tant qu'aucune ligne n'est commandée (V46) | ✅ idem (V46) | 🟢 exporter, supprimer la sélection |
 | Commandes | ✅ libre ou depuis les lignes d'un devis du client (V44) | ✅ idem | ✅ commande libre en brouillon (V46) ; reprise d'un devis : supprimer puis recréer | ✅ brouillon sans livraison, quantités rendues au devis (V46) | 🟢 exporter, confirmer (contrôle de crédit pour chacune), supprimer |
-| Livraisons | ✅ depuis la commande, ligne à ligne | ✅ idem | ➖ une livraison validée a déjà sorti le stock | 🟡 retour client (pièce de retour, mouvement d'entrée) | 🟢 exporter, facturer la sélection (factures brouillon) |
+| Livraisons | ✅ depuis la commande, ligne à ligne | ✅ idem | ➖ une livraison validée a déjà sorti le stock | ✅ retour client (V50) : pièce de retour, ré-entrée en stock, avoir lié | 🟢 exporter, facturer la sélection (factures brouillon) |
 | Données de base | ➖ lecture : clients (encours, limite), articles vendables, conditions | ✅ listes | 🟢 lien « Gérer » vers l'écran propriétaire de chaque donnée (fiches clients, Stocks → articles, Comptes clients → conditions) | — | — |
 | Rapports, Contrôle, Tableau de bord | ➖ vues calculées (pipeline, délais, audit) | ✅ exports existants | — | — | — |
 | Paramètres | — | — | 🟢 réglages et séries de numérotation (administrateur, V40) | — | — |
@@ -42,7 +42,7 @@ où il en faut, un CRUD complet et des actions groupées. Légende : ✅ fait et
 
 ## Reste à faire (ventes et clients)
 
-- Retour client sur livraison (pièce de retour et entrée en stock), puis avoir lié.
+- ~~Retour client sur livraison~~ : fait en V50.
 - ~~Acomptes clients et lettrage~~ : faits en V49 (acompte, imputation, remboursement, lettrage automatique).
 - Listes de prix par client, remises par client.
 - Actions groupées sur site (API) : statut des fiches clients.

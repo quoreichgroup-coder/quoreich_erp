@@ -114,6 +114,7 @@ export interface SalesLine {
   tax_code_id: string | null;
   quantity_ordered?: number;
   quantity_delivered?: number;
+  quantity_returned?: number;
   tax_code?: { code: string } | null;
 }
 
@@ -467,6 +468,69 @@ export function useBulkSales() {
       if (ok) toast.success(`${ok} ${BULK[v.action].done}`);
       if (echecs.length) toast.error(`${echecs.length} refus`, { description: [...new Set(echecs)].join(" · ") });
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ===== Retours clients (V50) =====
+export interface CustomerReturn {
+  id: string;
+  return_number: string;
+  dn_id: string;
+  customer_id: string;
+  return_date: string;
+  reason: string;
+  credit_note_id: string | null;
+  customer?: { name: string };
+  delivery?: { dn_number: string; ar_invoice_id: string | null };
+  credit_note?: { credit_note_number: string } | null;
+  lines?: { description: string; quantity: number; unit_price: number; unit_cost: number }[];
+}
+
+export function useCustomerReturns() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["customer-returns", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("customer_returns")
+        .select("*, customer:customers(name), delivery:delivery_notes(dn_number, ar_invoice_id), credit_note:ar_credit_notes(credit_note_number),"
+          + " lines:customer_return_lines(description, quantity, unit_price, unit_cost)")
+        .eq("tenant_id", tenantId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as CustomerReturn[];
+    },
+  });
+}
+
+const RETURN_KEYS = ["customer-returns", "delivery-notes", "dn-lines", "ar-invoices", "ar-credit-notes", "ar-payments", "customer-credits"];
+
+export function useCreateCustomerReturn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (i: { dnId: string; reason: string; date: string; lines: { dn_line_id: string; quantity: number }[]; withCreditNote: boolean }) => {
+      const { data, error } = await (supabase as any).rpc("create_customer_return", {
+        _dn_id: i.dnId, _reason: i.reason, _return_date: i.date, _lines: i.lines, _with_credit_note: i.withCreditNote,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: (_d, v) => {
+      for (const k of RETURN_KEYS) qc.invalidateQueries({ queryKey: [k] });
+      toast.success(v.withCreditNote ? "Retour enregistré, stock ré-entré et avoir émis" : "Retour enregistré, stock ré-entré");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useCreditCustomerReturn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (returnId: string) => {
+      const { error } = await (supabase as any).rpc("credit_customer_return", { _return_id: returnId });
+      if (error) throw error;
+    },
+    onSuccess: () => { for (const k of RETURN_KEYS) qc.invalidateQueries({ queryKey: [k] }); toast.success("Avoir du retour émis"); },
     onError: (e: Error) => toast.error(e.message),
   });
 }
