@@ -37,7 +37,7 @@ import {
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
 import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
-import { DocumentDetail } from "@/components/DocumentDetail";
+import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
 
@@ -367,7 +367,8 @@ function ProcurementDocDialog({ view, onClose, pos, grs }: { view: DocView; onCl
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
-        <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} />
+        <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title}
+          fileName={documentFileName(title)} />
       </DialogContent>
     </Dialog>
   );

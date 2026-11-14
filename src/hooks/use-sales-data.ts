@@ -14,6 +14,8 @@ export interface Quotation {
   total: number;
   status: string;
   valid_until: string | null;
+  tax_amount?: number;
+  total_ttc?: number;
   created_at: string;
   created_by: string;
   customer?: { name: string };
@@ -26,6 +28,9 @@ export interface SalesOrder {
   customer_id: string;
   quotation_id: string | null;
   total: number;
+  tax_amount?: number;
+  total_ttc?: number;
+  credit_override_reason?: string | null;
   status: string;
   created_at: string;
   created_by: string;
@@ -90,9 +95,72 @@ export function useSoLines(soId?: string) {
     queryKey: ["so-lines", soId],
     enabled: !!soId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("so_lines").select("*").eq("so_id", soId!);
+      const { data, error } = await (supabase as any).from("so_lines").select(LINE_SELECT).eq("so_id", soId!).order("created_at");
       if (error) throw error;
       return data || [];
+    },
+  });
+}
+
+/** Ligne d'une pièce de vente (devis, commande, livraison) — V43 / V44. */
+export interface SalesLine {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  discount_pct: number;
+  tax_amount: number;
+  total: number;
+  tax_code_id: string | null;
+  quantity_ordered?: number;
+  quantity_delivered?: number;
+  tax_code?: { code: string } | null;
+}
+
+const LINE_SELECT = "*, tax_code:tax_codes(code)";
+
+export function useQuoteLines(quoteId?: string) {
+  return useQuery({
+    queryKey: ["quote-lines", quoteId],
+    enabled: !!quoteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("quote_lines").select(LINE_SELECT)
+        .eq("quotation_id", quoteId!).order("created_at");
+      if (error) throw error;
+      return (data || []) as SalesLine[];
+    },
+  });
+}
+
+export function useDnLines(dnId?: string) {
+  return useQuery({
+    queryKey: ["dn-lines", dnId],
+    enabled: !!dnId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("dn_lines").select(LINE_SELECT)
+        .eq("dn_id", dnId!).order("created_at");
+      if (error) throw error;
+      return (data || []) as SalesLine[];
+    },
+  });
+}
+
+/** Encours d'un client : factures émises non soldées (même calcul que le contrôle de crédit, V43). */
+export function useCustomerExposure(customerId?: string) {
+  return useQuery({
+    queryKey: ["customer-exposure", customerId],
+    enabled: !!customerId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ar_invoices").select("total, amount_paid, status, due_date")
+        .eq("customer_id", customerId!).not("status", "in", "(draft,paid,cancelled)");
+      if (error) throw error;
+      const rows = data || [];
+      const today = new Date().toISOString().split("T")[0];
+      return {
+        outstanding: rows.reduce((s, r) => s + Number(r.total) - Number(r.amount_paid), 0),
+        overdue: rows.filter((r) => r.due_date && r.due_date < today).reduce((s, r) => s + Number(r.total) - Number(r.amount_paid), 0),
+        invoices: rows.length,
+      };
     },
   });
 }
@@ -309,6 +377,27 @@ export function useCreateSalesOrder() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales-orders"] });
       toast.success("Commande créée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Commande depuis les lignes choisies d'un devis du client (V44). */
+export function useCreateOrderFromQuote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { quoteId: string; orderDate: string; lines: { quote_line_id: string; quantity: number }[] }) => {
+      const { data, error } = await (supabase as any).rpc("create_sales_order_from_quote", {
+        _quote_id: input.quoteId, _lines: input.lines, _order_date: input.orderDate,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["quotations"] });
+      qc.invalidateQueries({ queryKey: ["quote-lines"] });
+      qc.invalidateQueries({ queryKey: ["sales-orders"] });
+      toast.success("Commande créée depuis le devis");
     },
     onError: (e: Error) => toast.error(e.message),
   });

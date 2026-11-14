@@ -127,6 +127,42 @@ class VentesPiecesCompletesIT {
     assertThat(texte("SELECT status FROM sales_orders WHERE id = '" + dansLaLimite + "'")).isEqualTo("confirmed");
   }
 
+  @Test
+  @DisplayName("V44 — commande depuis les lignes choisies d'un devis : reste à commander, devis partiellement puis totalement transformé")
+  void commandeDepuisLignesDuDevis() throws SQLException {
+    String devis = devis("CURRENT_DATE + 30");
+    String conseil = texte("SELECT id::text FROM quote_lines WHERE quotation_id = '" + devis + "' AND description = 'Conseil'");
+    String frais = texte("SELECT id::text FROM quote_lines WHERE quotation_id = '" + devis + "' AND description = 'Frais'");
+
+    String premiere = asUser(ADMIN, "SELECT create_sales_order_from_quote('" + devis + "', '[{\"quote_line_id\":\"" + conseil
+        + "\",\"quantity\":1}]'::jsonb)::text");
+    assertThat(texte("SELECT o.total::text || ' ' || o.tax_amount::text || ' ' || q.status FROM sales_orders o"
+            + " JOIN quotations q ON q.id = o.quotation_id WHERE o.id = '" + premiere + "'"))
+        .as("1 × 50 000 − 10 % = 45 000, TVA 8 100 ; devis partiellement transformé")
+        .isEqualTo("45000.00 8100.00 partially_converted");
+    assertThat(texte("SELECT (quote_line_id = '" + conseil + "')::text FROM so_lines WHERE so_id = '" + premiere + "'"))
+        .isEqualTo("true");
+
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT create_sales_order_from_quote('" + devis + "', '[{\"quote_line_id\":\""
+            + conseil + "\",\"quantity\":2}]'::jsonb)::text"))
+        .as("reste à commander : 1")
+        .hasMessageContaining("reste à commander");
+    String autreDevis = devis("CURRENT_DATE + 30");
+    String ligneAutre = texte("SELECT id::text FROM quote_lines WHERE quotation_id = '" + autreDevis + "' LIMIT 1");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT create_sales_order_from_quote('" + devis + "', '[{\"quote_line_id\":\""
+            + ligneAutre + "\",\"quantity\":1}]'::jsonb)::text"))
+        .hasMessageContaining("ne fait pas partie de ce devis");
+
+    String solde = asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis + "')::text");
+    assertThat(texte("SELECT string_agg(description || ':' || quantity::text, ' ' ORDER BY description) FROM so_lines"
+            + " WHERE so_id = '" + solde + "'"))
+        .as("la conversion complète ne reprend que le reste")
+        .isEqualTo("Conseil:1 Frais:1");
+    assertThat(texte("SELECT status FROM quotations WHERE id = '" + devis + "'")).isEqualTo("converted");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT confirm_quote_to_so('" + devis + "')::text"))
+        .hasMessageContaining("plus de ligne à commander");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {

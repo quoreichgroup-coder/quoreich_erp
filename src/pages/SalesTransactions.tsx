@@ -60,12 +60,18 @@ import {
   useInvoiceFromDelivery,
   useMySalesRoles,
   useSoLines,
+  useQuoteLines,
+  useDnLines,
+  useCustomerExposure,
+  useCreateOrderFromQuote,
+  type SalesLine,
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
 import { useTaxCodes } from "@/hooks/use-tax-codes";
 import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
 import { CommercialLinesEditor, CommercialTotals, toSalesLines } from "@/components/CommercialLinesEditor";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
@@ -98,6 +104,117 @@ const statusStyle = (s: string) => {
       return "bg-muted text-muted-foreground";
   }
 };
+
+/* ──────── CLIENT CHOISI : ENCOURS ET LIMITE ──────── */
+// Affiché dès le choix du client (devis, commande) : on voit ce qu'il doit avant de s'engager.
+function CustomerExposureBanner({ customerId }: { customerId: string }) {
+  const { data: customers = [] } = useCustomers();
+  const { data: exp } = useCustomerExposure(customerId || undefined);
+  if (!customerId || !exp) return null;
+  const limit = Number((customers.find((c) => c.id === customerId) as { credit_limit?: number } | undefined)?.credit_limit ?? 0);
+  const over = limit > 0 && exp.outstanding > limit;
+  return (
+    <div className="rounded border border-border bg-muted/30 p-2 text-xs flex flex-wrap gap-x-6 gap-y-1" data-testid="customer-exposure">
+      <span>Encours : <strong className="tabular-nums">{fmt(exp.outstanding)} XOF</strong> ({exp.invoices} facture(s) ouverte(s))</span>
+      <span className={exp.overdue > 0 ? "text-destructive" : "text-muted-foreground"}>Échu : <span className="tabular-nums">{fmt(exp.overdue)} XOF</span></span>
+      <span className={over ? "text-destructive" : "text-muted-foreground"}>Limite de crédit : {limit > 0 ? `${fmt(limit)} XOF` : "aucune"}</span>
+    </div>
+  );
+}
+
+const OPEN_QUOTE = new Set(["draft", "sent", "accepted", "partially_converted"]);
+
+/* ──────── LIGNES D'UN DEVIS À COMMANDER (V44) ──────── */
+function QuoteLinesPicker({ quoteId, qtys, onChange }: {
+  quoteId: string; qtys: Record<string, string>; onChange: (q: Record<string, string>) => void;
+}) {
+  const { data: lines = [], isLoading } = useQuoteLines(quoteId);
+  const remaining = (l: SalesLine) => Number(l.quantity) - Number(l.quantity_ordered ?? 0);
+  const open = lines.filter((l) => remaining(l) > 0);
+  if (isLoading) return <p className="text-xs text-muted-foreground">Chargement des lignes…</p>;
+  const allOn = open.length > 0 && open.every((l) => Number(qtys[l.id] ?? 0) > 0);
+  return (
+    <div className="space-y-2" data-testid="quote-lines-picker">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium">Lignes du devis</p>
+        <Button type="button" size="sm" variant="outline" className="h-7 text-[10px]"
+          onClick={() => onChange(allOn ? {} : Object.fromEntries(open.map((l) => [l.id, String(remaining(l))])))}>
+          {allOn ? "Tout désélectionner" : "Tout reprendre"}
+        </Button>
+      </div>
+      <table className="w-full text-xs">
+        <thead><tr className="text-muted-foreground border-b border-border">
+          <th className="w-8" /><th className="text-left py-1">Libellé</th><th className="text-right">P.U.</th><th className="text-right">Remise</th>
+          <th className="text-right">TVA</th><th className="text-right">Devisé</th><th className="text-right">Déjà commandé</th><th className="text-right w-24">À commander</th>
+        </tr></thead>
+        <tbody>
+          {lines.map((l, i) => {
+            const rest = remaining(l);
+            const on = Number(qtys[l.id] ?? 0) > 0;
+            return (
+              <tr key={l.id} className="border-b border-border/50">
+                <td><input type="checkbox" aria-label={`Choisir la ligne ${i + 1}`} disabled={rest <= 0} checked={on}
+                  onChange={(e) => onChange({ ...qtys, [l.id]: e.target.checked ? String(rest) : "" })} /></td>
+                <td className="py-1">{l.description}</td>
+                <td className="text-right tabular-nums">{fmt(Number(l.unit_price))}</td>
+                <td className="text-right tabular-nums">{Number(l.discount_pct) ? `${Number(l.discount_pct)} %` : ""}</td>
+                <td className="text-right">{l.tax_code?.code ?? "—"}</td>
+                <td className="text-right tabular-nums">{fmt(Number(l.quantity))}</td>
+                <td className="text-right tabular-nums">{fmt(Number(l.quantity_ordered ?? 0))}</td>
+                <td className="text-right">
+                  <Input aria-label={`Quantité à commander ligne ${i + 1}`} inputMode="decimal" className="h-7 text-xs text-right"
+                    disabled={rest <= 0} value={qtys[l.id] ?? ""} placeholder={rest > 0 ? String(rest) : "0"}
+                    onChange={(e) => onChange({ ...qtys, [l.id]: e.target.value })} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ──────── VUE D'UNE PIÈCE : EN-TÊTE, LIGNES, PIED ; EXPORTER, IMPRIMER ──────── */
+type SalesView = { kind: "qt" | "so" | "dn"; doc: any } | null;
+
+function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => void }) {
+  const qt = useQuoteLines(view?.kind === "qt" ? view.doc.id : undefined);
+  const so = useSoLines(view?.kind === "so" ? view.doc.id : undefined);
+  const dn = useDnLines(view?.kind === "dn" ? view.doc.id : undefined);
+  if (!view) return null;
+  const { kind, doc } = view;
+  const lines = ((kind === "qt" ? qt.data : kind === "so" ? so.data : dn.data) ?? []) as SalesLine[];
+  const net = lines.reduce((s, l) => s + Number(l.total), 0);
+  const tax = lines.reduce((s, l) => s + Number(l.tax_amount ?? 0), 0);
+  const title = kind === "qt" ? `Devis ${doc.quote_number}` : kind === "so" ? `Commande ${doc.so_number}` : `Livraison ${doc.dn_number}`;
+  const header: [string, React.ReactNode][] = kind === "qt"
+    ? [["Client", doc.customer?.name], ["Statut", doc.status], ["Date", doc.quote_date], ["Validité", doc.valid_until]]
+    : kind === "so"
+      ? [["Client", doc.customer?.name], ["Statut", doc.status], ["Date", doc.order_date], ["Devis d'origine", doc.quotation?.quote_number ?? "—"],
+         ...(doc.credit_override_reason ? [["Dépassement de crédit accordé", doc.credit_override_reason] as [string, string]] : [])]
+      : [["Client", doc.customer?.name], ["Statut", doc.status], ["Date", doc.delivery_date], ["Commande", doc.sales_order?.so_number ?? "—"],
+         ["Facture", doc.ar_invoice_id ? "préparée" : "—"]];
+  const extra = kind === "qt" ? { label: "Commandé", v: (l: SalesLine) => fmt(Number(l.quantity_ordered ?? 0)) }
+    : kind === "so" ? { label: "Livré", v: (l: SalesLine) => fmt(Number(l.quantity_delivered ?? 0)) } : null;
+  const columns = [{ label: "Libellé" }, { label: "Qté", align: "right" as const }, { label: "P.U.", align: "right" as const },
+    { label: "Remise", align: "right" as const }, { label: "TVA", align: "right" as const }, { label: "Montant HT", align: "right" as const },
+    ...(extra ? [{ label: extra.label, align: "right" as const }] : [])];
+  const rows = lines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)),
+    Number(l.discount_pct) ? `${Number(l.discount_pct)} %` : "", l.tax_code?.code ?? "—", fmt(Number(l.total)),
+    ...(extra ? [extra.v(l)] : [])]);
+  const footer: [string, React.ReactNode, boolean?][] = [["Total HT", `${fmt(net)} XOF`], ["TVA", `${fmt(tax)} XOF`],
+    ["Total TTC", `${fmt(net + tax)} XOF`, true]];
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
+        <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
+          emptyLines="Chargement des lignes…" />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: customers = [] } = useCustomers();
@@ -132,6 +249,7 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
           <DialogTitle className="text-sm">Nouveau devis</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <CustomerExposureBanner customerId={form.customer_id} />
           <div className="space-y-1.5">
             <Label className="text-xs">Client *</Label>
             <select
@@ -196,6 +314,10 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
 function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: customers = [] } = useCustomers();
   const create = useCreateSalesOrder();
+  const fromQuote = useCreateOrderFromQuote();
+  const { data: quotations = [] } = useQuotations();
+  const [quoteId, setQuoteId] = useState("");
+  const [qtys, setQtys] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     customer_id: "",
     order_date: new Date().toISOString().split("T")[0],
@@ -205,6 +327,14 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const { allValid } = invoiceTotals(lines, taxCodes);
 
   const handleCreate = async () => {
+    if (quoteId) {
+      const chosen = Object.entries(qtys).map(([id, q]) => ({ quote_line_id: id, quantity: Number(String(q).replace(",", ".")) }))
+        .filter((l) => l.quantity > 0);
+      if (chosen.length === 0) { toast.error("Choisissez au moins une ligne du devis"); return; }
+      await fromQuote.mutateAsync({ quoteId, orderDate: form.order_date, lines: chosen });
+      onClose();
+      return;
+    }
     if (!form.customer_id || !allValid) {
       toast.error("Choisissez le client et complétez chaque ligne (désignation, quantité, prix, remise 0–100 %)");
       return;
@@ -229,7 +359,7 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
             <select
               className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
               value={form.customer_id}
-              onChange={(e) => setForm((f) => ({ ...f, customer_id: e.target.value }))}
+              onChange={(e) => { setForm((f) => ({ ...f, customer_id: e.target.value })); setQuoteId(""); setQtys({}); }}
             >
               <option value="">— Sélectionner —</option>
               {customers.map((c) => (
@@ -239,6 +369,25 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               ))}
             </select>
           </div>
+          <CustomerExposureBanner customerId={form.customer_id} />
+          {form.customer_id && (
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="order-source-quote">Devis ouvert du client</Label>
+              <select id="order-source-quote" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                value={quoteId} onChange={(e) => { setQuoteId(e.target.value); setQtys({}); }}>
+                <option value="">— Aucun : saisie libre des lignes —</option>
+                {quotations
+                  .filter((q) => q.customer_id === form.customer_id && OPEN_QUOTE.has(q.status)
+                    && (!q.valid_until || q.valid_until >= new Date().toISOString().split("T")[0]))
+                  .map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.quote_number} · {q.quote_date} · {fmt(Number(q.total_ttc ?? q.total))} XOF TTC{q.status === "partially_converted" ? " · partiellement commandé" : ""}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">Seuls les devis non expirés de ce client, avec un reste à commander, sont proposés.</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">N° Commande</Label>
@@ -258,15 +407,21 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               />
             </div>
           </div>
-          <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} testId="sales-lines" linePrefix="sales-line" />
-          <CommercialTotals lines={lines} taxCodes={taxCodes} testId="sales-totals" />
+          {quoteId ? (
+            <QuoteLinesPicker quoteId={quoteId} qtys={qtys} onChange={setQtys} />
+          ) : (
+            <>
+              <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} testId="sales-lines" linePrefix="sales-line" />
+              <CommercialTotals lines={lines} taxCodes={taxCodes} testId="sales-totals" />
+            </>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>
             Annuler
           </Button>
-          <Button size="sm" className="text-xs" onClick={handleCreate} disabled={create.isPending}>
-            {create.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Créer"}
+          <Button size="sm" className="text-xs" onClick={handleCreate} disabled={create.isPending || fromQuote.isPending}>
+            {create.isPending || fromQuote.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Créer"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -379,6 +534,7 @@ export default function SalesTransactions() {
   const { data: myAccess } = useMyAccess();
   const canOverride = (myAccess?.permissions ?? []).includes("sales.credit_override");
   const [deliverSoId, setDeliverSoId] = useState<string | null>(null);
+  const [salesView, setSalesView] = useState<SalesView>(null);
   const [confirmInvoiceDnId, setConfirmInvoiceDnId] = useState<string | null>(null);
 
   // Global filters: période + client + onglet actif (pour export CSV)
@@ -790,7 +946,7 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {qtTable.pagedData.map((q) => (
-                      <TableRow key={q.id} className="text-xs">
+                      <TableRow key={q.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "qt", doc: q.raw })}>
                         <TableCell className="font-mono text-primary">{q.id}</TableCell>
                         <TableCell>{q.date}</TableCell>
                         <TableCell className="font-medium">{q.customer}</TableCell>
@@ -801,7 +957,7 @@ export default function SalesTransactions() {
                             {q.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {q.status !== "converted" && q.status !== "expired" ? (
                             canConfirm ? (
                               <Button
@@ -891,7 +1047,7 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {soTable.pagedData.map((so) => (
-                      <TableRow key={so.id} className="text-xs">
+                      <TableRow key={so.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "so", doc: so.raw })}>
                         <TableCell className="font-mono text-primary">{so.id}</TableCell>
                         <TableCell>{so.date}</TableCell>
                         <TableCell className="font-medium">{so.customer}</TableCell>
@@ -902,7 +1058,7 @@ export default function SalesTransactions() {
                             {so.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1">
                             {so.status === "draft" &&
                               (canConfirm ? (
@@ -1009,7 +1165,7 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {dnTable.pagedData.map((d) => (
-                      <TableRow key={d.id} className="text-xs">
+                      <TableRow key={d.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "dn", doc: d.raw })}>
                         <TableCell className="font-mono text-primary">{d.id}</TableCell>
                         <TableCell className="font-mono text-muted-foreground">{d.soRef}</TableCell>
                         <TableCell>{d.date}</TableCell>
@@ -1019,7 +1175,7 @@ export default function SalesTransactions() {
                             {d.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {d.invoiced ? (
                             <Badge variant="outline" className="text-[10px] gap-1">
                               <Receipt className="w-3 h-3" />
@@ -1075,6 +1231,7 @@ export default function SalesTransactions() {
       <CreateQuotationDialog open={showNewQuote} onClose={() => setShowNewQuote(false)} />
       <CreateOrderDialog open={showNewOrder} onClose={() => setShowNewOrder(false)} />
       <DeliverDialog soId={deliverSoId} onClose={() => setDeliverSoId(null)} />
+      <SalesDocDialog view={salesView} onClose={() => setSalesView(null)} />
 
       <AlertDialog open={!!confirmConvertId} onOpenChange={(o) => !o && setConfirmConvertId(null)}>
         <AlertDialogContent>

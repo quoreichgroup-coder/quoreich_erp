@@ -64,7 +64,11 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
   doc.setTextColor(110);
   const stamp = new Date().toLocaleString("fr-FR");
   doc.text(`Généré le ${stamp}`, margin, margin + 14);
-  if (opts.subtitle) doc.text(opts.subtitle, margin, margin + 28);
+  // Sous-titre replié à la largeur de la page (en-tête d'une pièce : plusieurs champs).
+  const subtitleLines: string[] = opts.subtitle
+    ? doc.splitTextToSize(opts.subtitle, doc.internal.pageSize.getWidth() - 2 * margin)
+    : [];
+  if (subtitleLines.length) doc.text(subtitleLines, margin, margin + 28);
 
   const head = [opts.columns.map((c) => c.header)];
   const body: RowInput[] = opts.rows.map((row) =>
@@ -77,7 +81,7 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
   autoTable(doc, {
     head,
     body,
-    startY: margin + (opts.subtitle ? 40 : 26),
+    startY: margin + (subtitleLines.length ? 28 + subtitleLines.length * 11 : 26),
     styles: { fontSize: 8, cellPadding: 4 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     alternateRowStyles: { fillColor: [245, 247, 250] },

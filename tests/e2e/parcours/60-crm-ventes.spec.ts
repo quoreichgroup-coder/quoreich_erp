@@ -89,13 +89,35 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await page.getByRole("button", { name: "Exporter l'onglet actif en PDF" }).click();
   await verifierPdf(await quotePdf, /quotations-.*\.pdf/);
 
-  obs.etape("créer une commande numérotée par la base");
+  // Vue d'une pièce : clic sur la ligne → en-tête, lignes, pied ; exporter et imprimer.
+  obs.etape("détail du devis : lignes, pied, export et impression");
+  const numeroDevis = (await quoteRow.locator("td").first().innerText()).trim();
+  await quoteRow.click();
+  const vue = page.getByRole("dialog", { name: `Devis ${numeroDevis}` });
+  await expect(vue.getByRole("region", { name: "Lignes" })).toContainText("Frais de dossier");
+  await expect(vue.getByRole("region", { name: "Lignes" })).toContainText("10 %");
+  await expect(vue.getByRole("region", { name: "Pied" })).toContainText("125 000");
+  const devisCsv = page.waitForEvent("download");
+  await vue.getByTestId("btn-document-csv").click();
+  expect((await devisCsv).suggestedFilename()).toMatch(/^devis-.*\.csv$/);
+  const devisPdf = page.waitForEvent("download");
+  await vue.getByTestId("btn-document-pdf").click();
+  await verifierPdf(await devisPdf, /^devis-.*\.pdf$/);
+  await page.keyboard.press("Escape");
+  await expect(vue).toBeHidden();
+
+  // V44 : client → SES devis ouverts → lignes à commander (comme fournisseur → ses commandes → lignes).
+  obs.etape("commande depuis les lignes du devis du client");
   await page.getByRole("button", { name: "New Order" }).click();
   dialog = page.getByRole("dialog");
   await dialog.locator("select").first().selectOption({ label: client });
-  await dialog.getByLabel("Libellé ligne 1").fill("Prestation de conseil");
-  await dialog.getByLabel("Quantité ligne 1").fill("1");
-  await dialog.getByLabel("Prix unitaire ligne 1").fill("125000");
+  await expect(dialog.getByTestId("customer-exposure"), "encours du client affiché").toContainText("Encours");
+  const source = dialog.getByLabel("Devis ouvert du client");
+  await source.selectOption(await source.locator("option", { hasText: numeroDevis }).getAttribute("value") ?? "");
+  const picker = dialog.getByTestId("quote-lines-picker");
+  await expect(picker).toContainText("Prestation de conseil");
+  await picker.getByRole("button", { name: "Tout reprendre" }).click();
+  await expect(dialog.getByLabel("Quantité à commander ligne 1")).toHaveValue("2");
   await dialog.getByRole("button", { name: "Créer" }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole("tab", { name: /Sales Orders/ }).click();
@@ -116,7 +138,8 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await verifierPdf(await orderPdf, /orders-.*\.pdf/);
   await orderRow.getByRole("button", { name: "Livrer" }).click();
   dialog = page.getByRole("dialog");
-  await dialog.locator('input[type="number"]').fill("1");
+  // Commande issue du devis : deux lignes ; la livraison propose le reste à livrer de chacune.
+  await expect(dialog.locator('input[type="number"]')).toHaveCount(2);
   await dialog.getByRole("button", { name: "Livrer" }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole("tab", { name: /Deliveries/ }).click();
@@ -143,7 +166,8 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   const panneau = page.getByRole("dialog", { name: /^Facture BROUILLON-/ });
   const zone = panneau.getByRole("region", { name: "Brouillon" });
   await expect(zone.getByLabel("Code TVA ligne 1")).toBeVisible();
-  await expect(panneau.getByRole("region", { name: "Lignes" })).toContainText("125");
+  await expect(panneau.getByRole("region", { name: "Lignes" }), "lignes reprises avec leur remise").toContainText("10 %");
+  await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("125 000");
   page.once("dialog", (d) => d.accept());
   await zone.getByRole("button", { name: "Émettre" }).click();
   testInfo.annotations.push({ type: "émission", description: await dernierToast(page) });
