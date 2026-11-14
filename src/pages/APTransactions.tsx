@@ -1,5 +1,9 @@
 import { exportToCSV } from "@/lib/csv-export";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -262,6 +266,166 @@ function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approval
 }
 
 /* ──────── MAIN ──────── */
+/* ──────── RÈGLEMENTS (onglet) ──────── */
+const METHOD_LABELS: Record<string, string> = { bank_transfer: "Virement", cash: "Espèces", check: "Chèque", mobile_money: "Mobile money" };
+
+function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => void }) {
+  const qc = useQueryClient();
+  const { data: access } = useMyAccess();
+  const canReverse = (access?.permissions ?? []).includes("ap.reverse_payment");
+  const [search, setSearch] = useState("");
+  const [target, setTarget] = useState<any | null>(null);
+  const [reason, setReason] = useState("");
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["ap-payments", "all"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("payments")
+        .select("id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, ap_invoice_id, invoice:ap_invoices(invoice_number, supplier:suppliers(name))")
+        .eq("payment_type", "ap_payment").order("payment_date", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  // Annulation d'un paiement : contre-passation motivée (V42, droit ap.reverse_payment).
+  const reverse = useMutation({
+    mutationFn: async ({ id, motif }: { id: string; motif: string }) => {
+      const { error } = await (supabase as any).rpc("reverse_settlement", { _payment_id: id, _reason: motif, _reversal_date: new Date().toISOString().split("T")[0] });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      for (const k of ["ap-payments", "ap-invoices"]) qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Paiement annulé (écriture contre-passée)");
+      setTarget(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const reversed = new Set(rows.filter((r) => r.reversal_of).map((r) => r.reversal_of));
+  const q = search.trim().toLowerCase();
+  const shown = rows.filter((r) => !q || `${r.reference ?? ""} ${r.invoice?.invoice_number ?? ""} ${r.invoice?.supplier?.name ?? ""}`.toLowerCase().includes(q));
+  const total = shown.reduce((t, r) => t + Number(r.amount), 0);
+  return (
+    <div className="space-y-3">
+      <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input type="text" aria-label="Rechercher un paiement" placeholder="Rechercher par référence, facture ou fournisseur..."
+            className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => exportToCSV(shown.map((r) => ({
+          date: r.payment_date, reference: r.reference ?? "", fournisseur: r.invoice?.supplier?.name ?? "", facture: r.invoice?.invoice_number ?? "",
+          montant: Number(r.amount), mode: METHOD_LABELS[r.payment_method] ?? r.payment_method,
+          etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
+        })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "fournisseur", header: "Fournisseur" },
+          { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "paiements-fournisseurs")}>
+          <Download className="w-3.5 h-3.5" /> Export
+        </Button>
+        <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} paiements · Net : {fmtCurrency(total)}</span>
+      </div>
+      <div className="card-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Date</th><th>Référence</th><th>Fournisseur</th><th>Facture</th><th>Mode</th><th className="text-right">Montant</th><th>État</th><th /></tr></thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={8} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+              ) : shown.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">Aucun paiement</td></tr>
+              ) : shown.map((r) => (
+                <tr key={r.id} data-testid="ap-payment-row" className="cursor-pointer" title="Ouvrir la facture" onClick={() => r.ap_invoice_id && onOpenInvoice(r.ap_invoice_id)}>
+                  <td className="tabular-nums">{r.payment_date}</td>
+                  <td>{r.reference || "—"}</td>
+                  <td>{r.invoice?.supplier?.name ?? "—"}</td>
+                  <td className="font-mono">{r.invoice?.invoice_number ?? "—"}</td>
+                  <td>{METHOD_LABELS[r.payment_method] ?? r.payment_method}</td>
+                  <td className={cn("text-right tabular-nums", Number(r.amount) < 0 && "text-destructive")}>{fmt(Number(r.amount))}</td>
+                  <td className="text-xs text-muted-foreground">{r.reversal_of ? `Annulation${r.reversal_reason ? ` · ${r.reversal_reason}` : ""}` : reversed.has(r.id) ? "Annulé" : "Enregistré"}</td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {canReverse && !r.reversal_of && !reversed.has(r.id) && (
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" onClick={() => { setTarget(r); setReason(""); }}>Annuler</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="text-sm">Annuler le paiement {target?.reference || ""}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">L'écriture fournisseur / banque est contre-passée et la facture redevient à payer. Le paiement d'origine reste visible.</p>
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="ap-reversal-reason">Motif (obligatoire)</Label>
+            <Input id="ap-reversal-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="outline" onClick={() => setTarget(null)}>Retour</Button>
+            <Button size="sm" variant="destructive" disabled={!reason.trim() || reverse.isPending}
+              onClick={() => target && reverse.mutate({ id: target.id, motif: reason.trim() })}>Annuler le paiement</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ──────── APPROBATIONS (onglet) : factures soumises, niveau en cours, historique ──────── */
+function ApprovalsTab({ invoices, approvals, onOpenInvoice, onEdit }: {
+  invoices: APInvoice[]; approvals: APInvoiceApproval[]; onOpenInvoice: (inv: APInvoice) => void; onEdit: (inv: APInvoice) => void;
+}) {
+  const soumises = invoices.filter((i) => i.approval_status === "submitted");
+  const byId = new Map(invoices.map((i) => [i.id, i]));
+  const decisions = approvals.filter((a) => a.status === "approved" || a.status === "rejected")
+    .sort((a, b) => String(b.decided_at ?? "").localeCompare(String(a.decided_at ?? ""))).slice(0, 50);
+  const STATUT: Record<string, string> = { approved: "Approuvé", rejected: "Rejeté" };
+  return (
+    <div className="space-y-4">
+      <div className="card-elevated overflow-hidden">
+        <div className="px-4 py-2 border-b border-border text-xs font-semibold">À approuver ({soumises.length})</div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Facture</th><th>Fournisseur</th><th>Date</th><th className="text-right">TTC</th><th>Niveau et actions</th></tr></thead>
+            <tbody>
+              {soumises.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Aucune facture en attente d'approbation</td></tr>
+              ) : soumises.map((inv) => (
+                <tr key={inv.id} data-testid="ap-approval-row" className="cursor-pointer" onClick={() => onOpenInvoice(inv)}>
+                  <td className="font-mono">{inv.invoice_number}</td>
+                  <td>{inv.supplier?.name ?? "—"}</td>
+                  <td className="tabular-nums">{inv.invoice_date}</td>
+                  <td className="text-right tabular-nums">{fmt(inv.total)}</td>
+                  <td onClick={(e) => e.stopPropagation()}><div className="flex items-center gap-1"><APInvoiceActions inv={inv} approvals={approvals} onEdit={() => onEdit(inv)} /></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="card-elevated overflow-hidden">
+        <div className="px-4 py-2 border-b border-border text-xs font-semibold">Dernières décisions</div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Facture</th><th>Niveau</th><th>Décision</th><th>Date</th><th>Commentaire</th></tr></thead>
+            <tbody>
+              {decisions.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Aucune décision enregistrée</td></tr>
+              ) : decisions.map((a) => (
+                <tr key={a.id}>
+                  <td className="font-mono">{byId.get(a.invoice_id)?.invoice_number ?? "—"}</td>
+                  <td>{a.level_label}</td>
+                  <td>{STATUT[a.status] ?? a.status}</td>
+                  <td className="tabular-nums">{a.decided_at ? String(a.decided_at).slice(0, 10) : "—"}</td>
+                  <td className="text-muted-foreground">{a.comment ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function APTransactions() {
   const { data: invoices = [], isLoading } = useAPInvoices();
   const { data: suppliers = [] } = useSuppliers();
@@ -274,6 +438,9 @@ export default function APTransactions() {
   const [paymentInv, setPaymentInv] = useState<APInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [editInv, setEditInv] = useState<APInvoice | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TABS = ["invoices", "payments", "approvals", "posting"];
+  const tab = TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "invoices";
   const { data: approvals = [] } = useAPInvoiceApprovals();
   const { data: myAccess } = useMyAccess();
   // V42 : un paiement demande le droit ap.pay (contrôlé en base).
@@ -294,15 +461,15 @@ export default function APTransactions() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Payables", href: "/payables" }, { label: "Supplier Invoices" }]} />
+      <Breadcrumb items={[{ label: "Achats et fournisseurs", href: "/" }, { label: "Comptes fournisseurs", href: "/payables" }, { label: "Transactions" }]} />
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Supplier Invoices</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Gestion des factures fournisseurs, approbation et paiements</p>
+          <h1 className="text-xl font-semibold text-foreground">Comptes fournisseurs — Transactions</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Factures fournisseurs, règlements, approbations, comptabilisation</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> New Supplier Invoice</Button>
+          <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Nouvelle facture fournisseur</Button>
           {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={() => exportToCSV(
             filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
@@ -316,10 +483,10 @@ export default function APTransactions() {
       {/* KPI Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Payable", value: fmtCurrency(totalPayable), color: "text-foreground" },
-          { label: "Pending Approval", value: invoices.filter(i => i.approval_status === "pending").length.toString(), color: "text-amber-600" },
-          { label: "Approved", value: invoices.filter(i => i.approval_status === "approved").length.toString(), color: "text-success" },
-          { label: "Paid", value: invoices.filter(i => i.status === "paid").length.toString(), color: "text-primary" },
+          { label: "Reste à payer", value: fmtCurrency(totalPayable), color: "text-foreground" },
+          { label: "En attente d'approbation", value: invoices.filter(i => i.approval_status === "submitted").length.toString(), color: "text-amber-600" },
+          { label: "Approuvées", value: invoices.filter(i => i.approval_status === "approved").length.toString(), color: "text-success" },
+          { label: "Réglées", value: invoices.filter(i => i.status === "paid").length.toString(), color: "text-primary" },
         ].map(k => (
           <div key={k.label} className="bg-card rounded-lg border border-border p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{k.label}</p>
@@ -328,6 +495,16 @@ export default function APTransactions() {
         ))}
       </div>
 
+      {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="invoices">Factures ({invoices.length})</TabsTrigger>
+          <TabsTrigger value="payments">Règlements</TabsTrigger>
+          <TabsTrigger value="approvals">Approbations ({invoices.filter((i) => i.approval_status === "submitted").length})</TabsTrigger>
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="invoices" className="space-y-3">
       {/* Toolbar */}
       <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
@@ -413,15 +590,25 @@ export default function APTransactions() {
         </div>
       </div>
 
-      {/* GL Posting Section */}
-      <div className="space-y-4 mt-6">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Accounts Payable</h2>
-        </div>
-        <GLPostingKPIsLive module="AP" />
-        <GLBatchHistoryLive module="AP" />
-      </div>
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentsTab onOpenInvoice={(id) => { const inv = invoices.find((i) => i.id === id); if (inv) setSelectedInv(inv); }} />
+        </TabsContent>
+
+        <TabsContent value="approvals">
+          <ApprovalsTab invoices={invoices} approvals={approvals} onOpenInvoice={setSelectedInv} onEdit={setEditInv} />
+        </TabsContent>
+
+        <TabsContent value="posting" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Comptabilisation — journaux et lots des comptes fournisseurs</h2>
+          </div>
+          <GLPostingKPIsLive module="AP" />
+          <GLBatchHistoryLive module="AP" />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
@@ -429,7 +616,7 @@ export default function APTransactions() {
 
       {selectedInv && (
         <InvoicePanel
-          inv={selectedInv}
+          inv={invoices.find((i) => i.id === selectedInv.id) ?? selectedInv}
           onClose={() => setSelectedInv(null)}
           onCreatePayment={() => { setPaymentInv(selectedInv); setSettlementOpen(true); setSelectedInv(null); }}
         />

@@ -413,7 +413,7 @@ function invalidateAP(qc: ReturnType<typeof useQueryClient>) {
 
 export type APInvoiceApproval = {
   id: string; invoice_id: string; level_order: number; level_label: string; approver_label: string | null;
-  amount: number; status: "pending" | "approved" | "rejected" | "skipped"; decided_by: string | null; comment: string | null;
+  amount: number; status: "pending" | "approved" | "rejected" | "skipped"; decided_by: string | null; decided_at?: string | null; comment: string | null;
 };
 
 export function useAPInvoiceApprovals() {

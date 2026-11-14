@@ -52,7 +52,7 @@ Tous les modules suivent la présentation d'Approvisionnement : même menu (**Ta
 | Stocks | ✅ | ✅ |
 | Grand livre | ✅ | ✅ Livres auxiliaires, Manuelles, Contre-passations |
 | Trésorerie | ✅ | ✅ |
-| Comptes fournisseurs | ✅ (depuis le 14 nov.) | 🟡 factures seules — **UX-10** : Factures, Règlements, Approbations |
+| Comptes fournisseurs | ✅ (depuis le 14 nov.) | ✅ Factures, Règlements (liste, annulation motivée), Approbations (à approuver, décisions), Comptabilisation |
 | CRM | ✅ (Transactions = opportunités, Données de base = contacts) | 🟡 **UX-10** : Opportunités, Activités / rappels |
 | RH et paie | ✅ (Données de base = employés) | 🟡 **UX-10** : Saisie, Cycles de paie |
 | Notes de frais, Immobilisations, Budget, Projets, Conformité, Risques | ✅ | 🟡 **UX-10** : à revoir module par module |

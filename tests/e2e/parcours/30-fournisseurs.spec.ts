@@ -15,7 +15,7 @@ test.skip(!identifiants() || !identifiants("approbateur"), "identifiants des com
 
 async function nouvelleFacture(page: Page, fournisseur: string, numero: string, ht: string, tva: string, commande?: string) {
   await page.goto("/payables/transactions");
-  await page.getByRole("button", { name: /New Supplier Invoice/i }).click();
+  await page.getByRole("button", { name: "Nouvelle facture fournisseur" }).click();
   const d = page.getByRole("dialog");
   await d.locator("select").first().selectOption({ label: fournisseur });
   if (commande) {
@@ -187,6 +187,14 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
     await expect(d).toBeHidden();
     await expect(ligne(page, ff1).getByRole("button", { name: /Pay/ })).toHaveCount(0);
     await expect(ligne(page, ffAutre).getByRole("button", { name: /Pay/ }), "la facture de l'autre fournisseur reste due").toBeVisible();
+
+    // Standard de présentation : règlements et approbations ont leur onglet dans Transactions.
+    obs.etape("onglets Règlements et Approbations");
+    await page.getByRole("tab", { name: "Règlements" }).click();
+    await expect(page.getByTestId("ap-payment-row").filter({ hasText: `VIR-${RUN}-2` }), "une ligne par facture réglée").toHaveCount(2);
+    await page.getByRole("tab", { name: /Approbations/ }).click();
+    await expect(page.getByRole("cell", { name: ff1 }).first(), "décision de l'approbateur historisée").toBeVisible();
+    await page.getByRole("tab", { name: /Factures/ }).click();
 
     obs.etape("détail, export, paramètres rétablis");
     await ligne(page, ff1).locator("td").first().click();
