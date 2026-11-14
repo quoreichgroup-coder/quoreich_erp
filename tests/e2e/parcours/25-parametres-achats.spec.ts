@@ -45,3 +45,49 @@ test("paramètres des achats : contrôles et suivi modifiables, conservés, rét
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });
+
+test("paramètres des ventes et des comptes clients : contrôle de crédit, devis expiré, lettrage", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  const ventes = async () => { await page.goto("/sales/settings"); await page.waitForLoadState("networkidle"); };
+
+  obs.etape("ventes : contrôle de crédit en avertissement, devis expiré commandable");
+  await ventes();
+  await expect(page.getByLabel("Contrôle de la limite de crédit")).toHaveValue("block");
+  await page.getByLabel("Contrôle de la limite de crédit").selectOption("warn");
+  await page.getByLabel("Refuser de commander un devis expiré").click();
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
+  testInfo.annotations.push({ type: "ventes", description: await dernierToast(page) });
+  await ventes();
+  await expect(page.getByLabel("Contrôle de la limite de crédit")).toHaveValue("warn");
+  await expect(page.getByLabel("Refuser de commander un devis expiré")).not.toBeChecked();
+
+  obs.etape("ventes : valeurs par défaut rétablies");
+  await page.getByLabel("Contrôle de la limite de crédit").selectOption("block");
+  await page.getByLabel("Refuser de commander un devis expiré").click();
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
+  await dernierToast(page);
+  await ventes();
+  await expect(page.getByLabel("Contrôle de la limite de crédit")).toHaveValue("block");
+  await expect(page.getByLabel("Refuser de commander un devis expiré")).toBeChecked();
+
+  obs.etape("comptes clients : lettrage automatique désactivé puis rétabli");
+  await page.goto("/receivables/settings");
+  await page.waitForLoadState("networkidle");
+  const lettrage = page.getByLabel("Lettrage automatique des factures soldées");
+  await expect(lettrage).toHaveValue("1");
+  await lettrage.selectOption("0");
+  await page.getByRole("button", { name: "Save Changes" }).click();
+  await dernierToast(page);
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(lettrage).toHaveValue("0");
+  await lettrage.selectOption("1");
+  await page.getByRole("button", { name: "Save Changes" }).click();
+  await dernierToast(page);
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(lettrage).toHaveValue("1");
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});

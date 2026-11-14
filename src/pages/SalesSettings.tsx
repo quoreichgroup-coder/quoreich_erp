@@ -16,9 +16,11 @@ export default function SalesSettings() {
   const { data: settings, isLoading } = useSalesSettings();
   const { data: permissions } = useMySalesRoles();
   const update = useUpdateSalesSettings();
-  const canManage = Boolean(permissions?.isAdmin);
+  const canManage = Boolean(permissions?.canSettings);
   const [form, setForm] = useState({
     auto_invoice_on_delivery: true,
+    credit_control_mode: "block",
+    block_expired_quotations: true,
     sla_quote_hours: 48,
     sla_quote_to_so_hours: 72,
     sla_so_to_dn_days: 7,
@@ -34,6 +36,8 @@ export default function SalesSettings() {
     if (settings) {
       setForm({
         auto_invoice_on_delivery: settings.auto_invoice_on_delivery,
+        credit_control_mode: (settings as any).credit_control_mode ?? "block",
+        block_expired_quotations: (settings as any).block_expired_quotations ?? true,
         sla_quote_hours: settings.sla_quote_hours,
         sla_quote_to_so_hours: settings.sla_quote_to_so_hours,
         sla_so_to_dn_days: settings.sla_so_to_dn_days,
@@ -89,7 +93,7 @@ export default function SalesSettings() {
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               ) : (
                 <>
-                  {!canManage && <p className="text-xs text-muted-foreground">Seul un administrateur de la société peut modifier ces paramètres.</p>}
+                  {!canManage && <p className="text-xs text-muted-foreground">Lecture seule : le droit « Modifier les paramètres des ventes » est requis.</p>}
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-xs font-medium">
@@ -106,6 +110,26 @@ export default function SalesSettings() {
                         setForm((f) => ({ ...f, auto_invoice_on_delivery: v }))
                       }
                     />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label htmlFor="sales-credit-mode" className="text-xs font-medium">Contrôle de la limite de crédit</Label>
+                      <p className="text-[11px] text-muted-foreground">À la confirmation d'une commande : encours ouvert + commande comparés à la limite du client.</p>
+                    </div>
+                    <select id="sales-credit-mode" className="h-8 rounded-md border border-input bg-background px-2 text-xs" disabled={!canManage}
+                      value={form.credit_control_mode} onChange={(e) => setForm((f) => ({ ...f, credit_control_mode: e.target.value }))}>
+                      <option value="block">Bloquer (dépassement motivé par un utilisateur habilité)</option>
+                      <option value="warn">Avertir seulement</option>
+                      <option value="off">Ne pas contrôler</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="sales-block-expired" className="text-xs font-medium">Refuser de commander un devis expiré</Label>
+                      <p className="text-[11px] text-muted-foreground">Désactivé : un devis dépassé peut encore être transformé en commande.</p>
+                    </div>
+                    <Switch id="sales-block-expired" aria-label="Refuser de commander un devis expiré" checked={form.block_expired_quotations} disabled={!canManage}
+                      onCheckedChange={(v) => setForm((f) => ({ ...f, block_expired_quotations: v }))} />
                   </div>
                   <p className="rounded-md border border-border bg-muted/40 p-3 text-[11px] text-muted-foreground">
                     Les stocks ne sont pas réservés à la confirmation. Leur mouvement est enregistré à la livraison.
@@ -268,7 +292,7 @@ function SalesNumberingSettings() {
   const { data: series = [], isLoading } = useSalesNumberingSeries();
   const { data: permissions } = useMySalesRoles();
   const update = useUpdateSalesNumberingSeries();
-  const canManage = Boolean(permissions?.isAdmin);
+  const canManage = Boolean(permissions?.canSettings);
   const names: Record<SalesNumberingSeries["doc_type"], string> = {
     quotation: "Devis",
     sales_order: "Commande de vente",

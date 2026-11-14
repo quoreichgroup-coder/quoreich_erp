@@ -260,7 +260,7 @@ export function useUpdateSalesSettings() {
         .select("tenant_id")
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("Seul un administrateur peut modifier ces paramètres, ou la société n'a pas de configuration.");
+      if (!data) throw new Error("Modification refusée : droit « Modifier les paramètres des ventes » requis, ou la société n'a pas de configuration.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales-settings"] });
@@ -315,8 +315,7 @@ export function useUpdateSalesNumberingSeries() {
 }
 
 export function useMySalesRoles() {
-  // Droits dits par la base (my_access, V27). L'export CSV, action du navigateur sans
-  // équivalent au catalogue, reste par rôle.
+  // Droits dits par la base (my_access, V27) ; export et paramètres : droits du catalogue (V58).
   const q = useMyAccess();
   const can = moduleCan(q.data, "sales");
   const roles = new Set(q.data?.roles ?? []);
@@ -328,7 +327,8 @@ export function useMySalesRoles() {
       canConfirm: can("confirm"),
       canDeliver: can("deliver"),
       canInvoice: can("invoice"),
-      canExport: roles.has("admin") || roles.has("sales_manager") || roles.has("sales_controller"),
+      canExport: can("export"),
+      canSettings: can("settings"),
       roles: Array.from(roles),
     },
   };

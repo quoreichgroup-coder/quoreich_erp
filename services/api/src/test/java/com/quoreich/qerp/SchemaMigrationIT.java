@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "57";
+  private static final String DERNIERE_MIGRATION = "58";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -100,7 +100,11 @@ class SchemaMigrationIT {
           // V56 — fiche fournisseur : écriture réservée.
           "suppliers/Tenant isolation",
           // V57 — achats paramétrables : paramètres des achats réservés.
-          "procurement_settings/tenant_isolation_procurement_settings");
+          "procurement_settings/tenant_isolation_procurement_settings",
+          // V58 — ventes et comptes clients paramétrables.
+          "ar_general_settings/Tenant isolation",
+          "ar_numbering_series/Tenant isolation",
+          "ar_notification_log/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -296,7 +300,10 @@ class SchemaMigrationIT {
           "acknowledge_purchase_order",
           "reschedule_purchase_order",
           // V57 — achats paramétrables.
-          "procurement_setting");
+          "procurement_setting",
+          // V58 — ventes et comptes clients paramétrables.
+          "sales_setting",
+          "ar_setting");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -346,22 +353,29 @@ class SchemaMigrationIT {
           "procurement_settings/Lecture société",
           "procurement_settings/Modification habilitée",
           "procurement_settings/Création habilitée",
+          // V58 — ventes et comptes clients paramétrables.
+          "ar_general_settings/Lecture société",
+          "ar_general_settings/Paramétrage habilité",
+          "ar_numbering_series/Lecture société",
+          "ar_numbering_series/Paramétrage habilité",
+          "ar_notification_log/Lecture société",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
           "customers/Modification habilitée",
-          "customers/Suppression comptable",
+          "customers/Suppression habilitée",
           "ar_payment_terms/Lecture société",
-          "ar_payment_terms/Gestion comptable",
+          "ar_payment_terms/Paramétrage habilité",
           "ar_dunning_rules/Lecture société",
-          "ar_dunning_rules/Gestion comptable",
+          "ar_dunning_rules/Paramétrage habilité",
           "ar_notification_rules/Lecture société",
-          "ar_notification_rules/Gestion comptable",
+          "ar_notification_rules/Paramétrage habilité",
           "sales_numbering_series/Tenant read",
-          "sales_numbering_series/Tenant admin update",
+          "sales_numbering_series/Paramétrage habilité",
           "sales_settings/Tenant read",
-          "sales_settings/Tenant admin update",
+          "sales_settings/Paramétrage habilité",
+          "sales_settings/Création habilitée",
           "fiscal_modules/Lecture du référentiel",
           "fiscal_years/Tenant isolation",
           "fiscal_periods/Tenant isolation",
@@ -382,13 +396,13 @@ class SchemaMigrationIT {
           "analytic_defaults/Tenant isolation",
           "analytic_defaults/Gestion comptable",
           "ar_invoice_analytics/Tenant isolation",
-          "ar_invoice_analytics/Gestion comptable",
+          "ar_invoice_analytics/Saisie habilitée",
           "journal_line_analytics/Tenant isolation",
           "journal_line_analytics/Gestion comptable",
           "tax_codes/Tenant isolation",
-          "tax_codes/Administrateur de la société",
+          "tax_codes/Gestion habilitée",
           "ar_invoice_lines/Tenant isolation",
-          "ar_invoice_lines/Gestion comptable",
+          "ar_invoice_lines/Saisie habilitée",
           "document_counters/Tenant isolation",
           "erp_permission_catalog/Lecture du référentiel",
           "erp_system_roles/Lecture du référentiel",

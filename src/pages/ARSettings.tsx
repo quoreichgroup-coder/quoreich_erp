@@ -56,6 +56,12 @@ function GeneralTab() {
           </select>
         </div>
         <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor="ar-auto-lettering">Lettrage automatique des factures soldées</Label>
+          <select id="ar-auto-lettering" className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs" value={form.auto_lettering === false ? "0" : "1"} onChange={e => setForm((f: any) => ({ ...f, auto_lettering: e.target.value === "1" }))}>
+            <option value="1">Activé</option><option value="0">Désactivé (lettrage manuel)</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
           <Label className="text-xs">Late Payment Interest (%)</Label>
           <Input type="number" step="0.1" className="h-9 text-xs" value={form.late_payment_interest_pct ?? ""} onChange={e => setForm((f: any) => ({ ...f, late_payment_interest_pct: parseFloat(e.target.value) || 0 }))} />
         </div>

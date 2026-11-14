@@ -310,7 +310,7 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
   const lines = useARInvoiceLines(inv.id);
   const { data: access } = useMyAccess();
   const perms = new Set(access?.permissions ?? []);
-  const isWriter = (access?.roles ?? []).some((r) => r === "admin" || r === "accountant");
+  const isWriter = (access?.permissions ?? []).includes("ar.invoice");
   const [creditOpen, setCreditOpen] = useState(false);
 
   return (
@@ -457,7 +457,7 @@ export default function ARTransactions() {
   const statusOptions = ["all", "draft", "sent", "partially_paid", "paid", "overdue"];
   const { data: access } = useMyAccess();
   const canReceive = (access?.permissions ?? []).includes("ar.receipt");
-  const isWriter = (access?.roles ?? []).some((r) => r === "admin" || r === "accountant");
+  const isWriter = (access?.permissions ?? []).includes("ar.invoice");
 
   const filtered = invoices.filter(inv => {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
