@@ -928,7 +928,7 @@ export interface components {
             /** Format: uuid */
             reversalOf?: string;
             reversalReason?: string;
-            /** @description ar_receipt (encaissement) ou ar_credit (imputation d'un avoir, V45) */
+            /** @description ar_receipt (encaissement), ar_credit (imputation d'un avoir, V45) ou ar_advance (imputation d'un acompte, V49) */
             paymentType: string;
         };
         ArInvoiceLineView: {

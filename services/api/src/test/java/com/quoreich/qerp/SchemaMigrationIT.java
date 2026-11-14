@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "48";
+  private static final String DERNIERE_MIGRATION = "49";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -135,7 +135,12 @@ class SchemaMigrationIT {
           "ap_invoice_approvals",
           // V45 — avoirs clients.
           "ar_credit_notes",
-          "ar_credit_note_lines");
+          "ar_credit_note_lines",
+          // V49 — acomptes, remboursements et lettrage clients.
+          "ar_customer_advances",
+          "ar_customer_refunds",
+          "ar_letterings",
+          "ar_lettering_counters");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -221,7 +226,16 @@ class SchemaMigrationIT {
           "update_sales_order",
           "delete_sales_order",
           // V47 — identité légale de la société.
-          "set_company_identity");
+          "set_company_identity",
+          // V49 — acomptes, crédits et lettrage clients.
+          "post_two_line_entry",
+          "require_posting_account",
+          "record_customer_advance",
+          "apply_customer_credit",
+          "refund_customer_credit",
+          "lettering_code_of",
+          "letter_ar_invoice",
+          "on_ar_invoice_lettering");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -231,6 +245,9 @@ class SchemaMigrationIT {
           "ap_invoice_approvals/Tenant isolation",
           "ar_credit_notes/Tenant isolation",
           "ar_credit_note_lines/Tenant isolation",
+          "ar_customer_advances/Tenant isolation",
+          "ar_customer_refunds/Tenant isolation",
+          "ar_letterings/Tenant isolation",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -332,7 +349,9 @@ class SchemaMigrationIT {
           // V42 — règlements figés, facture client figée une fois émise.
           "payments/trg_guard_payment",
           "ar_invoices/trg_guard_ar_invoice_lifecycle",
-          "ar_invoice_lines/trg_guard_ar_invoice_lines");
+          "ar_invoice_lines/trg_guard_ar_invoice_lines",
+          // V49 — lettrage automatique des factures soldées.
+          "ar_invoices/trg_ar_invoice_lettering");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

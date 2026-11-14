@@ -59,13 +59,13 @@ class ParametrageComptableIT {
   @DisplayName("l'administrateur applique SYSCOHADA : comptes et rôles créés ; rejouer ne change rien")
   void appliquerLeReferentielEstIdempotent() throws Exception {
     assertThat(asUser(BETA_ADMIN, "SELECT apply_accounting_framework('SYSCOHADA_REVISE')::text"))
-        .contains("\"comptes_crees\": 8")
-        .contains("\"roles_parametres\": 7");
+        .contains("\"comptes_crees\": 9") // + 4191 avances clients (V49)
+        .contains("\"roles_parametres\": 8");
 
     assertThat(rows("SELECT p.role_code || ' ' || g.code FROM tenant_posting_accounts p JOIN"
                 + " gl_accounts g ON g.id = p.gl_account_id WHERE p.tenant_id = ?::uuid ORDER BY 1", B))
         .containsExactly(
-            "AP_PAYABLE 401", "AR_RECEIVABLE 411", "BANK 521", "PURCHASES 601",
+            "AP_PAYABLE 401", "AR_RECEIVABLE 411", "BANK 521", "CUSTOMER_ADVANCE 4191", "PURCHASES 601",
             "SALES_REVENUE 701", "VAT_INPUT 4452", "VAT_OUTPUT 4431");
     assertThat(rows("SELECT framework_code FROM tenant_accounting_settings WHERE tenant_id = ?::uuid", B))
         .containsExactly("SYSCOHADA_REVISE");
@@ -91,7 +91,7 @@ class ParametrageComptableIT {
                   + " WHERE role_code = 'BANK'"))
           .isZero();
       // La lecture reste permise dans la société.
-      assertThat(asUser(user, "SELECT count(*)::text FROM tenant_posting_accounts")).isEqualTo("7");
+      assertThat(asUser(user, "SELECT count(*)::text FROM tenant_posting_accounts")).isEqualTo("8"); // + avances clients (V49)
     }
     assertThat(update(ALPHA_ADMIN, "UPDATE tenant_posting_accounts SET updated_at = now()"
             + " WHERE role_code = 'BANK'"))
@@ -156,7 +156,7 @@ class ParametrageComptableIT {
   void referentielInconnuEtLectureSeule() throws Exception {
     assertThatThrownBy(() -> asUser(ALPHA_ADMIN, "SELECT apply_accounting_framework('PCG_FR')::text"))
         .hasMessageContaining("Référentiel comptable inconnu");
-    assertThat(asUser(ALPHA_ADMIN, "SELECT count(*)::text FROM posting_roles")).isEqualTo("7");
+    assertThat(asUser(ALPHA_ADMIN, "SELECT count(*)::text FROM posting_roles")).isEqualTo("8"); // + CUSTOMER_ADVANCE (V49)
     assertThatThrownBy(
             () -> asUser(ALPHA_ADMIN, "DELETE FROM accounting_frameworks RETURNING code"))
         .hasMessageContaining("permission denied");

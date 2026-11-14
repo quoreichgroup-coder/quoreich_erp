@@ -649,7 +649,7 @@ export function useARInvoicePayments(invoiceId: string | undefined) {
         }));
       }
       const { data, error } = await supabase.from("payments").select("*")
-        .in("payment_type", ["ar_receipt", "ar_credit"]).eq("ar_invoice_id", invoiceId!).order("created_at");
+        .in("payment_type", ["ar_receipt", "ar_credit", "ar_advance"]).eq("ar_invoice_id", invoiceId!).order("created_at");
       if (error) throw error;
       return (data || []) as unknown as Payment[];
     },

@@ -27,6 +27,8 @@ import {
 import { useMyAccess } from "@/hooks/use-my-access";
 import { CreditNoteDialog, CreditNotesList } from "@/components/ARCreditNotes";
 import { CustomerStatementDialog } from "@/components/CustomerStatement";
+import { AdvanceDialog, CustomerCreditsList, InvoiceCredits } from "@/components/ARCustomerCredits";
+import { useARLetterings } from "@/hooks/use-ar-credits";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
@@ -212,6 +214,7 @@ function InvoicePayments({ inv, canReverse }: { inv: ARInvoice; canReverse: bool
               <td className="text-right tabular-nums">{fmt(Number(p.amount))}</td>
               <td className="text-right">
                 {p.payment_type === "ar_credit" ? <span>Avoir</span>
+                  : p.payment_type === "ar_advance" ? <span>Acompte</span>
                   : p.reversal_of ? <span>Annulation</span>
                   : reversed.has(p.id) ? <span>Annulé</span>
                   : canReverse ? (
@@ -339,6 +342,7 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
           />
           {inv.status === "draft" && isWriter && !isApiEnabled() && <DraftActions inv={inv} onDone={onClose} />}
           <InvoicePayments inv={inv} canReverse={perms.has("ar.reverse_receipt")} />
+          {!isApiEnabled() && <InvoiceCredits inv={inv} canApply={perms.has("ar.receipt")} />}
           <CreditNotesList invoiceId={inv.id} />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
@@ -370,6 +374,8 @@ export default function ARTransactions() {
   const [paymentInv, setPaymentInv] = useState<ARInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const { data: letterings } = useARLetterings(invoices.filter((i) => i.status === "paid").map((i) => i.id).sort().join(","));
   const bulk = useBulkARDrafts();
 
   const statusOptions = ["all", "draft", "sent", "partially_paid", "paid", "overdue"];
@@ -445,6 +451,7 @@ export default function ARTransactions() {
         <div className="flex items-center gap-2">
           {isWriter && <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>}
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
+          {canReceive && !isApiEnabled() && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}><Receipt className="w-3.5 h-3.5" /> Acompte client</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setStatementOpen(true)}><BookOpen className="w-3.5 h-3.5" /> Relevé de compte</Button>
           <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={handleExport}><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
@@ -515,13 +522,14 @@ export default function ARTransactions() {
                 <th className="text-right">Total</th>
                 <th className="text-right">Restant</th>
                 <th>Statut</th>
+                <th title="Code de lettrage : facture soldée et pièces qui la soldent">Lettrage</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={8} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+                <tr><td colSpan={9} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">
+                <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">
                   {invoices.length === 0 ? "Aucune facture — créez votre première facture AR" : "Aucun résultat"}
                 </td></tr>
               ) : (
@@ -541,6 +549,7 @@ export default function ARTransactions() {
                       <td>
                         <StatusBadge status={statusType(inv.status)} label={statusLabel(inv.status)} />
                       </td>
+                      <td className="font-mono text-xs text-muted-foreground" data-testid="ar-lettering">{letterings?.get(inv.id)?.code ?? ""}</td>
                     </tr>
                   );
                 })
@@ -549,6 +558,13 @@ export default function ARTransactions() {
           </table>
         </div>
       </div>
+
+      {/* Acomptes et crédits clients (V49) */}
+      {!isApiEnabled() && (
+        <div className="mt-6 rounded-md border border-border bg-card p-4">
+          <CustomerCreditsList canRefund={(access?.permissions ?? []).includes("ar.refund")} />
+        </div>
+      )}
 
       {/* Avoirs clients (V45) */}
       <div className="mt-6 rounded-md border border-border bg-card p-4">
@@ -568,10 +584,12 @@ export default function ARTransactions() {
       {/* Dialogs */}
       <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
       <CustomerStatementDialog open={statementOpen} onClose={() => setStatementOpen(false)} />
+      <AdvanceDialog open={advanceOpen} onClose={() => setAdvanceOpen(false)} />
 
       {selectedInv && (
         <InvoicePanel
-          inv={selectedInv}
+          // La facture à jour (après un encaissement, une imputation, un avoir), pas la copie du clic.
+          inv={invoices.find((i) => i.id === selectedInv.id) ?? selectedInv}
           onClose={() => setSelectedInv(null)}
           onRecordPayment={() => { setPaymentInv(selectedInv); setSettlementOpen(true); setSelectedInv(null); }}
         />

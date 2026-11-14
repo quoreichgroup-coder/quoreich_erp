@@ -14,5 +14,5 @@ public record ArPaymentView(
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) String reference,
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) UUID reversalOf,
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) String reversalReason,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "ar_receipt (encaissement) ou ar_credit (imputation d'un avoir, V45)")
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "ar_receipt (encaissement), ar_credit (imputation d'un avoir, V45) ou ar_advance (imputation d'un acompte, V49)")
         String paymentType) {}

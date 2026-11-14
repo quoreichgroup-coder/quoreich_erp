@@ -62,6 +62,21 @@ function useMovements(customerId: string) {
       for (const n of notes ?? []) {
         out.push({ date: n.credit_date, piece: n.credit_note_number, label: `Avoir sur ${n.invoice?.invoice_number ?? ""} — ${n.reason}`, debit: 0, credit: Number(n.total) });
       }
+      // V49 : acomptes reçus (crédit du client) et remboursements (débit). Leur imputation sur une
+      // facture est un virement interne 4191 → 411 : sans effet sur la position du client.
+      const [{ data: adv, error: ae }, { data: refunds, error: re }] = await Promise.all([
+        (supabase as any).from("ar_customer_advances").select("advance_number, received_date, amount, reference").eq("customer_id", customerId),
+        (supabase as any).from("ar_customer_refunds").select("refund_date, amount, reference, source_type").eq("customer_id", customerId),
+      ]);
+      if (ae) throw ae;
+      if (re) throw re;
+      for (const a of adv ?? []) {
+        out.push({ date: a.received_date, piece: a.advance_number, label: `Acompte reçu${a.reference ? ` (${a.reference})` : ""}`, debit: 0, credit: Number(a.amount) });
+      }
+      for (const r of refunds ?? []) {
+        out.push({ date: r.refund_date, piece: r.reference || "—", label: r.source_type === "advance" ? "Remboursement d'acompte" : "Remboursement d'avoir",
+          debit: Number(r.amount), credit: 0 });
+      }
       return out;
     },
   });

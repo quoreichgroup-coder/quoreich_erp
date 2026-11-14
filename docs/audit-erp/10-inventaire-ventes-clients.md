@@ -43,7 +43,7 @@ où il en faut, un CRUD complet et des actions groupées. Légende : ✅ fait et
 ## Reste à faire (ventes et clients)
 
 - Retour client sur livraison (pièce de retour et entrée en stock), puis avoir lié.
-- Acomptes clients et lettrage (V46 prévu à l'origine, renuméroté).
+- ~~Acomptes clients et lettrage~~ : faits en V49 (acompte, imputation, remboursement, lettrage automatique).
 - Listes de prix par client, remises par client.
 - Actions groupées sur site (API) : statut des fiches clients.
 - Relances exécutées (les niveaux existent, aucun traitement ne les applique).

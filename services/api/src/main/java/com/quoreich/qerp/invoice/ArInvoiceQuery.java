@@ -191,7 +191,7 @@ public class ArInvoiceQuery {
     return Optional.of(
         jdbc.query(
             "SELECT id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, payment_type"
-                + " FROM payments WHERE ar_invoice_id = ? AND payment_type IN ('ar_receipt', 'ar_credit')"
+                + " FROM payments WHERE ar_invoice_id = ? AND payment_type IN ('ar_receipt', 'ar_credit', 'ar_advance')"
                 + " ORDER BY created_at, id",
             (rs, i) ->
                 new ArPaymentView(

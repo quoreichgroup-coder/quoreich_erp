@@ -204,6 +204,46 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await expect(detailEcriture.getByRole("region", { name: "Pied" })).toContainText("168 000");
   await page.keyboard.press("Escape");
 
+  // V49 : acompte reçu avant facture (banque / 4191), imputé sur la facture de l'autre client,
+  // solde encaissé → facture lettrée ; reliquat de l'acompte remboursé.
+  obs.etape("acompte client : imputation, solde, lettrage, remboursement du reliquat");
+  await page.goto("/receivables/transactions");
+  await page.getByRole("button", { name: "Acompte client" }).click();
+  const acp = page.getByRole("dialog", { name: "Acompte client" });
+  await acp.getByLabel("Client *").selectOption({ label: autre });
+  await acp.getByLabel("Montant (XOF) *").fill("25000");
+  await acp.getByLabel("Référence").fill(`ACP-${RUN}`);
+  await acp.getByRole("button", { name: "Enregistrer l'acompte" }).click();
+  testInfo.annotations.push({ type: "acompte", description: await dernierToast(page) });
+  await expect(acp).toBeHidden();
+  await ligne(page, numeroAutre).click();
+  const pAutre = page.getByRole("dialog", { name: `Facture ${numeroAutre}` });
+  const credits = pAutre.getByRole("region", { name: "Crédits du client" });
+  await expect(credits.getByTestId("invoice-credit-row")).toHaveCount(1);
+  await credits.locator("input").fill("20000");
+  await credits.getByRole("button", { name: "Imputer" }).click();
+  testInfo.annotations.push({ type: "imputation", description: await dernierToast(page) });
+  await expect(pAutre.getByRole("region", { name: "Pied" }), "40 000 − 20 000").toContainText("20 000");
+  await expect(pAutre.getByRole("region", { name: "Règlements" })).toContainText("Acompte");
+  await pAutre.getByRole("button", { name: /Enregistrer paiement/ }).click();
+  const enc = page.getByRole("dialog", { name: "Encaissement client" });
+  await expect(enc.getByLabel(`Montant imputé ${numeroAutre}`)).toHaveValue("20000");
+  await enc.getByLabel("Référence").fill(`ENC-${RUN}-AUTRE`);
+  await enc.getByRole("button", { name: "Enregistrer le règlement" }).click();
+  await expect(enc).toBeHidden();
+  await fermerPanneau(page);
+  await expect(ligne(page, numeroAutre).getByTestId("ar-lettering"), "facture soldée : code de lettrage").toHaveText(/^[A-Z]{2,}$/);
+
+  const reliquat = page.getByRole("region", { name: "Acomptes et crédits clients" }).getByTestId("customer-credit-row").filter({ hasText: autre });
+  await expect(reliquat).toContainText("5 000");
+  await reliquat.getByRole("button", { name: "Rembourser" }).click();
+  const remb = page.getByRole("dialog", { name: /^Rembourser / });
+  await remb.getByLabel("Référence").fill(`REMB-${RUN}`);
+  await remb.getByRole("button", { name: /Rembourser 5/ }).click();
+  testInfo.annotations.push({ type: "remboursement", description: await dernierToast(page) });
+  await expect(remb).toBeHidden();
+  await expect(reliquat).toHaveCount(0);
+
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });
