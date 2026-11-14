@@ -33,6 +33,23 @@ RFQ et comparatif (G-29) ; réception de services (G-30) ; retenues à la source
 
 Tranches API Java AP / achats / stock / GL pour un sur site complet (G-39) ; idempotence et tests de concurrence (G-41) ; accessibilité et responsive (UX-8, UX-9) ; sauvegarde / restauration testée (T-13).
 
+## Stocks, achats et achats internationaux (ajout du 14 nov. 2026)
+
+Analyse complète et justification : [11-stocks-achats-international.md](11-stocks-achats-international.md).
+
+| Lot | Écarts | Contenu | Priorité |
+|---|---|---|---|
+| S1 — fait (V53) | S-stocks | Écritures directes fermées, ajustement motivé, transfert limité à la société, écrans réels | ✅ |
+| S2 | G-42 | Alerte au point de commande, tableau de bord Stocks réel | P1 |
+| R1 | G-42, G-43 | Règles par article × dépôt, catalogue fournisseur, stock prévisionnel, propositions → demandes d'achat | P1 |
+| A1 | G-45, G-33 | Fiche fournisseur complète, dates prévues et retards, envoi de la commande | P1 |
+| I1 | G-46 | Devises, écarts de change, avance fournisseur | P1 (sociétés importatrices) |
+| I2 | G-47 | Dossier d'import, frais d'approche répartis dans le coût du stock, douane UEMOA | P1 (sociétés importatrices) |
+| S3 | G-44 | Campagnes d'inventaire, gel, aveugle, tolérance, tournant ABC | P2 (P1 avant la clôture annuelle) |
+| A2 | G-29 | Demandes de prix et comparatif | P2 |
+| I3 | G-48 | En-cours de route, suivi logistique | P2 |
+| A3 | G-50 | Contrats-cadres, évaluation fournisseurs | P3 |
+
 ## Décisions attendues de votre part
 
 | # | Décision | Recommandation |

@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "52";
+  private static final String DERNIERE_MIGRATION = "53";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -87,7 +87,16 @@ class SchemaMigrationIT {
           "customers/Tenant isolation",
           "ar_payment_terms/Tenant isolation",
           "ar_dunning_rules/Tenant isolation",
-          "ar_notification_rules/Tenant isolation");
+          "ar_notification_rules/Tenant isolation",
+          // V53 — stocks : plus d'écriture pour tout membre.
+          "stock_movements/Tenant isolation",
+          "stock_valuation_layers/valuation layers tenant access",
+          "inventory_settings/inv settings tenant access",
+          "items/Tenant isolation",
+          "warehouses/warehouses tenant access",
+          "item_locations/item_locations tenant access",
+          "inventory_counts/inv counts tenant access",
+          "inventory_count_lines/inv count lines tenant access");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -251,7 +260,12 @@ class SchemaMigrationIT {
           "po_line_returned",
           "create_ap_credit_note",
           "credit_supplier_return",
-          "create_supplier_return");
+          "create_supplier_return",
+          // V53 — stocks sécurisés.
+          "guard_item_stock_fields",
+          "guard_inventory_count",
+          "stock_item_of_tenant",
+          "create_stock_adjustment");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -269,6 +283,23 @@ class SchemaMigrationIT {
           "ap_credit_notes/Tenant isolation",
           "supplier_returns/Tenant isolation",
           "supplier_return_lines/Tenant isolation",
+          // V53 — stocks sécurisés.
+          "stock_movements/Lecture société",
+          "stock_valuation_layers/Lecture société",
+          "inventory_settings/Lecture société",
+          "inventory_settings/Administrateur de la société",
+          "items/Lecture société",
+          "items/Création habilitée",
+          "items/Modification habilitée",
+          "items/Suppression administrateur",
+          "warehouses/Lecture société",
+          "warehouses/Écriture habilitée",
+          "item_locations/Lecture société",
+          "item_locations/Écriture habilitée",
+          "inventory_counts/Lecture société",
+          "inventory_counts/Comptage habilité",
+          "inventory_count_lines/Lecture société",
+          "inventory_count_lines/Comptage habilité",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -374,7 +405,11 @@ class SchemaMigrationIT {
           // V49 — lettrage automatique des factures soldées.
           "ar_invoices/trg_ar_invoice_lettering",
           // V50 — supprimer un brouillon issu d'une livraison libère la livraison.
-          "ar_invoices/trg_release_delivery_on_draft_delete");
+          "ar_invoices/trg_release_delivery_on_draft_delete",
+          // V53 — stock et coût moyen non saisissables, comptage validé figé.
+          "items/trg_guard_item_stock_fields",
+          "inventory_counts/trg_guard_inventory_count",
+          "inventory_count_lines/trg_guard_inventory_count_lines");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

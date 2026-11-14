@@ -42,8 +42,9 @@ export function useUpdateItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; [key: string]: unknown }) => {
-      const { error } = await supabase.from("items").update(updates as never).eq("id", id);
+      const { data, error } = await (supabase as any).from("items").update(updates).eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : droit « Mouvements de stock » requis.");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["items"] }); toast.success("Article mis à jour"); },
     onError: (e: Error) => toast.error(e.message),
@@ -73,6 +74,19 @@ export function useCreateWarehouse() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["warehouses"] }); toast.success("Entrepôt créé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; code?: string; name?: string; address?: string | null; status?: string }) => {
+      const { data, error } = await (supabase as any).from("warehouses").update(updates).eq("id", id).select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : droit « Mouvements de stock » requis.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["warehouses"] }); toast.success("Dépôt mis à jour"); },
     onError: (e: Error) => toast.error(e.message),
   });
 }
@@ -130,30 +144,49 @@ export function useStockMovementsAudit(filters?: { from?: string; to?: string; i
   });
 }
 
-export function useCreateStockMovement() {
-  const qc = useQueryClient();
+/** Tous les mouvements de la société, pages épuisées (pas de troncature à 500 pour les listes et exports). */
+export function useAllStockMovements() {
   const { data: tenantId } = useTenantId();
-  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["stock-movements", "all", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const rows: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await (supabase as any).from("stock_movements")
+          .select("*, item:items(name, code, unit), warehouse:warehouses(code, name), entry:journal_entries(piece_number)")
+          .eq("tenant_id", tenantId)
+          .order("movement_date", { ascending: false }).order("created_at", { ascending: false })
+          .range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      return rows;
+    },
+  });
+}
+
+const STOCK_KEYS = ["stock-movements", "items", "stock-valuation", "inventory-kpis", "inventory-kpis-view", "item-locations",
+  "journal-entries", "gl-batches", "low-stock"];
+
+/**
+ * Ajustement de stock motivé (V53, droit inventory.adjust) : les mouvements ne s'écrivent plus
+ * directement dans la table ; la base valorise une sortie au coût moyen et passe l'écriture.
+ */
+export function useCreateStockAdjustment() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
-      item_id: string; quantity: number; movement_type: string;
-      unit_cost?: number; warehouse_id?: string; reference_type?: string; reference_id?: string;
-      movement_date?: string;
-    }) => {
-      const { error } = await supabase.from("stock_movements").insert({
-        ...input,
-        tenant_id: tenantId!,
-        created_by: user?.id,
-        status: "posted",
-      } as never);
+    mutationFn: async (input: { item_id: string; warehouse_id: string | null; quantity: number; unit_cost: number; date: string; reason: string }) => {
+      const { error } = await (supabase as any).rpc("create_stock_adjustment", {
+        _item_id: input.item_id, _warehouse_id: input.warehouse_id, _quantity: input.quantity, _unit_cost: input.unit_cost,
+        _movement_date: input.date, _reason: input.reason,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["stock-movements"] });
-      qc.invalidateQueries({ queryKey: ["items"] });
-      qc.invalidateQueries({ queryKey: ["stock-valuation"] });
-      qc.invalidateQueries({ queryKey: ["inventory-kpis"] });
-      toast.success("Mouvement enregistré");
+      for (const k of STOCK_KEYS) qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Ajustement enregistré et comptabilisé");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -169,9 +202,7 @@ export function useTransferStock() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["stock-movements"] });
-      qc.invalidateQueries({ queryKey: ["items"] });
-      qc.invalidateQueries({ queryKey: ["item-locations"] });
+      for (const k of STOCK_KEYS) qc.invalidateQueries({ queryKey: [k] });
       toast.success("Transfert effectué");
     },
     onError: (e: Error) => toast.error(e.message),

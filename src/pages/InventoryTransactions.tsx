@@ -1,233 +1,295 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Plus, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ClipboardEdit, BookOpen, Lock } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeftRight, BookOpen, ClipboardEdit, Download, Loader2 } from "lucide-react";
 import { useTableFeatures } from "@/hooks/use-table-features";
 import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
-import { useMyInventoryRoles } from "@/hooks/use-inventory-data";
-import { actionTooltip, canDo } from "@/lib/inventory-roles";
+import { useAllStockMovements, useCreateStockAdjustment, useItems, useTransferStock, useWarehouses } from "@/hooks/use-inventory-data";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { movementLabel, movementsOfTab, validateAdjustment, type MovementTab } from "@/lib/stock-movements";
 import { exportToCSV } from "@/lib/csv-export";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-const fmt = (n: number) => n.toLocaleString("fr-FR");
+/*
+ * Stocks → Transactions : mouvements réels de la société (réceptions, livraisons, retours,
+ * transferts, ajustements, écarts d'inventaire), un onglet par type de pièce. Les mouvements ne se
+ * saisissent pas dans la table (V53) : ils naissent des pièces ou des deux fonctions habilitées
+ * ci-dessous (ajustement motivé, transfert entre dépôts).
+ */
+const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+const today = () => new Date().toISOString().split("T")[0];
+const num = (s: string) => Number(String(s).replace(",", "."));
 
-const goodsReceipts = [
-  { id: "GR-2025-001", date: "2025-03-01", poRef: "PO-2025-001", supplier: "Dell Technologies", product: "Serveurs Dell R760", qty: 5, unit: "Unit", warehouse: "WH-ABJ-01", unitCost: 25000000, totalCost: 125000000, status: "Complete", glEntry: "DR 1200 / CR 2010" },
-  { id: "GR-2025-002", date: "2025-03-03", poRef: "PO-2025-002", supplier: "Office Depot", product: "Mobilier bureau", qty: 20, unit: "Set", warehouse: "WH-ABJ-01", unitCost: 160000, totalCost: 3200000, status: "Partial", glEntry: "DR 1200 / CR 2010" },
-  { id: "GR-2025-003", date: "2025-03-05", poRef: "PO-2025-003", supplier: "SecuTrain Africa", product: "Formation sécurité", qty: 1, unit: "Service", warehouse: "N/A", unitCost: 7500000, totalCost: 7500000, status: "Complete", glEntry: "DR 6200 / CR 2010" },
-  { id: "GR-2025-004", date: "2025-03-08", poRef: "PO-2025-004", supplier: "Cisco Systems", product: "Switch Catalyst 9300", qty: 10, unit: "Unit", warehouse: "WH-ABJ-02", unitCost: 8900000, totalCost: 89000000, status: "Pending", glEntry: "Pending" },
-];
+type Row = {
+  id: string; date: string; type: string; libelle: string; article: string; code: string; depot: string;
+  quantite: number; cout: number; valeur: number; piece: string; motif: string;
+};
 
-const goodsIssues = [
-  { id: "GI-2025-001", date: "2025-03-02", soRef: "SO-2025-001", customer: "SONATEL", product: "Module Controller X1", qty: 15, unit: "Unit", warehouse: "WH-DKR-01", unitCost: 1200000, totalCost: 18000000, status: "Complete", glEntry: "DR 5000 / CR 1200" },
-  { id: "GI-2025-002", date: "2025-03-04", soRef: "SO-2025-003", customer: "Orange CI", product: "Cable fibre optique", qty: 500, unit: "m", warehouse: "WH-ABJ-01", unitCost: 12000, totalCost: 6000000, status: "Complete", glEntry: "DR 5000 / CR 1200" },
-  { id: "GI-2025-003", date: "2025-03-07", soRef: "SO-2025-005", customer: "MTN CI", product: "Antenne relais", qty: 3, unit: "Unit", warehouse: "WH-ABJ-02", unitCost: 15000000, totalCost: 45000000, status: "Partial", glEntry: "DR 5000 / CR 1200" },
-];
+function MovementsTable({ rows, empty }: { rows: Row[]; empty: string }) {
+  const t = useTableFeatures({
+    data: rows, pageSize: 15, searchableKeys: ["article", "code", "depot", "piece", "motif", "libelle"],
+    filterConfigs: [{ key: "libelle", label: "Type", options: Array.from(new Set(rows.map((r) => r.libelle))).sort() }],
+  });
+  return (
+    <Card className="border-border"><CardContent className="p-0">
+      <FilterBar search={t.search} onSearch={t.setSearch} filters={t.filters} onFilter={t.setFilter} onClear={t.clearFilters}
+        filterConfigs={t.filterConfigs} activeCount={t.activeFilterCount} searchPlaceholder="Article, dépôt, pièce, motif…" />
+      <div className="overflow-x-auto">
+        <Table><TableHeader><TableRow className="bg-muted/30">
+          <SortableHead label="Date" sortKey="date" sort={t.sort} onSort={t.toggleSort} />
+          <SortableHead label="Type" sortKey="libelle" sort={t.sort} onSort={t.toggleSort} />
+          <SortableHead label="Article" sortKey="article" sort={t.sort} onSort={t.toggleSort} />
+          <SortableHead label="Dépôt" sortKey="depot" sort={t.sort} onSort={t.toggleSort} />
+          <SortableHead label="Quantité" sortKey="quantite" sort={t.sort} onSort={t.toggleSort} className="text-right" />
+          <SortableHead label="Coût unitaire" sortKey="cout" sort={t.sort} onSort={t.toggleSort} className="text-right" />
+          <SortableHead label="Valeur" sortKey="valeur" sort={t.sort} onSort={t.toggleSort} className="text-right" />
+          <SortableHead label="Pièce comptable" sortKey="piece" sort={t.sort} onSort={t.toggleSort} />
+          <SortableHead label="Motif" sortKey="motif" sort={t.sort} onSort={t.toggleSort} />
+        </TableRow></TableHeader>
+        <TableBody>
+          {t.pagedData.length === 0 ? (
+            <TableRow><TableCell colSpan={9} className="text-center text-xs text-muted-foreground py-8">{empty}</TableCell></TableRow>
+          ) : t.pagedData.map((r) => (
+            <TableRow key={r.id} className="text-xs" data-testid="stock-movement-row">
+              <TableCell className="tabular-nums">{r.date}</TableCell>
+              <TableCell>{r.libelle}</TableCell>
+              <TableCell><span className="font-mono text-muted-foreground mr-1">{r.code}</span>{r.article}</TableCell>
+              <TableCell>{r.depot || "—"}</TableCell>
+              <TableCell className={cn("text-right tabular-nums", r.quantite < 0 && "text-destructive")}>{fmt(r.quantite)}</TableCell>
+              <TableCell className="text-right tabular-nums">{fmt(r.cout)}</TableCell>
+              <TableCell className="text-right tabular-nums">{fmt(r.valeur)}</TableCell>
+              <TableCell className="font-mono">{r.piece || "—"}</TableCell>
+              <TableCell className="truncate max-w-[14rem]">{r.motif || "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody></Table>
+      </div>
+      <PaginationBar page={t.page} totalPages={t.totalPages} totalItems={t.totalItems} pageSize={t.pageSize} onPageChange={t.setPage} />
+    </CardContent></Card>
+  );
+}
 
-const stockTransfers = [
-  { id: "ST-2025-001", date: "2025-03-01", fromWH: "WH-ABJ-01", toWH: "WH-DKR-01", product: "Module Controller X1", qty: 20, status: "Complete", initiator: "A. Koné" },
-  { id: "ST-2025-002", date: "2025-03-05", fromWH: "WH-ABJ-02", toWH: "WH-ABJ-01", product: "Bearing SKF 6205", qty: 50, status: "In Transit", initiator: "B. Coulibaly" },
-  { id: "ST-2025-003", date: "2025-03-08", fromWH: "WH-DKR-01", toWH: "WH-ABJ-02", product: "Safety Gloves L", qty: 200, status: "Pending", initiator: "D. Ouattara" },
-];
+function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { data: items = [] } = useItems();
+  const { data: warehouses = [] } = useWarehouses();
+  const create = useCreateStockAdjustment();
+  const [itemId, setItemId] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [qty, setQty] = useState("");
+  const [cost, setCost] = useState("");
+  const [date, setDate] = useState(today());
+  const [reason, setReason] = useState("");
+  const item: any = items.find((i: any) => i.id === itemId);
+  const q = num(qty);
+  const error = validateAdjustment({ itemId, quantity: q, reason }, Number(item?.quantity_on_hand ?? 0));
+  const close = () => { setItemId(""); setQty(""); setCost(""); setReason(""); onClose(); };
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-sm">Ajustement de stock</DialogTitle>
+          <DialogDescription className="text-xs">
+            Quantité positive pour un excédent, négative pour un manquant. Un manquant se valorise au coût moyen ; l'écriture
+            Stocks / Variation des stocks est passée automatiquement en inventaire permanent.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="adj-item">Article</Label>
+            <select id="adj-item" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {items.map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name} (stock {fmt(Number(i.quantity_on_hand ?? 0))})</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="adj-warehouse">Dépôt</Label>
+              <select id="adj-warehouse" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                <option value="">—</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="adj-date">Date</Label>
+              <Input id="adj-date" type="date" className="h-8 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="adj-qty">Quantité (±)</Label>
+              <Input id="adj-qty" className="h-8 text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="adj-cost">Coût unitaire (excédent)</Label>
+              <Input id="adj-cost" className="h-8 text-xs text-right" inputMode="decimal" disabled={!(q > 0)} value={cost}
+                placeholder={item ? `coût moyen ${fmt(Number(item.average_cost ?? 0))}` : ""} onChange={(e) => setCost(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="adj-reason">Motif (obligatoire)</Label>
+            <Input id="adj-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, péremption, erreur de saisie…" />
+          </div>
+          {error && (itemId || qty || reason) && <p className="text-xs text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={close}>Annuler</Button>
+          <Button size="sm" disabled={!!error || create.isPending}
+            onClick={() => create.mutate({ item_id: itemId, warehouse_id: warehouseId || null, quantity: q, unit_cost: num(cost) || 0, date, reason: reason.trim() },
+              { onSuccess: close })}>
+            {create.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}Enregistrer l'ajustement
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-const adjustments = [
-  { id: "ADJ-2025-001", date: "2025-03-03", product: "Copper Wire 2.5mm", warehouse: "WH-ABJ-01", systemQty: 150, physicalQty: 138, variance: -12, reason: "Physical count — shrinkage", glEntry: "DR 5900 / CR 1200", approvedBy: "M. Diallo" },
-  { id: "ADJ-2025-002", date: "2025-03-06", product: "Steel Bar 12mm", warehouse: "WH-ABJ-02", systemQty: 35, physicalQty: 40, variance: 5, reason: "Unrecorded receipt found", glEntry: "DR 1200 / CR 5900", approvedBy: "S. Koné" },
-];
+function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { data: items = [] } = useItems();
+  const { data: warehouses = [] } = useWarehouses();
+  const transfer = useTransferStock();
+  const [itemId, setItemId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [qty, setQty] = useState("");
+  const [notes, setNotes] = useState("");
+  const q = num(qty);
+  const error = !itemId ? "Choisissez l'article." : !from || !to || from === to ? "Choisissez deux dépôts différents."
+    : !(q > 0) ? "La quantité transférée doit être positive." : null;
+  const close = () => { setItemId(""); setQty(""); setNotes(""); onClose(); };
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-sm">Transfert entre dépôts</DialogTitle>
+          <DialogDescription className="text-xs">Deux mouvements (sortie puis entrée) au coût moyen ; aucune écriture comptable (même compte de stock).</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="tr-item">Article</Label>
+            <select id="tr-item" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {items.map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[["tr-from", "Dépôt de départ", from, setFrom], ["tr-to", "Dépôt d'arrivée", to, setTo]].map(([id, label, value, set]) => (
+              <div key={id as string} className="space-y-1.5">
+                <Label className="text-xs" htmlFor={id as string}>{label as string}</Label>
+                <select id={id as string} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={value as string}
+                  onChange={(e) => (set as (v: string) => void)(e.target.value)}>
+                  <option value="">Choisir…</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
+                </select>
+              </div>
+            ))}
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="tr-qty">Quantité</Label>
+              <Input id="tr-qty" className="h-8 text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="tr-notes">Note</Label>
+              <Input id="tr-notes" className="h-8 text-xs" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+          </div>
+          {error && (itemId || qty) && <p className="text-xs text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={close}>Annuler</Button>
+          <Button size="sm" disabled={!!error || transfer.isPending}
+            onClick={() => transfer.mutate({ item_id: itemId, from_wh: from, to_wh: to, qty: q, notes: notes.trim() || undefined }, { onSuccess: close })}>
+            Transférer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function InventoryTransactions() {
-  const grTable = useTableFeatures({ data: goodsReceipts, pageSize: 10, searchableKeys: ["id", "product", "supplier"], filterConfigs: [{ key: "status", label: "Status", options: ["Complete", "Partial", "Pending"] }] });
-  const giTable = useTableFeatures({ data: goodsIssues, pageSize: 10, searchableKeys: ["id", "product", "customer"], filterConfigs: [{ key: "status", label: "Status", options: ["Complete", "Partial"] }] });
-  const { data: perms } = useMyInventoryRoles();
+  const { data: movements = [], isLoading } = useAllStockMovements();
+  const { data: access } = useMyAccess();
+  const perms = new Set(access?.permissions ?? []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TABS = ["movements", "transfers", "adjustments", "posting"];
+  const tab = TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "movements";
+  const [adjOpen, setAdjOpen] = useState(false);
+  const [trOpen, setTrOpen] = useState(false);
 
-  const canMove = canDo(perms, "move");
-  const canExport = canDo(perms, "export");
+  const rows: Row[] = useMemo(() => movements.map((m: any) => ({
+    id: m.id, date: m.movement_date, type: m.movement_type, libelle: movementLabel(m.movement_type, m.reference_type),
+    article: m.item?.name ?? "", code: m.item?.code ?? "", depot: m.warehouse ? `${m.warehouse.code} — ${m.warehouse.name}` : "",
+    quantite: Number(m.quantity), cout: Number(m.unit_cost ?? 0), valeur: Number(m.total_value ?? 0) * (Number(m.quantity) < 0 ? -1 : 1),
+    piece: m.entry?.piece_number ?? "", motif: m.reason ?? "",
+  })), [movements]);
+  const shown = (t: MovementTab) => movementsOfTab(rows.map((r) => ({ ...r, movement_type: r.type })), t);
 
-  const handleExport = () => {
-    if (!canExport) { toast.error(actionTooltip(perms, "export")); return; }
-    exportToCSV(
-      goodsReceipts as unknown as Record<string, unknown>[],
-      [
-        { key: "id", header: "GR" }, { key: "date", header: "Date" }, { key: "poRef", header: "PO" },
-        { key: "supplier", header: "Supplier" }, { key: "product", header: "Product" },
-        { key: "qty", header: "Qty" }, { key: "warehouse", header: "Warehouse" },
-        { key: "totalCost", header: "Total Cost" }, { key: "status", header: "Status" },
-      ],
-      `inventory-movements-${new Date().toISOString().slice(0, 10)}`,
-    );
+  const exporter = () => {
+    const t = (tab === "posting" ? "movements" : tab) as MovementTab;
+    exportToCSV(shown(t), [
+      { key: "date", header: "Date" }, { key: "libelle", header: "Type" }, { key: "code", header: "Code article" },
+      { key: "article", header: "Article" }, { key: "depot", header: "Dépôt" }, { key: "quantite", header: "Quantité" },
+      { key: "cout", header: "Coût unitaire" }, { key: "valeur", header: "Valeur" }, { key: "piece", header: "Pièce comptable" },
+      { key: "motif", header: "Motif" },
+    ], `mouvements-de-stock-${t}`);
   };
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Inventory Control", href: "/inventory" }, { label: "Transactions" }]} />
-      <GuidanceBanner title="Inventory Transactions" description="Goods receipts, issues, stock transfers, and inventory adjustments with GL posting integration." />
+      <Breadcrumb items={[{ label: "Stocks" }, { label: "Gestion des stocks", href: "/inventory" }, { label: "Transactions" }]} />
+      <GuidanceBanner title="Mouvements de stock"
+        description="Réceptions, livraisons, retours, transferts et ajustements réels de la société, avec leur pièce comptable. Un mouvement naît d'une pièce : il ne se saisit ni ne se modifie directement." />
 
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Inventory Transactions</h1>
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+        <h1 className="text-lg font-semibold text-foreground">Stocks — Transactions</h1>
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="gap-1.5"
-            disabled={!canMove}
-            aria-disabled={!canMove}
-            aria-label={canMove ? "Nouveau mouvement" : actionTooltip(perms, "move")}
-            title={actionTooltip(perms, "move", "Créer un mouvement de stock")}
-          >
-            {canMove ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            New Movement
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={!canExport}
-            aria-disabled={!canExport}
-            aria-label={canExport ? "Exporter en CSV" : actionTooltip(perms, "export")}
-            title={actionTooltip(perms, "export", "Exporter les mouvements en CSV")}
-            onClick={handleExport}
-          >
-            {canExport ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            Export
-          </Button>
+          {perms.has("inventory.adjust") && (
+            <Button size="sm" className="gap-1.5" onClick={() => setAdjOpen(true)}><ClipboardEdit className="w-3.5 h-3.5" />Ajustement de stock</Button>
+          )}
+          {perms.has("inventory.transfer") && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrOpen(true)}><ArrowLeftRight className="w-3.5 h-3.5" />Transfert</Button>
+          )}
+          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exporter}><Download className="w-3.5 h-3.5" />Exporter</Button>
         </div>
       </div>
 
-
-      <Tabs defaultValue="receipts">
-        <TabsList className="mb-4">
-          <TabsTrigger value="receipts" className="gap-1.5"><ArrowDownLeft className="w-3.5 h-3.5" />Goods Receipt</TabsTrigger>
-          <TabsTrigger value="issues" className="gap-1.5"><ArrowUpRight className="w-3.5 h-3.5" />Goods Issue</TabsTrigger>
-          <TabsTrigger value="transfers" className="gap-1.5"><ArrowLeftRight className="w-3.5 h-3.5" />Stock Transfer</TabsTrigger>
-          <TabsTrigger value="adjustments" className="gap-1.5"><ClipboardEdit className="w-3.5 h-3.5" />Adjustments</TabsTrigger>
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start mb-4">
+          <TabsTrigger value="movements">Mouvements ({rows.length})</TabsTrigger>
+          <TabsTrigger value="transfers">Transferts</TabsTrigger>
+          <TabsTrigger value="adjustments">Ajustements et inventaires</TabsTrigger>
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="receipts">
-          <Card className="border-border"><CardContent className="p-0">
-            <FilterBar search={grTable.search} onSearch={grTable.setSearch} filters={grTable.filters} onFilter={grTable.setFilter} onClear={grTable.clearFilters} filterConfigs={grTable.filterConfigs} activeCount={grTable.activeFilterCount} searchPlaceholder="Search receipts…" />
-            <Table><TableHeader><TableRow className="bg-muted/30">
-              <SortableHead label="GR #" sortKey="id" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Date" sortKey="date" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="PO Ref" sortKey="poRef" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Supplier" sortKey="supplier" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Product" sortKey="product" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Qty" sortKey="qty" sort={grTable.sort} onSort={grTable.toggleSort} className="text-right" />
-              <SortableHead label="Warehouse" sortKey="warehouse" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Total Cost" sortKey="totalCost" sort={grTable.sort} onSort={grTable.toggleSort} className="text-right" />
-              <SortableHead label="GL" sortKey="glEntry" sort={grTable.sort} onSort={grTable.toggleSort} />
-              <SortableHead label="Status" sortKey="status" sort={grTable.sort} onSort={grTable.toggleSort} />
-            </TableRow></TableHeader>
-            <TableBody>{grTable.pagedData.map(r => (
-              <TableRow key={r.id} className="text-xs">
-                <TableCell className="font-mono text-primary">{r.id}</TableCell>
-                <TableCell>{r.date}</TableCell>
-                <TableCell className="font-mono text-muted-foreground">{r.poRef}</TableCell>
-                <TableCell className="font-medium">{r.supplier}</TableCell>
-                <TableCell className="max-w-[150px] truncate">{r.product}</TableCell>
-                <TableCell className="text-right font-mono">{r.qty} {r.unit}</TableCell>
-                <TableCell className="font-mono text-muted-foreground">{r.warehouse}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(r.totalCost)}</TableCell>
-                <TableCell className="font-mono text-[10px] text-muted-foreground">{r.glEntry}</TableCell>
-                <TableCell><Badge className={`text-[10px] ${r.status === "Complete" ? "bg-success/15 text-success border-success/20" : r.status === "Partial" ? "bg-amber-500/15 text-amber-700 border-amber-500/20" : "bg-muted text-muted-foreground"}`} variant="outline">{r.status}</Badge></TableCell>
-              </TableRow>
-            ))}</TableBody></Table>
-            <PaginationBar page={grTable.page} totalPages={grTable.totalPages} totalItems={grTable.totalItems} pageSize={grTable.pageSize} onPageChange={grTable.setPage} />
-          </CardContent></Card>
-        </TabsContent>
-
-        <TabsContent value="issues">
-          <Card className="border-border"><CardContent className="p-0">
-            <FilterBar search={giTable.search} onSearch={giTable.setSearch} filters={giTable.filters} onFilter={giTable.setFilter} onClear={giTable.clearFilters} filterConfigs={giTable.filterConfigs} activeCount={giTable.activeFilterCount} searchPlaceholder="Search issues…" />
-            <Table><TableHeader><TableRow className="bg-muted/30">
-              <SortableHead label="GI #" sortKey="id" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="Date" sortKey="date" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="SO Ref" sortKey="soRef" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="Customer" sortKey="customer" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="Product" sortKey="product" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="Qty" sortKey="qty" sort={giTable.sort} onSort={giTable.toggleSort} className="text-right" />
-              <SortableHead label="Total Cost" sortKey="totalCost" sort={giTable.sort} onSort={giTable.toggleSort} className="text-right" />
-              <SortableHead label="GL" sortKey="glEntry" sort={giTable.sort} onSort={giTable.toggleSort} />
-              <SortableHead label="Status" sortKey="status" sort={giTable.sort} onSort={giTable.toggleSort} />
-            </TableRow></TableHeader>
-            <TableBody>{giTable.pagedData.map(r => (
-              <TableRow key={r.id} className="text-xs">
-                <TableCell className="font-mono text-primary">{r.id}</TableCell>
-                <TableCell>{r.date}</TableCell>
-                <TableCell className="font-mono text-muted-foreground">{r.soRef}</TableCell>
-                <TableCell className="font-medium">{r.customer}</TableCell>
-                <TableCell className="max-w-[150px] truncate">{r.product}</TableCell>
-                <TableCell className="text-right font-mono">{r.qty} {r.unit}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(r.totalCost)}</TableCell>
-                <TableCell className="font-mono text-[10px] text-muted-foreground">{r.glEntry}</TableCell>
-                <TableCell><Badge className={`text-[10px] ${r.status === "Complete" ? "bg-success/15 text-success border-success/20" : "bg-amber-500/15 text-amber-700 border-amber-500/20"}`} variant="outline">{r.status}</Badge></TableCell>
-              </TableRow>
-            ))}</TableBody></Table>
-            <PaginationBar page={giTable.page} totalPages={giTable.totalPages} totalItems={giTable.totalItems} pageSize={giTable.pageSize} onPageChange={giTable.setPage} />
-          </CardContent></Card>
-        </TabsContent>
-
-        <TabsContent value="transfers">
-          <Card className="border-border"><CardContent className="p-0">
-            <Table><TableHeader><TableRow className="bg-muted/30">
-              {["ID", "Date", "From", "To", "Product", "Qty", "Status", "Initiator"].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
-              ))}
-            </TableRow></TableHeader>
-            <TableBody>{stockTransfers.map(t => (
-              <TableRow key={t.id} className="text-xs">
-                <TableCell className="font-mono text-primary">{t.id}</TableCell>
-                <TableCell>{t.date}</TableCell>
-                <TableCell className="font-mono">{t.fromWH}</TableCell>
-                <TableCell className="font-mono">{t.toWH}</TableCell>
-                <TableCell className="font-medium">{t.product}</TableCell>
-                <TableCell className="text-right font-mono">{t.qty}</TableCell>
-                <TableCell><Badge className={`text-[10px] ${t.status === "Complete" ? "bg-success/15 text-success border-success/20" : t.status === "In Transit" ? "bg-blue-500/15 text-blue-700 border-blue-500/20" : "bg-muted text-muted-foreground"}`} variant="outline">{t.status}</Badge></TableCell>
-                <TableCell className="text-muted-foreground">{t.initiator}</TableCell>
-              </TableRow>
-            ))}</TableBody></Table>
-          </CardContent></Card>
-        </TabsContent>
-
-        <TabsContent value="adjustments">
-          <Card className="border-border"><CardContent className="p-0">
-            <Table><TableHeader><TableRow className="bg-muted/30">
-              {["ID", "Date", "Product", "Warehouse", "System Qty", "Physical Qty", "Variance", "Reason", "GL Entry", "Approved By"].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
-              ))}
-            </TableRow></TableHeader>
-            <TableBody>{adjustments.map(a => (
-              <TableRow key={a.id} className="text-xs">
-                <TableCell className="font-mono text-primary">{a.id}</TableCell>
-                <TableCell>{a.date}</TableCell>
-                <TableCell className="font-medium">{a.product}</TableCell>
-                <TableCell className="font-mono text-muted-foreground">{a.warehouse}</TableCell>
-                <TableCell className="text-right font-mono">{a.systemQty}</TableCell>
-                <TableCell className="text-right font-mono">{a.physicalQty}</TableCell>
-                <TableCell className={`text-right font-mono font-medium ${a.variance < 0 ? "text-destructive" : "text-success"}`}>{a.variance > 0 ? "+" : ""}{a.variance}</TableCell>
-                <TableCell className="max-w-[180px] truncate text-muted-foreground">{a.reason}</TableCell>
-                <TableCell className="font-mono text-[10px] text-muted-foreground">{a.glEntry}</TableCell>
-                <TableCell>{a.approvedBy}</TableCell>
-              </TableRow>
-            ))}</TableBody></Table>
-          </CardContent></Card>
+        {(["movements", "transfers", "adjustments"] as MovementTab[]).map((t) => (
+          <TabsContent key={t} value={t}>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <MovementsTable rows={shown(t)} empty={t === "movements" ? "Aucun mouvement de stock." : "Aucun mouvement de ce type."} />
+            )}
+          </TabsContent>
+        ))}
+        <TabsContent value="posting" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Comptabilisation — mouvements de stock</h2>
+          </div>
+          <GLPostingKPIsLive module="Inventory" />
+          <GLBatchHistoryLive module="Inventory" />
         </TabsContent>
       </Tabs>
 
-      {/* GL Posting */}
-      <div className="space-y-4 mt-6">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Inventory</h2>
-        </div>
-        <GLPostingKPIsLive module="Inventory" />
-        <GLBatchHistoryLive module="Inventory" />
-      </div>
+      <AdjustmentDialog open={adjOpen} onClose={() => setAdjOpen(false)} />
+      <TransferDialog open={trOpen} onClose={() => setTrOpen(false)} />
     </PageShell>
   );
 }
+

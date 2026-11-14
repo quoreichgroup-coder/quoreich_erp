@@ -36,6 +36,7 @@ Légende utilisée dans tous les livrables :
 | 08 | [08-plan-de-tests-e2e.md](08-plan-de-tests-e2e.md) | Scénarios, données, résultats attendus, preuves |
 | 09 | [09-feuille-de-route.md](09-feuille-de-route.md) | Recommandations classées P0 → P3, plan progressif |
 | 10 | [10-inventaire-ventes-clients.md](10-inventaire-ventes-clients.md) | CRUD et actions groupées, écran par écran, ventes et comptes clients |
+| 11 | [11-stocks-achats-international.md](11-stocks-achats-international.md) | Stocks, réapprovisionnement, inventaires, achats et achats internationaux comparés aux références ; lots S / R / A / I proposés |
 
 ## Synthèse pour la direction
 
