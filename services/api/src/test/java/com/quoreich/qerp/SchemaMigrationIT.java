@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "53";
+  private static final String DERNIERE_MIGRATION = "55";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -156,7 +156,11 @@ class SchemaMigrationIT {
           // V52 — retours et avoirs fournisseurs.
           "ap_credit_notes",
           "supplier_returns",
-          "supplier_return_lines");
+          "supplier_return_lines",
+          // V54 — réapprovisionnement.
+          "supplier_items",
+          "item_replenishment_rules",
+          "replenishment_proposals");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -265,7 +269,16 @@ class SchemaMigrationIT {
           "guard_item_stock_fields",
           "guard_inventory_count",
           "stock_item_of_tenant",
-          "create_stock_adjustment");
+          "create_stock_adjustment",
+          // V54 — réapprovisionnement.
+          "replenishment_target_ok",
+          "replenishment_quantity",
+          "generate_replenishment_proposals",
+          "convert_replenishment_proposals",
+          "dismiss_replenishment_proposal",
+          // V55 — isolation stricte des sociétés.
+          "assert_same_tenant",
+          "install_tenant_isolation_triggers");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -300,6 +313,12 @@ class SchemaMigrationIT {
           "inventory_counts/Comptage habilité",
           "inventory_count_lines/Lecture société",
           "inventory_count_lines/Comptage habilité",
+          // V54 — réapprovisionnement.
+          "supplier_items/Lecture société",
+          "supplier_items/Écriture habilitée",
+          "item_replenishment_rules/Lecture société",
+          "item_replenishment_rules/Écriture habilitée",
+          "replenishment_proposals/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -412,7 +431,7 @@ class SchemaMigrationIT {
           "inventory_count_lines/trg_guard_inventory_count_lines");
 
   /** V38 — synthèse des lots du grand livre. */
-  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");
+  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {
@@ -527,7 +546,8 @@ class SchemaMigrationIT {
         JOIN pg_class c ON c.oid = t.tgrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND NOT t.tgisinternal
-        """)), "déclencheurs");
+          AND t.tgname <> 'trg_zz_isolation_societe'
+        """)), "déclencheurs"); // V55 : famille générée, couverture vérifiée par IsolationSocietesIT
 
     memeEnsemble(avec(sans(MANIFESTE.cles("policies", 1, 2), POLITIQUES_RETIREES), POLITIQUES_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT tablename || '/' || policyname FROM pg_policies WHERE schemaname = 'public'

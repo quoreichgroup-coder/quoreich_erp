@@ -116,7 +116,7 @@ class ReapprovisionnementIT {
     assertThatThrownBy(() -> asUser(LECTEUR, "SELECT generate_replenishment_proposals()::text")).hasMessageContaining("Droit insuffisant");
     assertThatThrownBy(() -> asUser(ADMIN, "INSERT INTO item_replenishment_rules (tenant_id, item_id, method, reorder_point, order_qty)"
             + " VALUES ('" + A + "', '" + artB + "', 'reorder_point', 5, 10) RETURNING id::text"))
-        .as("article d'une autre société").hasMessageContaining("row-level security");
+        .as("article d'une autre société : refusé par l'isolation des sociétés (V55)").hasMessageContaining("Isolation des sociétés");
     assertThatThrownBy(() -> asUser(ADMIN, "INSERT INTO item_replenishment_rules (tenant_id, item_id, method, reorder_point, max_qty)"
             + " VALUES ('" + A + "', '" + art + "', 'min_max', 10, 5) RETURNING id::text"))
         .as("maximum sous le point de commande").hasMessageContaining("replenishment_rule_quantities");
