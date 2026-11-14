@@ -14,6 +14,7 @@ import {
   useInventorySettings,
   useUpdateInventorySettings,
   useWarehouses,
+  useMyInventoryRoles,
 } from "@/hooks/use-inventory-data";
 
 export default function InventorySettings() {
@@ -25,6 +26,9 @@ export default function InventorySettings() {
   const [negative, setNegative] = useState(false);
   const [valuation, setValuation] = useState<string>("average");
   const [defaultWH, setDefaultWH] = useState<string>("");
+  const [reasonRequired, setReasonRequired] = useState(true);
+  const { data: perms } = useMyInventoryRoles();
+  const canEdit = Boolean((perms as any)?.canSettings);
 
   useEffect(() => {
     if (settings) {
@@ -32,6 +36,7 @@ export default function InventorySettings() {
       setNegative(Boolean(settings.negative_stock_allowed ?? false));
       setValuation((settings.valuation_method as string) ?? "average");
       setDefaultWH((settings.default_warehouse_id as string) ?? "");
+      setReasonRequired((settings as any).adjustment_reason_required ?? true);
     }
   }, [settings]);
 
@@ -41,7 +46,8 @@ export default function InventorySettings() {
       negative_stock_allowed: negative,
       valuation_method: valuation,
       default_warehouse_id: defaultWH || null,
-    });
+      adjustment_reason_required: reasonRequired,
+    } as any);
   };
 
   return (
@@ -89,7 +95,15 @@ export default function InventorySettings() {
                 <span className="text-xs text-muted-foreground">{negative ? "Autorisé" : "Bloqué (recommandé)"}</span>
               </div>
             </div>
-            <Button size="sm" className="text-xs" onClick={save} disabled={update.isPending}>Enregistrer</Button>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="inventory-reason-required">Motif obligatoire sur les ajustements</Label>
+              <div className="flex items-center gap-2 h-9">
+                <Switch id="inventory-reason-required" checked={reasonRequired} onCheckedChange={setReasonRequired} disabled={!canEdit} />
+                <span className="text-xs text-muted-foreground">{reasonRequired ? "Oui (recommandé pour la piste d'audit)" : "Facultatif"}</span>
+              </div>
+            </div>
+            {!canEdit && <p className="text-xs text-muted-foreground">Lecture seule : le droit « Modifier les paramètres de stock » est requis.</p>}
+            <Button size="sm" className="text-xs" onClick={save} disabled={update.isPending || !canEdit}>Enregistrer</Button>
           </CardContent>
         </Card>
 

@@ -51,9 +51,15 @@ export function canDo(perms: InventoryPerms | undefined, action: InventoryAction
   }
 }
 
+/** Droit du catalogue requis par chaque action (attribuable à tout rôle, Paramètres → Rôles et autorisations). */
+const PERMISSION_LABELS: Record<InventoryAction, string> = {
+  move: "Mouvements de stock", adjust: "Ajustements de stock", transfer: "Transferts entre dépôts",
+  count: "Comptages d'inventaire", post_count: "Validation des inventaires", close: "Clôture des stocks",
+  export: "Exporter les données de stock",
+};
+
 export function missingRoleHint(action: InventoryAction): string {
-  const roles = REQUIRED_ROLES[action].map((r) => ROLE_LABELS[r] ?? r).join(", ");
-  return `Action verrouillée — rôle requis : ${roles}.`;
+  return `Action verrouillée — droit requis : « ${PERMISSION_LABELS[action]} » (attribuable à tout rôle). Rôles par défaut : ${REQUIRED_ROLES[action].map((r) => ROLE_LABELS[r] ?? r).join(", ")}.`;
 }
 
 export function actionTooltip(

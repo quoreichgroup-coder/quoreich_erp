@@ -78,7 +78,7 @@ describe("inventory-roles: tooltip / hint", () => {
 
   it("actionTooltip returns missing-role hint when disallowed", () => {
     const p = permsForRoles(["inventory_clerk"]);
-    expect(actionTooltip(p, "export", "Exporter CSV")).toMatch(/rôle requis/);
+    expect(actionTooltip(p, "export", "Exporter CSV")).toMatch(/droit requis : « Exporter les données de stock »/);
   });
 
   it("actionTooltip with no enabledLabel returns empty string when allowed", () => {

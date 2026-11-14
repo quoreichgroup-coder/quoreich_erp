@@ -23,5 +23,6 @@ describe("mouvements de stock", () => {
     expect(validateAdjustment({ ...ok, reason: " " }, 10)).toMatch(/motif/);
     expect(validateAdjustment({ ...ok, quantity: -11 }, 10)).toMatch(/supérieur au stock/);
     expect(validateAdjustment(ok, 10)).toBeNull();
+    expect(validateAdjustment({ ...ok, reason: "" }, 10, false), "motif facultatif si la société le décide (V59)").toBeNull();
   });
 });

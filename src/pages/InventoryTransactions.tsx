@@ -14,7 +14,7 @@ import { ArrowLeftRight, BookOpen, ClipboardEdit, Download, Loader2 } from "luci
 import { useTableFeatures } from "@/hooks/use-table-features";
 import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
-import { useAllStockMovements, useCreateStockAdjustment, useItems, useTransferStock, useWarehouses } from "@/hooks/use-inventory-data";
+import { useAllStockMovements, useCreateStockAdjustment, useInventorySettings, useItems, useTransferStock, useWarehouses } from "@/hooks/use-inventory-data";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { movementLabel, movementsOfTab, validateAdjustment, type MovementTab } from "@/lib/stock-movements";
 import { exportToCSV } from "@/lib/csv-export";
@@ -83,6 +83,8 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const { data: items = [] } = useItems();
   const { data: warehouses = [] } = useWarehouses();
   const create = useCreateStockAdjustment();
+  const { data: stockSettings } = useInventorySettings();
+  const reasonRequired = (stockSettings as any)?.adjustment_reason_required ?? true;
   const [itemId, setItemId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [qty, setQty] = useState("");
@@ -91,7 +93,7 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [reason, setReason] = useState("");
   const item: any = items.find((i: any) => i.id === itemId);
   const q = num(qty);
-  const error = validateAdjustment({ itemId, quantity: q, reason }, Number(item?.quantity_on_hand ?? 0));
+  const error = validateAdjustment({ itemId, quantity: q, reason }, Number(item?.quantity_on_hand ?? 0), reasonRequired);
   const close = () => { setItemId(""); setQty(""); setCost(""); setReason(""); onClose(); };
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
@@ -134,7 +136,7 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="adj-reason">Motif (obligatoire)</Label>
+            <Label className="text-xs" htmlFor="adj-reason">{reasonRequired ? "Motif (obligatoire)" : "Motif"}</Label>
             <Input id="adj-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, péremption, erreur de saisie…" />
           </div>
           {error && (itemId || qty || reason) && <p className="text-xs text-destructive" role="alert">{error}</p>}

@@ -35,10 +35,10 @@ export function movementsOfTab<T extends { movement_type: string }>(rows: T[], t
 }
 
 /** Contrôle de saisie d'un ajustement : message en français, ou null. */
-export function validateAdjustment(a: { itemId: string; quantity: number; reason: string }, onHand: number): string | null {
+export function validateAdjustment(a: { itemId: string; quantity: number; reason: string }, onHand: number, reasonRequired = true): string | null {
   if (!a.itemId) return "Choisissez l'article.";
   if (!Number.isFinite(a.quantity) || a.quantity === 0) return "Saisissez une quantité (positive pour un excédent, négative pour un manquant).";
-  if (!a.reason.trim()) return "Le motif de l'ajustement est obligatoire.";
+  if (reasonRequired && !a.reason.trim()) return "Le motif de l'ajustement est obligatoire.";
   if (a.quantity < 0 && -a.quantity > onHand) return `Manquant supérieur au stock (${onHand}).`;
   return null;
 }

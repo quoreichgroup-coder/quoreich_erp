@@ -680,9 +680,7 @@ export const INVENTORY_ROLE_LABELS: Array<{ value: InventoryRole; label: string 
 const INV_ROLES: InventoryRole[] = ["inventory_clerk", "inventory_manager", "inventory_controller"];
 
 export function useMyInventoryRoles() {
-  // Droits dits par la base (my_access, V27). La clôture suit inventory.close (réservée de fait
-  // à admin, comme la base) ; l'export CSV, action du navigateur sans équivalent au catalogue,
-  // reste par rôle.
+  // Droits dits par la base (my_access, V27) ; export et paramètres : droits du catalogue (V59).
   const q = useMyAccess();
   const can = moduleCan(q.data, "inventory");
   const roles = q.data?.roles ?? [];
@@ -699,7 +697,9 @@ export function useMyInventoryRoles() {
       canCount:     can("count"),
       canPostCount: can("post_count"),
       canClose:     can("close"),
-      canExport:    hasRole("inventory_manager") || hasRole("inventory_controller"),
+      canExport:    can("export"),
+      canSettings:  can("settings"),
+      canDeleteItem: can("delete_item"),
     },
   };
 }

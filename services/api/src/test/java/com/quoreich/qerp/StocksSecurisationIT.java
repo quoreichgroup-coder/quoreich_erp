@@ -85,7 +85,9 @@ class StocksSecurisationIT {
         .isEqualTo("Article renommé");
     assertThat(asUser(MAGASINIER, "WITH u AS (UPDATE inventory_settings SET auto_je_on_movement = false WHERE tenant_id = '" + A
             + "' RETURNING 1) SELECT count(*)::text FROM u"))
-        .as("paramètres de stock : administrateur seulement").isEqualTo("0");
+        .as("paramètres de stock : droit inventory.settings requis").isEqualTo("0");
+    assertThat(asUser(MAGASINIER, "WITH d AS (DELETE FROM items WHERE id = '" + art + "' RETURNING 1) SELECT count(*)::text FROM d"))
+        .as("suppression d'article : droit inventory.delete_item requis").isEqualTo("0");
   }
 
   @Test
@@ -103,6 +105,13 @@ class StocksSecurisationIT {
     assertThat(texte("SELECT quantity_on_hand::text FROM items WHERE id = '" + art + "'")).isEqualTo("8.00");
     assertThat(texte("SELECT count(*)::text FROM journal_lines l JOIN stock_movements s ON s.journal_entry_id = l.entry_id WHERE s.id = '" + m + "'"))
         .isEqualTo("2");
+
+    // V59 : motif paramétrable ; réglé ici « facultatif », puis rétabli.
+    owner("UPDATE inventory_settings SET adjustment_reason_required = false WHERE tenant_id = '" + A + "'");
+    String sansMotif = asUser(ADMIN, "SELECT create_stock_adjustment('" + art + "', '" + wh + "', 1, 0, CURRENT_DATE, NULL)::text");
+    assertThat(texte("SELECT (reason IS NULL)::text FROM stock_movements WHERE id = '" + sansMotif + "'")).isEqualTo("true");
+    owner("UPDATE inventory_settings SET adjustment_reason_required = true WHERE tenant_id = '" + A + "'");
+    asUser(ADMIN, "SELECT create_stock_adjustment('" + art + "', '" + wh + "', -1, 0, CURRENT_DATE, 'Annulation essai')::text");
 
     assertThatThrownBy(() -> asUser(MAGASINIER, "SELECT transfer_stock('" + art + "', '" + wh + "', '" + autre + "', 1, null)::text"))
         .as("dépôt d'une autre société").hasMessageContaining("Dépôt introuvable");

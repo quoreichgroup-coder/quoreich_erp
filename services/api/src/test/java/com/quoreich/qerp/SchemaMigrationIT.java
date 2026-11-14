@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "58";
+  private static final String DERNIERE_MIGRATION = "59";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -325,11 +325,11 @@ class SchemaMigrationIT {
           "stock_movements/Lecture société",
           "stock_valuation_layers/Lecture société",
           "inventory_settings/Lecture société",
-          "inventory_settings/Administrateur de la société",
+          "inventory_settings/Paramétrage habilité",
           "items/Lecture société",
           "items/Création habilitée",
           "items/Modification habilitée",
-          "items/Suppression administrateur",
+          "items/Suppression habilitée",
           "warehouses/Lecture société",
           "warehouses/Écriture habilitée",
           "item_locations/Lecture société",
