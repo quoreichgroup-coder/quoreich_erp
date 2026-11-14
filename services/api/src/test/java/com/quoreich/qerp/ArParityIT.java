@@ -407,16 +407,17 @@ class ArParityIT {
   }
 
   /**
-   * Écart <strong>voulu</strong> entre les deux chemins : le chemin historique laisse un lecteur
-   * émettre une facture et son écriture ({@code on_ar_invoice_posted} est SECURITY DEFINER),
-   * l'API la refuse. Le test fige les deux comportements pour que l'écart reste documenté.
+   * Écart historique résorbé par V42 : le chemin Supabase laissait un lecteur émettre une facture
+   * et son écriture ({@code on_ar_invoice_posted} est SECURITY DEFINER) ; la base le refuse
+   * désormais, comme l'API. Les deux chemins sont figés ici.
    */
   @Test
-  @DisplayName("écart voulu : le chemin historique laisse un lecteur facturer, l'API refuse")
+  @DisplayName("lecteur : facturation refusée par la base (V42) comme par l'API")
   void lecteurAutoriseHistoriquementRefuseParLApi() throws Exception {
-    String legacy = legacyCreate(ALPHA_VIEWER, "PAR-HIST-LECTEUR", "2030-01-20");
-    assertThat(rows("SELECT journal_entry_id IS NOT NULL FROM ar_invoices WHERE id = ?::uuid", legacy))
-        .containsExactly("t");
+    assertThatThrownBy(() -> legacyCreate(ALPHA_VIEWER, "PAR-HIST-LECTEUR", "2030-01-20"))
+        .hasMessageContaining("Droit insuffisant");
+    assertThat(rows("SELECT count(*) FROM ar_invoices WHERE invoice_number = 'PAR-HIST-LECTEUR'"))
+        .containsExactly("0");
 
     mockMvc
         .perform(

@@ -392,6 +392,9 @@ export interface Payment {
   reference: string | null;
   created_by: string;
   created_at: string;
+  /** V42 : une annulation est une ligne négative liée au règlement d'origine. */
+  reversal_of?: string | null;
+  reversal_reason?: string | null;
 }
 
 // tenant_id is now fetched dynamically via fetchTenantId()
@@ -516,28 +519,49 @@ export function useCreateARInvoice() {
   });
 }
 
-export function useUpdateARInvoice() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; amount_paid?: number }) => {
-      const { error } = await supabase.from("ar_invoices").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ar-invoices"] }),
-    onError: (err: any) => toast.error(err.message),
-  });
-}
-
-export function useDeleteARInvoice() {
+/* V42 : une facture émise est figée en base ; seul un brouillon s'émet, se complète ou se supprime. */
+export function useEmitARInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("ar_invoices").delete().eq("id", id);
+      const { error } = await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", id).eq("status", "draft");
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ar-invoices"] });
-      toast.success("Facture supprimée");
+      qc.invalidateQueries({ queryKey: ["ar-invoice-lines"] });
+      toast.success("Facture émise et comptabilisée");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
+export function useDeleteARDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ar_invoices").delete().eq("id", id).eq("status", "draft");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar-invoices"] });
+      toast.success("Brouillon supprimé");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
+/** Code TVA d'une ligne de brouillon : la base recalcule la ligne et le pied (V21). */
+export function useSetARDraftLineTax() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ lineId, taxCodeId }: { lineId: string; taxCodeId: string | null }) => {
+      const { error } = await (supabase as any).from("ar_invoice_lines").update({ tax_code_id: taxCodeId }).eq("id", lineId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar-invoices"] });
+      qc.invalidateQueries({ queryKey: ["ar-invoice-lines"] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -555,6 +579,53 @@ export function useARPayments(invoiceId?: string) {
       return (data || []) as Payment[];
     },
     enabled: !!invoiceId || invoiceId === undefined,
+  });
+}
+
+/** Règlements d'une facture, annulations comprises (API sur site, sinon Supabase). */
+export function useARInvoicePayments(invoiceId: string | undefined) {
+  const source = isApiEnabled() ? "api" : "supabase";
+  return useQuery({
+    queryKey: ["ar-payments", invoiceId, source],
+    enabled: !!invoiceId,
+    queryFn: async (): Promise<Payment[]> => {
+      if (source === "api") {
+        const rows = await apiGet<ApiSchemas["ArPaymentView"][]>(`/api/v1/ar/invoices/${invoiceId}/payments`);
+        return rows.map((r) => ({
+          id: r.id, tenant_id: "", payment_type: "ar_receipt", ar_invoice_id: invoiceId ?? null,
+          amount: Number(r.amount), payment_date: r.paymentDate, payment_method: r.paymentMethod,
+          reference: r.reference ?? null, created_by: "", created_at: r.paymentDate,
+          reversal_of: r.reversalOf ?? null, reversal_reason: r.reversalReason ?? null,
+        }));
+      }
+      const { data, error } = await supabase.from("payments").select("*")
+        .eq("payment_type", "ar_receipt").eq("ar_invoice_id", invoiceId!).order("created_at");
+      if (error) throw error;
+      return (data || []) as unknown as Payment[];
+    },
+  });
+}
+
+/** Annulation d'un encaissement (V42) : contre-passation, motif obligatoire. */
+export function useReverseARReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ invoiceId, paymentId, reason, date }: { invoiceId: string; paymentId: string; reason: string; date: string }) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/ar/invoices/${invoiceId}/payments/${paymentId}/reversal`, { reason, reversalDate: date });
+        return;
+      }
+      const { error } = await (supabase as any).rpc("reverse_settlement", {
+        _payment_id: paymentId, _reason: reason, _reversal_date: date,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar-invoices"] });
+      qc.invalidateQueries({ queryKey: ["ar-payments"] });
+      toast.success("Encaissement annulé (écriture contre-passée)");
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 }
 
@@ -722,6 +793,9 @@ export function useARAging() {
 
 // ── Lignes d'une facture client (vue de détail : en-tête, lignes, pied) ──
 export type ARInvoiceLineRow = {
+  /** Supabase seulement : identifiant et code TVA modifiables sur un brouillon. */
+  id?: string;
+  tax_code_id?: string | null;
   line_no: number;
   description: string;
   quantity: number;
@@ -747,11 +821,12 @@ export function useARInvoiceLines(invoiceId: string | undefined) {
       }
       const { data, error } = await (supabase as any)
         .from("ar_invoice_lines")
-        .select("line_no, description, quantity, unit_price, discount_pct, net_amount, tax_amount, tax_code:tax_codes(code)")
+        .select("id, tax_code_id, line_no, description, quantity, unit_price, discount_pct, net_amount, tax_amount, tax_code:tax_codes(code)")
         .eq("invoice_id", invoiceId)
         .order("line_no");
       if (error) throw error;
       return (data ?? []).map((r: any) => ({
+        id: r.id, tax_code_id: r.tax_code_id ?? null,
         line_no: r.line_no, description: r.description, quantity: Number(r.quantity), unit_price: Number(r.unit_price),
         discount_pct: Number(r.discount_pct ?? 0), tax_code: r.tax_code?.code ?? null,
         net_amount: Number(r.net_amount), tax_amount: Number(r.tax_amount),

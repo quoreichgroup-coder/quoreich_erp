@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "41";
+  private static final String DERNIERE_MIGRATION = "42";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -192,7 +192,13 @@ class SchemaMigrationIT {
           "ap_invoice_for_caller",
           "ap_invoice_submit",
           "ap_invoice_decide",
-          "guard_ap_invoice_lifecycle");
+          "guard_ap_invoice_lifecycle",
+          // V42 — ventes et clients : règlements, facture client, livraison.
+          "guard_payment",
+          "reverse_settlement",
+          "guard_ar_invoice_lifecycle",
+          "guard_ar_invoice_lines",
+          "draft_invoice_from_delivery");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -286,7 +292,11 @@ class SchemaMigrationIT {
           "sales_orders/trg_assign_sales_document_number",
           "delivery_notes/trg_assign_sales_document_number",
           // V41 — cycle de vie des factures fournisseurs.
-          "ap_invoices/trg_guard_ap_invoice_lifecycle");
+          "ap_invoices/trg_guard_ap_invoice_lifecycle",
+          // V42 — règlements figés, facture client figée une fois émise.
+          "payments/trg_guard_payment",
+          "ar_invoices/trg_guard_ar_invoice_lifecycle",
+          "ar_invoice_lines/trg_guard_ar_invoice_lines");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

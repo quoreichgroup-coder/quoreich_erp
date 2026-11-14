@@ -182,6 +182,49 @@ public class ArInvoiceQuery {
     return findById(invoiceId);
   }
 
+  /** Règlements d'une facture visible, annulations comprises ; vide si la facture n'est pas visible. */
+  @Transactional(readOnly = true)
+  public Optional<List<ArPaymentView>> payments(UUID invoiceId) {
+    if (findById(invoiceId).isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        jdbc.query(
+            "SELECT id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason"
+                + " FROM payments WHERE ar_invoice_id = ? AND payment_type = 'ar_receipt'"
+                + " ORDER BY created_at, id",
+            (rs, i) ->
+                new ArPaymentView(
+                    rs.getObject("id", UUID.class),
+                    rs.getObject("payment_date", LocalDate.class),
+                    rs.getBigDecimal("amount"),
+                    rs.getString("payment_method"),
+                    rs.getString("reference"),
+                    rs.getObject("reversal_of", UUID.class),
+                    rs.getString("reversal_reason")),
+            invoiceId));
+  }
+
+  /**
+   * Annule un encaissement par contre-passation ({@code reverse_settlement}, V42) : droit
+   * {@code ar.reverse_receipt}, motif, une seule fois, contrôlés par la base. Vide si la facture
+   * n'est pas visible ou si le règlement n'est pas l'un des siens.
+   */
+  @Transactional
+  public Optional<ArInvoiceView> reverse(UUID invoiceId, UUID paymentId, ReverseArPayment in) {
+    if (findById(invoiceId).isEmpty()
+        || !exists("SELECT EXISTS (SELECT 1 FROM payments WHERE id = ? AND ar_invoice_id = ?)", paymentId, invoiceId)) {
+      return Optional.empty();
+    }
+    jdbc.queryForObject(
+        "SELECT reverse_settlement(?, ?, COALESCE(?, CURRENT_DATE))::text",
+        String.class,
+        paymentId,
+        in.reason().strip(),
+        in.reversalDate());
+    return findById(invoiceId);
+  }
+
   private boolean exists(String sql, Object... args) {
     return Boolean.TRUE.equals(jdbc.queryForObject(sql, Boolean.class, args));
   }

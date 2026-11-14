@@ -284,13 +284,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Lire les règlements d'une facture client
+         * @description Encaissements et annulations (montant négatif, V42). 404 si la facture n'est pas visible.
+         */
+        get: operations["listArPayments"];
         put?: never;
         /**
          * Enregistrer un encaissement
-         * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.
+         * @description Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 422 si la base refuse avec un motif (reste dû dépassé, facture non ouverte, plan comptable incomplet), 409 pour un autre refus (période close), 403 sans rôle admin ou accountant, ou sans le droit ar.receipt (V42).
          */
         post: operations["recordArPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ar/invoices/{id}/payments/{paymentId}/reversal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Annuler un encaissement (contre-passation)
+         * @description L'écriture bancaire est contre-passée et la facture redevient due ; l'encaissement d'origine est conservé. 404 si la facture ou le règlement n'est pas visible, 422 si la base refuse (déjà annulé, motif, date), 403 sans le droit ar.reverse_receipt.
+         */
+        post: operations["reverseArPayment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -726,6 +750,11 @@ export interface components {
             reference?: string;
             paymentMethod?: string;
         };
+        ReverseArPayment: {
+            reason?: string;
+            /** Format: date */
+            reversalDate?: string;
+        };
         CreateAnalyticAxis: {
             code?: string;
             name?: string;
@@ -836,6 +865,18 @@ export interface components {
             status: string;
             /** Format: uuid */
             journalEntryId?: string;
+        };
+        ArPaymentView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            paymentDate: string;
+            amount: number;
+            paymentMethod: string;
+            reference?: string;
+            /** Format: uuid */
+            reversalOf?: string;
+            reversalReason?: string;
         };
         ArInvoiceLineView: {
             /** Format: int32 */
@@ -1788,6 +1829,50 @@ export interface operations {
             };
         };
     };
+    listArPayments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArPaymentView"][];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     recordArPayment: {
         parameters: {
             query?: never;
@@ -1800,6 +1885,55 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordArPayment"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    reverseArPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseArPayment"];
             };
         };
         responses: {

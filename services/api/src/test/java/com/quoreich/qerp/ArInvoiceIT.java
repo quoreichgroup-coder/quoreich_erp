@@ -164,7 +164,7 @@ class ArInvoiceIT {
   }
 
   @Test
-  @DisplayName("un surpaiement est refusé en 409 sans effet partiel")
+  @DisplayName("un surpaiement est refusé en 422 avec le message de la base (V42), sans effet partiel")
   void unSurpaiementEstRefuse() throws Exception {
     JsonNode invoice = createInvoice("IT-AR-002", "2030-01-16");
     String id = invoice.get("id").asString();
@@ -175,7 +175,8 @@ class ArInvoiceIT {
                 .with(alpha())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"amount\":5000.00}"))
-        .andExpect(status().isConflict());
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("supérieur au reste dû")));
 
     assertThat(
             PostgresFixture.countAsAdmin(

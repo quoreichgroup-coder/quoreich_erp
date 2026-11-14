@@ -87,12 +87,12 @@ class AuthorizationsApiIT {
 
   @Test
   @Order(1)
-  @DisplayName("lecture : catalogue de 49 droits (45 + ap.approve_l1..l4, V41), 50 rôles système ; seul l'administrateur gère")
+  @DisplayName("lecture : catalogue de 53 droits (45 + ap.approve_l1..l4, V41 ; ar.receipt, ar.reverse_receipt, ap.pay, ap.reverse_payment, V42), 50 rôles système ; seul l'administrateur gère")
   void lecture() throws Exception {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(49));
+        .andExpect(jsonPath("$.catalog.length()").value(53));
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -108,7 +108,7 @@ class AuthorizationsApiIT {
     send(post("/api/v1/authorizations/roles"), ADMIN,
             "{\"name\":\"Caissier\",\"description\":\"Encaissements\",\"copyFromRoleId\":\"" + systemRoleId("treasury_clerk") + "\"}")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.roles[?(@.name == 'Caissier')].permissions.length()").value(4));
+        .andExpect(jsonPath("$.roles[?(@.name == 'Caissier')].permissions.length()").value(6)); // 4 + ar.receipt, ap.pay (V42)
     send(post("/api/v1/authorizations/roles"), ADMIN, "{\"name\":\"Caissier\"}").andExpect(status().isConflict());
 
     String caissier = roleId("Caissier");
@@ -174,7 +174,7 @@ class AuthorizationsApiIT {
         .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.contains("treasury.match")));
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(49));
+        .andExpect(jsonPath("$.permissions.length()").value(53));
   }
 
   @Test
@@ -218,11 +218,13 @@ class AuthorizationsApiIT {
     assertThat(sql("SELECT count(*) FROM (SELECT string_agg(action, ',' ORDER BY seq) AS suite"
         + " FROM erp_authorization_audit WHERE role_id = '" + r + "') x WHERE suite = 'role_created,"
         + "permission_granted,permission_granted,permission_granted,permission_granted,"
-        + "permission_removed,permission_removed,permission_removed'")).isEqualTo("1");
+        + "permission_granted,permission_granted," // ar.receipt, ap.pay (V42)
+        + "permission_removed,permission_removed,permission_removed,permission_removed,permission_removed'"))
+        .isEqualTo("1");
     mockMvc.perform(get("/api/v1/authorizations/audit").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].action").value("permission_removed"))
-        .andExpect(jsonPath("$[3].action").value("permission_granted"))
-        .andExpect(jsonPath("$[7].action").value("role_created"));
+        .andExpect(jsonPath("$[5].action").value("permission_granted"))
+        .andExpect(jsonPath("$[11].action").value("role_created"));
   }
 }

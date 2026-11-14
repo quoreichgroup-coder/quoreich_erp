@@ -20,9 +20,11 @@ import { Label } from "@/components/ui/label";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
-  useARInvoices, useARInvoiceLines, useCreateARInvoice, useCustomers,
-  type ARInvoice,
+  useARInvoices, useARInvoiceLines, useCreateARInvoice, useCustomers, useARInvoicePayments,
+  useReverseARReceipt, useEmitARInvoice, useDeleteARDraft, useSetARDraftLineTax,
+  type ARInvoice, type Payment,
 } from "@/hooks/use-ar-data";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
@@ -43,13 +45,17 @@ function daysDiff(due: string): number {
 }
 
 function statusLabel(s: string) {
-  const map: Record<string, string> = { draft: "Draft", open: "Open", partially_paid: "Partially Paid", paid: "Paid", overdue: "Overdue" };
+  const map: Record<string, string> = {
+    draft: "Brouillon", sent: "Émise", open: "Émise", posted: "Émise", partially_paid: "Partiellement réglée",
+    paid: "Réglée", overdue: "En retard", cancelled: "Annulée",
+  };
   return map[s] || s;
 }
 function statusType(s: string) {
-  const map: Record<string, string> = { draft: "info", open: "info", partially_paid: "warning", paid: "success", overdue: "error" };
+  const map: Record<string, string> = { draft: "info", sent: "info", open: "info", posted: "info", partially_paid: "warning", paid: "success", overdue: "error", cancelled: "error" };
   return map[s] || "info";
 }
+const today = () => new Date().toISOString().split("T")[0];
 
 /* ──────── CREATE INVOICE DIALOG ──────── */
 function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -219,9 +225,120 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
 const fmtNum = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
 /* ──────── SIDE PANEL ──────── */
+/* Règlements de la facture : encaissements et annulations (V42, contre-passation motivée). */
+function InvoicePayments({ inv, canReverse }: { inv: ARInvoice; canReverse: boolean }) {
+  const { data: payments = [], isLoading } = useARInvoicePayments(inv.id);
+  const reverse = useReverseARReceipt();
+  const [target, setTarget] = useState<Payment | null>(null);
+  const [reason, setReason] = useState("");
+  const [date, setDate] = useState(today());
+  const reversed = new Set(payments.filter((p) => p.reversal_of).map((p) => p.reversal_of));
+  if (isLoading || payments.length === 0) return null;
+  return (
+    <section aria-label="Règlements" className="space-y-2">
+      <h3 className="text-xs font-semibold text-foreground">Règlements</h3>
+      <table className="w-full text-xs">
+        <thead><tr className="text-muted-foreground"><th className="text-left">Date</th><th className="text-left">Référence</th>
+          <th className="text-right">Montant</th><th /></tr></thead>
+        <tbody>
+          {payments.map((p) => (
+            <tr key={p.id} data-testid="ar-payment-row" className={cn(p.reversal_of && "text-muted-foreground")}>
+              <td className="tabular-nums">{p.payment_date}</td>
+              <td>{p.reference || "—"}{p.reversal_reason ? ` · ${p.reversal_reason}` : ""}</td>
+              <td className="text-right tabular-nums">{fmt(Number(p.amount))}</td>
+              <td className="text-right">
+                {p.reversal_of ? <span>Annulation</span>
+                  : reversed.has(p.id) ? <span>Annulé</span>
+                  : canReverse ? (
+                    <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive"
+                      onClick={() => { setTarget(p); setReason(""); setDate(today()); }}>Annuler</Button>
+                  ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Annuler l'encaissement {target?.reference || ""}</DialogTitle>
+            <DialogDescription className="text-xs">
+              L'écriture bancaire est contre-passée et la facture redevient due. L'encaissement d'origine reste visible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="ar-reversal-reason">Motif (obligatoire)</Label>
+              <Input id="ar-reversal-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Chèque impayé, erreur de saisie…" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="ar-reversal-date">Date d'annulation</Label>
+              <Input id="ar-reversal-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="outline" onClick={() => setTarget(null)}>Retour</Button>
+            <Button size="sm" variant="destructive" disabled={!reason.trim() || reverse.isPending}
+              onClick={() => target && reverse.mutate({ invoiceId: inv.id, paymentId: target.id, reason: reason.trim(), date },
+                { onSuccess: () => setTarget(null) })}>
+              Annuler l'encaissement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+/* Brouillon (préparé depuis une livraison, V42) : codes TVA par ligne, puis émission. */
+function DraftActions({ inv, onDone }: { inv: ARInvoice; onDone: () => void }) {
+  const lines = useARInvoiceLines(inv.id);
+  const { data: taxCodes = [] } = useTaxCodes();
+  const setTax = useSetARDraftLineTax();
+  const emit = useEmitARInvoice();
+  const remove = useDeleteARDraft();
+  const sansCode = (lines.data ?? []).filter((l) => !l.tax_code_id).length;
+  return (
+    <section aria-label="Brouillon" className="space-y-2 rounded border border-border p-3">
+      <h3 className="text-xs font-semibold text-foreground">Brouillon à compléter</h3>
+      <p className="text-[11px] text-muted-foreground">
+        Choisir le code TVA de chaque ligne (exonérée : laisser « Sans TVA »), puis émettre : le numéro légal
+        et l'écriture comptable sont attribués à l'émission. Une facture émise ne se modifie plus.
+      </p>
+      {(lines.data ?? []).map((l) => (
+        <div key={l.id ?? l.line_no} className="flex items-center gap-2 text-xs">
+          <span className="flex-1 truncate">{l.line_no}. {l.description}</span>
+          <select aria-label={`Code TVA ligne ${l.line_no}`} className="h-7 rounded border border-input bg-background px-2 text-xs"
+            value={l.tax_code_id ?? ""} disabled={!l.id || setTax.isPending}
+            onChange={(e) => l.id && setTax.mutate({ lineId: l.id, taxCodeId: e.target.value || null })}>
+            <option value="">Sans TVA</option>
+            {taxCodes.filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.code} — {fmtNum(t.rate)} %</option>)}
+          </select>
+        </div>
+      ))}
+      <div className="flex gap-2 pt-1">
+        <Button size="sm" className="text-xs gap-1.5" disabled={emit.isPending}
+          onClick={() => {
+            if (sansCode > 0 && !window.confirm(sansCode + " ligne(s) sans code TVA : émettre sans TVA sur ces lignes ?")) return;
+            emit.mutate(inv.id, { onSuccess: onDone });
+          }}>
+          <Send className="w-3.5 h-3.5" /> Émettre
+        </Button>
+        <Button size="sm" variant="ghost" className="text-xs text-destructive" disabled={remove.isPending}
+          onClick={() => { if (window.confirm("Supprimer ce brouillon ?")) remove.mutate(inv.id, { onSuccess: onDone }); }}>
+          Supprimer le brouillon
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClose: () => void; onRecordPayment: () => void }) {
   const outstanding = inv.total - inv.amount_paid;
   const lines = useARInvoiceLines(inv.id);
+  const { data: access } = useMyAccess();
+  const perms = new Set(access?.permissions ?? []);
+  const isWriter = (access?.roles ?? []).some((r) => r === "admin" || r === "accountant");
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -254,10 +371,12 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
               ["Reste à payer", fmtCurrency(outstanding), true],
             ]}
           />
+          {inv.status === "draft" && isWriter && !isApiEnabled() && <DraftActions inv={inv} onDone={onClose} />}
+          <InvoicePayments inv={inv} canReverse={perms.has("ar.reverse_receipt")} />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2 flex-wrap">
-          {inv.status !== "paid" && (
+          {!["paid", "draft", "cancelled"].includes(inv.status) && perms.has("ar.receipt") && (
             <Button size="sm" className="text-xs gap-1.5" onClick={onRecordPayment}><CreditCard className="w-3.5 h-3.5" /> Enregistrer paiement</Button>
           )}
         </div>
@@ -278,7 +397,10 @@ export default function ARTransactions() {
   const [paymentInv, setPaymentInv] = useState<ARInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
 
-  const statusOptions = ["all", "draft", "open", "partially_paid", "paid", "overdue"];
+  const statusOptions = ["all", "draft", "sent", "partially_paid", "paid", "overdue"];
+  const { data: access } = useMyAccess();
+  const canReceive = (access?.permissions ?? []).includes("ar.receipt");
+  const isWriter = (access?.roles ?? []).some((r) => r === "admin" || r === "accountant");
 
   const filtered = invoices.filter(inv => {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
@@ -346,8 +468,8 @@ export default function ARTransactions() {
           <p className="text-xs text-muted-foreground mt-0.5">Gestion des factures clients, encaissements et recouvrement</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>
+          {isWriter && <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>}
+          {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={handleExport}><Download className="w-3.5 h-3.5" /> Export</Button>
         </div>
       </div>

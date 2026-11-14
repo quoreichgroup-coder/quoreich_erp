@@ -1124,10 +1124,66 @@
       }
     },
     "/api/v1/ar/invoices/{id}/payments" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Lire les règlements d'une facture client",
+        "description" : "Encaissements et annulations (montant négatif, V42). 404 si la facture n'est pas visible.",
+        "operationId" : "listArPayments",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ArPaymentView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
       "post" : {
         "tags" : [ "Factures clients" ],
         "summary" : "Enregistrer un encaissement",
-        "description" : "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou accountant dans la société courante, 422 si le plan comptable est incomplet.",
+        "description" : "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 422 si la base refuse avec un motif (reste dû dépassé, facture non ouverte, plan comptable incomplet), 409 pour un autre refus (période close), 403 sans rôle admin ou accountant, ou sans le droit ar.receipt (V42).",
         "operationId" : "recordArPayment",
         "parameters" : [ {
           "name" : "id",
@@ -1143,6 +1199,79 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/RecordArPayment"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ar/invoices/{id}/payments/{paymentId}/reversal" : {
+      "post" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Annuler un encaissement (contre-passation)",
+        "description" : "L'écriture bancaire est contre-passée et la facture redevient due ; l'encaissement d'origine est conservé. 404 si la facture ou le règlement n'est pas visible, 422 si la base refuse (déjà annulé, motif, date), 403 sans le droit ar.reverse_receipt.",
+        "operationId" : "reverseArPayment",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "paymentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReverseArPayment"
               }
             }
           },
@@ -2388,6 +2517,18 @@
           }
         }
       },
+      "ReverseArPayment" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "reversalDate" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
       "CreateAnalyticAxis" : {
         "type" : "object",
         "properties" : {
@@ -2689,6 +2830,36 @@
           }
         },
         "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]
+      },
+      "ArPaymentView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "paymentDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "paymentMethod" : {
+            "type" : "string"
+          },
+          "reference" : {
+            "type" : "string"
+          },
+          "reversalOf" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "reversalReason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "id", "paymentDate", "paymentMethod" ]
       },
       "ArInvoiceLineView" : {
         "type" : "object",

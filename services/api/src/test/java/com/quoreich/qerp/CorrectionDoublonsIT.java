@@ -45,6 +45,8 @@ class CorrectionDoublonsIT {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
     String a = PostgresFixture.ALPHA_TENANT;
     PostgresFixture.applySyscohada(DATABASE, a);
+    // V42 : la facture et l'encaissement exigent un comptable (ar.receipt) dans la société.
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "accountant", a);
     recreerLeDefautPourUnPaiement();
 
     assertThat(rows("SELECT count(*) FROM journal_entries WHERE description = ?", RECU))

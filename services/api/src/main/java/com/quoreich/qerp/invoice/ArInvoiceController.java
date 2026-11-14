@@ -85,9 +85,10 @@ public class ArInvoiceController {
       operationId = "recordArPayment",
       summary = "Enregistrer un encaissement",
       description =
-          "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 409 si"
-              + " l'encaissement est refusé (surpaiement, période close), 403 sans rôle admin ou"
-              + " accountant dans la société courante, 422 si le plan comptable est incomplet.")
+          "Solde et statut recalculés côté base. 404 si la facture n'est pas visible, 422 si la"
+              + " base refuse avec un motif (reste dû dépassé, facture non ouverte, plan comptable"
+              + " incomplet), 409 pour un autre refus (période close), 403 sans rôle admin ou"
+              + " accountant, ou sans le droit ar.receipt (V42).")
   public ResponseEntity<?> pay(@PathVariable UUID id, @RequestBody RecordArPayment body) {
     String problem = body.problem();
     if (problem != null) {
@@ -95,6 +96,33 @@ public class ArInvoiceController {
     }
     return query
         .pay(id, body)
+        .<ResponseEntity<?>>map(ResponseEntity::ok)
+        .orElse(ResponseEntity.notFound().build());
+  }
+
+  @GetMapping("/{id}/payments")
+  @Operation(operationId = "listArPayments", summary = "Lire les règlements d'une facture client",
+      description = "Encaissements et annulations (montant négatif, V42). 404 si la facture n'est pas visible.")
+  public ResponseEntity<List<ArPaymentView>> payments(@PathVariable UUID id) {
+    return query.payments(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+  }
+
+  @PostMapping("/{id}/payments/{paymentId}/reversal")
+  @Operation(
+      operationId = "reverseArPayment",
+      summary = "Annuler un encaissement (contre-passation)",
+      description =
+          "L'écriture bancaire est contre-passée et la facture redevient due ; l'encaissement"
+              + " d'origine est conservé. 404 si la facture ou le règlement n'est pas visible, 422"
+              + " si la base refuse (déjà annulé, motif, date), 403 sans le droit ar.reverse_receipt.")
+  public ResponseEntity<?> reverse(
+      @PathVariable UUID id, @PathVariable UUID paymentId, @RequestBody ReverseArPayment body) {
+    String problem = body.problem();
+    if (problem != null) {
+      return ResponseEntity.badRequest().body(Map.of("error", problem));
+    }
+    return query
+        .reverse(id, paymentId, body)
         .<ResponseEntity<?>>map(ResponseEntity::ok)
         .orElse(ResponseEntity.notFound().build());
   }
@@ -117,6 +145,11 @@ public class ArInvoiceController {
       }
     }
     for (Throwable t = e; t != null; t = t.getCause()) {
+      if (t instanceof SQLException sql && "42501".equals(sql.getSQLState())) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", premiereLigne(sql)));
+      }
+    }
+    for (Throwable t = e; t != null; t = t.getCause()) {
       if (t instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(Map.of("error", "Ce numéro de facture existe déjà dans la société"));
@@ -126,8 +159,13 @@ public class ArInvoiceController {
         .body(Map.of("error", "Opération refusée par les règles comptables"));
   }
 
-  /** QG001 : paramétrage comptable incomplet (V17, V18) ; QG002 : imputation analytique (V19). */
-  private static final java.util.Set<String> REFUS_METIER = java.util.Set.of("QG001", "QG002");
+  /**
+   * QG001 : paramétrage comptable incomplet (V17, V18) ; QG002 : imputation analytique (V19) ;
+   * QG005 : règlement refusé (V36, V42 : reste dû, facture non ouverte, déjà annulé, motif) ;
+   * QG009 : facture émise figée (V42). Messages rédigés par le schéma, en français, sans donnée
+   * d'une autre société.
+   */
+  private static final java.util.Set<String> REFUS_METIER = java.util.Set.of("QG001", "QG002", "QG005", "QG009");
 
   /** « ERROR: message\n  Hint: … » → « message » (préfixe de sévérité éventuellement localisé). */
   private static String premiereLigne(SQLException e) {

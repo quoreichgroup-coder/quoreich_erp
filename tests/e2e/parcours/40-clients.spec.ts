@@ -113,6 +113,28 @@ test("facture client à lignes → émission → encaissements par client", asyn
   obs.etape("facture soldée : plus d'encaissement proposé");
   await ligne(page, numero).click();
   await expect(page.getByRole("dialog", { name: /^Facture / }).getByRole("button", { name: /Enregistrer paiement/ })).toHaveCount(0);
+
+  // V42 : un encaissement ne se supprime pas ; il s'annule par contre-passation, avec un motif.
+  obs.etape("annulation du second encaissement : contre-passation, facture de nouveau due");
+  let panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
+  const reglements = panneau.getByRole("region", { name: "Règlements" });
+  await expect(reglements.getByTestId("ar-payment-row")).toHaveCount(2);
+  await reglements.getByTestId("ar-payment-row").filter({ hasText: `ENC-${RUN}-2` }).getByRole("button", { name: "Annuler" }).click();
+  const a = page.getByRole("dialog", { name: /Annuler l'encaissement/ });
+  await expect(a.getByRole("button", { name: "Annuler l'encaissement" }), "motif obligatoire").toBeDisabled();
+  await a.getByLabel("Motif (obligatoire)").fill("Chèque impayé");
+  await a.getByRole("button", { name: "Annuler l'encaissement" }).click();
+  const m3 = await dernierToast(page);
+  testInfo.annotations.push({ type: "annulation", description: m3 });
+  await expect(a, `annulation : ${m3}`).toBeHidden();
+  await fermerPanneau(page);
+  await expect(ligne(page, numero)).toContainText("Partiellement réglée");
+  await ligne(page, numero).click();
+  panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await expect(panneau.getByRole("region", { name: "Règlements" }).getByTestId("ar-payment-row")).toHaveCount(3);
+  await expect(panneau.getByRole("region", { name: "Règlements" })).toContainText("Chèque impayé");
+  await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("68 000");
+  await expect(panneau.getByRole("button", { name: /Enregistrer paiement/ }), "de nouveau encaissable").toBeVisible();
   await fermerPanneau(page);
 
   await obs.joindre(testInfo);

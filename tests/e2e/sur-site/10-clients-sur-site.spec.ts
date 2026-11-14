@@ -10,7 +10,7 @@ import { ligne } from "../parcours/champs";
  */
 test.skip(!identifiants(), "identifiants du compte de test absents");
 
-const PERIMETRE = /\/rest\/v1\/(customers|ar_invoices|ar_invoice_lines|payments)\b/;
+const PERIMETRE = /\/rest\/v1\/(customers|ar_invoices|ar_invoice_lines|payments|rpc\/reverse_settlement)\b/;
 
 function routage(page: Page) {
   const api = process.env.E2E_API_URL!;
@@ -80,7 +80,21 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   testInfo.annotations.push({ type: "encaissement", description: m });
   await expect(p, `encaissement : ${m}`).toBeHidden();
   await panneau.getByRole("button", { name: "Fermer" }).click().catch(() => undefined);
-  await expect(ligne(page, numero)).toContainText(/payée|paid|Payée/i);
+  await expect(ligne(page, numero)).toContainText("Réglée");
+
+  // V42 : annulation par contre-passation, par l'API sur site.
+  obs.etape("annulation de l'encaissement par l'API");
+  await ligne(page, numero).click();
+  const detail = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await detail.getByRole("region", { name: "Règlements" }).getByRole("button", { name: "Annuler" }).click();
+  const a = page.getByRole("dialog", { name: /Annuler l'encaissement/ });
+  await a.getByLabel("Motif (obligatoire)").fill("Virement rejeté");
+  await a.getByRole("button", { name: "Annuler l'encaissement" }).click();
+  testInfo.annotations.push({ type: "annulation", description: await dernierToast(page) });
+  await expect(a).toBeHidden();
+  await expect(detail.getByRole("region", { name: "Règlements" })).toContainText("Virement rejeté");
+  await detail.getByRole("button", { name: "Fermer" }).click();
+  await expect(ligne(page, numero)).toContainText("Émise");
 
   obs.etape("export par l'API");
   const telechargement = page.waitForEvent("download");
@@ -91,6 +105,7 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   expect(flux.versNuage, "aucune écriture clients / factures / encaissements vers Supabase").toEqual([]);
   expect(flux.versApi.some((x) => x.startsWith("POST /api/v1/customers"))).toBeTruthy();
   expect(flux.versApi.some((x) => x.startsWith("POST /api/v1/ar/invoices"))).toBeTruthy();
+  expect(flux.versApi.some((x) => x.endsWith("/reversal"))).toBeTruthy();
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

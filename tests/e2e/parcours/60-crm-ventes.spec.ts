@@ -1,7 +1,8 @@
 import { test, expect, type Download } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { identifiants, RUN, surveiller } from "./outils";
-import { creerClient } from "./actions";
+import { identifiants, RUN, surveiller, dernierToast } from "./outils";
+import { creerClient, assurerPlanComptable } from "./actions";
+import { ligne } from "./champs";
 
 test.skip(!identifiants(), "identifiants du compte de test absents");
 
@@ -122,6 +123,28 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   const deliveryPdf = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exporter l'onglet actif en PDF" }).click();
   await verifierPdf(await deliveryPdf, /deliveries-.*\.pdf/);
+
+  // V42 : la livraison prépare une facture BROUILLON reprenant ses lignes (avant : facture émise
+  // d'office, sans lignes, TVA à 0). Le comptable choisit les codes TVA puis l'émet.
+  obs.etape("facture préparée en brouillon depuis la livraison, puis émise");
+  await assurerPlanComptable(page);
+  await page.goto("/receivables/transactions");
+  const brouillon = ligne(page, client);
+  await expect(brouillon).toContainText("Brouillon");
+  await expect(brouillon).toContainText("125");
+  await brouillon.click();
+  const panneau = page.getByRole("dialog", { name: /^Facture BROUILLON-/ });
+  const zone = panneau.getByRole("region", { name: "Brouillon" });
+  await expect(zone.getByLabel("Code TVA ligne 1")).toBeVisible();
+  await expect(panneau.getByRole("region", { name: "Lignes" })).toContainText("125");
+  page.once("dialog", (d) => d.accept());
+  await zone.getByRole("button", { name: "Émettre" }).click();
+  testInfo.annotations.push({ type: "émission", description: await dernierToast(page) });
+  await expect(panneau).toBeHidden();
+  await expect(ligne(page, client)).toContainText("Émise");
+  const numero = (await ligne(page, client).locator("td").nth(1).innerText()).trim();
+  testInfo.annotations.push({ type: "numéro", description: numero });
+  expect(numero, "numéro légal attribué à l'émission").not.toMatch(/BROUILLON/);
 
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);

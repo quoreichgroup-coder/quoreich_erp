@@ -154,6 +154,8 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
 /* ──────── SIDE PANEL ──────── */
 function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClose: () => void; onCreatePayment: () => void }) {
   const outstanding = inv.total - inv.amount_paid;
+  const { data: access } = useMyAccess();
+  const canPay = (access?.permissions ?? []).includes("ap.pay");
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30" onClick={onClose} />
@@ -186,7 +188,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2">
-          {inv.status !== "paid" && inv.approval_status === "approved" && (
+          {inv.status !== "paid" && inv.approval_status === "approved" && canPay && (
             <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Payer</Button>
           )}
         </div>
@@ -273,6 +275,9 @@ export default function APTransactions() {
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [editInv, setEditInv] = useState<APInvoice | null>(null);
   const { data: approvals = [] } = useAPInvoiceApprovals();
+  const { data: myAccess } = useMyAccess();
+  // V42 : un paiement demande le droit ap.pay (contrôlé en base).
+  const canPay = (myAccess?.permissions ?? []).includes("ap.pay");
 
   const statusOptions = ["all", "draft", "open", "partially_paid", "paid", "overdue"];
   const approvalOptions = ["all", "pending", "approved", "rejected"];
@@ -298,7 +303,7 @@ export default function APTransactions() {
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> New Supplier Invoice</Button>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>
+          {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={() => exportToCSV(
             filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
@@ -392,7 +397,7 @@ export default function APTransactions() {
                       <td onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           <APInvoiceActions inv={inv} approvals={approvals} onEdit={() => setEditInv(inv)} />
-                          {inv.approval_status === "approved" && inv.status !== "paid" && (
+                          {inv.approval_status === "approved" && inv.status !== "paid" && canPay && (
                             <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setPaymentInv(inv); setSettlementOpen(true); }}>
                               <CreditCard className="w-3 h-3 mr-1" /> Pay
                             </Button>
