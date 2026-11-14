@@ -56,8 +56,7 @@ function useFollowupAction() {
 export function PurchaseFollowupPanel() {
   const { data: rows = [], isLoading } = useFollowup();
   const { data: access } = useMyAccess();
-  const roles = new Set(access?.roles ?? []);
-  const canAct = ["admin", "procurement_controller", "procurement_l1", "procurement_l2", "procurement_l3"].some((r) => roles.has(r));
+  const canAct = (access?.permissions ?? []).includes("procurement.followup");
   const action = useFollowupAction();
   const [dlg, setDlg] = useState<{ kind: "ack" | "reschedule"; row: any } | null>(null);
   const [date, setDate] = useState(today());
@@ -99,7 +98,7 @@ export function PurchaseFollowupPanel() {
                     <td className="p-2 font-mono">{r.po_number}</td><td>{r.supplier_name}</td><td>{r.incoterm ?? "—"}</td>
                     <td className="tabular-nums">{r.order_date}</td>
                     <td className="tabular-nums">{r.promised_date ?? "—"}{r.supplier_confirmed_date ? " (confirmée)" : ""}</td>
-                    <td className="text-right tabular-nums">{r.days_late > 0 ? `${r.days_late} j` : "—"}</td>
+                    <td className="text-right tabular-nums">{r.days_late > 0 ? `${r.days_late} j${r.grace_days ? ` (tolérance ${r.grace_days} j)` : ""}` : "—"}</td>
                     <td className="text-right tabular-nums">{fmt(r.value_remaining)}</td>
                     <td className="pl-3">{r.supplier_reference ?? "—"}</td>
                     <td><StatusBadge status={st} label={lbl} /></td>

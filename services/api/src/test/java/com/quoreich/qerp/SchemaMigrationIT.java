@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "56";
+  private static final String DERNIERE_MIGRATION = "57";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -98,7 +98,9 @@ class SchemaMigrationIT {
           "inventory_counts/inv counts tenant access",
           "inventory_count_lines/inv count lines tenant access",
           // V56 — fiche fournisseur : écriture réservée.
-          "suppliers/Tenant isolation");
+          "suppliers/Tenant isolation",
+          // V57 — achats paramétrables : paramètres des achats réservés.
+          "procurement_settings/tenant_isolation_procurement_settings");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -292,7 +294,9 @@ class SchemaMigrationIT {
           "default_po_dates",
           "po_followup_target",
           "acknowledge_purchase_order",
-          "reschedule_purchase_order");
+          "reschedule_purchase_order",
+          // V57 — achats paramétrables.
+          "procurement_setting");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -337,8 +341,11 @@ class SchemaMigrationIT {
           "suppliers/Lecture société",
           "suppliers/Création habilitée",
           "suppliers/Modification habilitée",
-          "suppliers/Suppression comptable",
-          "supplier_change_log/Lecture comptable",
+          "suppliers/Suppression habilitée",
+          "supplier_change_log/Lecture habilitée",
+          "procurement_settings/Lecture société",
+          "procurement_settings/Modification habilitée",
+          "procurement_settings/Création habilitée",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",

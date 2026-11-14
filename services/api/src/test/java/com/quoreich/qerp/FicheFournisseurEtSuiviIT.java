@@ -69,18 +69,18 @@ class FicheFournisseurEtSuiviIT {
         + "UPDATE ap_invoices SET approval_status = 'approved', status = 'open' WHERE id = '" + facture + "'");
     String virement = "INSERT INTO payments (tenant_id, payment_type, ap_invoice_id, amount, payment_date, payment_method, created_by)"
         + " VALUES ('" + A + "', 'ap_payment', '" + facture + "', 1000, CURRENT_DATE, 'bank_transfer', '" + ADMIN + "')";
-    assertThatThrownBy(() -> owner(virement)).hasStackTraceContaining("Virement refusé");
+    assertThatThrownBy(() -> owner(virement)).hasStackTraceContaining("Paiement refusé");
 
     assertThatThrownBy(() -> asUser(ADMIN, "SELECT verify_supplier_bank_details('" + f + "')::text"))
         .as("l'auteur du changement ne valide pas").hasMessageContaining("autre personne");
-    assertThatThrownBy(() -> asUser(LECTEUR, "SELECT verify_supplier_bank_details('" + f + "')::text")).hasMessageContaining("administrateur ou un comptable");
+    assertThatThrownBy(() -> asUser(LECTEUR, "SELECT verify_supplier_bank_details('" + f + "')::text")).hasMessageContaining("Droit insuffisant");
     asUser(COMPTABLE, "SELECT verify_supplier_bank_details('" + f + "')::text");
     owner(virement);
     assertThat(texte("SELECT amount_paid::text FROM ap_invoices WHERE id = '" + facture + "'")).isEqualTo("1000.00");
 
     asUser(ADMIN, "UPDATE suppliers SET bank_account = 'BF0009 99999 99999999999 99' WHERE id = '" + f + "' RETURNING id::text");
     assertThat(texte("SELECT bank_verified::text FROM suppliers WHERE id = '" + f + "'")).as("nouveau RIB : à revalider").isEqualTo("false");
-    assertThatThrownBy(() -> owner(virement)).hasStackTraceContaining("Virement refusé");
+    assertThatThrownBy(() -> owner(virement)).hasStackTraceContaining("Paiement refusé");
     assertThat(texte("SELECT string_agg(field, ',' ORDER BY id) FROM supplier_change_log WHERE supplier_id = '" + f + "'"))
         .isEqualTo("bank_verified,bank_account,bank_verified");
   }

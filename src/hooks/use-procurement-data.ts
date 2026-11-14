@@ -296,8 +296,9 @@ export function useUpdateProcurementSettings() {
   return useMutation({
     mutationFn: async (patch: Record<string, any> & { id: string }) => {
       const { id, ...rest } = patch;
-      const { error } = await supabase.from("procurement_settings" as any).update(rest).eq("id", id);
+      const { data, error } = await (supabase as any).from("procurement_settings").update(rest).eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : droit « Modifier les paramètres des achats » requis.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["procurement-settings"] });

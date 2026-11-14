@@ -13,6 +13,7 @@ import {
   useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier, useVerifySupplierBank, useSupplierChangeLog, type Supplier,
 } from "@/hooks/use-ap-data";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { useProcurementSettings } from "@/hooks/use-procurement-data";
 import { useAuth } from "@/contexts/AuthContext";
 import { INCOTERMS, SUPPLIER_FIELD_LABELS, bankStatus, validateSupplier } from "@/lib/supplier";
 
@@ -78,9 +79,13 @@ const Suppliers = () => {
   const verify = useVerifySupplierBank();
   const { user } = useAuth();
   const { data: access } = useMyAccess();
-  const roles = new Set(access?.roles ?? []);
-  const canManage = ["admin", "accountant", "procurement_controller", "procurement_l1", "procurement_l2", "procurement_l3"].some((r) => roles.has(r));
-  const canVerify = roles.has("admin") || roles.has("accountant");
+  // Droits du catalogue (V57), attribuables à tout rôle dans Paramètres → Rôles et autorisations.
+  const perms = new Set(access?.permissions ?? []);
+  const canManage = perms.has("suppliers.manage");
+  const canDelete = perms.has("suppliers.delete");
+  const canVerify = perms.has("suppliers.verify_bank");
+  const { data: settings } = useProcurementSettings();
+  const dualControl = settings?.bank_dual_control ?? true;
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -166,7 +171,7 @@ const Suppliers = () => {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           {canManage && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Modifier ${s.name}`} onClick={() => openEdit(s)}><Pencil className="w-4 h-4 text-muted-foreground" /></Button>}
-                          {canVerify && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Supprimer ${s.name}`} onClick={() => setDeleting(s)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
+                          {canDelete && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Supprimer ${s.name}`} onClick={() => setDeleting(s)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -219,8 +224,10 @@ const Suppliers = () => {
             </section>
             {current && bankStatus(current) === "pending" && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs flex items-center justify-between gap-2 flex-wrap" role="status">
-                <span>Coordonnées bancaires à valider : aucun virement n'est possible tant qu'une autre personne ne les a pas validées.</span>
-                {canVerify && current.bank_changed_by !== user?.id && (
+                <span>{dualControl
+                  ? "Coordonnées bancaires à valider : aucun paiement contrôlé n'est possible tant qu'une autre personne ne les a pas validées."
+                  : "Coordonnées bancaires non validées (double contrôle désactivé dans les paramètres des achats)."}</span>
+                {canVerify && (!dualControl || current.bank_changed_by !== user?.id) && (
                   <Button size="sm" variant="outline" className="gap-1.5" disabled={verify.isPending} onClick={() => verify.mutate(current.id)}>
                     <ShieldCheck className="w-3.5 h-3.5" /> Valider les coordonnées bancaires
                   </Button>
@@ -235,7 +242,7 @@ const Suppliers = () => {
                 </select>
               </div>
             )}
-            {editing && canVerify && <ChangeLog supplierId={editing.id} />}
+            {editing && (canVerify || canDelete) && <ChangeLog supplierId={editing.id} />}
             {error && form.name && <p className="text-xs text-destructive" role="alert">{error}</p>}
           </div>
           <DialogFooter>

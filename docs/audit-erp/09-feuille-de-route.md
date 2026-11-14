@@ -50,6 +50,10 @@ Analyse complète et justification : [11-stocks-achats-international.md](11-stoc
 | I3 | G-48 | En-cours de route, suivi logistique | P2 |
 | A3 | G-50 | Contrats-cadres, évaluation fournisseurs | P3 |
 
+## Paramétrage (règle du propriétaire, 14 nov. 2026 : « tout doit être paramétrable »)
+
+Méthode (appliquée à V57 pour les achats) : chaque règle = paramètre par société (valeur par défaut = comportement livré, désactivable) lu par la base, et chaque action = droit du catalogue attribuable à tout rôle. Ordre proposé pour résorber **G-51** : ventes et comptes clients (cycle de la facture, crédit), stocks (rôles des modules → catalogue), trésorerie, comptabilité (écrans de comptabilisation statiques → rôles de comptabilisation), RH, immobilisations, budget, CRM. Chaque nouveau lot (I1 devises, I2 import…) naît paramétrable.
+
 ## Décisions attendues de votre part
 
 | # | Décision | Recommandation |

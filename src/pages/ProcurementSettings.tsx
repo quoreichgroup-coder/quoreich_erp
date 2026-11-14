@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, BookOpen, Users, Tag, Link, Scale, Timer } from "lucide-react";
+import { Settings, BookOpen, Users, Tag, Link, Scale, Timer, ShieldCheck } from "lucide-react";
+import { ProcurementControlSettings } from "@/components/ProcurementControlSettings";
 import { cn } from "@/lib/utils";
 import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
 import {
@@ -20,6 +21,7 @@ import {
 
 const tabs = [
   { id: "general", label: "General", icon: Settings },
+  { id: "controls", label: "Contrôles et suivi", icon: ShieldCheck },
   { id: "threeway", label: "3-Way Match", icon: Scale },
   { id: "sla", label: "SLA", icon: Timer },
   { id: "approval", label: "Approval Levels", icon: Users },
@@ -127,6 +129,8 @@ export default function ProcurementSettings() {
           </button>
         ))}
       </div>
+
+      {activeTab === "controls" && <ProcurementControlSettings />}
 
       {activeTab === "general" && (
         <Card className="border-border max-w-2xl">
