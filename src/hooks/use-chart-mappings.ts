@@ -103,3 +103,6 @@ export const useDecideMappingLines = () => useRpc((v: { mapping: string; lines: 
   (n) => `${n} ligne(s) traitée(s)`);
 export const useValidateMapping = () => useRpc((id: string) => call("validate_chart_mapping", { _mapping: id }), "Correspondance validée");
 export const useArchiveMapping = () => useRpc((id: string) => call("archive_chart_mapping", { _mapping: id }), "Correspondance archivée");
+export const useImportMappingLines = () => useRpc((v: { mapping: string; rows: { line: number; source: string; target: string; ratio: string; comment: string }[] }) =>
+  call("import_chart_mapping_lines", { _mapping: v.mapping, _rows: v.rows }),
+  (d) => `Modèle importé : ${d?.comptes ?? 0} compte(s), ${d?.lignes ?? 0} ligne(s) proposée(s), à valider`);

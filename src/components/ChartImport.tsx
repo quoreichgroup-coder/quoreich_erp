@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import Papa from "papaparse";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,9 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { exportToCSV } from "@/lib/csv-export";
+import { ExportButtons } from "@/components/ExportButtons";
+import { readTableFile, TABLE_FILE_ACCEPT } from "@/lib/table-file";
 import { cn } from "@/lib/utils";
-import { IMPORT_FIELDS, detectMapping, mapRows, missingRequired, type Mapping } from "@/lib/chart-import";
+import { IMPORT_FIELDS, STANDARD_COLUMNS, detectMapping, mapRows, missingRequired, type Mapping } from "@/lib/chart-import";
 import {
   useCancelImport, useImportProfiles, useImportRows, useImportRuns, useImportSettings, usePrepareImport, useSaveImportSettings,
   useUpdateImportRow, useValidateImport, type ImportRun, type ImportRunRow,
@@ -94,6 +94,8 @@ function NewImport({ onPrepared }: { onPrepared: (id: string) => void }) {
   const { data: profiles = [] } = useImportProfiles();
   // Format standard unique (V68) : colonnes reconnues automatiquement, aucun profil à choisir.
   const standard = profiles.find((p) => !p.tenant_id && p.code === "QUOREICH");
+  // Colonnes reconnues dès la lecture (en-têtes intégrés), complétées quand le format standard est chargé.
+  const columnMap = standard?.column_map ?? STANDARD_COLUMNS;
   const [file, setFile] = useState<{ name: string; headers: string[]; records: Record<string, string>[] } | null>(null);
   const [mapping, setMapping] = useState<Mapping>({});
   const [showColumns, setShowColumns] = useState(false);
@@ -102,34 +104,35 @@ function NewImport({ onPrepared }: { onPrepared: (id: string) => void }) {
   const rows = useMemo(() => (file ? mapRows(file.records, mapping) : []), [file, mapping]);
   const recognised = IMPORT_FIELDS.filter((f) => mapping[f.key]).map((f) => `${f.label} = « ${mapping[f.key]} »`);
 
-  const read = (f: File) => {
-    Papa.parse<Record<string, string>>(f, {
-      header: true, skipEmptyLines: true,
-      complete: (res) => {
-        const headers = res.meta.fields ?? [];
-        const m = standard ? detectMapping(headers, standard.column_map) : {};
-        setFile({ name: f.name, headers, records: res.data });
-        setMapping(m);
-        setShowColumns(missingRequired(m).length > 0);
-      },
-      error: (e) => toast.error(`Fichier illisible : ${e.message}`),
-    });
+  useEffect(() => {
+    if (!file) return;
+    const m = detectMapping(file.headers, columnMap);
+    setMapping(m);
+    setShowColumns(missingRequired(m).length > 0);
+  }, [file, columnMap]);
+  const read = async (f: File) => {
+    try {
+      const t = await readTableFile(f);
+      setFile(t);
+    } catch (e) { toast.error((e as Error).message); }
   };
-  const template = () => exportToCSV([
+  const templateRows = [
     { code: "6056", intitule: "Achats de petit matériel", type: "Charges", parent: "", regroupement: "oui", sens: "Débit" },
     { code: "605610", intitule: "Petit matériel informatique", type: "", parent: "6056", regroupement: "non", sens: "" },
-  ], [{ key: "code", header: "Code" }, { key: "intitule", header: "Intitulé" }, { key: "type", header: "Type" }, { key: "parent", header: "Parent" },
-    { key: "regroupement", header: "Regroupement" }, { key: "sens", header: "Sens" }], "modele-import-plan-comptable");
+  ];
+  const templateColumns: { key: keyof (typeof templateRows)[number]; header: string; width: number }[] = [
+    { key: "code", header: "Code", width: 14 }, { key: "intitule", header: "Intitulé", width: 45 }, { key: "type", header: "Type", width: 18 },
+    { key: "parent", header: "Parent", width: 12 }, { key: "regroupement", header: "Regroupement", width: 14 }, { key: "sens", header: "Sens", width: 10 }];
 
   return (
     <section aria-label="Nouvel import" className="card-elevated p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-sm font-semibold">Nouvel import</h2>
-        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={template}>Télécharger le modèle</Button>
+        <ExportButtons label="Télécharger le modèle" rows={templateRows} columns={templateColumns} filename="modele-import-plan-comptable" sheetName="Plan comptable" />
       </div>
-      <p className="text-[11px] text-muted-foreground">Un fichier CSV avec au moins les colonnes Code et Intitulé (Type, Parent, Regroupement et Sens sont facultatifs ; le type se déduit de la classe du compte). Le fichier « Exporter le plan » se réimporte tel quel ; les en-têtes usuels (Sage, SAP, anglais) sont reconnus.</p>
-      <div className="space-y-1"><Label className="text-xs" htmlFor="imp-file">Fichier CSV</Label>
-        <Input id="imp-file" type="file" accept=".csv,.txt,text/csv" className="h-8 text-xs w-72" onChange={(e) => { const f = e.target.files?.[0]; if (f) read(f); }} /></div>
+      <p className="text-[11px] text-muted-foreground">Un fichier Excel (.xlsx) ou CSV avec au moins les colonnes Code et Intitulé (Type, Parent, Regroupement et Sens sont facultatifs ; le type se déduit de la classe du compte). Le fichier « Exporter le plan » se réimporte tel quel ; les en-têtes usuels (Sage, SAP, anglais) sont reconnus.</p>
+      <div className="space-y-1"><Label className="text-xs" htmlFor="imp-file">Fichier Excel ou CSV</Label>
+        <Input id="imp-file" type="file" accept={TABLE_FILE_ACCEPT} className="h-8 text-xs w-72" onChange={(e) => { const f = e.target.files?.[0]; if (f) read(f); }} /></div>
       {file && (
         <>
           <p className="text-xs text-muted-foreground" data-testid="import-file-summary">{file.name} · {rows.length} ligne(s) lue(s) · colonnes reconnues : {recognised.join(", ") || "aucune"}
@@ -180,12 +183,11 @@ function RunDetail({ run, canImport, canValidate }: { run: ImportRun; canImport:
           {open && blockedByOwner && canValidate && <p className="text-[11px] text-muted-foreground">Vous avez préparé cet import : une autre personne doit le valider.</p>}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={rows.length === 0}
-            onClick={() => exportToCSV(rows.map((r) => ({ ligne: r.line_no, code: r.code ?? "", intitule: r.name ?? "", type: typeLabel(r.account_type), parent: r.parent_code ?? "",
-              action: ACTION[r.action], etat: STATUS[r.status][1], messages: r.messages.join(" ; ") })),
-              [{ key: "ligne", header: "Ligne" }, { key: "code", header: "Code" }, { key: "intitule", header: "Intitulé" }, { key: "type", header: "Type" },
-                { key: "parent", header: "Parent" }, { key: "action", header: "Action" }, { key: "etat", header: "État" }, { key: "messages", header: "Messages" }],
-              `rapport-import-${run.file_name.replace(/\.[^.]+$/, "")}`)}>Rapport d'import</Button>
+          <ExportButtons label="Rapport d'import" sheetName="Rapport" filename={`rapport-import-${run.file_name.replace(/\.[^.]+$/, "")}`}
+            rows={rows.map((r) => ({ ligne: r.line_no, code: r.code ?? "", intitule: r.name ?? "", type: typeLabel(r.account_type), parent: r.parent_code ?? "",
+              action: ACTION[r.action], etat: STATUS[r.status][1], messages: r.messages.join(" ; ") }))}
+            columns={[{ key: "ligne", header: "Ligne", width: 8 }, { key: "code", header: "Code", width: 14 }, { key: "intitule", header: "Intitulé", width: 40 }, { key: "type", header: "Type", width: 16 },
+              { key: "parent", header: "Parent", width: 12 }, { key: "action", header: "Action", width: 16 }, { key: "etat", header: "État", width: 12 }, { key: "messages", header: "Messages", width: 60 }]} />
           {open && (canImport || canValidate) && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={cancel.isPending}
             onClick={() => cancel.mutate({ runId: run.id, reason: "Annulé depuis l'écran" })}>Annuler l'import</Button>}
           {open && canValidate && <Button size="sm" className="h-8 text-xs" disabled={errors > 0 || blockedByOwner || validate.isPending}

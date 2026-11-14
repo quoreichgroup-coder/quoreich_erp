@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { identifiants, surveiller } from "./outils";
+import { buildXlsx } from "../../../src/lib/xlsx";
 
 /*
  * Comptabilité générale, après les parcours précédents : journal des écritures et états (balance,
@@ -152,11 +153,16 @@ test("plans et référentiels : référentiel appliqué, règle désactivée pui
 test("plan comptable : import guidé, correction, validation, export", async ({ page }, testInfo) => {
   const obs = surveiller(page);
   const base = `6059${String(Date.now()).slice(-4)}`;
-  const csv = `Code,Intitulé,Type,Parent,Regroupement\n${base},Petit matériel E2E,Charges,,oui\n${base}1,Petit outillage E2E,,${base},non\n${base}1,Doublon E2E,,,non\n`;
+  // Classeur Excel (.xlsx) : une valeur par cellule, en-têtes clairs.
+  const classeur = Buffer.from(buildXlsx([
+    { code: base, intitule: "Petit matériel E2E", type: "Charges", parent: "", regroupement: "oui" },
+    { code: `${base}1`, intitule: "Petit outillage E2E", type: "", parent: base, regroupement: "non" },
+    { code: `${base}1`, intitule: "Doublon E2E", type: "", parent: "", regroupement: "non" },
+  ], [{ key: "code", header: "Code" }, { key: "intitule", header: "Intitulé" }, { key: "type", header: "Type" }, { key: "parent", header: "Parent" }, { key: "regroupement", header: "Regroupement" }]));
 
   obs.etape("préparation");
   await page.goto("/journal/charts?tab=import");
-  await page.getByLabel("Fichier CSV").setInputFiles({ name: `plan-${base}.csv`, mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
+  await page.getByLabel("Fichier Excel ou CSV").setInputFiles({ name: `plan-${base}.xlsx`, mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: classeur });
   await expect(page.getByTestId("import-file-summary")).toContainText("3 ligne(s) lue(s)");
   await expect(page.getByTestId("import-file-summary")).toContainText("Code = « Code »");
   await page.getByRole("button", { name: "Préparer l'import" }).click();
@@ -183,9 +189,9 @@ test("plan comptable : import guidé, correction, validation, export", async ({ 
 
   obs.etape("export du plan");
   await page.goto("/journal/master-data");
-  const [telechargement] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exporter le plan" }).click()]);
+  const [telechargement] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exporter le plan (CSV)" }).click()]);
   const contenu = await (await import("node:fs/promises")).readFile(await telechargement.path(), "utf-8");
-  expect(contenu).toContain(`${base}1,Petit outillage E2E,Charges,${base},non`);
+  expect(contenu).toContain(`${base}1;Petit outillage E2E;Charges;${base};non`);
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
@@ -206,6 +212,16 @@ test("plan comptable : correspondance vers le PCG, validation, balance convertie
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "proposée(s), à valider" }).first()).toBeVisible();
   await expect(page.getByTestId("mapping-summary")).toContainText("0 validée(s)");
   await expect(page.getByRole("button", { name: "Tout sélectionner (0)" })).toBeVisible();
+
+  obs.etape("modèle de correspondance : téléchargé (Excel), rempli, réimporté (CSV « ; »)");
+  const [modele] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Modèle de correspondance (Excel)" }).click()]);
+  expect(modele.suggestedFilename()).toMatch(/\.xlsx$/);
+  const octets = await (await import("node:fs/promises")).readFile((await modele.path())!);
+  expect(octets.subarray(0, 2).toString("ascii")).toBe("PK");
+  const rempli = "Compte source;Compte cible;Clé (%);Commentaire\r\n521;512;60;Banque\r\n521;530;40;Caisse\r\n";
+  await page.getByLabel("Importer le modèle de correspondance rempli").setInputFiles({ name: "correspondance.csv", mimeType: "text/csv", buffer: Buffer.from("﻿" + rempli, "utf-8") });
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Modèle importé : 1 compte(s), 2 ligne(s)" }).first()).toBeVisible();
+  await expect(page.getByTestId("mapping-line").filter({ hasText: "521" }).filter({ hasText: "60 %" })).toHaveCount(1);
 
   obs.etape("décision (séparation des tâches levée le temps du parcours)");
   const strict = page.getByRole("switch", { name: "Correspondances validées par une autre personne" });

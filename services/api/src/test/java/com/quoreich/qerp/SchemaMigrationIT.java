@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "68";
+  private static final String DERNIERE_MIGRATION = "69";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -388,7 +388,9 @@ class SchemaMigrationIT {
           "chart_migration_plan_json",
           "simulate_chart_migration",
           "apply_chart_migration",
-          "cancel_chart_migration");
+          "cancel_chart_migration",
+          // V69 — import des correspondances.
+          "import_chart_mapping_lines");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(

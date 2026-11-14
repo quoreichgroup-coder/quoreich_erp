@@ -10,11 +10,14 @@ import { useMyAccess } from "@/hooks/use-my-access";
 import { useFrameworks } from "@/hooks/use-chart-frameworks";
 import { useImportSettings, useSaveImportSettings } from "@/hooks/use-chart-import";
 import { Switch } from "@/components/ui/switch";
-import { exportToCSV } from "@/lib/csv-export";
+import { ExportButtons } from "@/components/ExportButtons";
+import { readTableFile, TABLE_FILE_ACCEPT } from "@/lib/table-file";
+import { MAPPING_TEMPLATE_COLUMNS, mappingImportRows, mappingTemplateRows } from "@/lib/chart-import";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useArchiveMapping, useChartMappings, useCompareMapping, useCreateMapping, useCreateSecondaryChart, useDecideMappingLines,
-  useMappedTrialBalance, useMappingLineAuthors, useProposeMapping, useSecondaryCharts, useSetMappingLines, useValidateMapping,
+  useImportMappingLines, useMappedTrialBalance, useMappingLineAuthors, useProposeMapping, useSecondaryCharts, useSetMappingLines, useValidateMapping,
   type ChartMapping, type CompareRow,
 } from "@/hooks/use-chart-mappings";
 
@@ -156,10 +159,16 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
   const decidable = shown.filter((r) => r.line_id && r.status === "proposed" && !mine.has(r.line_id)).map((r) => r.line_id!);
   const selection = [...checked].filter((id) => decidable.includes(id));
   const count = (f: (r: CompareRow) => boolean) => rows.filter(f).length;
-  const exportMapping = () => exportToCSV(
-    rows.filter((r) => r.status === "validated").map((r) => ({ src: r.source_code, srcName: r.source_name, tgt: r.target_code ?? "", tgtName: r.target_name ?? "", ratio: r.ratio ?? "" })),
-    [{ key: "src", header: "Compte source" }, { key: "srcName", header: "Intitulé source" }, { key: "tgt", header: "Compte cible" },
-      { key: "tgtName", header: "Intitulé cible" }, { key: "ratio", header: "Clé (%)" }], "correspondance");
+  const importLines = useImportMappingLines();
+  const template = mappingTemplateRows(rows);
+  const readTemplate = async (f: File) => {
+    try {
+      const t = await readTableFile(f);
+      const { missing, rows: lines } = mappingImportRows(t.records, t.headers);
+      if (missing.length) { toast.error(`Colonne(s) introuvable(s) : ${missing.join(", ")} (en-têtes du modèle attendus)`); return; }
+      importLines.mutate({ mapping: mapping.id, rows: lines });
+    } catch (e) { toast.error((e as Error).message); }
+  };
   return (
     <section aria-label="Détail de la correspondance" className="card-elevated p-4 space-y-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -170,6 +179,10 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <ExportButtons label="Modèle de correspondance" rows={template} columns={MAPPING_TEMPLATE_COLUMNS} filename={`correspondance-${mapping.name}`.replace(/[^\p{L}\p{N}_-]+/gu, "-")} sheetName="Correspondance" />
+          {draft && canPropose && <label className="inline-flex items-center h-8 px-3 text-xs rounded-md border border-input bg-background cursor-pointer hover:bg-muted/50">
+            Importer le modèle rempli<input type="file" aria-label="Importer le modèle de correspondance rempli" accept={TABLE_FILE_ACCEPT} className="sr-only" disabled={importLines.isPending}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void readTemplate(f); }} /></label>}
           {draft && canPropose && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={propose.isPending} onClick={() => propose.mutate(mapping.id)}>Proposer automatiquement</Button>}
           {draft && canValidate && <Button size="sm" className="h-8 text-xs" disabled={validate.isPending} onClick={() => validate.mutate(mapping.id)}>Valider la correspondance</Button>}
           {mapping.status !== "archived" && canValidate && <Button size="sm" variant="ghost" className="h-8 text-xs" disabled={archive.isPending} onClick={() => archive.mutate(mapping.id)}>Archiver</Button>}
@@ -217,11 +230,10 @@ function MappingDetail({ mapping, title, canPropose, canValidate }: { mapping: C
           <div className="space-y-1"><Label className="text-xs" htmlFor="mtb-from">Du</Label><Input id="mtb-from" type="date" className="h-8 text-xs w-36" value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></div>
           <div className="space-y-1"><Label className="text-xs" htmlFor="mtb-to">Au</Label><Input id="mtb-to" type="date" className="h-8 text-xs w-36" value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></div>
           <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setPeriod({ ...period, show: true })}>Calculer</Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={balance.length === 0}
-            onClick={() => exportToCSV(balance.map((b) => ({ code: b.target_code, name: b.target_name, debit: b.debit, credit: b.credit, balance: b.balance, sources: b.sources })),
-              [{ key: "code", header: "Compte" }, { key: "name", header: "Intitulé" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" },
-                { key: "balance", header: "Solde" }, { key: "sources", header: "Comptes source" }], "balance-convertie")}>Exporter la balance</Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs ml-auto" disabled={!rows.some((r) => r.status === "validated")} onClick={exportMapping}>Exporter la correspondance</Button>
+          <ExportButtons label="Exporter la balance" filename="balance-convertie" sheetName="Balance convertie"
+            rows={balance.map((b) => ({ code: b.target_code, name: b.target_name, debit: Number(b.debit), credit: Number(b.credit), balance: Number(b.balance), sources: b.sources }))}
+            columns={[{ key: "code", header: "Compte", width: 14 }, { key: "name", header: "Intitulé", width: 40 }, { key: "debit", header: "Débit", width: 16 },
+              { key: "credit", header: "Crédit", width: 16 }, { key: "balance", header: "Solde", width: 16 }, { key: "sources", header: "Comptes source", width: 30 }]} />
         </div>
         {period.show && (isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : (
           <table className="w-full text-xs" data-testid="mapped-balance">

@@ -24,7 +24,7 @@ import { GLAccountFormDialog, AttributeDefinitionsDialog } from "@/components/GL
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { exportToCSV } from "@/lib/csv-export";
+import { ExportButtons } from "@/components/ExportButtons";
 import { chartExportRows, CHART_EXPORT_COLUMNS } from "@/lib/chart-import";
 import {
   useGLAccounts, useAccountBalances, buildAccountTree, categorizeAccounts,
@@ -129,8 +129,7 @@ export default function GLMasterData() {
           <p className="text-xs text-muted-foreground">Plan comptable principal · {totalAccounts} comptes · {activeAccounts} actifs</p>
         </div>
         <div className="flex items-center gap-2">
-          {canExport && <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" disabled={accounts.length === 0}
-            onClick={() => exportToCSV(chartExportRows(accounts as any[]), CHART_EXPORT_COLUMNS, "plan-comptable")}><FileText className="w-3.5 h-3.5" /> Exporter le plan</Button>}
+          {canExport && <ExportButtons label="Exporter le plan" rows={chartExportRows(accounts as any[])} columns={CHART_EXPORT_COLUMNS} filename="plan-comptable" sheetName="Plan comptable" />}
           <Button variant="outline" size="sm" className="h-8 text-xs" asChild><Link to="/journal/charts?tab=import">Importer</Link></Button>
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAttributes(true)}>Attributs personnalisés</Button>
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCreateDialog(true)}><Plus className="w-3.5 h-3.5" /> Ajouter un compte</Button>

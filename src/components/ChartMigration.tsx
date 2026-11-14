@@ -12,7 +12,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { useChartMappings } from "@/hooks/use-chart-mappings";
 import { useImportSettings, useSaveImportSettings } from "@/hooks/use-chart-import";
-import { exportToCSV } from "@/lib/csv-export";
+import { ExportButtons } from "@/components/ExportButtons";
 import { cn } from "@/lib/utils";
 
 /*
@@ -114,11 +114,14 @@ export function ChartMigration() {
               {current.status === "simulated" && strict && current.simulated_by === user?.id && <p className="text-[11px] text-muted-foreground">Vous avez simulé cette migration : une autre personne doit l'appliquer.</p>}
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => exportToCSV(current.plan.map((p) => ({
-                source: p.source_code ?? "", cible: p.target_code ?? "", action: p.action ? ACTION[p.action] : "", cle: p.ratio ?? "", solde: p.balance ?? "", reclasse: p.moved ?? "",
-                roles: p.roles ?? "", probleme: p.problem ?? "" })), [{ key: "source", header: "Compte source" }, { key: "cible", header: "Compte cible" }, { key: "action", header: "Action" },
-                { key: "cle", header: "Clé (%)" }, { key: "solde", header: "Solde à la date" }, { key: "reclasse", header: "Montant reclassé" }, { key: "roles", header: "Rôles redirigés" },
-                { key: "probleme", header: "Anomalie" }], "simulation-migration-plan")}>Exporter la simulation</Button>
+              <ExportButtons label="Exporter la simulation" filename="simulation-migration-plan" sheetName="Simulation"
+                rows={current.plan.map((p) => ({ source: p.source_code ?? "", sourceName: p.source_name ?? "", cible: p.target_code ?? "", cibleName: p.target_name ?? "",
+                  action: p.action ? ACTION[p.action] : "", cle: p.ratio != null ? Number(p.ratio) : "", solde: p.balance != null ? Number(p.balance) : "",
+                  reclasse: p.moved != null ? Number(p.moved) : "", roles: p.roles ?? "", probleme: p.problem ?? "" }))}
+                columns={[{ key: "source", header: "Compte source", width: 14 }, { key: "sourceName", header: "Intitulé source", width: 36 }, { key: "cible", header: "Compte cible", width: 14 },
+                  { key: "cibleName", header: "Intitulé cible", width: 36 }, { key: "action", header: "Action", width: 22 }, { key: "cle", header: "Clé (%)", width: 10 },
+                  { key: "solde", header: "Solde à la date", width: 16 }, { key: "reclasse", header: "Montant reclassé", width: 16 }, { key: "roles", header: "Rôles redirigés", width: 24 },
+                  { key: "probleme", header: "Anomalie", width: 40 }]} />
               {current.status === "simulated" && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={cancel.isPending} onClick={() => cancel.mutate(current.id)}>Annuler la simulation</Button>}
               {current.status === "simulated" && <Button size="sm" className="h-8 text-xs" disabled={current.blocking > 0 || (strict && current.simulated_by === user?.id) || apply.isPending}
                 onClick={() => apply.mutate(current.id)}>Appliquer la migration</Button>}

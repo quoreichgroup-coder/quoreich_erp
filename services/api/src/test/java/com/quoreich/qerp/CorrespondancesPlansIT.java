@@ -108,6 +108,31 @@ class CorrespondancesPlansIT {
     assertThatThrownBy(() -> asUser(VALIDEUR, "SELECT validate_chart_mapping('" + m + "')::text")).hasMessageContaining("4431");
   }
 
+  @Test
+  @DisplayName("V69 : modèle rempli réimporté — refus global détaillé, puis lignes remplacées en propositions")
+  void importDuModele() throws SQLException {
+    String m = asUser(AUTEUR, "SELECT create_chart_mapping('Modèle importé', 'PCG_FR', NULL)::text");
+    assertThatThrownBy(() -> asUser(AUTEUR, "SELECT import_chart_mapping_lines('" + m + "', '["
+        + "{\"line\":2,\"source\":\"521\",\"target\":\"512\",\"ratio\":\"60\"},"
+        + "{\"line\":3,\"source\":\"521\",\"target\":\"530\",\"ratio\":\"30\"},"
+        + "{\"line\":4,\"source\":\"999999\",\"target\":\"411\"},"
+        + "{\"line\":5,\"source\":\"701\",\"target\":\"ZZZ\"}]')::text"))
+        .hasMessageContaining("rien n'a été modifié").hasMessageContaining("ligne 4 : compte source 999999 absent du plan")
+        .hasMessageContaining("ligne 5 : compte cible ZZZ absent").hasMessageContaining("compte 521 : répartition de 90");
+    assertThat(texte("SELECT count(*)::text FROM chart_mapping_lines WHERE mapping_id = '" + m + "'")).isEqualTo("0");
+
+    assertThat(asUser(AUTEUR, "SELECT import_chart_mapping_lines('" + m + "', '["
+        + "{\"line\":2,\"source\":\"521\",\"target\":\"512\",\"ratio\":\"66,5 %\"},"
+        + "{\"line\":3,\"source\":\"521\",\"target\":\"530\",\"ratio\":\"33,5\"},"
+        + "{\"line\":4,\"source\":\"701\",\"target\":\"707\",\"comment\":\"Ventes\"},"
+        + "{\"line\":5,\"source\":\"411\",\"target\":\"\"}]')::text"))
+        .isEqualTo("{\"lignes\": 3, \"comptes\": 2}");
+    assertThat(texte("SELECT string_agg(g.code || '>' || l.target_code || ':' || l.ratio || ':' || l.status || ':' || l.method, ' ' ORDER BY g.code, l.target_code)"
+        + " FROM chart_mapping_lines l JOIN gl_accounts g ON g.id = l.source_account_id WHERE l.mapping_id = '" + m + "'"))
+        .as("virgule décimale et % acceptés ; propositions ; ligne sans cible ignorée")
+        .isEqualTo("521>512:66.5000:proposed:manual 521>530:33.5000:proposed:manual 701>707:100.0000:proposed:manual");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {
