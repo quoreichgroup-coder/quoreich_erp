@@ -8,6 +8,8 @@ export type SettlementInput = {
   partyId: string;
   paymentDate: string;
   paymentMethod: string;
+  /** Compte de trésorerie (V70) ; à défaut, le compte par défaut du mode de paiement. */
+  bankAccountId?: string | null;
   reference: string;
   allocations: Allocation[];
 };
@@ -44,6 +46,7 @@ export function useRecordSettlement(kind: SettlementKind) {
         _payment_method: s.paymentMethod,
         _reference: s.reference,
         _allocations: s.allocations,
+        ...(s.bankAccountId ? { _bank_account_id: s.bankAccountId } : {}),
       });
       if (error) throw error;
     },

@@ -7,12 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, Building2, Bell, Globe, ShieldCheck, BookOpen, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { Switch } from "@/components/ui/switch";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { useTreasuryRequireAccount } from "@/hooks/use-treasury-accounts";
 import { TreasuryRolesPanel } from "@/components/TreasuryRolesPanel";
 
 const tabs = [
-  { id: "general", label: "General", icon: Settings },
-  { id: "glposting", label: "GL Posting", icon: BookOpen },
+  { id: "general", label: "Général", icon: Settings },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "banks", label: "Bank Integration", icon: Building2 },
   { id: "alerts", label: "Alerts & Thresholds", icon: Bell },
   { id: "fx", label: "FX Policy", icon: Globe },
@@ -43,30 +46,12 @@ export default function TreasurySettings() {
         ))}
       </div>
 
-      {activeTab === "general" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">General Treasury Settings</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label className="text-xs">Forecast Horizon (weeks)</Label>
-              <Input defaultValue="8" className="h-9 text-xs" /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Minimum Liquidity (XOF)</Label>
-              <Input defaultValue="20000000" className="h-9 text-xs" /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Reconciliation Frequency</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Daily</option><option>Weekly</option><option>Monthly</option>
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Cash Pooling</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Enabled</option><option>Disabled</option>
-              </select></div>
-          </div>
-          <Button size="sm" className="text-xs">Save Changes</Button>
-        </div>
-      )}
+      {activeTab === "general" && <TreasuryGeneralSettings />}
 
       {activeTab === "glposting" && (
-        <div className="max-w-3xl">
-          <GLPostingConfigPanel config={defaultGLPostingSettings.Treasury} />
+        <div className="max-w-3xl space-y-2">
+          <p className="text-xs text-muted-foreground">Comptes utilisés quand un règlement ne cite aucun compte de trésorerie (sinon : le compte comptable du compte de trésorerie, Données de base).</p>
+          <PostingAccountsPanel modules={["TRE"]} />
         </div>
       )}
 
@@ -153,5 +138,23 @@ export default function TreasurySettings() {
 
       {activeTab === "roles" && <TreasuryRolesPanel />}
     </PageShell>
+  );
+}
+
+/* Paramètres de trésorerie réels (V70) : compte de trésorerie obligatoire sur les règlements. */
+function TreasuryGeneralSettings() {
+  const { data: access } = useMyAccess();
+  const canEdit = (access?.permissions ?? []).includes("treasury.settings");
+  const { query, save } = useTreasuryRequireAccount();
+  return (
+    <section aria-label="Règlements et trésorerie" className="bg-card border border-border rounded-lg p-5 space-y-3 max-w-2xl">
+      <h3 className="text-sm font-semibold text-foreground">Règlements et trésorerie</h3>
+      <label className="flex items-start gap-3 text-xs">
+        <Switch aria-label="Compte de trésorerie obligatoire" checked={!!query.data} disabled={!canEdit || save.isPending || query.isLoading} onCheckedChange={(v) => save.mutate(v)} />
+        <span>Compte de trésorerie obligatoire sur les règlements, acomptes et remboursements
+          <span className="block text-muted-foreground">Désactivé : sans compte choisi ni compte par défaut du type, l'écriture passe sur le rôle Banque, Caisse ou Monnaie électronique du paramétrage comptable, sans mouvement de trésorerie.</span></span>
+      </label>
+      {!canEdit && <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres de trésorerie » est requis.</p>}
+    </section>
   );
 }

@@ -92,10 +92,10 @@ const rpc = async (name: string, args: Record<string, unknown>) => {
 };
 
 export const useRecordAdvance = () => useCreditMutation(
-  (i: { customerId: string; date: string; method: string; reference: string; amount: number; salesOrderId?: string | null }) =>
+  (i: { customerId: string; date: string; method: string; reference: string; amount: number; salesOrderId?: string | null; bankAccountId?: string | null }) =>
     rpc("record_customer_advance", { _customer_id: i.customerId, _received_date: i.date, _payment_method: i.method,
-      _reference: i.reference || null, _amount: i.amount, _sales_order_id: i.salesOrderId || null }),
-  "Acompte enregistré et comptabilisé (banque / avances clients)");
+      _reference: i.reference || null, _amount: i.amount, _sales_order_id: i.salesOrderId || null, ...(i.bankAccountId ? { _bank_account_id: i.bankAccountId } : {}) }),
+  "Acompte enregistré et comptabilisé (trésorerie / avances clients)");
 
 export const useApplyCredit = () => useCreditMutation(
   (i: { invoiceId: string; kind: "advance" | "credit_note"; sourceId: string; amount: number; date: string }) =>
@@ -103,7 +103,7 @@ export const useApplyCredit = () => useCreditMutation(
   "Crédit imputé sur la facture");
 
 export const useRefundCredit = () => useCreditMutation(
-  (i: { kind: "advance" | "credit_note"; sourceId: string; amount: number; date: string; method: string; reference: string }) =>
+  (i: { kind: "advance" | "credit_note"; sourceId: string; amount: number; date: string; method: string; reference: string; bankAccountId?: string | null }) =>
     rpc("refund_customer_credit", { _source_type: i.kind, _source_id: i.sourceId, _amount: i.amount, _refund_date: i.date,
-      _payment_method: i.method, _reference: i.reference || null }),
+      _payment_method: i.method, _reference: i.reference || null, ...(i.bankAccountId ? { _bank_account_id: i.bankAccountId } : {}) }),
   "Remboursement enregistré et comptabilisé");

@@ -121,7 +121,7 @@ class AcomptesEtLettrageIT {
 
     asUser(COMPTABLE, "SELECT refund_customer_credit('advance', '" + acp + "', 10000, CURRENT_DATE, 'cash', 'REMB-1')::text");
     assertThat(ecriture("SELECT journal_entry_id FROM ar_customer_refunds WHERE advance_id = '" + acp + "'"))
-        .isEqualTo("BQ 4191:10000.00/0.00 521:0.00/10000.00");
+        .as("remboursement en espèces : compte de caisse (rôle CASH, V70)").isEqualTo("BQ 4191:10000.00/0.00 571:0.00/10000.00");
     assertThatThrownBy(() -> asUser(COMPTABLE, "SELECT refund_customer_credit('advance', '" + acp + "', 20001, CURRENT_DATE, 'cash', NULL)::text"))
         .hasMessageContaining("disponible");
   }

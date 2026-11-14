@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "69";
+  private static final String DERNIERE_MIGRATION = "70";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -88,6 +88,13 @@ class SchemaMigrationIT {
           "ar_payment_terms/Tenant isolation",
           "ar_dunning_rules/Tenant isolation",
           "ar_notification_rules/Tenant isolation",
+          // V70 — trésorerie : plus d'écriture pour tout membre.
+          "bank_accounts/Tenant isolation",
+          "bank_transactions/Tenant isolation",
+          "bank_statements/tenant_bank_statements",
+          "bank_statement_lines/tenant_bank_statement_lines",
+          "bank_reconciliations/tenant_bank_reconciliations",
+          "treasury_settings/tenant_treasury_settings",
           // V53 — stocks : plus d'écriture pour tout membre.
           "stock_movements/Tenant isolation",
           "stock_valuation_layers/valuation layers tenant access",
@@ -390,7 +397,23 @@ class SchemaMigrationIT {
           "apply_chart_migration",
           "cancel_chart_migration",
           // V69 — import des correspondances.
-          "import_chart_mapping_lines");
+          "import_chart_mapping_lines",
+          // V70 — trésorerie reliée aux règlements.
+          "treasury_require_account",
+          "treasury_kind_for_method",
+          "treasury_role_for_method",
+          "resolve_treasury_account",
+          "treasury_gl_account",
+          "record_treasury_line",
+          "refresh_bank_account_balance",
+          "guard_bank_account",
+          "set_default_treasury_account",
+          "assign_payment_treasury",
+          "payment_treasury_line",
+          "guard_bank_statement_line",
+          "guard_bank_reconciliation",
+          "record_treasury_movement",
+          "transfer_between_treasury_accounts");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -487,6 +510,22 @@ class SchemaMigrationIT {
           "chart_mapping_lines/Lecture société",
           // V67 — migration du plan opérationnel.
           "chart_migrations/Lecture société",
+          // V70 — trésorerie : les FOR ALL remplacés par des politiques par droit.
+          "bank_accounts/Lecture société",
+          "bank_accounts/Gestion habilitée",
+          "bank_accounts/Modification habilitée",
+          "bank_accounts/Suppression habilitée",
+          "bank_transactions/Lecture société",
+          "bank_statements/Lecture société",
+          "bank_statements/Import habilité",
+          "bank_statement_lines/Lecture société",
+          "bank_statement_lines/Import habilité",
+          "bank_statement_lines/Rapprochement habilité",
+          "bank_statement_lines/Suppression habilitée",
+          "bank_reconciliations/Lecture société",
+          "bank_reconciliations/Rapprochement habilité",
+          "treasury_settings/Lecture société",
+          "treasury_settings/Paramétrage habilité",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -543,6 +582,13 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V70 — trésorerie reliée aux règlements.
+          "bank_transactions/trg_refresh_bank_account_balance",
+          "bank_accounts/trg_guard_bank_account",
+          "payments/trg_assign_payment_treasury",
+          "payments/trg_payment_treasury_line",
+          "bank_statement_lines/trg_guard_bank_statement_line",
+          "bank_reconciliations/trg_guard_bank_reconciliation",
           "journal_entries/trg_enforce_analytics",
           "journal_line_analytics/trg_guard_journal_line_analytics",
           "ar_invoice_analytics/trg_guard_ar_invoice_analytics",

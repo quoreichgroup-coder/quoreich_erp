@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
 import { useRecordSettlement } from "@/hooks/use-settlements";
 import { autoAllocate, checkAllocations, openItems, type OpenItemSource, type SettlementKind } from "@/lib/settlement";
 
@@ -33,6 +34,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
   const [date, setDate] = useState(today());
   const [method, setMethod] = useState("bank_transfer");
   const [reference, setReference] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
   const [amount, setAmount] = useState("");
   const [entered, setEntered] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
     const check = checkAllocations(items, numbers, amountN);
     if (check.error) { setError(check.error); return; }
     record.mutate(
-      { partyId, paymentDate: date, paymentMethod: method, reference, allocations: check.allocations },
+      { partyId, paymentDate: date, paymentMethod: method, reference, allocations: check.allocations, bankAccountId: bankAccount || null },
       { onSuccess: onClose },
     );
   };
@@ -103,6 +105,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
               {METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
+          <TreasuryAccountSelect id="st-treasury" method={method} value={bankAccount} onChange={setBankAccount} />
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="st-ref">Référence</Label>
             <Input id="st-ref" className="h-8 text-xs" value={reference} onChange={(e) => setReference(e.target.value)}

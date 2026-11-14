@@ -1,3 +1,4 @@
+import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,7 +23,7 @@ export function AdvanceDialog({ open, onClose }: { open: boolean; onClose: () =>
   const { data: customers = [] } = useCustomers();
   const { data: orders = [] } = useSalesOrders();
   const record = useRecordAdvance();
-  const [f, setF] = useState({ customerId: "", date: today(), method: "bank_transfer", reference: "", amount: "", salesOrderId: "" });
+  const [f, setF] = useState({ customerId: "", date: today(), method: "bank_transfer", reference: "", amount: "", salesOrderId: "", bankAccountId: "" });
   const ordersOf = orders.filter((o) => o.customer_id === f.customerId && !["cancelled", "draft"].includes(o.status));
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -56,6 +57,7 @@ export function AdvanceDialog({ open, onClose }: { open: boolean; onClose: () =>
               {METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
+          <TreasuryAccountSelect id="advance-treasury" method={f.method} value={f.bankAccountId} onChange={(v) => setF((p) => ({ ...p, bankAccountId: v }))} />
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="advance-reference">Référence</Label>
             <Input id="advance-reference" className="h-8 text-xs" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} />
@@ -147,7 +149,7 @@ export function CustomerCreditsList({ canRefund }: { canRefund: boolean }) {
 
 function RefundDialog({ credit, onClose }: { credit: CustomerCredit | null; onClose: () => void }) {
   const refund = useRefundCredit();
-  const [f, setF] = useState({ amount: "", date: today(), method: "bank_transfer", reference: "" });
+  const [f, setF] = useState({ amount: "", date: today(), method: "bank_transfer", reference: "", bankAccountId: "" });
   if (!credit) return null;
   const amount = f.amount === "" ? credit.available : num(f.amount);
   return (
@@ -166,13 +168,14 @@ function RefundDialog({ credit, onClose }: { credit: CustomerCredit | null; onCl
             <select id="refund-method" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}>
               {METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select></div>
+          <TreasuryAccountSelect id="refund-treasury" method={f.method} value={f.bankAccountId} onChange={(v) => setF((p) => ({ ...p, bankAccountId: v }))} />
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="refund-reference">Référence</Label>
             <Input id="refund-reference" className="h-8 text-xs" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} /></div>
         </div>
         <DialogFooter>
           <Button size="sm" variant="outline" onClick={onClose}>Retour</Button>
           <Button size="sm" disabled={amount <= 0 || refund.isPending}
-            onClick={() => refund.mutate({ kind: credit.kind, sourceId: credit.id, amount, date: f.date, method: f.method, reference: f.reference }, { onSuccess: onClose })}>
+            onClick={() => refund.mutate({ kind: credit.kind, sourceId: credit.id, amount, date: f.date, method: f.method, reference: f.reference, bankAccountId: f.bankAccountId }, { onSuccess: onClose })}>
             Rembourser {fmt(amount)} XOF
           </Button>
         </DialogFooter>

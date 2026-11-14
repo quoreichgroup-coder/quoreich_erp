@@ -54,6 +54,7 @@ export function useRealtimeInvalidation() {
         () => {
           queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
           queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+          queryClient.invalidateQueries({ queryKey: ["treasury-accounts"] });
           queryClient.invalidateQueries({ queryKey: ["treasury-cash-position"] });
         }
       )
@@ -62,6 +63,7 @@ export function useRealtimeInvalidation() {
         { event: "*", schema: "public", table: "bank_transactions" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["treasury-accounts"] });
           queryClient.invalidateQueries({ queryKey: ["treasury-recon-status"] });
           queryClient.invalidateQueries({ queryKey: ["treasury-cash-position"] });
         }
