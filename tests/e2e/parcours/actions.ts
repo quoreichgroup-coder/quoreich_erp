@@ -4,10 +4,10 @@ import { expect, type Page } from "@playwright/test";
 
 export async function creerFournisseur(page: Page, nom: string) {
   await page.goto("/suppliers");
-  await page.getByRole("button", { name: /Add Supplier/i }).click();
+  await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
   const d = page.getByRole("dialog");
-  await d.getByPlaceholder("Company name").fill(nom);
-  await d.getByRole("button", { name: "Create" }).click();
+  await d.getByLabel("Nom du fournisseur *").fill(nom);
+  await d.getByRole("button", { name: "Créer" }).click();
   await expect(d).toBeHidden();
 }
 

@@ -186,6 +186,24 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await page.getByRole("tab", { name: /Purchase Orders/ }).click();
   const poNumero = (await bc.locator("td").first().innerText()).trim();
 
+  // V56 : suivi des livraisons — commande approuvée « à confirmer », accusé de réception du fournisseur.
+  obs.etape("suivi des livraisons : accusé de réception du fournisseur");
+  await page.getByRole("tab", { name: "Suivi des livraisons" }).click();
+  const suivi = page.getByTestId("po-followup-row").filter({ hasText: poNumero });
+  await expect(suivi).toContainText("À confirmer");
+  await suivi.getByRole("button", { name: "Accusé de réception" }).click();
+  const ar = page.getByRole("dialog");
+  const dans7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  await ar.getByLabel("Date confirmée").fill(dans7);
+  await ar.getByLabel("Référence du fournisseur").fill(`AR-${RUN}`);
+  await ar.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(ar).toBeHidden();
+  await expect(suivi).toContainText("Dans les délais");
+  await expect(suivi).toContainText(`AR-${RUN}`);
+  await expect(suivi).toContainText(`${dans7} (confirmée)`);
+  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await expect(bc.locator("td").nth(3), "accusé de réception : commande « commandée »").toHaveText("ordered");
+
   obs.etape("réception partielle : fournisseur d'abord, sur-réception refusée");
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
   let r = page.getByRole("dialog");

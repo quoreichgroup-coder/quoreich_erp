@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "55";
+  private static final String DERNIERE_MIGRATION = "56";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -96,7 +96,9 @@ class SchemaMigrationIT {
           "warehouses/warehouses tenant access",
           "item_locations/item_locations tenant access",
           "inventory_counts/inv counts tenant access",
-          "inventory_count_lines/inv count lines tenant access");
+          "inventory_count_lines/inv count lines tenant access",
+          // V56 — fiche fournisseur : écriture réservée.
+          "suppliers/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -160,7 +162,10 @@ class SchemaMigrationIT {
           // V54 — réapprovisionnement.
           "supplier_items",
           "item_replenishment_rules",
-          "replenishment_proposals");
+          "replenishment_proposals",
+          // V56 — fiche fournisseur et suivi des commandes.
+          "supplier_change_log",
+          "purchase_order_followup_log");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -278,7 +283,16 @@ class SchemaMigrationIT {
           "dismiss_replenishment_proposal",
           // V55 — isolation stricte des sociétés.
           "assert_same_tenant",
-          "install_tenant_isolation_triggers");
+          "install_tenant_isolation_triggers",
+          // V56 — fiche fournisseur et suivi des commandes.
+          "guard_supplier_bank",
+          "log_supplier_changes",
+          "verify_supplier_bank_details",
+          "guard_supplier_bank_payment",
+          "default_po_dates",
+          "po_followup_target",
+          "acknowledge_purchase_order",
+          "reschedule_purchase_order");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -319,6 +333,13 @@ class SchemaMigrationIT {
           "item_replenishment_rules/Lecture société",
           "item_replenishment_rules/Écriture habilitée",
           "replenishment_proposals/Lecture société",
+          // V56 — fiche fournisseur et suivi des commandes.
+          "suppliers/Lecture société",
+          "suppliers/Création habilitée",
+          "suppliers/Modification habilitée",
+          "suppliers/Suppression comptable",
+          "supplier_change_log/Lecture comptable",
+          "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -428,10 +449,15 @@ class SchemaMigrationIT {
           // V53 — stock et coût moyen non saisissables, comptage validé figé.
           "items/trg_guard_item_stock_fields",
           "inventory_counts/trg_guard_inventory_count",
-          "inventory_count_lines/trg_guard_inventory_count_lines");
+          "inventory_count_lines/trg_guard_inventory_count_lines",
+          // V56 — double contrôle bancaire, journal, dates par défaut des commandes.
+          "suppliers/trg_guard_supplier_bank",
+          "suppliers/trg_log_supplier_changes",
+          "payments/trg_guard_supplier_bank_payment",
+          "purchase_orders/trg_default_po_dates");
 
   /** V38 — synthèse des lots du grand livre. */
-  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view");
+  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {

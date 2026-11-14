@@ -89,6 +89,8 @@ export function useCreatePurchaseOrder() {
       po_number: string;
       supplier_id: string;
       order_date?: string;
+      expected_date?: string | null;
+      incoterm?: string | null;
       total: number;
       tenant_id: string;
       created_by: string;
@@ -96,7 +98,7 @@ export function useCreatePurchaseOrder() {
     }) => {
       // En-tête puis lignes ; le total d'en-tête est recalculé par la base (recompute_po_total).
       const { lines, ...header } = input;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("purchase_orders")
         .insert(header)
         .select()

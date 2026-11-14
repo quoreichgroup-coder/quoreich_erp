@@ -16,6 +16,25 @@ export interface Supplier {
   payment_terms: number | null;
   status: string;
   created_at: string;
+  // V56 — fiche complète
+  legal_name?: string | null;
+  rccm?: string | null;
+  tax_regime?: string | null;
+  category?: string | null;
+  contact_name?: string | null;
+  city?: string | null;
+  country?: string | null;
+  currency?: string;
+  default_incoterm?: string | null;
+  lead_time_days?: number;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_swift?: string | null;
+  bank_verified?: boolean;
+  bank_changed_by?: string | null;
+  bank_changed_at?: string | null;
+  bank_verified_at?: string | null;
+  notes?: string | null;
 }
 
 export interface APInvoice {
@@ -58,7 +77,7 @@ export function useCreateSupplier() {
   return useMutation({
     mutationFn: async (s: Omit<Supplier, "id" | "tenant_id" | "created_at">) => {
       const tenant_id = await fetchTenantId();
-      const { data, error } = await supabase.from("suppliers").insert({
+      const { data, error } = await (supabase as any).from("suppliers").insert({
         ...s,
         tenant_id,
       }).select().single();
@@ -77,8 +96,9 @@ export function useUpdateSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Supplier> & { id: string }) => {
-      const { error } = await supabase.from("suppliers").update(updates).eq("id", id);
+      const { data, error } = await (supabase as any).from("suppliers").update(updates).eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : réservée à l'administrateur, au comptable et aux acheteurs.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
@@ -88,12 +108,44 @@ export function useUpdateSupplier() {
   });
 }
 
+/** Double contrôle des coordonnées bancaires (V56) : validées par une autre personne que leur auteur. */
+export function useVerifySupplierBank() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).rpc("verify_supplier_bank_details", { _supplier_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier-change-log"] });
+      toast.success("Coordonnées bancaires validées");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
+/** Journal des changements sensibles d'une fiche (lisible par l'administrateur et le comptable). */
+export function useSupplierChangeLog(supplierId?: string) {
+  return useQuery({
+    queryKey: ["supplier-change-log", supplierId],
+    enabled: !!supplierId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("supplier_change_log").select("*")
+        .eq("supplier_id", supplierId).order("id", { ascending: false }).limit(50);
+      if (error) throw error;
+      return (data ?? []) as { id: number; field: string; old_value: string | null; new_value: string | null; changed_at: string }[];
+    },
+  });
+}
+
 export function useDeleteSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("suppliers").delete().eq("id", id);
+      const { data, error } = await (supabase as any).from("suppliers").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Suppression refusée : réservée à l'administrateur et au comptable (un fournisseur cité par une pièce se désactive).");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });

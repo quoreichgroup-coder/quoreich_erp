@@ -41,6 +41,8 @@ import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
 import { ReplenishmentProposalsPanel } from "@/components/Replenishment";
+import { PurchaseFollowupPanel } from "@/components/PurchaseFollowup";
+import { INCOTERMS } from "@/lib/supplier";
 import { useSupplierReturns } from "@/hooks/use-supplier-returns";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
@@ -144,7 +146,10 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
   const { data: suppliers } = useSuppliers();
   const [supplierId, setSupplierId] = useState(edit?.supplier_id ?? "");
   const [orderDate, setOrderDate] = useState(() => edit?.order_date ?? new Date().toISOString().slice(0, 10));
+  const [expectedDate, setExpectedDate] = useState<string>(edit?.expected_date ?? "");
+  const [incoterm, setIncoterm] = useState<string>(edit?.incoterm ?? "");
   const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "unit_cost"));
+  const supplier: any = (suppliers || []).find((s: any) => s.id === supplierId);
   const [error, setError] = useState<string | null>(null);
   const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); };
 
@@ -155,7 +160,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
     if (edit) {
       updateDraft.mutate(
-        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate }, lines: toLines(lines) },
+        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: toLines(lines) },
         { onSuccess: () => onOpenChange(false) });
       return;
     }
@@ -163,6 +168,8 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       po_number: `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       supplier_id: supplierId,
       order_date: orderDate,
+      expected_date: expectedDate || null,
+      incoterm: incoterm || null,
       total: documentFooter(lines).total,
       tenant_id: tenantId,
       created_by: user.id,
@@ -175,7 +182,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la commande " + edit.po_number : "Nouvelle commande fournisseur"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><Label className="text-xs" htmlFor="po-supplier">Fournisseur</Label>
               <select id="po-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                 value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
@@ -185,6 +192,14 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
             </div>
             <div><Label className="text-xs" htmlFor="po-date">Date de commande</Label>
               <Input id="po-date" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
+            <div><Label className="text-xs" htmlFor="po-expected">Livraison prévue</Label>
+              <Input id="po-expected" type="date" min={orderDate} value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+              {!expectedDate && <p className="text-[10px] text-muted-foreground mt-0.5">Vide : date de commande + {supplier?.lead_time_days ?? 0} j (délai du fournisseur)</p>}</div>
+            <div><Label className="text-xs" htmlFor="po-incoterm">Incoterm</Label>
+              <select id="po-incoterm" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={incoterm} onChange={(e) => setIncoterm(e.target.value)}>
+                <option value="">{supplier?.default_incoterm ? `Celui du fournisseur (${supplier.default_incoterm})` : "—"}</option>
+                {INCOTERMS.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}
+              </select></div>
           </div>
           <DocumentLinesEditor lines={lines} onChange={setLines} />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
@@ -461,6 +476,7 @@ export default function ProcurementTransactions() {
           <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Goods Receipt ({grs.length})</TabsTrigger>
           <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
           <TabsTrigger value="replenishment">Réapprovisionnement</TabsTrigger>
+          <TabsTrigger value="followup">Suivi des livraisons</TabsTrigger>
           <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Approval Workflow</TabsTrigger>
         </TabsList>
 
@@ -608,6 +624,11 @@ export default function ProcurementTransactions() {
         {/* Réapprovisionnement (V54) */}
         <TabsContent value="replenishment">
           <Card className="border-border"><CardContent className="p-4"><ReplenishmentProposalsPanel /></CardContent></Card>
+        </TabsContent>
+
+        {/* Suivi des livraisons (V56) */}
+        <TabsContent value="followup">
+          <Card className="border-border"><CardContent className="p-4"><PurchaseFollowupPanel /></CardContent></Card>
         </TabsContent>
 
         {/* Approval Workflow Tab */}

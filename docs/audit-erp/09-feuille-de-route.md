@@ -42,7 +42,7 @@ Analyse complète et justification : [11-stocks-achats-international.md](11-stoc
 | S1 — fait (V53) | S-stocks | Écritures directes fermées, ajustement motivé, transfert limité à la société, écrans réels | ✅ |
 | S2 — fait (V54) | G-42 | Alerte au point de commande | ✅ |
 | R1 — fait (V54) | G-42, G-43 | Règles par article × dépôt, catalogue fournisseur, stock prévisionnel, propositions → demandes d'achat | ✅ |
-| A1 | G-45, G-33 | Fiche fournisseur complète, dates prévues et retards, envoi de la commande | P1 |
+| A1 — fait (V56) | G-45, G-33 | Fiche fournisseur complète, double contrôle bancaire, dates prévues, accusé de réception, retards | ✅ |
 | I1 | G-46 | Devises, écarts de change, avance fournisseur | P1 (sociétés importatrices) |
 | I2 | G-47 | Dossier d'import, frais d'approche répartis dans le coût du stock, douane UEMOA | P1 (sociétés importatrices) |
 | S3 | G-44 | Campagnes d'inventaire, gel, aveugle, tolérance, tournant ABC | P2 (P1 avant la clôture annuelle) |
