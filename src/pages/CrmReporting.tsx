@@ -69,7 +69,8 @@ export default function CrmReporting() {
         <Card>
           <CardHeader className="py-2"><CardTitle className="text-xs">Funnel commercial</CardTitle></CardHeader>
           <CardContent>
-            <Table>
+            <div className="overflow-x-auto">
+            <Table className="min-w-[560px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-[11px]">Étape</TableHead>
@@ -95,6 +96,7 @@ export default function CrmReporting() {
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

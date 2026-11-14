@@ -26,7 +26,6 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });
-  await page.waitForLoadState("networkidle");
 
   if (page.url().includes("/onboarding")) {
     obs.etape("invitation émise par l'administrateur");

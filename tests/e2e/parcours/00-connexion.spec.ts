@@ -23,7 +23,6 @@ test("connexion et société de test", async ({ page }, testInfo) => {
   // La garde de route lit d'abord le profil (« Chargement… ») puis redirige vers l'accueil si
   // aucune société n'est rattachée : attendre que la page se stabilise avant de décider.
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });
-  await page.waitForLoadState("networkidle");
 
   if (page.url().includes("/onboarding")) {
     obs.etape("création de la société (accueil)");

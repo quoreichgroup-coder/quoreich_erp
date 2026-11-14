@@ -10,7 +10,8 @@ export type CrmBulkAction = "change_stage" | "assign" | "archive";
 export const BULK_ACTION_REQUIRED: Record<CrmBulkAction, CrmAction> = {
   change_stage: "edit",
   assign: "edit",
-  archive: "delete",
+  // Archiving is an UPDATE to status, so the database requires edit permission.
+  archive: "edit",
 };
 
 export const BULK_ACTION_LABEL: Record<CrmBulkAction, string> = {

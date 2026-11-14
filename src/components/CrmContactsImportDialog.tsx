@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import Papa from "papaparse";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -9,52 +9,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
-import { useBulkInsertContacts, type CrmContact } from "@/hooks/use-crm-data";
-
-type Row = Partial<CrmContact> & { full_name: string };
-type ParsedRow = { line: number; raw: Record<string, string>; row: Row; errors: string[] };
-
-const ALLOWED_STATUS = ["active", "inactive", "archived"];
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalize(raw: Record<string, string>, line: number): ParsedRow {
-  const get = (k: string) => (raw[k] ?? raw[k.toLowerCase()] ?? "").trim();
-  const full_name = get("full_name") || get("nom") || get("name");
-  const email = get("email") || null;
-  const phone = get("phone") || get("telephone") || null;
-  const company = get("company") || get("societe") || null;
-  const position = get("position") || get("fonction") || null;
-  const source = get("source") || null;
-  let status = (get("status") || "active").toLowerCase();
-  if (!ALLOWED_STATUS.includes(status)) status = "active";
-
-  const errors: string[] = [];
-  if (!full_name) errors.push("Nom complet manquant");
-  if (email && !EMAIL_RE.test(email)) errors.push("Email invalide");
-  if (full_name && full_name.length > 200) errors.push("Nom > 200 caractères");
-
-  return {
-    line,
-    raw,
-    errors,
-    row: {
-      full_name,
-      email: email || null,
-      phone: phone || null,
-      company: company || null,
-      position: position || null,
-      source: source || null,
-      status,
-      tags: [],
-    },
-  };
-}
+import { useBulkInsertContacts } from "@/hooks/use-crm-data";
+import { markDuplicateContactEmails, normalizeContactRow, type ParsedContactRow } from "@/lib/crm-contact-import";
 
 type Props = { open: boolean; onClose: () => void; canCreate: boolean };
 
 export default function CrmContactsImportDialog({ open, onClose, canCreate }: Props) {
-  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [rows, setRows] = useState<ParsedContactRow[]>([]);
   const [filename, setFilename] = useState<string>("");
+  const [parseError, setParseError] = useState<string | null>(null);
   const bulk = useBulkInsertContacts();
 
   const valid = useMemo(() => rows.filter((r) => r.errors.length === 0), [rows]);
@@ -62,18 +25,25 @@ export default function CrmContactsImportDialog({ open, onClose, canCreate }: Pr
 
   function handleFile(file: File) {
     setFilename(file.name);
+    setParseError(null);
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header) => header.replace(/^\uFEFF/, "").trim().toLowerCase(),
       complete: (res) => {
-        const parsed = res.data.map((r, i) => normalize(r, i + 2));
-        setRows(parsed);
+        if (!res.meta.fields?.length || !res.meta.fields.some((field) => ["full_name", "nom", "name"].includes(field))) {
+          setParseError("En-tête CSV invalide : ajoutez la colonne obligatoire full_name (ou nom/name).");
+          setRows([]);
+          return;
+        }
+        setParseError(res.errors.length ? res.errors.map((error) => `Ligne ${error.row ?? "?"} : ${error.message}`).join(" · ") : null);
+        setRows(markDuplicateContactEmails(res.data.map((r, i) => normalizeContactRow(r, i + 2))));
       },
     });
   }
 
   function handleImport() {
-    if (!canCreate || valid.length === 0) return;
+    if (!canCreate || valid.length === 0 || parseError) return;
     bulk.mutate(valid.map((r) => r.row), {
       onSuccess: () => {
         setRows([]);
@@ -86,11 +56,12 @@ export default function CrmContactsImportDialog({ open, onClose, canCreate }: Pr
   function reset() {
     setRows([]);
     setFilename("");
+    setParseError(null);
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-sm flex items-center gap-2">
             <Upload className="w-4 h-4" /> Importer des contacts (CSV)
@@ -107,6 +78,8 @@ export default function CrmContactsImportDialog({ open, onClose, canCreate }: Pr
             </AlertDescription>
           </Alert>
 
+          {parseError && <Alert variant="destructive"><AlertTriangle className="w-4 h-4" /><AlertDescription className="text-xs">{parseError}</AlertDescription></Alert>}
+
           {rows.length === 0 ? (
             <label className="border-2 border-dashed rounded p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/40">
               <Upload className="w-6 h-6 text-muted-foreground" />
@@ -115,7 +88,7 @@ export default function CrmContactsImportDialog({ open, onClose, canCreate }: Pr
                 type="file"
                 accept=".csv,text/csv"
                 className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFile(file); e.currentTarget.value = ""; }}
               />
             </label>
           ) : (
@@ -181,7 +154,7 @@ export default function CrmContactsImportDialog({ open, onClose, canCreate }: Pr
           <Button
             size="sm"
             onClick={handleImport}
-            disabled={!canCreate || valid.length === 0 || bulk.isPending}
+            disabled={!canCreate || valid.length === 0 || !!parseError || bulk.isPending}
             title={!canCreate ? "Action verrouillée — rôle requis pour créer." : ""}
           >
             Importer {valid.length} contact(s)

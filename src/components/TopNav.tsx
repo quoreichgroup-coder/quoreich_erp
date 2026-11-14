@@ -1,3 +1,4 @@
+import { useFiscalCalendar } from "@/hooks/use-fiscal-calendar";
 import { Shield, Building2, LogOut } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,18 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+/** Exercice en cours, lu dans le calendrier fiscal (remplace le libellé figé « AF 2025–2026 »). */
+function TopNavFiscalYear() {
+  const { data } = useFiscalCalendar();
+  const today = new Date().toISOString().slice(0, 10);
+  const fy = data?.years.find((y) => y.start_date <= today && today <= y.end_date);
+  return (
+    <span className="hidden md:inline text-xs text-muted-foreground whitespace-nowrap">
+      · {fy ? `Exercice ${fy.code}` : "Aucun exercice en cours"}
+    </span>
+  );
+}
 
 export function TopNav() {
   const { user, signOut } = useAuth();
@@ -43,21 +56,21 @@ export function TopNav() {
   };
 
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6 gap-4">
-      <div className="flex items-center gap-3">
-        <SidebarTrigger className="lg:hidden" />
+    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-3 sm:px-4 lg:px-6 gap-2 sm:gap-4 min-w-0">
+      {/* Mobile : le nom de la société se tronque, la partie droite ne se comprime pas (pas de débordement). */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+        <SidebarTrigger className="lg:hidden shrink-0" />
 
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border">
-          <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">{tenant?.name || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">{tenant?.currency || ""}</span>
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border min-w-0">
+          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-foreground truncate">{tenant?.name || "—"}</span>
+          <span className="text-[10px] text-muted-foreground shrink-0">{tenant?.currency || ""}</span>
         </div>
 
-        <span className="text-xs text-muted-foreground">·</span>
-        <span className="text-xs text-muted-foreground">AF 2025–2026</span>
+        <TopNavFiscalYear />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <CommandPalette />
 
         <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground border-border gap-1 hidden sm:flex">

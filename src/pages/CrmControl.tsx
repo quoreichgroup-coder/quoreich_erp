@@ -159,19 +159,20 @@ export default function CrmControl() {
         />
 
         <Tabs defaultValue="roles">
-          <TabsList>
+          <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="roles" className="text-xs">Rôles ({audit.length})</TabsTrigger>
             <TabsTrigger value="stages" className="text-xs">Étapes & assignations ({stageAudit.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="roles" className="mt-3">
             <Card>
-              <CardHeader className="py-2 flex flex-row items-center justify-between space-y-0">
+              <CardHeader className="flex flex-col items-start justify-between gap-2 py-2 sm:flex-row sm:items-center sm:space-y-0">
                 <CardTitle className="text-xs">Journal d'audit des rôles CRM</CardTitle>
                 <PreviewButton onClick={openRolesPreview} />
               </CardHeader>
               <CardContent>
-                <Table>
+                <div className="overflow-x-auto">
+                <Table className="min-w-[640px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-[11px]">Date</TableHead>
@@ -203,18 +204,20 @@ export default function CrmControl() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="stages" className="mt-3">
             <Card>
-              <CardHeader className="py-2 flex flex-row items-center justify-between space-y-0">
+              <CardHeader className="flex flex-col items-start justify-between gap-2 py-2 sm:flex-row sm:items-center sm:space-y-0">
                 <CardTitle className="text-xs">Changements d'étape et assignations</CardTitle>
                 <PreviewButton onClick={openStagesPreview} />
               </CardHeader>
               <CardContent>
-                <Table>
+                <div className="overflow-x-auto">
+                <Table className="min-w-[640px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-[11px]">Date</TableHead>
@@ -238,6 +241,7 @@ export default function CrmControl() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

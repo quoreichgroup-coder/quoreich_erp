@@ -78,14 +78,21 @@ export function useCrmContacts(search = "") {
     queryKey: ["crm-contacts", tenantId, search],
     enabled: !!tenantId,
     queryFn: async () => {
-      let q = supabase.from("crm_contacts" as never).select("*").eq("tenant_id", tenantId!).order("created_at", { ascending: false }).limit(500);
-      if (search.trim()) {
-        const s = `%${search.trim()}%`;
-        q = q.or(`full_name.ilike.${s},email.ilike.${s},company.ilike.${s},phone.ilike.${s}`);
+      const rows: unknown[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from("crm_contacts" as never).select("*").eq("tenant_id", tenantId!).order("created_at", { ascending: false }).order("id", { ascending: true });
+        if (search.trim()) {
+          const s = `%${search.trim()}%`;
+          q = q.or(`full_name.ilike.${s},email.ilike.${s},company.ilike.${s},phone.ilike.${s}`);
+        }
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) throw error;
+        const batch = data as unknown[] | null;
+        rows.push(...(batch ?? []));
+        if (!batch || batch.length < pageSize) break;
       }
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as CrmContact[];
+      return rows as unknown as CrmContact[];
     },
   });
 }
@@ -127,6 +134,42 @@ export function useDeleteContact() {
   });
 }
 
+export function useBulkUpdateContacts() {
+  const qc = useQueryClient();
+  const { data: tenantId } = useTenantId();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; patch: Pick<CrmContact, "status"> }) => {
+      if (!tenantId) throw new Error("Société active introuvable");
+      if (input.ids.length === 0) return;
+      const { error } = await supabase.from("crm_contacts" as never).update(input.patch as never).eq("tenant_id", tenantId).in("id", input.ids);
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ["crm-contacts"] });
+      toast.success(`${input.ids.length} contact(s) mis à jour`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useBulkDeleteContacts() {
+  const qc = useQueryClient();
+  const { data: tenantId } = useTenantId();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!tenantId) throw new Error("Société active introuvable");
+      if (ids.length === 0) return;
+      const { error } = await supabase.from("crm_contacts" as never).delete().eq("tenant_id", tenantId).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_data, ids) => {
+      qc.invalidateQueries({ queryKey: ["crm-contacts"] });
+      toast.success(`${ids.length} contact(s) supprimé(s)`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
 // ───── Opportunities ─────
 export function useCrmOpportunities() {
   const { data: tenantId } = useTenantId();
@@ -134,14 +177,21 @@ export function useCrmOpportunities() {
     queryKey: ["crm-opportunities", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_opportunities" as never)
-        .select("*")
-        .eq("tenant_id", tenantId!)
-        .order("expected_close_date", { ascending: true, nullsFirst: false })
-        .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as CrmOpportunity[];
+      const rows: unknown[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("crm_opportunities" as never)
+          .select("*")
+          .eq("tenant_id", tenantId!)
+          .order("expected_close_date", { ascending: true, nullsFirst: false })
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows as unknown as CrmOpportunity[];
     },
   });
 }
@@ -230,6 +280,7 @@ export function useCreateActivity() {
       const payload = {
         ...input,
         tenant_id: tenantId!,
+        assigned_to: input.assigned_to ?? user?.id ?? null,
         created_by: user?.id ?? null,
       } as Record<string, unknown>;
       const { error } = await supabase.from("crm_activities" as never).insert(payload as never);
@@ -246,15 +297,18 @@ export function useCreateActivity() {
 // ───── Bulk actions on opportunities ─────
 export function useBulkUpdateOpportunities() {
   const qc = useQueryClient();
+  const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: {
       ids: string[];
       patch: Partial<Pick<CrmOpportunity, "stage" | "owner_id" | "status" | "probability">>;
     }) => {
+      if (!tenantId) throw new Error("Société active introuvable");
       if (input.ids.length === 0) return;
       const { error } = await supabase
         .from("crm_opportunities" as never)
         .update(input.patch as never)
+        .eq("tenant_id", tenantId)
         .in("id", input.ids);
       if (error) throw error;
     },
@@ -294,15 +348,23 @@ export function useCrmReminders() {
     queryKey: ["crm-reminders", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_activities" as never)
-        .select("*")
-        .eq("tenant_id", tenantId!)
-        .not("due_at", "is", null)
-        .order("due_at", { ascending: true })
-        .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as CrmActivity[];
+      const rows: unknown[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("crm_activities" as never)
+          .select("*")
+          .eq("tenant_id", tenantId!)
+          .not("due_at", "is", null)
+          .order("due_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const batch = data as unknown[] | null;
+        rows.push(...(batch ?? []));
+        if (!batch || batch.length < pageSize) break;
+      }
+      return rows as unknown as CrmActivity[];
     },
   });
 }
@@ -334,15 +396,22 @@ export function useCrmStageAudit() {
     queryKey: ["crm-stage-audit", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_activities" as never)
-        .select("*")
-        .eq("tenant_id", tenantId!)
-        .eq("type", "stage_change")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as CrmStageAuditRow[];
+      const rows: unknown[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("crm_activities" as never)
+          .select("*")
+          .eq("tenant_id", tenantId!)
+          .eq("type", "stage_change")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows as unknown as CrmStageAuditRow[];
     },
   });
 }
@@ -409,14 +478,21 @@ export function useCrmRoleAudit() {
     queryKey: ["crm-role-audit", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_role_audit" as never)
-        .select("*")
-        .eq("tenant_id", tenantId!)
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as CrmRoleAuditRow[];
+      const rows: unknown[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("crm_role_audit" as never)
+          .select("*")
+          .eq("tenant_id", tenantId!)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows as unknown as CrmRoleAuditRow[];
     },
   });
 }

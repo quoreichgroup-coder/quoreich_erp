@@ -102,7 +102,8 @@ export default function CrmSettings() {
         <Card>
           <CardHeader className="py-2"><CardTitle className="text-xs">Matrice rôle × action</CardTitle></CardHeader>
           <CardContent>
-            <Table>
+            <div className="overflow-x-auto">
+            <Table className="min-w-[620px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-[11px]">Action</TableHead>
@@ -122,6 +123,7 @@ export default function CrmSettings() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

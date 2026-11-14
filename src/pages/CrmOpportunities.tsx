@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/PageShell";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Download, FileDown, X, Archive, UserCog, MoveRight } from "lucide-react";
 import {
   useCrmOpportunities, useUpsertOpportunity, useUpdateOpportunityStage,
@@ -22,6 +25,8 @@ import {
 } from "@/lib/crm-roles";
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
+import { assertBulkAllowed, type CrmBulkAction } from "@/lib/crm-bulk-actions";
+import { toast } from "sonner";
 import OpportunityDetailDialog from "@/components/OpportunityDetailDialog";
 import { useTenantId } from "@/hooks/use-tenant";
 
@@ -39,6 +44,11 @@ export default function CrmOpportunities() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAssignTo, setBulkAssignTo] = useState("");
   const [filterConv, setFilterConv] = useState<"all" | "quote" | "so" | "none">("all");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState({
+    name: "", contactId: "none", stage: "lead" as CrmStage, amount: "0", currency: "XOF",
+    probability: STAGE_DEFAULT_PROBABILITY.lead, expectedCloseDate: "", notes: "",
+  });
 
   function toggleSelect(id: string) {
     setSelected((p) => {
@@ -49,6 +59,11 @@ export default function CrmOpportunities() {
     });
   }
   function clearSelection() { setSelected(new Set()); }
+  function runBulk(action: CrmBulkAction, patch: Parameters<typeof bulk.mutate>[0]["patch"], onSuccess: () => void) {
+    const check = assertBulkAllowed(perms, action, [...selected]);
+    if ("message" in check) { toast.error(check.message); return; }
+    bulk.mutate({ ids: [...selected], patch }, { onSuccess });
+  }
 
   const quoteIds = useMemo(
     () => opps.map((o) => o.converted_quotation_id).filter((x): x is string => !!x),
@@ -68,10 +83,7 @@ export default function CrmOpportunities() {
     },
   });
 
-  const grouped = useMemo(() => {
-    const map = new Map<CrmStage, CrmOpportunity[]>();
-    CRM_STAGES.forEach((s) => map.set(s, []));
-    const filtered = opps.filter((o) => {
+  const visibleOpps = useMemo(() => opps.filter((o) => {
       const hasQuote = !!o.converted_quotation_id;
       const hasSo = hasQuote && (soSet?.has(o.converted_quotation_id!) ?? false);
       switch (filterConv) {
@@ -80,10 +92,14 @@ export default function CrmOpportunities() {
         case "none":  return !hasQuote;
         default:      return true;
       }
-    });
-    filtered.forEach((o) => map.get(o.stage as CrmStage)?.push(o));
+    }), [opps, soSet, filterConv]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<CrmStage, CrmOpportunity[]>();
+    CRM_STAGES.forEach((s) => map.set(s, []));
+    visibleOpps.forEach((o) => map.get(o.stage as CrmStage)?.push(o));
     return map;
-  }, [opps, soSet, filterConv]);
+  }, [visibleOpps]);
 
   function handleDrop(stage: CrmStage) {
     if (!draggedId || !perms.canEdit) { setDraggedId(null); return; }
@@ -96,15 +112,43 @@ export default function CrmOpportunities() {
 
   function handleCreate() {
     if (!perms.canCreate) return;
-    const name = prompt("Nom de l'opportunité ?");
-    if (!name?.trim()) return;
-    upsert.mutate({ name: name.trim(), stage: "lead", amount: 0, currency: "XOF", probability: STAGE_DEFAULT_PROBABILITY.lead });
+    setCreateDraft({ name: "", contactId: "none", stage: "lead", amount: "0", currency: "XOF", probability: STAGE_DEFAULT_PROBABILITY.lead, expectedCloseDate: "", notes: "" });
+    setCreateOpen(true);
+  }
+
+  function handleCreateSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amount = Number(createDraft.amount);
+    const currency = createDraft.currency.trim().toUpperCase();
+    if (!perms.canCreate || !createDraft.name.trim()) return;
+    if (perms.canViewSensitive && (!Number.isFinite(amount) || amount < 0)) {
+      toast.error("Le montant doit être un nombre positif ou nul.");
+      return;
+    }
+    if (!Number.isInteger(createDraft.probability) || createDraft.probability < 0 || createDraft.probability > 100) {
+      toast.error("La probabilité doit être un nombre entier entre 0 et 100.");
+      return;
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      toast.error("Saisissez un code devise ISO à 3 lettres, par exemple XOF.");
+      return;
+    }
+    upsert.mutate({
+      name: createDraft.name.trim(),
+      contact_id: createDraft.contactId === "none" ? null : createDraft.contactId,
+      stage: createDraft.stage,
+      amount: perms.canViewSensitive ? amount : 0,
+      currency,
+      probability: createDraft.probability,
+      expected_close_date: createDraft.expectedCloseDate || null,
+      notes: createDraft.notes.trim() || null,
+    }, { onSuccess: () => setCreateOpen(false) });
   }
 
   function handleExportCsv() {
     if (!perms.canExport) return;
     exportToCSV(
-      opps.map((o) => ({
+      visibleOpps.map((o) => ({
         name: o.name,
         stage: STAGE_LABELS[o.stage as CrmStage] ?? o.stage,
         amount: perms.canViewSensitive ? o.amount : "•••",
@@ -127,7 +171,7 @@ export default function CrmOpportunities() {
     exportToPDF({
       filename: `crm-opportunities-${new Date().toISOString().slice(0, 10)}.pdf`,
       title: "Pipeline CRM",
-      subtitle: `${opps.length} opportunité(s)`,
+      subtitle: `${visibleOpps.length} opportunité(s)`,
       columns: [
         { key: "name", header: "Nom" },
         { key: "stage", header: "Étape", format: (r) => STAGE_LABELS[(r as CrmOpportunity).stage as CrmStage] ?? (r as CrmOpportunity).stage },
@@ -136,7 +180,7 @@ export default function CrmOpportunities() {
         { key: "probability", header: "%" },
         { key: "expected_close_date", header: "Clôture" },
       ],
-      rows: opps as unknown as Record<string, unknown>[],
+      rows: visibleOpps as unknown as Record<string, unknown>[],
     });
   }
 
@@ -151,7 +195,7 @@ export default function CrmOpportunities() {
 
         <div className="flex flex-wrap justify-end items-center gap-2">
           <Select value={filterConv} onValueChange={(v) => setFilterConv(v as typeof filterConv)}>
-            <SelectTrigger className="h-8 text-xs w-56">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-56">
               <SelectValue placeholder="Filtrer par conversion…" />
             </SelectTrigger>
             <SelectContent>
@@ -181,19 +225,16 @@ export default function CrmOpportunities() {
                 <X className="w-3 h-3 mr-1" /> Effacer
               </Button>
 
-              <div className="flex items-center gap-1 ml-2">
+              <div className="flex w-full flex-wrap items-center gap-1 sm:ml-2 sm:w-auto">
                 <MoveRight className="w-3.5 h-3.5 text-muted-foreground" />
                 <Select
                   onValueChange={(v) => {
                     if (!perms.canEdit) return;
                     const stage = v as CrmStage;
-                    bulk.mutate(
-                      { ids: [...selected], patch: { stage, probability: STAGE_DEFAULT_PROBABILITY[stage] } },
-                      { onSuccess: clearSelection },
-                    );
+                    runBulk("change_stage", { stage, probability: STAGE_DEFAULT_PROBABILITY[stage] }, clearSelection);
                   }}
                 >
-                  <SelectTrigger className="h-7 text-[11px] w-40" disabled={!perms.canEdit} title={actionTooltip(perms, "edit", "Changer l'étape")}>
+                <SelectTrigger className="h-7 w-full text-[11px] sm:w-40" disabled={!perms.canEdit || bulk.isPending} title={actionTooltip(perms, "edit", "Changer l'étape")}>
                     <SelectValue placeholder="Changer d'étape…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -204,23 +245,20 @@ export default function CrmOpportunities() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-1 ml-2">
+              <div className="flex w-full flex-wrap items-center gap-1 sm:ml-2 sm:w-auto">
                 <UserCog className="w-3.5 h-3.5 text-muted-foreground" />
                 <Input
                   placeholder="UUID utilisateur"
                   value={bulkAssignTo}
                   onChange={(e) => setBulkAssignTo(e.target.value)}
-                  className="h-7 text-[11px] w-56"
+                  className="h-7 w-full text-[11px] sm:w-56"
                 />
                 <Button
                   size="sm" variant="outline" className="h-7 text-[11px]"
-                  disabled={!perms.canEdit || !bulkAssignTo.trim()}
+                  disabled={!perms.canEdit || !bulkAssignTo.trim() || bulk.isPending}
                   title={actionTooltip(perms, "edit", "Assigner")}
                   onClick={() => {
-                    bulk.mutate(
-                      { ids: [...selected], patch: { owner_id: bulkAssignTo.trim() } },
-                      { onSuccess: () => { clearSelection(); setBulkAssignTo(""); } },
-                    );
+                    runBulk("assign", { owner_id: bulkAssignTo.trim() }, () => { clearSelection(); setBulkAssignTo(""); });
                   }}
                 >
                   Assigner
@@ -228,15 +266,12 @@ export default function CrmOpportunities() {
               </div>
 
               <Button
-                size="sm" variant="outline" className="h-7 text-[11px] ml-auto"
-                disabled={!perms.canDelete}
+                size="sm" variant="outline" className="h-7 text-[11px] sm:ml-auto"
+                disabled={!perms.canEdit || bulk.isPending}
                 title={actionTooltip(perms, "delete", "Archiver")}
                 onClick={() => {
                   if (!confirm(`Archiver ${selected.size} opportunité(s) ?`)) return;
-                  bulk.mutate(
-                    { ids: [...selected], patch: { status: "archived" } },
-                    { onSuccess: clearSelection },
-                  );
+                  runBulk("archive", { status: "archived" }, clearSelection);
                 }}
               >
                 <Archive className="w-3 h-3 mr-1" /> Archiver
@@ -248,7 +283,8 @@ export default function CrmOpportunities() {
         {isLoading ? (
           <div className="text-xs text-muted-foreground">Chargement du pipeline…</div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="w-full min-w-0 overflow-x-auto pb-2">
+          <div className="grid w-max grid-flow-col auto-cols-[240px] gap-2 md:w-full md:grid-flow-row md:grid-cols-3 md:auto-cols-auto lg:grid-cols-6">
             {CRM_STAGES.map((stage) => {
               const list = grouped.get(stage) ?? [];
               const total = list.reduce((s, o) => s + Number(o.amount || 0), 0);
@@ -312,6 +348,7 @@ export default function CrmOpportunities() {
               );
             })}
           </div>
+          </div>
         )}
       </div>
 
@@ -320,6 +357,70 @@ export default function CrmOpportunities() {
         open={!!detailId}
         onClose={() => setDetailId(null)}
       />
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Nouvelle opportunité</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateSave} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="crm-opportunity-name">Nom de l’opportunité *</Label>
+              <Input id="crm-opportunity-name" autoFocus value={createDraft.name} onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))} maxLength={200} required placeholder="Ex. Renouvellement contrat client" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="crm-opportunity-contact">Contact associé</Label>
+                <Select value={createDraft.contactId} onValueChange={(contactId) => setCreateDraft((d) => ({ ...d, contactId }))}>
+                  <SelectTrigger id="crm-opportunity-contact"><SelectValue placeholder="Choisir un contact" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun contact</SelectItem>
+                    {contacts.filter((contact) => contact.status === "active").map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>{contact.full_name}{contact.company ? ` · ${contact.company}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="crm-opportunity-stage">Étape</Label>
+                <Select value={createDraft.stage} onValueChange={(value) => { const stage = value as CrmStage; setCreateDraft((d) => ({ ...d, stage, probability: STAGE_DEFAULT_PROBABILITY[stage] })); }}>
+                  <SelectTrigger id="crm-opportunity-stage"><SelectValue /></SelectTrigger>
+                  <SelectContent>{CRM_STAGES.map((stage) => <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+
+              {perms.canViewSensitive && <div className="space-y-1.5">
+                <Label htmlFor="crm-opportunity-amount">Montant estimé</Label>
+                <div className="flex gap-2">
+                  <Input id="crm-opportunity-amount" type="number" min="0" step="0.01" value={createDraft.amount} onChange={(e) => setCreateDraft((d) => ({ ...d, amount: e.target.value }))} className="min-w-0 flex-1" />
+                  <Input aria-label="Devise" value={createDraft.currency} onChange={(e) => setCreateDraft((d) => ({ ...d, currency: e.target.value.toUpperCase().slice(0, 3) }))} maxLength={3} className="w-20" />
+                </div>
+              </div>}
+              <div className="space-y-1.5">
+                <Label htmlFor="crm-opportunity-probability">Probabilité (%)</Label>
+                <Input id="crm-opportunity-probability" type="number" min="0" max="100" value={createDraft.probability} onChange={(e) => setCreateDraft((d) => ({ ...d, probability: Number(e.target.value) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="crm-opportunity-close-date">Date de clôture prévue</Label>
+                <Input id="crm-opportunity-close-date" type="date" value={createDraft.expectedCloseDate} onChange={(e) => setCreateDraft((d) => ({ ...d, expectedCloseDate: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="crm-opportunity-notes">Notes</Label>
+              <Textarea id="crm-opportunity-notes" value={createDraft.notes} onChange={(e) => setCreateDraft((d) => ({ ...d, notes: e.target.value }))} rows={3} />
+            </div>
+
+            <DialogFooter className="gap-2 pt-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
+              <Button type="submit" disabled={!createDraft.name.trim() || upsert.isPending}>
+                {upsert.isPending ? "Création…" : "Créer l’opportunité"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

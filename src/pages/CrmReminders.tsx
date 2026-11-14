@@ -37,7 +37,8 @@ export default function CrmReminders() {
     if (isLoading) return <div className="text-xs text-muted-foreground py-6 text-center">Chargement…</div>;
     if (rows.length === 0) return <div className="text-xs text-muted-foreground py-6 text-center">Aucun rappel.</div>;
     return (
-      <Table>
+      <div className="overflow-x-auto">
+      <Table className="min-w-[640px]">
         <TableHeader>
           <TableRow>
             <TableHead className="text-[11px]">Échéance</TableHead>
@@ -88,6 +89,7 @@ export default function CrmReminders() {
           })}
         </TableBody>
       </Table>
+      </div>
     );
   }
 
@@ -100,7 +102,7 @@ export default function CrmReminders() {
           description="Suivez vos rappels d'activités CRM par état. Une activité avec une échéance dépassée est marquée en retard."
         />
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <KpiCard icon={<Clock className="w-4 h-4 text-blue-500" />} label="À faire" value={buckets.todo.length} />
           <KpiCard icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="En retard" value={buckets.overdue.length} />
           <KpiCard icon={<CheckCircle2 className="w-4 h-4 text-success" />} label="Terminés" value={buckets.done.length} />

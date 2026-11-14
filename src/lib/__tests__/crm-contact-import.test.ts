@@ -4,6 +4,7 @@ import {
   normalizeContactRow,
   summarizeContactRows,
   ALLOWED_CONTACT_STATUS,
+  markDuplicateContactEmails,
 } from "@/lib/crm-contact-import";
 
 const CSV_OK = [
@@ -44,6 +45,7 @@ describe("crm-contact-import — validation des champs", () => {
     }
     const [bad] = parseCsv(`full_name,status\nX,bogus`);
     expect(bad.row.status).toBe("active");
+    expect(bad.errors.length).toBeGreaterThan(0);
   });
 
   it("détaille toutes les erreurs ligne par ligne", () => {
@@ -52,7 +54,7 @@ describe("crm-contact-import — validation des champs", () => {
     expect(rows[0].errors).toEqual([]);
     expect(rows[1].errors).toContain("Nom complet manquant");
     expect(rows[2].errors).toContain("Email invalide");
-    expect(rows[3].errors).toEqual([]); // status corrigé silencieusement
+    expect(rows[3].errors.length).toBeGreaterThan(0); // status corrigé silencieusement
   });
 
   it("signale un nom > 200 caractères", () => {
@@ -67,8 +69,8 @@ describe("crm-contact-import — récapitulatif avant import", () => {
     const rows = parseCsv(CSV_MIXED);
     const sum = summarizeContactRows(rows);
     expect(sum.total).toBe(4);
-    expect(sum.validCount).toBe(2); // Fatou + Status Reset
-    expect(sum.invalidCount).toBe(2);
+    expect(sum.validCount).toBe(1);
+    expect(sum.invalidCount).toBe(3);
     expect(sum.canImport).toBe(true);
   });
 
@@ -94,5 +96,12 @@ describe("crm-contact-import — récapitulatif avant import", () => {
     expect(sum.invalidCount).toBe(0);
     expect(sum.validCount).toBe(2);
     expect(sum.valid[0].row.full_name).toBe("Awa Diop");
+  });
+
+  it("normalizes header BOM and catches duplicate emails", () => {
+    const first = normalizeContactRow({ "\uFEFF Full_Name ": "Awa", EMAIL: "awa@example.com" }, 2);
+    const second = normalizeContactRow({ full_name: "Awa bis", email: "AWA@example.com" }, 3);
+    expect(first.errors).toEqual([]);
+    expect(markDuplicateContactEmails([first, second]).every((row) => row.errors.length > 0)).toBe(true);
   });
 });

@@ -19,7 +19,7 @@ describe("crm-bulk-actions — RBAC", () => {
   it("expose les actions requises par bulk action (SoD-friendly)", () => {
     expect(BULK_ACTION_REQUIRED.change_stage).toBe("edit");
     expect(BULK_ACTION_REQUIRED.assign).toBe("edit");
-    expect(BULK_ACTION_REQUIRED.archive).toBe("delete");
+    expect(BULK_ACTION_REQUIRED.archive).toBe("edit");
   });
 
   it("refuse change_stage / assign sans canEdit (agent ⇄ manager respect)", () => {
@@ -29,12 +29,12 @@ describe("crm-bulk-actions — RBAC", () => {
   });
 
   it("refuse archive sans canDelete (réservé manager/admin)", () => {
-    const p = perms({ canEdit: true });
+    const p = perms({ canDelete: true });
     expect(canPerformBulk(p, "archive")).toBe(false);
   });
 
   it("autorise change_stage/assign avec canEdit, archive uniquement avec canDelete", () => {
-    const manager = perms({ canEdit: true, canDelete: true });
+    const manager = perms({ canEdit: true });
     expect(canPerformBulk(manager, "change_stage")).toBe(true);
     expect(canPerformBulk(manager, "assign")).toBe(true);
     expect(canPerformBulk(manager, "archive")).toBe(true);
@@ -50,7 +50,7 @@ describe("crm-bulk-actions — assertBulkAllowed (requêtes modifiées)", () => 
   });
 
   it("bloque une requête forgée (ids présents) sans le rôle requis", () => {
-    const agent = perms({ canEdit: true }); // pas de delete
+    const agent = perms({ canCreate: true }); // pas de droit edit pour l'archivage
     const forgedIds = ["id-1", "id-2", "id-3"];
     const r = assertBulkAllowed(agent, "archive", forgedIds) as Extract<
       ReturnType<typeof assertBulkAllowed>,

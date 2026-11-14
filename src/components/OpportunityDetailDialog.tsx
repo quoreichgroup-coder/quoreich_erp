@@ -68,7 +68,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
 
   const [tab, setTab] = useState("details");
   const [draft, setDraft] = useState<Partial<typeof opp>>({});
-  const [newActivity, setNewActivity] = useState<{ subject: string; type: string; notes: string }>({ subject: "", type: "task", notes: "" });
+  const [newActivity, setNewActivity] = useState<{ subject: string; type: string; notes: string; dueAt: string }>({ subject: "", type: "task", notes: "", dueAt: "" });
   const [conversionCustomer, setConversionCustomer] = useState<string>("");
 
   const convertSo = useConvertQuoteToSo();
@@ -94,8 +94,9 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
       type: newActivity.type,
       subject: newActivity.subject.trim(),
       notes: newActivity.notes || null,
+      due_at: newActivity.dueAt ? new Date(newActivity.dueAt).toISOString() : null,
     }, {
-      onSuccess: () => setNewActivity({ subject: "", type: "task", notes: "" }),
+      onSuccess: () => setNewActivity({ subject: "", type: "task", notes: "", dueAt: "" }),
     });
   }
 
@@ -109,7 +110,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-sm flex items-center gap-2">
             {opp.name}
@@ -121,7 +122,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="h-8">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
             <TabsTrigger value="details" className="text-xs">Détails</TabsTrigger>
             <TabsTrigger value="activities" className="text-xs">Activités &amp; timeline</TabsTrigger>
             <TabsTrigger value="assign" className="text-xs">Assignation</TabsTrigger>
@@ -130,7 +131,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
 
 
           <TabsContent value="details" className="space-y-2 text-xs">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Nom"><Input value={current.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} className="h-8 text-xs" disabled={!perms.canEdit} /></Field>
               <Field label="Contact">
                 <Select value={current.contact_id ?? ""} onValueChange={(v) => setDraft((d) => ({ ...d, contact_id: v || null }))} disabled={!perms.canEdit}>
@@ -141,7 +142,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
                 </Select>
               </Field>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <Field label="Étape">
                 <Select
                   value={current.stage}
@@ -173,7 +174,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Clôture prévue">
                 <Input
                   type="date"
@@ -200,7 +201,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
           <TabsContent value="activities" className="space-y-2 text-xs">
             <div className="border rounded p-2 space-y-1.5">
               <Label className="text-[11px]">Nouvelle activité</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Select value={newActivity.type} onValueChange={(v) => setNewActivity((a) => ({ ...a, type: v }))}>
                   <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -221,6 +222,15 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
                   <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter
                 </Button>
               </div>
+              <Field label="Échéance du rappel (optionnel)">
+                <Input
+                  type="datetime-local"
+                  value={newActivity.dueAt}
+                  onChange={(e) => setNewActivity((a) => ({ ...a, dueAt: e.target.value }))}
+                  className="h-8 text-xs"
+                  disabled={!perms.canCreate}
+                />
+              </Field>
               <Textarea
                 placeholder="Notes (optionnel)…"
                 value={newActivity.notes}
@@ -230,7 +240,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
               />
             </div>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto">
+            <div className="max-h-60 space-y-2 overflow-y-auto sm:max-h-72">
               {activities.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground text-center py-4">Aucune activité.</p>
               ) : activities.map((a) => (
