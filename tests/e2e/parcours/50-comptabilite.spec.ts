@@ -45,3 +45,25 @@ test("journal des écritures et états comptables : affichage et exports", async
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });
+
+// V60 : contrôle SYSCOHADA du plan comptable, comptes de regroupement et rattachement des sous-comptes.
+test("plan comptable : contrôle SYSCOHADA, regroupements, rattachement", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  obs.etape("contrôle affiché");
+  await page.goto("/journal/master-data");
+  const resume = page.getByTestId("chart-issues-summary");
+  await expect(resume).not.toHaveText("Analyse…");
+  testInfo.annotations.push({ type: "contrôle avant", description: await resume.innerText() });
+
+  obs.etape("regroupements puis rattachement");
+  await page.getByRole("button", { name: "Créer les comptes de regroupement" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Comptes de regroupement créés" })).toBeVisible();
+  await page.getByRole("button", { name: "Rattacher les sous-comptes" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Sous-comptes rattachés" })).toBeVisible();
+  await expect(page.getByTestId("chart-issue-row").filter({ hasText: "Sous-compte non rattaché" })).toHaveCount(0);
+  await expect(page.getByTestId("chart-issue-row").filter({ hasText: "Erreur" })).toHaveCount(0);
+  testInfo.annotations.push({ type: "contrôle après", description: await resume.innerText() });
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});

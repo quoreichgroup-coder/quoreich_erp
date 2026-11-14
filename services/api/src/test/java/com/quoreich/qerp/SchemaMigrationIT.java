@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "59";
+  private static final String DERNIERE_MIGRATION = "61";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -104,7 +104,9 @@ class SchemaMigrationIT {
           // V58 — ventes et comptes clients paramétrables.
           "ar_general_settings/Tenant isolation",
           "ar_numbering_series/Tenant isolation",
-          "ar_notification_log/Tenant isolation");
+          "ar_notification_log/Tenant isolation",
+          // V60 — plan comptable : écriture réservée.
+          "gl_accounts/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -171,7 +173,10 @@ class SchemaMigrationIT {
           "replenishment_proposals",
           // V56 — fiche fournisseur et suivi des commandes.
           "supplier_change_log",
-          "purchase_order_followup_log");
+          "purchase_order_followup_log",
+          // V60 — référentiel SYSCOHADA.
+          "syscohada_reference_accounts",
+          "syscohada_keyword_hints");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -303,7 +308,19 @@ class SchemaMigrationIT {
           "procurement_setting",
           // V58 — ventes et comptes clients paramétrables.
           "sales_setting",
-          "ar_setting");
+          "ar_setting",
+          // V60 — plan comptable SYSCOHADA.
+          "guard_gl_account",
+          "guard_journal_line_account",
+          "normalize_account_label",
+          "labels_compatible",
+          "syscohada_reference_of",
+          "chart_of_accounts_issues",
+          "require_chart_right",
+          "replace_gl_account",
+          "create_syscohada_headings",
+          "link_gl_account_parents",
+          "reclassify_gl_account_balance");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -359,6 +376,11 @@ class SchemaMigrationIT {
           "ar_numbering_series/Lecture société",
           "ar_numbering_series/Paramétrage habilité",
           "ar_notification_log/Lecture société",
+          // V60 — plan comptable SYSCOHADA.
+          "gl_accounts/Lecture société",
+          "gl_accounts/Paramétrage habilité",
+          "syscohada_reference_accounts/Lecture du référentiel",
+          "syscohada_keyword_hints/Lecture du référentiel",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -475,7 +497,10 @@ class SchemaMigrationIT {
           "suppliers/trg_guard_supplier_bank",
           "suppliers/trg_log_supplier_changes",
           "payments/trg_guard_supplier_bank_payment",
-          "purchase_orders/trg_default_po_dates");
+          "purchase_orders/trg_default_po_dates",
+          // V60 — plan comptable : garde des comptes et des imputations.
+          "gl_accounts/trg_guard_gl_account",
+          "journal_lines/trg_guard_journal_line_account");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");

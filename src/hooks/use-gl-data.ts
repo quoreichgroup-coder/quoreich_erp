@@ -149,11 +149,13 @@ export function useUpdateGLAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; code?: string; name?: string; account_type?: string; is_active?: boolean; parent_id?: string | null }) => {
-      const { error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("gl_accounts")
         .update(updates)
-        .eq("id", id);
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : droit « Paramétrer le plan comptable » requis.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gl-accounts-full"] });

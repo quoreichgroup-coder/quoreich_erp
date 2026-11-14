@@ -19,6 +19,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { ChartOfAccountsAudit } from "@/components/ChartOfAccountsAudit";
 import { toast } from "sonner";
 import {
   useGLAccounts, useAccountBalances, buildAccountTree, categorizeAccounts,
@@ -191,6 +192,8 @@ export default function GLMasterData() {
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCreateDialog(true)}><Plus className="w-3.5 h-3.5" /> Ajouter un compte</Button>
         </div>
       </div>
+
+      <ChartOfAccountsAudit />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
