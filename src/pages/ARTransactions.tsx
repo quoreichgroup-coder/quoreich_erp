@@ -21,7 +21,7 @@ import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
   useARInvoices, useARInvoiceLines, useCreateARInvoice, useCustomers, useARInvoicePayments,
-  useReverseARReceipt, useEmitARInvoice, useDeleteARDraft, useSetARDraftLineTax,
+  useReverseARReceipt, useEmitARInvoice, useDeleteARDraft, useSetARDraftLineTax, useBulkARDrafts,
   type ARInvoice, type Payment,
 } from "@/hooks/use-ar-data";
 import { useMyAccess } from "@/hooks/use-my-access";
@@ -370,6 +370,7 @@ export default function ARTransactions() {
   const [paymentInv, setPaymentInv] = useState<ARInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  const bulk = useBulkARDrafts();
 
   const statusOptions = ["all", "draft", "sent", "partially_paid", "paid", "overdue"];
   const { data: access } = useMyAccess();
@@ -467,13 +468,46 @@ export default function ARTransactions() {
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">{filtered.length} factures · Restant: {fmtCurrency(totalOutstanding)}</span>
       </div>
 
+      {/* Actions groupées sur la sélection */}
+      {selectedIds.size > 0 && (() => {
+        const choix = invoices.filter((i) => selectedIds.has(i.id));
+        const brouillons = choix.filter((i) => i.status === "draft").map((i) => i.id);
+        return (
+          <div className="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs" data-testid="ar-bulk-bar">
+            <span className="font-medium">{choix.length} facture(s) sélectionnée(s)</span>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(choix.map((i) => ({
+              numero: i.invoice_number, client: i.customer?.name ?? "", date: i.invoice_date, echeance: i.due_date,
+              ht: i.subtotal, tva: i.tax_amount, ttc: i.total, regle: i.amount_paid, reste: i.total - i.amount_paid, statut: statusLabel(i.status),
+            })), [{ key: "numero", header: "N° facture" }, { key: "client", header: "Client" }, { key: "date", header: "Date" },
+              { key: "echeance", header: "Échéance" }, { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" },
+              { key: "regle", header: "Réglé" }, { key: "reste", header: "Reste dû" }, { key: "statut", header: "Statut" }], "factures-clients-selection")}>
+              Exporter la sélection
+            </Button>
+            {isWriter && !isApiEnabled() && brouillons.length > 0 && (
+              <>
+                <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulk.isPending}
+                  onClick={() => { if (window.confirm(`Émettre ${brouillons.length} brouillon(s) ? Le numéro légal et l'écriture seront attribués.`)) bulk.mutate({ ids: brouillons, action: "emit" }, { onSuccess: () => setSelectedIds(new Set()) }); }}>
+                  Émettre les brouillons ({brouillons.length})
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" disabled={bulk.isPending}
+                  onClick={() => { if (window.confirm(`Supprimer ${brouillons.length} brouillon(s) ?`)) bulk.mutate({ ids: brouillons, action: "delete" }, { onSuccess: () => setSelectedIds(new Set()) }); }}>
+                  Supprimer les brouillons ({brouillons.length})
+                </Button>
+              </>
+            )}
+            <span className="text-muted-foreground">Une facture émise se corrige par un avoir ; les encaissements se font par client (« Encaissement client »).</span>
+            <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={() => setSelectedIds(new Set())}>Effacer la sélection</Button>
+          </div>
+        );
+      })()}
+
       {/* Data Table */}
       <div className="card-elevated overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-10"><input type="checkbox" className="rounded border-input" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleAll} /></th>
+                <th className="w-10"><input type="checkbox" aria-label="Tout sélectionner" className="rounded border-input" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleAll} /></th>
                 <th>N° Facture</th>
                 <th>Client</th>
                 <th>Date</th>

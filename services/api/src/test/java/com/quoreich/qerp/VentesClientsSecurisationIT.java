@@ -202,6 +202,28 @@ class VentesClientsSecurisationIT {
         .isEqualTo("true");
   }
 
+  @Test
+  @DisplayName("V48 — fiches clients et paramètres AR : le lecteur lit, le comptable gère")
+  void droitsClientsEtParametres() throws SQLException {
+    assertThat(asUser(LECTEUR, "SELECT count(*)::text FROM customers")).isNotEqualTo("0");
+    assertThatThrownBy(() -> asUser(LECTEUR, "INSERT INTO customers (tenant_id, name) VALUES (get_user_tenant_id(auth.uid()),"
+            + " 'Client pirate') RETURNING id::text"))
+        .hasMessageContaining("row-level security");
+    assertThat(asUser(LECTEUR, "WITH x AS (UPDATE customers SET credit_limit = 1 RETURNING 1) SELECT count(*)::text FROM x"))
+        .as("modification sans effet pour le lecteur")
+        .isEqualTo("0");
+    assertThatThrownBy(() -> asUser(LECTEUR, "INSERT INTO ar_payment_terms (tenant_id, code, label, days) VALUES"
+            + " (get_user_tenant_id(auth.uid()), 'P1', 'Pirate', 1) RETURNING id::text"))
+        .hasMessageContaining("row-level security");
+
+    String id = asUser(COMPTABLE, "INSERT INTO customers (tenant_id, name) VALUES (get_user_tenant_id(auth.uid()),"
+        + " 'Client V48') RETURNING id::text");
+    asUser(COMPTABLE, "INSERT INTO ar_payment_terms (tenant_id, code, label, days) VALUES (get_user_tenant_id(auth.uid()),"
+        + " 'N45', '45 jours net', 45) RETURNING id::text");
+    assertThat(asUser(COMPTABLE, "WITH x AS (DELETE FROM customers WHERE id = '" + id + "' RETURNING 1) SELECT count(*)::text FROM x"))
+        .isEqualTo("1");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {

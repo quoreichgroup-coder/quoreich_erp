@@ -48,6 +48,26 @@ export function useUpsertARPaymentTerm() {
   });
 }
 
+/** Suppression d'un paramètre AR (V48 : administrateur ou comptable ; zéro ligne touchée = refus). */
+function useDeleteARSetting(table: string, key: string, label: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await sb.from(table).delete().eq("id", id).select("id");
+      if (error) {
+        if (error.code === "23503") throw new Error(`${label} est utilisé par des pièces : désactivez-le plutôt.`);
+        throw error;
+      }
+      if (!data || data.length === 0) throw new Error("Droit insuffisant : seuls l'administrateur et le comptable gèrent ces paramètres.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [key] }); toast.success(`${label} supprimé`); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+export const useDeleteARPaymentTerm = () => useDeleteARSetting("ar_payment_terms", "ar-payment-terms", "Terme de paiement");
+export const useDeleteARDunningRule = () => useDeleteARSetting("ar_dunning_rules", "ar-dunning-rules", "Niveau de relance");
+export const useDeleteARNotificationRule = () => useDeleteARSetting("ar_notification_rules", "ar-notification-rules", "Règle de notification");
+
 // ─── Numbering Series ───
 export interface ARNumberingSeries {
   id: string;
@@ -551,6 +571,35 @@ export function useDeleteARDraft() {
   });
 }
 
+/**
+ * Actions groupées sur des brouillons de facture : émettre (numéro légal et écriture, une facture
+ * après l'autre : un refus n'arrête pas les suivantes et il est rapporté) ou supprimer.
+ */
+export function useBulkARDrafts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, action }: { ids: string[]; action: "emit" | "delete" }) => {
+      const echecs: string[] = [];
+      let ok = 0;
+      for (const id of ids) {
+        const { data, error } = action === "emit"
+          ? await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", id).eq("status", "draft").select("invoice_number")
+          : await supabase.from("ar_invoices").delete().eq("id", id).eq("status", "draft").select("invoice_number");
+        if (error) echecs.push(error.message);
+        else if (!data || data.length === 0) echecs.push("brouillon introuvable ou droit insuffisant");
+        else ok++;
+      }
+      return { ok, echecs };
+    },
+    onSuccess: ({ ok, echecs }, v) => {
+      qc.invalidateQueries({ queryKey: ["ar-invoices"] });
+      if (ok) toast.success(`${ok} facture(s) ${v.action === "emit" ? "émise(s)" : "supprimée(s)"}`);
+      if (echecs.length) toast.error(`${echecs.length} refus`, { description: [...new Set(echecs)].join(" · ") });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
 /** Code TVA d'une ligne de brouillon : la base recalcule la ligne et le pied (V21). */
 export function useSetARDraftLineTax() {
   const qc = useQueryClient();
@@ -817,12 +866,33 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Customer> & { id: string }) => {
       if (isApiEnabled()) { await apiPut(`/api/v1/customers/${id}`, customerToApi(updates)); return; }
-      const { error } = await supabase.from("customers").update(updates).eq("id", id);
+      const { data, error } = await supabase.from("customers").update(updates).eq("id", id).select("id");
       if (error) throw error;
+      // RLS (V48) : une modification sans droit ne touche aucune ligne, sans erreur.
+      if (!data || data.length === 0) throw new Error("Droit insuffisant : modification de la fiche client refusée.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Client mis à jour");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
+/** Statut de plusieurs fiches à la fois (action groupée : activer / désactiver). */
+export function useSetCustomersStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: "active" | "inactive" }) => {
+      if (isApiEnabled()) throw new Error("Sur site, le statut d'une fiche client se change fiche par fiche (API à venir).");
+      const { data, error } = await supabase.from("customers").update({ status }).in("id", ids).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Droit insuffisant : modification des fiches clients refusée.");
+      return data.length;
+    },
+    onSuccess: (n, v) => {
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      toast.success(`${n} fiche(s) ${v.status === "active" ? "activée(s)" : "désactivée(s)"}`);
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -833,8 +903,12 @@ export function useDeleteCustomer() {
   return useMutation({
     mutationFn: async (id: string) => {
       if (isApiEnabled()) throw new Error("Sur site, un client ne se supprime pas : ses pièces y restent rattachées.");
-      const { error } = await supabase.from("customers").delete().eq("id", id);
-      if (error) throw error;
+      const { data, error } = await supabase.from("customers").delete().eq("id", id).select("id");
+      if (error) {
+        if (error.code === "23503") throw new Error("Ce client a des pièces (devis, commandes, factures) : désactivez-le au lieu de le supprimer.");
+        throw error;
+      }
+      if (!data || data.length === 0) throw new Error("Droit insuffisant : seuls l'administrateur et le comptable suppriment une fiche client.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });

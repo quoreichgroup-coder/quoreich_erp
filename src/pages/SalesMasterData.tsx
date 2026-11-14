@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/PageShell";
+import { Link } from "react-router-dom";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,6 +94,7 @@ export default function SalesMasterData() {
 
         {/* CUSTOMERS — credit limit live */}
         <TabsContent value="customers">
+          <div className="flex justify-end mb-2"><Link to="/customers" className="text-xs text-primary hover:underline" data-testid="manage-customers">Gérer les fiches clients (créer, modifier, désactiver) →</Link></div>
           <Card className="border-border">
             <CardContent className="p-0">
               {lc ? (
@@ -179,6 +181,7 @@ export default function SalesMasterData() {
 
         {/* CATALOG — sellable items live */}
         <TabsContent value="catalog">
+          <div className="flex justify-end mb-2"><Link to="/inventory/master-data" className="text-xs text-primary hover:underline" data-testid="manage-catalog">Gérer les articles et prix dans Stocks → Données de base →</Link></div>
           <Card className="border-border">
             <CardContent className="p-0">
               {li ? (
@@ -237,6 +240,7 @@ export default function SalesMasterData() {
 
         {/* PAYMENT TERMS — live AR terms */}
         <TabsContent value="terms">
+          <div className="flex justify-end mb-2"><Link to="/receivables/settings" className="text-xs text-primary hover:underline" data-testid="manage-terms">Gérer les conditions de paiement dans Comptes clients → Paramètres →</Link></div>
           <Card className="border-border">
             <CardContent className="p-0">
               {lt ? (

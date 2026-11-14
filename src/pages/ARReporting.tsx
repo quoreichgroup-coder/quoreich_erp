@@ -82,35 +82,7 @@ const groupingOptions = [
   { id: "category", label: "Par catégorie" },
 ];
 
-/* ──────── SAVED TEMPLATES ──────── */
-
-const savedTemplates = [
-  { id: 1, name: "Balance âgée détaillée", source: "aging", columns: 8, createdBy: "A. Kouassi", date: "2026-02-20", status: "Active", permission: "Finance" },
-  { id: 2, name: "Encaissements mensuels", source: "receipts", columns: 6, createdBy: "C. Bamba", date: "2026-02-15", status: "Active", permission: "Finance" },
-  { id: 3, name: "Factures impayées > 60j", source: "invoices", columns: 7, createdBy: "B. Traoré", date: "2026-01-28", status: "Active", permission: "AR Manager" },
-  { id: 4, name: "Suivi DSO par client", source: "customers", columns: 5, createdBy: "M. Diallo", date: "2026-01-10", status: "Draft", permission: "Direction" },
-  { id: 5, name: "Rapport crédit client", source: "customers", columns: 6, createdBy: "A. Kouassi", date: "2025-12-15", status: "Active", permission: "Risk" },
-];
-
-/* ──────── SCHEDULED REPORTS ──────── */
-
-const scheduledReports = [
-  { name: "Balance âgée hebdomadaire", frequency: "Hebdo", nextRun: "2026-03-07", recipients: "ar-team@quoreich.com", format: "Excel", status: "Active" },
-  { name: "DSO mensuel", frequency: "Mensuel", nextRun: "2026-04-01", recipients: "cfo@quoreich.com", format: "PDF", status: "Active" },
-  { name: "Rapport risque crédit", frequency: "Quotidien", nextRun: "2026-03-03", recipients: "risk@quoreich.com", format: "PDF + Excel", status: "Active" },
-  { name: "Encaissements trimestriels", frequency: "Trimestriel", nextRun: "2026-04-01", recipients: "direction@quoreich.com", format: "PDF", status: "Draft" },
-];
-
 /* preview data and aging pie are now computed from DB inside component */
-
-/* ──────── PERMISSION ROLES ──────── */
-
-const permissionRoles = [
-  { role: "AR Analyst", canView: true, canCreate: true, canExport: true, canSchedule: false, canAdmin: false },
-  { role: "AR Manager", canView: true, canCreate: true, canExport: true, canSchedule: true, canAdmin: false },
-  { role: "Finance Director", canView: true, canCreate: true, canExport: true, canSchedule: true, canAdmin: true },
-  { role: "Auditor", canView: true, canCreate: false, canExport: true, canSchedule: false, canAdmin: false },
-];
 
 /* ──────── NAVIGATION ──────── */
 
@@ -735,18 +707,10 @@ export default function ARReporting() {
                     </tr>
                   </thead>
                   <tbody>
-                    {scheduledReports.map((r, i) => (
-                      <tr key={i}>
-                        <td className="font-medium text-foreground">{r.name}</td>
-                        <td>{r.frequency}</td>
-                        <td className="tabular-nums text-muted-foreground">{r.nextRun}</td>
-                        <td className="text-muted-foreground">{r.recipients}</td>
-                        <td>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{r.format}</span>
-                        </td>
-                        <td><StatusBadge status={r.status} /></td>
-                      </tr>
-                    ))}
+                    {/* Aucune planification n'est gérée par la base : pas de liste inventée (audit U-01). */}
+                    <tr><td colSpan={6} className="text-center text-muted-foreground py-6">
+                      Planification des rapports : non disponible à ce jour. Exportez un modèle depuis « Templates sauvegardés ».
+                    </td></tr>
                   </tbody>
                 </table>
               </div>
@@ -773,20 +737,11 @@ export default function ARReporting() {
                     </tr>
                   </thead>
                   <tbody>
-                    {permissionRoles.map((r) => (
-                      <tr key={r.role}>
-                        <td className="font-medium text-foreground">{r.role}</td>
-                        {[r.canView, r.canCreate, r.canExport, r.canSchedule, r.canAdmin].map((can, i) => (
-                          <td key={i} className="text-center">
-                            {can ? (
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-success/10 text-success text-[10px]">✓</span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-[10px]">—</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {/* Les droits viennent du modèle d'autorisations central (V23), pas d'une matrice locale. */}
+                    <tr><td colSpan={6} className="text-center text-muted-foreground py-6">
+                      Les droits sur les factures, encaissements et avoirs (ar.receipt, ar.reverse_receipt, ar.credit_note…) se gèrent dans
+                      {" "}<a className="text-primary hover:underline" href="/settings?tab=roles">Paramètres → Rôles et autorisations</a>.
+                    </td></tr>
                   </tbody>
                 </table>
               </div>

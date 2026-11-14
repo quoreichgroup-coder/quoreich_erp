@@ -68,6 +68,7 @@ import {
   useDeleteQuotation,
   useUpdateSalesOrder,
   useDeleteSalesOrder,
+  useBulkSales,
   type SalesLine,
 } from "@/hooks/use-sales-data";
 import { useCustomers } from "@/hooks/use-ar-data";
@@ -217,6 +218,26 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
           emptyLines="Chargement des lignes…" />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ──────── ACTIONS GROUPÉES ──────── */
+function BulkBar({ count, onClear, children }: { count: number; onClear: () => void; children: React.ReactNode }) {
+  if (count === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/30 text-xs" data-testid="sales-bulk-bar">
+      <span className="font-medium">{count} pièce(s) sélectionnée(s)</span>
+      {children}
+      <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={onClear}>Effacer la sélection</Button>
+    </div>
+  );
+}
+
+function SelectBox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  return (
+    <TableCell onClick={(e) => e.stopPropagation()} className="w-8">
+      <input type="checkbox" aria-label={label} className="rounded border-input" checked={checked} onChange={onChange} />
+    </TableCell>
   );
 }
 
@@ -631,6 +652,15 @@ export default function SalesTransactions() {
   const [salesView, setSalesView] = useState<SalesView>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const deleteQuote = useDeleteQuotation();
+  const bulk = useBulkSales();
+  const [selQt, setSelQt] = useState<Set<string>>(new Set());
+  const [selSo, setSelSo] = useState<Set<string>>(new Set());
+  const [selDn, setSelDn] = useState<Set<string>>(new Set());
+  const flip = (set: Set<string>, id: string) => { const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); return n; };
+  const runBulk = (action: Parameters<typeof bulk.mutate>[0]["action"], ids: string[], question: string, clear: () => void) => {
+    if (ids.length === 0) return;
+    if (window.confirm(question)) bulk.mutate({ action, ids }, { onSuccess: clear });
+  };
   const deleteOrder = useDeleteSalesOrder();
   const [confirmInvoiceDnId, setConfirmInvoiceDnId] = useState<string | null>(null);
 
@@ -995,6 +1025,22 @@ export default function SalesTransactions() {
         <TabsContent value="quotations">
           <Card className="border-border">
             <CardContent className="p-0">
+              {(() => {
+                const choix = qtRows.filter((q) => selQt.has(q.quoteId));
+                const supprimables = choix.filter((q) => ["draft", "sent", "accepted", "expired"].includes(q.status)).map((q) => q.quoteId);
+                return (
+                  <BulkBar count={choix.length} onClear={() => setSelQt(new Set())}>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(choix.map((q) => ({ numero: q.id, date: q.date, client: q.customer, ttc: q.total, validite: q.validUntil, statut: q.status })),
+                      [{ key: "numero", header: "N° devis" }, { key: "date", header: "Date" }, { key: "client", header: "Client" }, { key: "ttc", header: "Total TTC" }, { key: "validite", header: "Validité" }, { key: "statut", header: "Statut" }], "devis-selection")}>Exporter la sélection</Button>
+                    {perms?.canCreate && supprimables.length > 0 && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" disabled={bulk.isPending}
+                        onClick={() => runBulk("deleteQuotes", supprimables, `Supprimer ${supprimables.length} devis ? (un devis déjà commandé est refusé)`, () => setSelQt(new Set()))}>
+                        Supprimer ({supprimables.length})
+                      </Button>
+                    )}
+                  </BulkBar>
+                );
+              })()}
               <FilterBar
                 search={qtTable.search}
                 onSearch={qtTable.setSearch}
@@ -1032,6 +1078,9 @@ export default function SalesTransactions() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
+                      <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner tous les devis" className="rounded border-input"
+                        checked={qtTable.pagedData.length > 0 && qtTable.pagedData.every((q) => selQt.has(q.quoteId))}
+                        onChange={(e) => setSelQt(e.target.checked ? new Set(qtTable.pagedData.map((q) => q.quoteId)) : new Set())} /></TableCell>
                       <SortableHead label="Quote #" sortKey="id" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Customer" sortKey="customer" sort={qtTable.sort} onSort={qtTable.toggleSort} />
@@ -1044,6 +1093,7 @@ export default function SalesTransactions() {
                   <TableBody>
                     {qtTable.pagedData.map((q) => (
                       <TableRow key={q.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "qt", doc: q.raw })}>
+                        <SelectBox checked={selQt.has(q.quoteId)} onChange={() => setSelQt((s) => flip(s, q.quoteId))} label={`Sélectionner le devis ${q.id}`} />
                         <TableCell className="font-mono text-primary">{q.id}</TableCell>
                         <TableCell>{q.date}</TableCell>
                         <TableCell className="font-medium">{q.customer}</TableCell>
@@ -1105,6 +1155,28 @@ export default function SalesTransactions() {
         <TabsContent value="orders">
           <Card className="border-border">
             <CardContent className="p-0">
+              {(() => {
+                const choix = soRows.filter((o) => selSo.has(o.soId));
+                const brouillons = choix.filter((o) => o.status === "draft").map((o) => o.soId);
+                return (
+                  <BulkBar count={choix.length} onClear={() => setSelSo(new Set())}>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(choix.map((o) => ({ numero: o.id, date: o.date, client: o.customer, devis: o.qtRef, ttc: o.total, statut: o.status })),
+                      [{ key: "numero", header: "N° commande" }, { key: "date", header: "Date" }, { key: "client", header: "Client" }, { key: "devis", header: "Devis" }, { key: "ttc", header: "Total TTC" }, { key: "statut", header: "Statut" }], "commandes-selection")}>Exporter la sélection</Button>
+                    {canConfirm && brouillons.length > 0 && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulk.isPending}
+                        onClick={() => runBulk("confirmOrders", brouillons, `Confirmer ${brouillons.length} commande(s) ? (limite de crédit contrôlée pour chacune)`, () => setSelSo(new Set()))}>
+                        Confirmer ({brouillons.length})
+                      </Button>
+                    )}
+                    {perms?.canCreate && brouillons.length > 0 && (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" disabled={bulk.isPending}
+                        onClick={() => runBulk("deleteOrders", brouillons, `Supprimer ${brouillons.length} commande(s) en brouillon ?`, () => setSelSo(new Set()))}>
+                        Supprimer ({brouillons.length})
+                      </Button>
+                    )}
+                  </BulkBar>
+                );
+              })()}
               <FilterBar
                 search={soTable.search}
                 onSearch={soTable.setSearch}
@@ -1142,6 +1214,9 @@ export default function SalesTransactions() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
+                      <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner toutes les commandes" className="rounded border-input"
+                        checked={soTable.pagedData.length > 0 && soTable.pagedData.every((o) => selSo.has(o.soId))}
+                        onChange={(e) => setSelSo(e.target.checked ? new Set(soTable.pagedData.map((o) => o.soId)) : new Set())} /></TableCell>
                       <SortableHead label="SO #" sortKey="id" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Customer" sortKey="customer" sort={soTable.sort} onSort={soTable.toggleSort} />
@@ -1154,6 +1229,7 @@ export default function SalesTransactions() {
                   <TableBody>
                     {soTable.pagedData.map((so) => (
                       <TableRow key={so.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "so", doc: so.raw })}>
+                        <SelectBox checked={selSo.has(so.soId)} onChange={() => setSelSo((s) => flip(s, so.soId))} label={`Sélectionner la commande ${so.id}`} />
                         <TableCell className="font-mono text-primary">{so.id}</TableCell>
                         <TableCell>{so.date}</TableCell>
                         <TableCell className="font-medium">{so.customer}</TableCell>
@@ -1231,6 +1307,22 @@ export default function SalesTransactions() {
         <TabsContent value="deliveries">
           <Card className="border-border">
             <CardContent className="p-0">
+              {(() => {
+                const choix = dnRows.filter((d) => selDn.has(d.dnId));
+                const aFacturer = choix.filter((d) => d.status === "completed" && !d.invoiced).map((d) => d.dnId);
+                return (
+                  <BulkBar count={choix.length} onClear={() => setSelDn(new Set())}>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(choix.map((d) => ({ numero: d.id, commande: d.soRef, date: d.date, client: d.customer, statut: d.status, facture: d.invoiced ? "oui" : "non" })),
+                      [{ key: "numero", header: "N° livraison" }, { key: "commande", header: "Commande" }, { key: "date", header: "Date" }, { key: "client", header: "Client" }, { key: "statut", header: "Statut" }, { key: "facture", header: "Facturée" }], "livraisons-selection")}>Exporter la sélection</Button>
+                    {canInvoice && aFacturer.length > 0 && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulk.isPending}
+                        onClick={() => runBulk("invoiceDeliveries", aFacturer, `Préparer ${aFacturer.length} facture(s) brouillon ?`, () => setSelDn(new Set()))}>
+                        Facturer ({aFacturer.length})
+                      </Button>
+                    )}
+                  </BulkBar>
+                );
+              })()}
               <FilterBar
                 search={dnTable.search}
                 onSearch={dnTable.setSearch}
@@ -1270,6 +1362,9 @@ export default function SalesTransactions() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
+                      <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner toutes les livraisons" className="rounded border-input"
+                        checked={dnTable.pagedData.length > 0 && dnTable.pagedData.every((d) => selDn.has(d.dnId))}
+                        onChange={(e) => setSelDn(e.target.checked ? new Set(dnTable.pagedData.map((d) => d.dnId)) : new Set())} /></TableCell>
                       <SortableHead label="DN #" sortKey="id" sort={dnTable.sort} onSort={dnTable.toggleSort} />
                       <SortableHead label="SO Ref" sortKey="soRef" sort={dnTable.sort} onSort={dnTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={dnTable.sort} onSort={dnTable.toggleSort} />
@@ -1281,6 +1376,7 @@ export default function SalesTransactions() {
                   <TableBody>
                     {dnTable.pagedData.map((d) => (
                       <TableRow key={d.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "dn", doc: d.raw })}>
+                        <SelectBox checked={selDn.has(d.dnId)} onChange={() => setSelDn((s) => flip(s, d.dnId))} label={`Sélectionner la livraison ${d.id}`} />
                         <TableCell className="font-mono text-primary">{d.id}</TableCell>
                         <TableCell className="font-mono text-muted-foreground">{d.soRef}</TableCell>
                         <TableCell>{d.date}</TableCell>

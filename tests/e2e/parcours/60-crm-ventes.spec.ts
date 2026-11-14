@@ -92,7 +92,7 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await page.getByRole("button", { name: "Exporter l'onglet actif en PDF" }).click();
   await verifierPdf(await quotePdf, /quotations-.*\.pdf/);
 
-  const numeroDevis = (await quoteRow.locator("td").first().innerText()).trim();
+  const numeroDevis = (await quoteRow.locator("td").nth(1).innerText()).trim(); // colonne 0 : case de sélection
 
   // V46 : un devis non encore commandé se modifie.
   obs.etape("modifier le devis (libellé d'une ligne)");

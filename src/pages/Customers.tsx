@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Trash2, Users, Loader2 } from "lucide-react";
-import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from "@/hooks/use-ar-data";
+import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, useSetCustomersStatus, type Customer } from "@/hooks/use-ar-data";
+import { exportToCSV } from "@/lib/csv-export";
 import { CustomerAnalyticDefaults } from "@/components/AnalyticSelectors";
 
 const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30 };
@@ -20,6 +21,10 @@ const Customers = () => {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
+  // Actions groupées : sélection de fiches, export, activation / désactivation.
+  const setStatus = useSetCustomersStatus();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -126,10 +131,33 @@ const Customers = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                {selected.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border bg-muted/30 text-xs" data-testid="customers-bulk-bar">
+                    <span className="font-medium">{selected.size} fiche(s) sélectionnée(s)</span>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(
+                      customers.filter((c) => selected.has(c.id)).map((c) => ({ nom: c.name, email: c.email ?? "", telephone: c.phone ?? "",
+                        identifiant_fiscal: c.tax_id ?? "", adresse: c.address ?? "", limite_credit: c.credit_limit ?? 0,
+                        delai_paiement: c.payment_terms ?? "", statut: c.status })),
+                      [{ key: "nom", header: "Nom" }, { key: "email", header: "E-mail" }, { key: "telephone", header: "Téléphone" },
+                        { key: "identifiant_fiscal", header: "IFU / NIF" }, { key: "adresse", header: "Adresse" },
+                        { key: "limite_credit", header: "Limite de crédit" }, { key: "delai_paiement", header: "Délai de paiement (jours)" },
+                        { key: "statut", header: "Statut" }], "clients-selection")}>Exporter la sélection</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" disabled={setStatus.isPending}
+                      onClick={() => setStatus.mutate({ ids: [...selected], status: "inactive" }, { onSuccess: () => setSelected(new Set()) })}>Désactiver</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" disabled={setStatus.isPending}
+                      onClick={() => setStatus.mutate({ ids: [...selected], status: "active" }, { onSuccess: () => setSelected(new Set()) })}>Réactiver</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={() => setSelected(new Set())}>Effacer la sélection</Button>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10">
+                          <input type="checkbox" aria-label="Tout sélectionner" className="rounded border-input"
+                            checked={filtered.length > 0 && filtered.every((c) => selected.has(c.id))}
+                            onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((c) => c.id)) : new Set())} />
+                        </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead className="hidden md:table-cell">Email</TableHead>
                         <TableHead className="hidden lg:table-cell">Phone</TableHead>
@@ -142,17 +170,21 @@ const Customers = () => {
                     <TableBody>
                       {isLoading ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
+                          <TableCell colSpan={8} className="text-center py-8">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
                           </TableCell>
                         </TableRow>
                       ) : filtered.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No customers found.</TableCell>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No customers found.</TableCell>
                         </TableRow>
                       ) : (
                         filtered.map(customer => (
                           <TableRow key={customer.id}>
+                            <TableCell>
+                              <input type="checkbox" aria-label={`Sélectionner ${customer.name}`} className="rounded border-input"
+                                checked={selected.has(customer.id)} onChange={() => toggle(customer.id)} />
+                            </TableCell>
                             <TableCell className="font-medium text-foreground">{customer.name}</TableCell>
                             <TableCell className="hidden md:table-cell text-muted-foreground">{customer.email}</TableCell>
                             <TableCell className="hidden lg:table-cell text-muted-foreground">{customer.phone}</TableCell>
@@ -165,10 +197,10 @@ const Customers = () => {
                             <TableCell className="text-right font-medium">{formatCurrency(customer.credit_limit || 0)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(customer)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Modifier ${customer.name}`} onClick={() => openEdit(customer)}>
                                   <Pencil className="w-4 h-4 text-muted-foreground" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDeletingCustomer(customer); setDeleteDialogOpen(true); }}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Supprimer ${customer.name}`} onClick={() => { setDeletingCustomer(customer); setDeleteDialogOpen(true); }}>
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               </div>

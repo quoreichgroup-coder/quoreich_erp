@@ -13,8 +13,7 @@ import {
   useARNumberingSeries, useUpdateARNumberingSeries,
   useARDunningRules, useUpsertARDunningRule,
   useARGeneralSettings, useUpdateARGeneralSettings,
-  useARNotificationRules, useUpsertARNotificationRule, useToggleARNotificationRule,
-} from "@/hooks/use-ar-data";
+  useARNotificationRules, useUpsertARNotificationRule, useToggleARNotificationRule, useDeleteARPaymentTerm, useDeleteARDunningRule, useDeleteARNotificationRule } from "@/hooks/use-ar-data";
 
 const tabs = [
   { id: "general", label: "General", icon: Settings },
@@ -73,6 +72,7 @@ function GeneralTab() {
 }
 
 function PaymentTermsTab() {
+  const remove = useDeleteARPaymentTerm();
   const { data: terms = [], isLoading } = useARPaymentTerms();
   const upsert = useUpsertARPaymentTerm();
   const [editing, setEditing] = useState<any>(null);
@@ -95,7 +95,9 @@ function PaymentTermsTab() {
                 <td className="px-3 py-2">{t.days}</td>
                 <td className="px-3 py-2">{t.discount_percent}%</td>
                 <td className="px-3 py-2">{t.is_active ? <span className="text-success">●</span> : <span className="text-muted-foreground">●</span>}</td>
-                <td className="px-3 py-2"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(t)}>Edit</Button></td>
+                <td className="px-3 py-2 flex gap-1"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(t)}>Modifier</Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={remove.isPending}
+                    onClick={() => { if (window.confirm(`Supprimer le terme ${t.code} ?`)) remove.mutate(t.id); }}>Supprimer</Button></td>
               </tr>
             ))}
           </tbody>
@@ -165,6 +167,7 @@ function NumberingTab() {
 }
 
 function DunningTab() {
+  const remove = useDeleteARDunningRule();
   const { data: rules = [], isLoading } = useARDunningRules();
   const upsert = useUpsertARDunningRule();
   const [editing, setEditing] = useState<any>(null);
@@ -187,7 +190,9 @@ function DunningTab() {
                 <td className="px-3 py-2">{d.action}</td>
                 <td className="px-3 py-2 font-mono">{fmt(d.fee_amount)}</td>
                 <td className="px-3 py-2 text-muted-foreground">{d.template}</td>
-                <td className="px-3 py-2"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(d)}>Edit</Button></td>
+                <td className="px-3 py-2 flex gap-1"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(d)}>Modifier</Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={remove.isPending}
+                    onClick={() => { if (window.confirm(`Supprimer le niveau ${d.level} ?`)) remove.mutate(d.id); }}>Supprimer</Button></td>
               </tr>
             ))}
           </tbody>
@@ -211,6 +216,7 @@ function DunningTab() {
 }
 
 function NotificationsTab() {
+  const remove = useDeleteARNotificationRule();
   const { data: rules = [], isLoading } = useARNotificationRules();
   const upsert = useUpsertARNotificationRule();
   const toggle = useToggleARNotificationRule();
@@ -232,7 +238,9 @@ function NotificationsTab() {
               </div>
               <div className="flex gap-1">
                 <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => toggle.mutate({ id: r.id, is_active: !r.is_active })}>{r.is_active ? "Pause" : "Resume"}</Button>
-                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(r)}>Edit</Button>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditing(r)}>Modifier</Button>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={remove.isPending}
+                  onClick={() => { if (window.confirm("Supprimer cette règle ?")) remove.mutate(r.id); }}>Supprimer</Button>
               </div>
             </div>
           ))}

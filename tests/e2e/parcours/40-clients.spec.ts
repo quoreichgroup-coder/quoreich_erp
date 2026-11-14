@@ -42,6 +42,18 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await creerClient(page, client);
   await creerClient(page, autre);
 
+  obs.etape("fiches clients : sélection groupée et export de la sélection");
+  await page.goto("/customers");
+  await page.getByPlaceholder("Search customers...").fill(RUN);
+  await page.getByLabel(`Sélectionner ${client}`).check();
+  await page.getByLabel(`Sélectionner ${autre}`).check();
+  const barre = page.getByTestId("customers-bulk-bar");
+  await expect(barre).toContainText("2 fiche(s)");
+  const selection = page.waitForEvent("download");
+  await barre.getByRole("button", { name: "Exporter la sélection" }).click();
+  expect((await selection).suggestedFilename()).toMatch(/^clients-selection.*\.csv$/);
+  await barre.getByRole("button", { name: "Effacer la sélection" }).click();
+
   obs.etape("facture à deux lignes : pied calculé");
   let d = await facturer(page, client, [["Prestation de conseil", "2", "75000"], ["Frais de déplacement", "1", "20000", "10"]]);
   await expect(d, "pied de facture : 150 000 + 18 000 = 168 000 HT").toContainText("168");

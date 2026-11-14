@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "47";
+  private static final String DERNIERE_MIGRATION = "48";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -82,7 +82,12 @@ class SchemaMigrationIT {
           // V34 — FOR ALL à tout membre, annulait les politiques comptable / administrateur.
           "journal_lines/Access via entry",
           // V40 — paramètres des ventes : lecture pour tous, modification par l'administrateur.
-          "sales_settings/tenant rw sales_settings");
+          "sales_settings/tenant rw sales_settings",
+          // V48 — clients et paramètres AR : plus d'écriture pour tout membre.
+          "customers/Tenant isolation",
+          "ar_payment_terms/Tenant isolation",
+          "ar_dunning_rules/Tenant isolation",
+          "ar_notification_rules/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -226,6 +231,17 @@ class SchemaMigrationIT {
           "ap_invoice_approvals/Tenant isolation",
           "ar_credit_notes/Tenant isolation",
           "ar_credit_note_lines/Tenant isolation",
+          // V48 — clients et paramètres AR.
+          "customers/Lecture société",
+          "customers/Création habilitée",
+          "customers/Modification habilitée",
+          "customers/Suppression comptable",
+          "ar_payment_terms/Lecture société",
+          "ar_payment_terms/Gestion comptable",
+          "ar_dunning_rules/Lecture société",
+          "ar_dunning_rules/Gestion comptable",
+          "ar_notification_rules/Lecture société",
+          "ar_notification_rules/Gestion comptable",
           "sales_numbering_series/Tenant read",
           "sales_numbering_series/Tenant admin update",
           "sales_settings/Tenant read",

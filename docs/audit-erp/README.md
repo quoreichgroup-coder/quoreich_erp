@@ -35,6 +35,7 @@ Légende utilisée dans tous les livrables :
 | 07 | [07-revue-architecture-technique.md](07-revue-architecture-technique.md) | Architecture, sécurité, transactions, intégrations |
 | 08 | [08-plan-de-tests-e2e.md](08-plan-de-tests-e2e.md) | Scénarios, données, résultats attendus, preuves |
 | 09 | [09-feuille-de-route.md](09-feuille-de-route.md) | Recommandations classées P0 → P3, plan progressif |
+| 10 | [10-inventaire-ventes-clients.md](10-inventaire-ventes-clients.md) | CRUD et actions groupées, écran par écran, ventes et comptes clients |
 
 ## Synthèse pour la direction
 

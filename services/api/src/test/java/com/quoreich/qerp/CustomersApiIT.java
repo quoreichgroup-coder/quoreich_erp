@@ -45,6 +45,8 @@ class CustomersApiIT {
   @BeforeEach
   void preparer() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
+    // V48 : créer ou modifier une fiche client demande un rôle habilité (ici comptable).
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.ALPHA_USER, "accountant", A);
     TenantContextHolder.clear();
   }
 

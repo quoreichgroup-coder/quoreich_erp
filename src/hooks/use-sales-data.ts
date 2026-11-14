@@ -438,6 +438,39 @@ export const useUpdateSalesOrder = salesMutation(
 export const useDeleteSalesOrder = salesMutation(
   (id: string) => rpc("delete_sales_order", { _so_id: id }), "Commande supprimée", ["sales-orders", "quotations", "quote-lines"]);
 
+/**
+ * Actions groupées sur les pièces de vente (une fonction contrôlée par pièce ; un refus n'arrête pas
+ * les suivantes et il est rapporté avec le message de la base).
+ */
+const BULK = {
+  deleteQuotes: { rpc: "delete_sales_quotation", arg: "_quote_id", done: "devis supprimé(s)", keys: ["quotations"] },
+  confirmOrders: { rpc: "confirm_so", arg: "_so_id", done: "commande(s) confirmée(s)", keys: ["sales-orders"] },
+  deleteOrders: { rpc: "delete_sales_order", arg: "_so_id", done: "commande(s) supprimée(s)", keys: ["sales-orders", "quotations", "quote-lines"] },
+  invoiceDeliveries: { rpc: "invoice_from_delivery", arg: "_dn_id", done: "facture(s) brouillon préparée(s)", keys: ["delivery-notes", "ar-invoices"] },
+} as const;
+
+export function useBulkSales() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ action, ids }: { action: keyof typeof BULK; ids: string[] }) => {
+      const b = BULK[action];
+      const echecs: string[] = [];
+      let ok = 0;
+      for (const id of ids) {
+        const { error } = await (supabase as any).rpc(b.rpc, { [b.arg]: id });
+        if (error) echecs.push(error.message); else ok++;
+      }
+      return { ok, echecs };
+    },
+    onSuccess: ({ ok, echecs }, v) => {
+      for (const k of BULK[v.action].keys) qc.invalidateQueries({ queryKey: [k] });
+      if (ok) toast.success(`${ok} ${BULK[v.action].done}`);
+      if (echecs.length) toast.error(`${echecs.length} refus`, { description: [...new Set(echecs)].join(" · ") });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ===== Secured RPCs =====
 export function useConvertQuoteToSO() {
   const qc = useQueryClient();
