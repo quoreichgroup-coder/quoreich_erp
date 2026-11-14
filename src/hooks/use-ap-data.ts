@@ -138,7 +138,7 @@ export function useCreateAPInvoice() {
         tenant_id,
         created_by: user!.id,
         status: "draft",
-        approval_status: "pending",
+        approval_status: "draft",
         amount_paid: 0,
       }).select().single();
       if (error) throw error;
@@ -395,5 +395,76 @@ export function useAPAging() {
       if (error) throw error;
       return (data || []) as APAgingRow[];
     },
+  });
+}
+
+// ── Cycle de vie des factures fournisseurs (V41) ─────────────────────────
+// Brouillon → soumise (contrôles des paramètres : bon de commande, réception, rapprochement à 3
+// voies ; niveaux selon les seuils) → approuvée par des tiers habilités (ap.approve_l<n>) →
+// comptabilisée ; ou rejetée (motif), de nouveau modifiable. La base refuse toute approbation
+// directe : ces fonctions sont le seul chemin.
+
+function invalidateAP(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["ap-invoices"] });
+  qc.invalidateQueries({ queryKey: ["ap-invoice-approvals"] });
+  qc.invalidateQueries({ queryKey: ["journal-entries"] });
+  qc.invalidateQueries({ queryKey: ["gl-batches"] });
+}
+
+export type APInvoiceApproval = {
+  id: string; invoice_id: string; level_order: number; level_label: string; approver_label: string | null;
+  amount: number; status: "pending" | "approved" | "rejected" | "skipped"; decided_by: string | null; comment: string | null;
+};
+
+export function useAPInvoiceApprovals() {
+  return useQuery({
+    queryKey: ["ap-invoice-approvals"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("ap_invoice_approvals").select("*").order("level_order");
+      if (error) throw error;
+      return (data ?? []) as APInvoiceApproval[];
+    },
+  });
+}
+
+export function useSubmitAPInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await (supabase as any).rpc("ap_invoice_submit", { _id: id });
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (levels) => { invalidateAP(qc); toast.success(`Facture soumise : ${levels} niveau${levels > 1 ? "x" : ""} d'approbation`); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useDecideAPInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ approvalId, approve, comment }: { approvalId: string; approve: boolean; comment?: string }) => {
+      const { error } = await (supabase as any).rpc("ap_invoice_decide", {
+        _approval_id: approvalId, _approve: approve, _comment: comment ?? null,
+      });
+      if (error) throw error;
+      return approve;
+    },
+    onSuccess: (approve) => { invalidateAP(qc); toast.success(approve ? "Niveau approuvé" : "Facture rejetée"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+/** Suppression d'une facture en brouillon ou rejetée (la base refuse au-delà). */
+export function useDeleteAPInvoiceDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await (supabase as any).from("ap_invoices").delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Facture introuvable ou non supprimable.");
+    },
+    onSuccess: () => { invalidateAP(qc); toast.success("Facture supprimée"); },
+    onError: (e: any) => toast.error(e.message),
   });
 }

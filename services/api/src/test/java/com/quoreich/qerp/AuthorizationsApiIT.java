@@ -87,12 +87,12 @@ class AuthorizationsApiIT {
 
   @Test
   @Order(1)
-  @DisplayName("lecture : catalogue de 45 droits, 50 rôles système ; seul l'administrateur gère")
+  @DisplayName("lecture : catalogue de 49 droits (45 + ap.approve_l1..l4, V41), 50 rôles système ; seul l'administrateur gère")
   void lecture() throws Exception {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(45));
+        .andExpect(jsonPath("$.catalog.length()").value(49));
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -174,7 +174,7 @@ class AuthorizationsApiIT {
         .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.contains("treasury.match")));
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(45));
+        .andExpect(jsonPath("$.permissions.length()").value(49));
   }
 
   @Test

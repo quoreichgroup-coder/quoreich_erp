@@ -54,3 +54,24 @@ export async function pageApprobateur(browser: import("@playwright/test").Browse
   const ctx = await browser.newContext({ baseURL, locale: "fr-FR", storageState: "test-results-parcours/.auth/approbateur.json" });
   return { ctx, page: await ctx.newPage() };
 }
+
+/** Paramètres fournisseurs « bon de commande requis » et « rapprochement à 3 voies », par l'écran. */
+export async function parametresFournisseurs(page: Page, poRequis: "mandatory" | "optional" | "none", troisVoies: boolean) {
+  await page.goto("/payables/settings");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Bon de commande requis").selectOption(poRequis);
+  await page.getByLabel("Rapprochement à 3 voies").selectOption(troisVoies ? "true" : "false");
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).first().click();
+  await expect(page.locator("[data-sonner-toast]").last()).toBeVisible();
+}
+
+/** Approbation d'une facture fournisseur par l'approbateur (second membre, rôle Comptable). */
+export async function approuverFactureFournisseur(browser: import("@playwright/test").Browser, baseURL: string | undefined,
+                                                   numero: string) {
+  const { ctx, page } = await pageApprobateur(browser, baseURL);
+  await page.goto("/payables/transactions");
+  const l = page.locator("tr").filter({ hasText: numero }).first();
+  await l.getByRole("button", { name: "Approuver" }).click();
+  await expect(l).toContainText("Approuvée");
+  await ctx.close();
+}

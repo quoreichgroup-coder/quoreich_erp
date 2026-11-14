@@ -86,15 +86,15 @@ export default function APSettings() {
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
                 <option>XOF</option><option>EUR</option><option>USD</option>
               </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Bon de commande requis</Label>
-              <select value={form.po_required || "mandatory"} onChange={(e) => setForm({ ...form, po_required: e.target.value })}
+            <div className="space-y-1.5"><Label className="text-xs" htmlFor="ap-po-required">Bon de commande requis</Label>
+              <select id="ap-po-required" value={form.po_required || "mandatory"} onChange={(e) => setForm({ ...form, po_required: e.target.value })}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
                 <option value="mandatory">Oui — Obligatoire</option>
                 <option value="optional">Optionnel</option>
                 <option value="none">Non</option>
               </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">3-Way Match</Label>
-              <select value={form.three_way_match ? "true" : "false"} onChange={(e) => setForm({ ...form, three_way_match: e.target.value === "true" })}
+            <div className="space-y-1.5"><Label className="text-xs" htmlFor="ap-three-way">Rapprochement à 3 voies</Label>
+              <select id="ap-three-way" value={form.three_way_match ? "true" : "false"} onChange={(e) => setForm({ ...form, three_way_match: e.target.value === "true" })}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
                 <option value="true">Activé</option><option value="false">Désactivé</option>
               </select></div>

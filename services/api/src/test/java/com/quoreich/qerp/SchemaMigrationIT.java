@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "39";
+  private static final String DERNIERE_MIGRATION = "41";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -80,7 +80,9 @@ class SchemaMigrationIT {
           "user_roles/Admins view all roles",
           "user_roles/Users can view own roles",
           // V34 — FOR ALL à tout membre, annulait les politiques comptable / administrateur.
-          "journal_lines/Access via entry");
+          "journal_lines/Access via entry",
+          // V40 — paramètres des ventes : lecture pour tous, modification par l'administrateur.
+          "sales_settings/tenant rw sales_settings");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
 
@@ -121,7 +123,11 @@ class SchemaMigrationIT {
           // V38 — journaux, lots et compteurs de pièces.
           "accounting_journals",
           "journal_batches",
-          "journal_piece_counters");
+          "journal_piece_counters",
+          // V40 — séries de numérotation des pièces de vente.
+          "sales_numbering_series",
+          // V41 — file d'approbation des factures fournisseurs.
+          "ap_invoice_approvals");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -178,13 +184,26 @@ class SchemaMigrationIT {
           "procurement_submit",
           "procurement_cancel",
           "guard_procurement_document",
-          "guard_procurement_lines");
+          "guard_procurement_lines",
+          "next_sales_document_number",
+          "assign_sales_document_number",
+          "create_sales_quotation",
+          "create_sales_order",
+          "ap_invoice_for_caller",
+          "ap_invoice_submit",
+          "ap_invoice_decide",
+          "guard_ap_invoice_lifecycle");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
           "tenant_invitations/Administrateur de la société",
           "accounting_journals/Lecture du référentiel",
           "journal_batches/Tenant isolation",
+          "ap_invoice_approvals/Tenant isolation",
+          "sales_numbering_series/Tenant read",
+          "sales_numbering_series/Tenant admin update",
+          "sales_settings/Tenant read",
+          "sales_settings/Tenant admin update",
           "fiscal_modules/Lecture du référentiel",
           "fiscal_years/Tenant isolation",
           "fiscal_periods/Tenant isolation",
@@ -261,7 +280,13 @@ class SchemaMigrationIT {
           "purchase_requisitions/trg_guard_procurement_document",
           "purchase_orders/trg_guard_procurement_document",
           "requisition_lines/trg_guard_procurement_lines",
-          "po_lines/trg_guard_procurement_lines");
+          "po_lines/trg_guard_procurement_lines",
+          // V40 — numéro attribué par la base aux devis, commandes et livraisons.
+          "quotations/trg_assign_sales_document_number",
+          "sales_orders/trg_assign_sales_document_number",
+          "delivery_notes/trg_assign_sales_document_number",
+          // V41 — cycle de vie des factures fournisseurs.
+          "ap_invoices/trg_guard_ap_invoice_lifecycle");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary");

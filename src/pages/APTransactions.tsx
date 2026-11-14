@@ -22,8 +22,11 @@ import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
   useAPInvoices, useCreateAPInvoice, useUpdateAPInvoice, useSuppliers,
-  type APInvoice,
+  useAPInvoiceApprovals, useSubmitAPInvoice, useDecideAPInvoice, useDeleteAPInvoiceDraft,
+  type APInvoice, type APInvoiceApproval,
 } from "@/hooks/use-ap-data";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMyAccess } from "@/hooks/use-my-access";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 const fmtCurrency = (n: number) => `${fmt(n)} XOF`;
@@ -37,27 +40,28 @@ function statusType(s: string) {
   return map[s] || "info";
 }
 function approvalLabel(s: string) {
-  const map: Record<string, string> = { pending: "Pending", approved: "Approved", rejected: "Rejected" };
+  const map: Record<string, string> = { draft: "Brouillon", pending: "Brouillon", submitted: "Soumise", approved: "Approuvée", rejected: "Rejetée" };
   return map[s] || s;
 }
 function approvalType(s: string) {
-  const map: Record<string, string> = { pending: "warning", approved: "success", rejected: "error" };
+  const map: Record<string, string> = { draft: "info", pending: "info", submitted: "warning", approved: "success", rejected: "error" };
   return map[s] || "info";
 }
 
 /* ──────── CREATE INVOICE DIALOG ──────── */
-function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: () => void; edit?: APInvoice }) {
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchaseOrders = [] } = usePurchaseOrders();
   const createInvoice = useCreateAPInvoice();
+  const updateInvoice = useUpdateAPInvoice();
   const [form, setForm] = useState({
-    supplier_id: "",
-    po_id: "",
-    invoice_number: `BILL-${Date.now().toString(36).toUpperCase()}`,
-    invoice_date: new Date().toISOString().split("T")[0],
-    due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    subtotal: "",
-    tax_amount: "0",
+    supplier_id: edit?.supplier_id ?? "",
+    po_id: (edit as any)?.po_id ?? "",
+    invoice_number: edit?.invoice_number ?? `BILL-${Date.now().toString(36).toUpperCase()}`,
+    invoice_date: edit?.invoice_date ?? new Date().toISOString().split("T")[0],
+    due_date: edit?.due_date ?? new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+    subtotal: edit ? String(edit.subtotal) : "",
+    tax_amount: edit ? String(edit.tax_amount) : "0",
   });
 
   const subtotal = parseFloat(form.subtotal) || 0;
@@ -71,7 +75,12 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
   const handleCreate = async () => {
     if (!form.supplier_id || subtotal <= 0) { toast.error("Remplissez tous les champs"); return; }
     try {
-      await createInvoice.mutateAsync({ ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total });
+      if (edit) {
+        // Brouillon ou facture rejetée seulement : la base refuse au-delà (V41).
+        await updateInvoice.mutateAsync({ id: edit.id, ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total } as any);
+      } else {
+        await createInvoice.mutateAsync({ ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total });
+      }
       onClose();
     } catch {
       // Le refus est déjà affiché par le hook (toast) ; le formulaire reste ouvert pour corriger.
@@ -82,7 +91,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-sm">Nouvelle facture fournisseur</DialogTitle>
+          <DialogTitle className="text-sm">{edit ? "Modifier la facture " + edit.invoice_number : "Nouvelle facture fournisseur"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -133,7 +142,7 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
           <Button size="sm" className="text-xs" onClick={handleCreate} disabled={createInvoice.isPending}>
-            {createInvoice.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Créer"}
+            {createInvoice.isPending || updateInvoice.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : edit ? "Enregistrer" : "Créer"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -186,11 +195,74 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
   );
 }
 
+/* ──────── CYCLE DE VIE (V41) ──────── */
+// Brouillon / rejetée → Modifier, Soumettre, Supprimer ; soumise → niveau en cours, et pour un tiers
+// habilité Approuver / Rejeter. La base applique paramètres, seuils, ordre et séparation des tâches.
+function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approvals: APInvoiceApproval[]; onEdit: () => void }) {
+  const { user } = useAuth();
+  const { data: access } = useMyAccess();
+  const submit = useSubmitAPInvoice();
+  const decide = useDecideAPInvoice();
+  const remove = useDeleteAPInvoiceDraft();
+  const [rejet, setRejet] = useState(false);
+  const [motif, setMotif] = useState("");
+  const s = inv.approval_status;
+  const isCreator = user?.id === inv.created_by;
+  const pending = approvals.filter((a) => a.invoice_id === inv.id && a.status === "pending").sort((a, b) => a.level_order - b.level_order)[0];
+  const dejaDecide = approvals.some((a) => a.invoice_id === inv.id && a.status === "approved" && a.decided_by === user?.id);
+  const peutDecider = !!pending && !isCreator && !dejaDecide
+    && (access?.permissions ?? []).includes(`ap.approve_l${Math.min(pending.level_order, 4)}`);
+  const b = "h-7 text-[10px]";
+  return (
+    <>
+      {(s === "draft" || s === "pending" || s === "rejected") && (
+        <>
+          <Button size="sm" variant="ghost" className={b} onClick={onEdit}>Modifier</Button>
+          <Button size="sm" variant="outline" className={b} disabled={submit.isPending} onClick={() => submit.mutate(inv.id)}>Soumettre</Button>
+          <Button size="sm" variant="ghost" className={`${b} text-destructive`} disabled={remove.isPending}
+            onClick={() => { if (window.confirm("Supprimer cette facture ?")) remove.mutate(inv.id); }}>Supprimer</Button>
+        </>
+      )}
+      {s === "submitted" && pending && (
+        <>
+          <span className="text-[10px] text-muted-foreground" data-testid="ap-approval-level">
+            {pending.level_label}{isCreator ? " · vous êtes l'auteur" : ""}
+          </span>
+          {peutDecider && (
+            <>
+              <Button size="sm" variant="outline" className={`${b} text-success`} disabled={decide.isPending}
+                onClick={() => decide.mutate({ approvalId: pending.id, approve: true })}>
+                <CheckCircle className="w-3 h-3 mr-1" /> Approuver
+              </Button>
+              <Button size="sm" variant="ghost" className={`${b} text-destructive`} onClick={() => { setMotif(""); setRejet(true); }}>Rejeter</Button>
+            </>
+          )}
+        </>
+      )}
+      <Dialog open={rejet} onOpenChange={setRejet}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="text-sm">Rejeter la facture {inv.invoice_number}</DialogTitle></DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="ap-reject-reason">Motif (obligatoire)</Label>
+            <Input id="ap-reject-reason" value={motif} onChange={(e) => setMotif(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="outline" onClick={() => setRejet(false)}>Retour</Button>
+            <Button size="sm" variant="destructive" disabled={!motif.trim() || decide.isPending}
+              onClick={() => pending && decide.mutate({ approvalId: pending.id, approve: false, comment: motif.trim() }, { onSuccess: () => setRejet(false) })}>
+              Rejeter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 /* ──────── MAIN ──────── */
 export default function APTransactions() {
   const { data: invoices = [], isLoading } = useAPInvoices();
   const { data: suppliers = [] } = useSuppliers();
-  const updateInvoice = useUpdateAPInvoice();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
@@ -199,6 +271,8 @@ export default function APTransactions() {
   const [settlementOpen, setSettlementOpen] = useState(false);
   const [paymentInv, setPaymentInv] = useState<APInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [editInv, setEditInv] = useState<APInvoice | null>(null);
+  const { data: approvals = [] } = useAPInvoiceApprovals();
 
   const statusOptions = ["all", "draft", "open", "partially_paid", "paid", "overdue"];
   const approvalOptions = ["all", "pending", "approved", "rejected"];
@@ -212,16 +286,6 @@ export default function APTransactions() {
 
   const totalPayable = filtered.filter(i => i.status !== "paid").reduce((s, i) => s + (i.total - i.amount_paid), 0);
 
-  // L'approbation comptabilise la facture (V37) : un paramétrage incomplet la refuse (QG001), et le
-  // message de la base est affiché par le hook ; rien n'est approuvé.
-  const handleApprove = async (inv: APInvoice) => {
-    try {
-      await updateInvoice.mutateAsync({ id: inv.id, approval_status: "approved", status: "open" });
-      toast.success("Facture approuvée et comptabilisée");
-    } catch {
-      /* refus déjà affiché */
-    }
-  };
 
   return (
     <PageShell>
@@ -327,11 +391,7 @@ export default function APTransactions() {
                       <td><StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} /></td>
                       <td onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          {inv.approval_status === "pending" && (
-                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleApprove(inv)}>
-                              <CheckCircle className="w-3 h-3 mr-1" /> Approve
-                            </Button>
-                          )}
+                          <APInvoiceActions inv={inv} approvals={approvals} onEdit={() => setEditInv(inv)} />
                           {inv.approval_status === "approved" && inv.status !== "paid" && (
                             <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setPaymentInv(inv); setSettlementOpen(true); }}>
                               <CreditCard className="w-3 h-3 mr-1" /> Pay
@@ -360,6 +420,7 @@ export default function APTransactions() {
 
       {/* Dialogs */}
       <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
+      {editInv && <CreateInvoiceDialog open edit={editInv} onClose={() => setEditInv(null)} />}
 
       {selectedInv && (
         <InvoicePanel

@@ -55,7 +55,32 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });
   await expect(page).not.toHaveURL(/\/(login|onboarding)/);
   await expect(page.getByText("E2E QUOREICH (société de test)").first(), "même société que l'auteur").toBeVisible();
-  await ctx.storageState({ path: "test-results-parcours/.auth/approbateur.json" });
+  const etat = await ctx.storageState({ path: "test-results-parcours/.auth/approbateur.json" });
+
+  // Factures fournisseurs (V41) : le niveau 1 demande ap.approve_l1, porté par le rôle « Comptable ».
+  // L'administrateur l'ajoute par l'écran des autorisations s'il manque (ligne repérée par
+  // l'identifiant : les deux comptes de test portent le même nom).
+  obs.etape("rôle Comptable de l'approbateur");
+  const jeton = etat.origins.flatMap((o) => o.localStorage).find((i) => /^sb-.*-auth-token$/.test(i.name));
+  const approbateurId = jeton ? JSON.parse(jeton.value)?.user?.id : undefined;
+  expect(approbateurId, "identifiant de l'approbateur dans sa session").toBeTruthy();
+  const admin = await browser.newContext({
+    baseURL: testInfo.project.use.baseURL, locale: "fr-FR", storageState: "test-results-parcours/.auth/session.json",
+  });
+  const pa = await admin.newPage();
+  await pa.goto("/settings?tab=roles");
+  await pa.getByTestId("authz-tab-users").click();
+  const rangee = pa.getByTestId(`user-row-${approbateurId}`);
+  await expect(rangee).toBeVisible();
+  // Rôle détenu = bouton « Retirer Comptable à … » présent (la liste déroulante, elle, contient tous
+  // les rôles attribuables : lire le texte de la ligne ne dit rien).
+  const detenu = rangee.getByRole("button", { name: /^Retirer Comptable à / });
+  if ((await detenu.count()) === 0) {
+    const choix = rangee.getByRole("combobox");
+    await choix.selectOption(await choix.locator("option", { hasText: /^Comptable$/ }).getAttribute("value") ?? "");
+    await expect(detenu).toHaveCount(1);
+  }
+  await admin.close();
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
   await ctx.close();
