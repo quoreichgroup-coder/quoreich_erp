@@ -234,6 +234,11 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await fermerPanneau(page);
   await expect(ligne(page, numeroAutre).getByTestId("ar-lettering"), "facture soldée : code de lettrage").toHaveText(/^[A-Z]{2,}$/);
 
+  // Standard de présentation : chaque pièce a son onglet dans Transactions.
+  await page.getByRole("tab", { name: "Encaissements" }).click();
+  await expect(page.getByTestId("receipt-row").filter({ hasText: `ENC-${RUN}-AUTRE` })).toHaveCount(1);
+  await expect(page.getByTestId("receipt-row").filter({ hasText: `ANNULATION ENC-${RUN}-2` }), "annulation listée").toHaveCount(1);
+  await page.getByRole("tab", { name: "Acomptes et crédits" }).click();
   const reliquat = page.getByRole("region", { name: "Acomptes et crédits clients" }).getByTestId("customer-credit-row").filter({ hasText: autre });
   await expect(reliquat).toContainText("5 000");
   await reliquat.getByRole("button", { name: "Rembourser" }).click();

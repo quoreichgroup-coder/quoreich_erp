@@ -17,10 +17,19 @@ export interface NavModule {
 export interface NavLinkEntry { title: string; url: string; icon: string }
 export interface NavSection { id: string; label: string; modules?: NavModule[]; links?: NavLinkEntry[] }
 
-const standard = (base: string, extras: NavItem[] = []): NavItem[] => [
+/**
+ * Standard de présentation, commun à TOUS les modules (règle du propriétaire, 14 nov. 2026) :
+ * Tableau de bord, Transactions, Données de base, Rapports, Contrôle, [pages propres au module],
+ * Paramètres — comme Approvisionnement. Une entrée ne porte jamais le nom d'une pièce : les pièces
+ * (factures, encaissements, demandes, commandes…) sont des ONGLETS de la page Transactions, les
+ * fiches de tiers et référentiels sont dans Données de base. `urls` relie une entrée standard à une
+ * page existante dont l'adresse diffère (ex. Données de base des comptes clients → /customers).
+ */
+const standard = (base: string, extras: NavItem[] = [],
+  urls: { transactions?: string; masterData?: string } = {}): NavItem[] => [
   { title: "Tableau de bord", url: base },
-  { title: "Transactions", url: `${base}/transactions` },
-  { title: "Données de base", url: `${base}/master-data` },
+  { title: "Transactions", url: urls.transactions ?? `${base}/transactions` },
+  { title: "Données de base", url: urls.masterData ?? `${base}/master-data` },
   { title: "Rapports", url: `${base}/reporting` },
   { title: "Contrôle", url: `${base}/control` },
   ...extras,
@@ -43,28 +52,15 @@ export const NAV_SECTIONS: NavSection[] = [
     modules: [
       {
         title: "CRM", icon: "Handshake", basePath: "/crm",
-        items: [
-          { title: "Tableau de bord", url: "/crm" },
-          { title: "Contacts", url: "/crm/contacts" },
-          { title: "Opportunités", url: "/crm/opportunities" },
-          { title: "Rappels", url: "/crm/reminders" },
-          { title: "Rapports", url: "/crm/reporting" },
-          { title: "Contrôle", url: "/crm/control" },
-          { title: "Paramètres", url: "/crm/settings" },
-        ],
+        // Transactions = opportunités (pipeline) ; Données de base = contacts.
+        items: standard("/crm", [{ title: "Rappels", url: "/crm/reminders" }],
+          { transactions: "/crm/opportunities", masterData: "/crm/contacts" }),
       },
       { title: "Commandes de vente", icon: "ShoppingBag", basePath: "/sales", moduleKey: "Sales Orders", items: standard("/sales") },
       {
         title: "Comptes clients", icon: "ArrowDownLeft", basePath: "/receivables", moduleKey: "Accounts Receivable",
-        items: [
-          { title: "Tableau de bord", url: "/receivables" },
-          { title: "Factures et encaissements", url: "/receivables/transactions" },
-          { title: "Analyse d'âge", url: "/receivables/aging" },
-          { title: "Clients", url: "/customers" },
-          { title: "Rapports", url: "/receivables/reporting" },
-          { title: "Contrôle", url: "/receivables/control" },
-          { title: "Paramètres", url: "/receivables/settings" },
-        ],
+        // Transactions : onglets Factures, Encaissements, Avoirs, Acomptes et crédits ; Données de base = clients.
+        items: standard("/receivables", [{ title: "Analyse d'âge", url: "/receivables/aging" }], { masterData: "/customers" }),
       },
     ],
   },
@@ -74,15 +70,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: "Approvisionnement", icon: "ShoppingCart", basePath: "/procurement", moduleKey: "Procurement", items: standard("/procurement") },
       {
         title: "Comptes fournisseurs", icon: "ArrowUpRight", basePath: "/payables", moduleKey: "Accounts Payable",
-        items: [
-          { title: "Tableau de bord", url: "/payables" },
-          { title: "Factures fournisseurs", url: "/payables/transactions" },
-          { title: "Planification des paiements", url: "/payables/payment-planning" },
-          { title: "Fournisseurs", url: "/suppliers" },
-          { title: "Rapports", url: "/payables/reporting" },
-          { title: "Contrôle", url: "/payables/control" },
-          { title: "Paramètres", url: "/payables/settings" },
-        ],
+        items: standard("/payables", [{ title: "Planification des paiements", url: "/payables/payment-planning" }], { masterData: "/suppliers" }),
       },
       { title: "Notes de frais", icon: "Receipt", basePath: "/expenses", moduleKey: "Expense Management", items: standard("/expenses") },
     ],
@@ -111,16 +99,8 @@ export const NAV_SECTIONS: NavSection[] = [
     modules: [
       {
         title: "RH et paie", icon: "UsersRound", basePath: "/hr",
-        items: [
-          { title: "Tableau de bord", url: "/hr" },
-          { title: "Saisie de paie", url: "/hr/transactions" },
-          { title: "Cycles de paie", url: "/hr/payroll" },
-          { title: "Employés", url: "/hr/employees" },
-          { title: "Rapports", url: "/hr/reporting" },
-          { title: "Contrôle", url: "/hr/control" },
-          { title: "Historique des rôles", url: "/audit/hr" },
-          { title: "Paramètres", url: "/hr/settings" },
-        ],
+        items: standard("/hr", [{ title: "Cycles de paie", url: "/hr/payroll" }, { title: "Historique des rôles", url: "/audit/hr" }],
+          { masterData: "/hr/employees" }),
       },
     ],
   },

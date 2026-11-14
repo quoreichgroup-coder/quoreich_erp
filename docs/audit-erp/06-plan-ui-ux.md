@@ -39,3 +39,21 @@ Base : lecture des 112 pages, parcours Playwright (nuage 13/13, sur site 2/2) qu
 | UX-7 | Masquer les actions interdites dans AR / budget / notes de frais dès que leur cycle de vie existe en base (U-08) | `useMyAccess` | avec P0/P1 correspondants |
 | UX-8 | Accessibilité : rôles de dialogue et libellés de champs (déjà commencé pour les parcours), contraste des badges, navigation clavier des grilles de lignes | — | P3 |
 | UX-9 | Responsive : listes en cartes sous 768 px pour la consultation (la saisie de pièces reste sur poste) | — | P3 |
+
+## 4. Règle de présentation des modules (propriétaire, 14 nov. 2026)
+
+Tous les modules suivent la présentation d'Approvisionnement : même menu (**Tableau de bord, Transactions, Données de base, Rapports, Contrôle**, pages propres au module, **Paramètres**), aucune entrée de menu nommée d'après une pièce, **un onglet par type de pièce dans Transactions**, tiers et référentiels dans Données de base. Le menu est imposé par `standard()` et vérifié par `navigation.test.ts`.
+
+| Module | Menu standard | Transactions en onglets par pièce |
+|---|---|---|
+| Approvisionnement | ✅ | ✅ Demandes, Commandes, Réceptions, Approbations |
+| Commandes de vente | ✅ | ✅ Devis, Commandes, Livraisons, Retours |
+| Comptes clients | ✅ (depuis le 14 nov. : « Factures et encaissements » → Transactions) | ✅ Factures, Encaissements, Avoirs, Acomptes et crédits, Comptabilisation |
+| Stocks | ✅ | ✅ |
+| Grand livre | ✅ | ✅ Livres auxiliaires, Manuelles, Contre-passations |
+| Trésorerie | ✅ | ✅ |
+| Comptes fournisseurs | ✅ (depuis le 14 nov.) | 🟡 factures seules — **UX-10** : Factures, Règlements, Approbations |
+| CRM | ✅ (Transactions = opportunités, Données de base = contacts) | 🟡 **UX-10** : Opportunités, Activités / rappels |
+| RH et paie | ✅ (Données de base = employés) | 🟡 **UX-10** : Saisie, Cycles de paie |
+| Notes de frais, Immobilisations, Budget, Projets, Conformité, Risques | ✅ | 🟡 **UX-10** : à revoir module par module |
+

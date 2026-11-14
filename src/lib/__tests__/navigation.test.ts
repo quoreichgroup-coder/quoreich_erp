@@ -38,6 +38,14 @@ describe("navigation principale", () => {
     expect(anciennes.filter((u) => !allUrls.includes(u))).toEqual([]);
   });
 
+  it("chaque module suit le standard de présentation (Tableau de bord, Transactions, Données de base, Rapports, Contrôle … Paramètres)", () => {
+    const hors = NAV_SECTIONS.flatMap((s) => s.modules ?? []).filter((m) => {
+      const t = m.items.map((i) => i.title);
+      return t.slice(0, 5).join("|") !== "Tableau de bord|Transactions|Données de base|Rapports|Contrôle" || t[t.length - 1] !== "Paramètres";
+    }).map((m) => m.title);
+    expect(hors).toEqual([]);
+  });
+
   it("aucun lien en double", () => {
     expect(allUrls.length).toBe(new Set(allUrls).size);
   });

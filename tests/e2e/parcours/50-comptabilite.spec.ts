@@ -27,7 +27,8 @@ test("journal des écritures et états comptables : affichage et exports", async
   obs.etape("lots du grand livre alimentés par les livres auxiliaires (V38)");
   await page.goto("/payables/transactions");
   await expect(page.getByText(/LOT-AC-\d{4}-\d{2}/).first(), "lot du journal des achats").toBeVisible();
-  await page.goto("/receivables/transactions");
+  // Standard de présentation : la comptabilisation est un onglet de Transactions.
+  await page.goto("/receivables/transactions?tab=posting");
   await expect(page.getByText(/LOT-VT-\d{4}-\d{2}/).first(), "lot du journal des ventes").toBeVisible();
   await expect(page.getByText(/LOT-BQ-\d{4}-\d{2}/).first(), "lot du journal de banque").toBeVisible();
 

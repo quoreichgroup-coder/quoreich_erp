@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -362,6 +366,75 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
   );
 }
 
+/* ──────── ENCAISSEMENTS (onglet) ──────── */
+const METHOD_LABELS: Record<string, string> = { bank_transfer: "Virement", cash: "Espèces", check: "Chèque", mobile_money: "Mobile money" };
+
+function ReceiptsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => void }) {
+  const [search, setSearch] = useState("");
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["ar-payments", "all-receipts"],
+    enabled: !isApiEnabled(),
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("payments")
+        .select("id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, ar_invoice_id, invoice:ar_invoices(invoice_number, customer:customers(name))")
+        .eq("payment_type", "ar_receipt").order("payment_date", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  if (isApiEnabled()) {
+    return <p className="text-xs text-muted-foreground p-4">Sur site, les encaissements se consultent dans le panneau de chaque facture (liste globale par l'API à venir).</p>;
+  }
+  const reversed = new Set(rows.filter((r) => r.reversal_of).map((r) => r.reversal_of));
+  const q = search.trim().toLowerCase();
+  const shown = rows.filter((r) => !q || `${r.reference ?? ""} ${r.invoice?.invoice_number ?? ""} ${r.invoice?.customer?.name ?? ""}`.toLowerCase().includes(q));
+  const total = shown.reduce((s2, r) => s2 + Number(r.amount), 0);
+  return (
+    <div className="space-y-3">
+      <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input type="text" aria-label="Rechercher un encaissement" placeholder="Rechercher par référence, facture ou client..."
+            className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => exportToCSV(shown.map((r) => ({
+          date: r.payment_date, reference: r.reference ?? "", client: r.invoice?.customer?.name ?? "", facture: r.invoice?.invoice_number ?? "",
+          montant: Number(r.amount), mode: METHOD_LABELS[r.payment_method] ?? r.payment_method,
+          etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
+        })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "client", header: "Client" },
+          { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "encaissements-clients")}>
+          <Download className="w-3.5 h-3.5" /> Export
+        </Button>
+        <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} encaissements · Net : {fmtCurrency(total)}</span>
+      </div>
+      <div className="card-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Date</th><th>Référence</th><th>Client</th><th>Facture</th><th>Mode</th><th className="text-right">Montant</th><th>État</th></tr></thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={7} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+              ) : shown.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Aucun encaissement</td></tr>
+              ) : shown.map((r) => (
+                <tr key={r.id} data-testid="receipt-row" className="cursor-pointer" title="Ouvrir la facture" onClick={() => r.ar_invoice_id && onOpenInvoice(r.ar_invoice_id)}>
+                  <td className="tabular-nums">{r.payment_date}</td>
+                  <td>{r.reference || "—"}</td>
+                  <td>{r.invoice?.customer?.name ?? "—"}</td>
+                  <td className="font-mono">{r.invoice?.invoice_number ?? "—"}</td>
+                  <td>{METHOD_LABELS[r.payment_method] ?? r.payment_method}</td>
+                  <td className={cn("text-right tabular-nums", Number(r.amount) < 0 && "text-destructive")}>{fmt(Number(r.amount))}</td>
+                  <td className="text-xs text-muted-foreground">{r.reversal_of ? `Annulation${r.reversal_reason ? ` · ${r.reversal_reason}` : ""}` : reversed.has(r.id) ? "Annulé" : "Enregistré"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ──────── MAIN ──────── */
 export default function ARTransactions() {
   const { data: invoices = [], isLoading } = useARInvoices();
@@ -374,6 +447,9 @@ export default function ARTransactions() {
   const [paymentInv, setPaymentInv] = useState<ARInvoice | null>(null);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TABS = ["invoices", "receipts", "credit-notes", "credits", "posting"];
+  const tab = TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "invoices";
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const { data: letterings } = useARLetterings(invoices.filter((i) => i.status === "paid").map((i) => i.id).sort().join(","));
   const bulk = useBulkARDrafts();
@@ -441,12 +517,12 @@ export default function ARTransactions() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Receivables", href: "/receivables" }, { label: "Transactions" }]} />
+      <Breadcrumb items={[{ label: "Ventes et clients", href: "/" }, { label: "Comptes clients", href: "/receivables" }, { label: "Transactions" }]} />
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Accounts Receivable Transactions</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Gestion des factures clients, encaissements et recouvrement</p>
+          <h1 className="text-xl font-semibold text-foreground">Comptes clients — Transactions</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Factures, encaissements, avoirs, acomptes et crédits clients, comptabilisation</p>
         </div>
         <div className="flex items-center gap-2">
           {isWriter && <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>}
@@ -457,6 +533,17 @@ export default function ARTransactions() {
         </div>
       </div>
 
+      {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="invoices">Factures ({invoices.length})</TabsTrigger>
+          <TabsTrigger value="receipts">Encaissements</TabsTrigger>
+          <TabsTrigger value="credit-notes">Avoirs</TabsTrigger>
+          {!isApiEnabled() && <TabsTrigger value="credits">Acomptes et crédits</TabsTrigger>}
+          <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="invoices" className="space-y-3">
       {/* Toolbar */}
       <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
@@ -559,27 +646,35 @@ export default function ARTransactions() {
         </div>
       </div>
 
-      {/* Acomptes et crédits clients (V49) */}
-      {!isApiEnabled() && (
-        <div className="mt-6 rounded-md border border-border bg-card p-4">
-          <CustomerCreditsList canRefund={(access?.permissions ?? []).includes("ar.refund")} />
-        </div>
-      )}
+        </TabsContent>
 
-      {/* Avoirs clients (V45) */}
-      <div className="mt-6 rounded-md border border-border bg-card p-4">
-        <CreditNotesList title="Avoirs clients" />
-      </div>
+        <TabsContent value="receipts">
+          <ReceiptsTab onOpenInvoice={(id) => { const inv = invoices.find((i) => i.id === id); if (inv) setSelectedInv(inv); }} />
+        </TabsContent>
 
-      {/* GL Posting Section */}
-      <div className="space-y-4 mt-6">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Accounts Receivable</h2>
-        </div>
-        <GLPostingKPIsLive module="AR" />
-        <GLBatchHistoryLive module="AR" />
-      </div>
+        <TabsContent value="credit-notes">
+          <div className="rounded-md border border-border bg-card p-4">
+            <CreditNotesList title="Avoirs clients" />
+          </div>
+        </TabsContent>
+
+        {!isApiEnabled() && (
+          <TabsContent value="credits">
+            <div className="rounded-md border border-border bg-card p-4">
+              <CustomerCreditsList canRefund={(access?.permissions ?? []).includes("ar.refund")} />
+            </div>
+          </TabsContent>
+        )}
+
+        <TabsContent value="posting" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Comptabilisation — journaux et lots des comptes clients</h2>
+          </div>
+          <GLPostingKPIsLive module="AR" />
+          <GLBatchHistoryLive module="AR" />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
