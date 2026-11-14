@@ -592,14 +592,15 @@ export function useARInvoicePayments(invoiceId: string | undefined) {
       if (source === "api") {
         const rows = await apiGet<ApiSchemas["ArPaymentView"][]>(`/api/v1/ar/invoices/${invoiceId}/payments`);
         return rows.map((r) => ({
-          id: r.id, tenant_id: "", payment_type: "ar_receipt", ar_invoice_id: invoiceId ?? null,
+          id: r.id, tenant_id: "", ar_invoice_id: invoiceId ?? null,
           amount: Number(r.amount), payment_date: r.paymentDate, payment_method: r.paymentMethod,
           reference: r.reference ?? null, created_by: "", created_at: r.paymentDate,
           reversal_of: r.reversalOf ?? null, reversal_reason: r.reversalReason ?? null,
+          payment_type: r.paymentType,
         }));
       }
       const { data, error } = await supabase.from("payments").select("*")
-        .eq("payment_type", "ar_receipt").eq("ar_invoice_id", invoiceId!).order("created_at");
+        .in("payment_type", ["ar_receipt", "ar_credit"]).eq("ar_invoice_id", invoiceId!).order("created_at");
       if (error) throw error;
       return (data || []) as unknown as Payment[];
     },
@@ -624,6 +625,89 @@ export function useReverseARReceipt() {
       qc.invalidateQueries({ queryKey: ["ar-invoices"] });
       qc.invalidateQueries({ queryKey: ["ar-payments"] });
       toast.success("Encaissement annulé (écriture contre-passée)");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+}
+
+// ─── Avoirs clients (V45) ───
+export interface ARCreditNote {
+  id: string;
+  credit_note_number: string;
+  invoice_id: string;
+  invoice_number: string;
+  customer_id: string;
+  customer_name: string;
+  credit_date: string;
+  reason: string;
+  subtotal: number;
+  tax_amount: number;
+  total: number;
+  amount_allocated: number;
+  lines: { line_no: number; description: string; quantity: number; unit_price: number; discount_pct: number;
+    tax_code: string | null; net_amount: number; tax_amount: number }[];
+}
+
+export function useARCreditNotes(invoiceId?: string) {
+  const source = isApiEnabled() ? "api" : "supabase";
+  return useQuery({
+    queryKey: ["ar-credit-notes", invoiceId ?? "all", source],
+    queryFn: async (): Promise<ARCreditNote[]> => {
+      if (source === "api") {
+        const rows = await apiGet<ApiSchemas["ArCreditNoteView"][]>(
+          `/api/v1/ar/invoices/credit-notes${invoiceId ? `?invoiceId=${invoiceId}` : ""}`);
+        return rows.map((r) => ({
+          id: r.id, credit_note_number: r.creditNoteNumber, invoice_id: r.invoiceId, invoice_number: r.invoiceNumber,
+          customer_id: r.customerId, customer_name: r.customerName, credit_date: r.creditDate, reason: r.reason,
+          subtotal: Number(r.subtotal), tax_amount: Number(r.taxAmount), total: Number(r.total),
+          amount_allocated: Number(r.amountAllocated),
+          lines: r.lines.map((l) => ({
+            line_no: Number(l.lineNo), description: l.description, quantity: Number(l.quantity), unit_price: Number(l.unitPrice),
+            discount_pct: Number(l.discountPct), tax_code: l.taxCode ?? null, net_amount: Number(l.netAmount), tax_amount: Number(l.taxAmount),
+          })),
+        }));
+      }
+      let q = (supabase as any).from("ar_credit_notes")
+        .select("*, invoice:ar_invoices(invoice_number), customer:customers(name), lines:ar_credit_note_lines(line_no, description, quantity, unit_price, discount_pct, net_amount, tax_amount, tax_code:tax_codes(code))")
+        .order("credit_date", { ascending: false });
+      if (invoiceId) q = q.eq("invoice_id", invoiceId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id, credit_note_number: r.credit_note_number, invoice_id: r.invoice_id, invoice_number: r.invoice?.invoice_number ?? "",
+        customer_id: r.customer_id, customer_name: r.customer?.name ?? "", credit_date: r.credit_date, reason: r.reason,
+        subtotal: Number(r.subtotal), tax_amount: Number(r.tax_amount), total: Number(r.total), amount_allocated: Number(r.amount_allocated),
+        lines: (r.lines ?? []).sort((a: any, b: any) => a.line_no - b.line_no).map((l: any) => ({
+          line_no: l.line_no, description: l.description, quantity: Number(l.quantity), unit_price: Number(l.unit_price),
+          discount_pct: Number(l.discount_pct), tax_code: l.tax_code?.code ?? null, net_amount: Number(l.net_amount), tax_amount: Number(l.tax_amount),
+        })),
+      }));
+    },
+  });
+}
+
+/** Émission d'un avoir : motif, date, lignes [{invoice_line_id, quantity}] ou rien (tout le reste). */
+export function useCreateARCreditNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ invoiceId, reason, date, lines }: {
+      invoiceId: string; reason: string; date: string; lines: { invoice_line_id: string; quantity: number }[] | null;
+    }) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/ar/invoices/${invoiceId}/credit-notes`, {
+          reason, creditDate: date,
+          lines: lines ? lines.map((l) => ({ invoiceLineId: l.invoice_line_id, quantity: l.quantity })) : null,
+        });
+        return;
+      }
+      const { error } = await (supabase as any).rpc("create_ar_credit_note", {
+        _invoice_id: invoiceId, _reason: reason, _credit_date: date, _lines: lines,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      for (const k of ["ar-invoices", "ar-payments", "ar-credit-notes", "ar-invoice-lines"]) qc.invalidateQueries({ queryKey: [k] });
+      toast.success("Avoir émis et comptabilisé");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -796,6 +880,8 @@ export type ARInvoiceLineRow = {
   /** Supabase seulement : identifiant et code TVA modifiables sur un brouillon. */
   id?: string;
   tax_code_id?: string | null;
+  /** Quantité déjà créditée par des avoirs (V45). */
+  credited_quantity?: number;
   line_no: number;
   description: string;
   quantity: number;
@@ -814,6 +900,7 @@ export function useARInvoiceLines(invoiceId: string | undefined) {
       if (isApiEnabled()) {
         const rows = await apiGet<ApiSchemas["ArInvoiceLineView"][]>(`/api/v1/ar/invoices/${invoiceId}/lines`);
         return rows.map((r) => ({
+          id: r.id, credited_quantity: Number(r.creditedQuantity ?? 0),
           line_no: Number(r.lineNo), description: r.description, quantity: Number(r.quantity),
           unit_price: Number(r.unitPrice), discount_pct: Number(r.discountPct ?? 0), tax_code: r.taxCode ?? null,
           net_amount: Number(r.netAmount), tax_amount: Number(r.taxAmount),
@@ -825,8 +912,16 @@ export function useARInvoiceLines(invoiceId: string | undefined) {
         .eq("invoice_id", invoiceId)
         .order("line_no");
       if (error) throw error;
+      const ids = (data ?? []).map((r: any) => r.id);
+      const credited = new Map<string, number>();
+      if (ids.length > 0) {
+        const { data: cl, error: ce } = await (supabase as any).from("ar_credit_note_lines")
+          .select("invoice_line_id, quantity").in("invoice_line_id", ids);
+        if (ce) throw ce;
+        for (const c of cl ?? []) credited.set(c.invoice_line_id, (credited.get(c.invoice_line_id) ?? 0) + Number(c.quantity));
+      }
       return (data ?? []).map((r: any) => ({
-        id: r.id, tax_code_id: r.tax_code_id ?? null,
+        id: r.id, tax_code_id: r.tax_code_id ?? null, credited_quantity: credited.get(r.id) ?? 0,
         line_no: r.line_no, description: r.description, quantity: Number(r.quantity), unit_price: Number(r.unit_price),
         discount_pct: Number(r.discount_pct ?? 0), tax_code: r.tax_code?.code ?? null,
         net_amount: Number(r.net_amount), tax_amount: Number(r.tax_amount),

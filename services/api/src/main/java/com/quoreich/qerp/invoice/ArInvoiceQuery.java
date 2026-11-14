@@ -190,8 +190,8 @@ public class ArInvoiceQuery {
     }
     return Optional.of(
         jdbc.query(
-            "SELECT id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason"
-                + " FROM payments WHERE ar_invoice_id = ? AND payment_type = 'ar_receipt'"
+            "SELECT id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, payment_type"
+                + " FROM payments WHERE ar_invoice_id = ? AND payment_type IN ('ar_receipt', 'ar_credit')"
                 + " ORDER BY created_at, id",
             (rs, i) ->
                 new ArPaymentView(
@@ -201,7 +201,8 @@ public class ArInvoiceQuery {
                     rs.getString("payment_method"),
                     rs.getString("reference"),
                     rs.getObject("reversal_of", UUID.class),
-                    rs.getString("reversal_reason")),
+                    rs.getString("reversal_reason"),
+                    rs.getString("payment_type")),
             invoiceId));
   }
 
@@ -225,11 +226,63 @@ public class ArInvoiceQuery {
     return findById(invoiceId);
   }
 
+  /**
+   * Émet un avoir sur une facture visible ({@code create_ar_credit_note}, V45) : droit
+   * {@code ar.credit_note}, motif, quantités ≤ facturé non crédité, écriture miroir et imputation
+   * contrôlés par la base. Vide si la facture n'est pas visible.
+   */
+  @Transactional
+  public Optional<ArCreditNoteView> creditNote(UUID invoiceId, CreateArCreditNote in) {
+    if (findById(invoiceId).isEmpty()) {
+      return Optional.empty();
+    }
+    String lines = null;
+    if (in.lines() != null && !in.lines().isEmpty()) {
+      StringBuilder b = new StringBuilder("[");
+      for (CreateArCreditNote.CreditedLine l : in.lines()) {
+        if (b.length() > 1) b.append(',');
+        b.append("{\"invoice_line_id\":\"").append(l.invoiceLineId()).append("\",\"quantity\":")
+            .append(l.quantity().toPlainString()).append('}');
+      }
+      lines = b.append(']').toString();
+    }
+    UUID id = jdbc.queryForObject(
+        "SELECT create_ar_credit_note(?, ?, COALESCE(?, CURRENT_DATE), ?::jsonb)",
+        UUID.class, invoiceId, in.reason().strip(), in.creditDate(), lines);
+    return creditNotes(invoiceId).stream().filter(n -> n.id().equals(id)).findFirst();
+  }
+
+  /** Avoirs d'une facture (ou de toute la société si {@code invoiceId} est nul), lignes comprises. */
+  @Transactional(readOnly = true)
+  public List<ArCreditNoteView> creditNotes(UUID invoiceId) {
+    List<ArCreditNoteView> notes = jdbc.query(
+        "SELECT c.id, c.credit_note_number, c.invoice_id, i.invoice_number, c.customer_id, cu.name, c.credit_date,"
+            + " c.reason, c.subtotal, c.tax_amount, c.total, c.amount_allocated"
+            + " FROM ar_credit_notes c JOIN ar_invoices i ON i.id = c.invoice_id JOIN customers cu ON cu.id = c.customer_id"
+            + " WHERE (?::uuid IS NULL OR c.invoice_id = ?::uuid) ORDER BY c.credit_date DESC, c.credit_note_number DESC",
+        (rs, i) -> new ArCreditNoteView(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class),
+            rs.getString(4), rs.getObject(5, UUID.class), rs.getString(6), rs.getObject(7, LocalDate.class),
+            rs.getString(8), rs.getBigDecimal(9), rs.getBigDecimal(10), rs.getBigDecimal(11), rs.getBigDecimal(12),
+            new java.util.ArrayList<>()),
+        invoiceId, invoiceId);
+    for (ArCreditNoteView n : notes) {
+      n.lines().addAll(jdbc.query(
+          "SELECT l.line_no, l.description, l.quantity, l.unit_price, l.discount_pct, t.code, l.net_amount, l.tax_amount"
+              + " FROM ar_credit_note_lines l LEFT JOIN tax_codes t ON t.id = l.tax_code_id"
+              + " WHERE l.credit_note_id = ? ORDER BY l.line_no",
+          (rs, i) -> new ArCreditNoteView.NoteLine(rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
+              rs.getBigDecimal(5), rs.getString(6), rs.getBigDecimal(7), rs.getBigDecimal(8)),
+          n.id()));
+    }
+    return notes;
+  }
+
   private boolean exists(String sql, Object... args) {
     return Boolean.TRUE.equals(jdbc.queryForObject(sql, Boolean.class, args));
   }
 
   public record ArInvoiceLineView(
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) UUID id,
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) int lineNo,
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) String description,
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal quantity,
@@ -237,18 +290,21 @@ public class ArInvoiceQuery {
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal discountPct,
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.NOT_REQUIRED) String taxCode,
       @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal netAmount,
-      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal taxAmount) {}
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal taxAmount,
+      @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED) BigDecimal creditedQuantity) {}
 
   /** Lignes d'une facture visible ; vide si la facture n'en a pas (facture d'en-tête). */
   @Transactional(readOnly = true)
   public Optional<List<ArInvoiceLineView>> lines(UUID invoiceId) {
     if (findById(invoiceId).isEmpty()) return Optional.empty();
     return Optional.of(jdbc.query(
-        "SELECT l.line_no, l.description, l.quantity, l.unit_price, l.discount_pct, t.code, l.net_amount, l.tax_amount"
+        "SELECT l.id, l.line_no, l.description, l.quantity, l.unit_price, l.discount_pct, t.code, l.net_amount, l.tax_amount,"
+            + " COALESCE((SELECT SUM(c.quantity) FROM ar_credit_note_lines c WHERE c.invoice_line_id = l.id), 0)"
             + " FROM ar_invoice_lines l LEFT JOIN tax_codes t ON t.id = l.tax_code_id"
             + " WHERE l.invoice_id = ? ORDER BY l.line_no",
-        (rs, i) -> new ArInvoiceLineView(rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
-            rs.getBigDecimal(5), rs.getString(6), rs.getBigDecimal(7), rs.getBigDecimal(8)),
+        (rs, i) -> new ArInvoiceLineView(rs.getObject(1, UUID.class), rs.getInt(2), rs.getString(3), rs.getBigDecimal(4),
+            rs.getBigDecimal(5), rs.getBigDecimal(6), rs.getString(7), rs.getBigDecimal(8), rs.getBigDecimal(9),
+            rs.getBigDecimal(10)),
         invoiceId));
   }
 }

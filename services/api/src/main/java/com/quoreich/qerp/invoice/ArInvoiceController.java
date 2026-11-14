@@ -127,6 +127,32 @@ public class ArInvoiceController {
         .orElse(ResponseEntity.notFound().build());
   }
 
+  @PostMapping("/{id}/credit-notes")
+  @Operation(
+      operationId = "createArCreditNote",
+      summary = "Émettre un avoir sur une facture client",
+      description =
+          "Sans lignes : tout ce qui reste à créditer. Numéro légal, écriture miroir et imputation sur le"
+              + " reste dû faits par la base (V45). 404 si la facture n'est pas visible, 422 si la base refuse"
+              + " (motif, quantité, facture non émise, période close), 403 sans le droit ar.credit_note.")
+  public ResponseEntity<?> creditNote(@PathVariable UUID id, @RequestBody CreateArCreditNote body) {
+    String problem = body.problem();
+    if (problem != null) {
+      return ResponseEntity.badRequest().body(Map.of("error", problem));
+    }
+    return query
+        .creditNote(id, body)
+        .<ResponseEntity<?>>map(n -> ResponseEntity.status(HttpStatus.CREATED).body(n))
+        .orElse(ResponseEntity.notFound().build());
+  }
+
+  @GetMapping("/credit-notes")
+  @Operation(operationId = "listArCreditNotes", summary = "Lire les avoirs clients",
+      description = "Avoirs de la société, ou d'une facture avec invoiceId ; lignes comprises.")
+  public List<ArCreditNoteView> creditNotes(@org.springframework.web.bind.annotation.RequestParam(required = false) UUID invoiceId) {
+    return query.creditNotes(invoiceId);
+  }
+
   /**
    * Refus de la base.
    *
@@ -165,7 +191,7 @@ public class ArInvoiceController {
    * QG009 : facture émise figée (V42). Messages rédigés par le schéma, en français, sans donnée
    * d'une autre société.
    */
-  private static final java.util.Set<String> REFUS_METIER = java.util.Set.of("QG001", "QG002", "QG005", "QG009");
+  private static final java.util.Set<String> REFUS_METIER = java.util.Set.of("QG001", "QG002", "QG005", "QG009", "QG011");
 
   /** « ERROR: message\n  Hint: … » → « message » (préfixe de sévérité éventuellement localisé). */
   private static String premiereLigne(SQLException e) {

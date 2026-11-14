@@ -25,6 +25,7 @@ import {
   type ARInvoice, type Payment,
 } from "@/hooks/use-ar-data";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { CreditNoteDialog, CreditNotesList } from "@/components/ARCreditNotes";
 import { apiDownloadCsv, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
@@ -194,6 +195,7 @@ function InvoicePayments({ inv, canReverse }: { inv: ARInvoice; canReverse: bool
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(today());
   const reversed = new Set(payments.filter((p) => p.reversal_of).map((p) => p.reversal_of));
+  // Encaissements et imputations d'avoir (V45).
   if (isLoading || payments.length === 0) return null;
   return (
     <section aria-label="Règlements" className="space-y-2">
@@ -208,7 +210,8 @@ function InvoicePayments({ inv, canReverse }: { inv: ARInvoice; canReverse: bool
               <td>{p.reference || "—"}{p.reversal_reason ? ` · ${p.reversal_reason}` : ""}</td>
               <td className="text-right tabular-nums">{fmt(Number(p.amount))}</td>
               <td className="text-right">
-                {p.reversal_of ? <span>Annulation</span>
+                {p.payment_type === "ar_credit" ? <span>Avoir</span>
+                  : p.reversal_of ? <span>Annulation</span>
                   : reversed.has(p.id) ? <span>Annulé</span>
                   : canReverse ? (
                     <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive"
@@ -300,6 +303,7 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
   const { data: access } = useMyAccess();
   const perms = new Set(access?.permissions ?? []);
   const isWriter = (access?.roles ?? []).some((r) => r === "admin" || r === "accountant");
+  const [creditOpen, setCreditOpen] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -334,9 +338,16 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
           />
           {inv.status === "draft" && isWriter && !isApiEnabled() && <DraftActions inv={inv} onDone={onClose} />}
           <InvoicePayments inv={inv} canReverse={perms.has("ar.reverse_receipt")} />
+          <CreditNotesList invoiceId={inv.id} />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2 flex-wrap">
+          {!["draft", "cancelled"].includes(inv.status) && perms.has("ar.credit_note") && (
+            <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => setCreditOpen(true)}>
+              <FileText className="w-3.5 h-3.5" /> Créer un avoir
+            </Button>
+          )}
+          <CreditNoteDialog inv={inv} open={creditOpen} onClose={() => setCreditOpen(false)} />
           {!["paid", "draft", "cancelled"].includes(inv.status) && perms.has("ar.receipt") && (
             <Button size="sm" className="text-xs gap-1.5" onClick={onRecordPayment}><CreditCard className="w-3.5 h-3.5" /> Enregistrer paiement</Button>
           )}
@@ -500,6 +511,11 @@ export default function ARTransactions() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Avoirs clients (V45) */}
+      <div className="mt-6 rounded-md border border-border bg-card p-4">
+        <CreditNotesList title="Avoirs clients" />
       </div>
 
       {/* GL Posting Section */}

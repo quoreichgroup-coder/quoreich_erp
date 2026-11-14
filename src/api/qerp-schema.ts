@@ -321,6 +321,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ar/invoices/{id}/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Émettre un avoir sur une facture client
+         * @description Sans lignes : tout ce qui reste à créditer. Numéro légal, écriture miroir et imputation sur le reste dû faits par la base (V45). 404 si la facture n'est pas visible, 422 si la base refuse (motif, quantité, facture non émise, période close), 403 sans le droit ar.credit_note.
+         */
+        post: operations["createArCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/axes": {
         parameters: {
             query?: never;
@@ -524,6 +544,26 @@ export interface paths {
          * @description Même périmètre que la liste : uniquement la société du porteur (RLS), jamais d'autre.
          */
         get: operations["exportArInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ar/invoices/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lire les avoirs clients
+         * @description Avoirs de la société, ou d'une facture avec invoiceId ; lignes comprises.
+         */
+        get: operations["listArCreditNotes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -755,6 +795,17 @@ export interface components {
             /** Format: date */
             reversalDate?: string;
         };
+        CreateArCreditNote: {
+            reason?: string;
+            /** Format: date */
+            creditDate?: string;
+            lines?: components["schemas"]["CreditedLine"][];
+        };
+        CreditedLine: {
+            /** Format: uuid */
+            invoiceLineId?: string;
+            quantity?: number;
+        };
         CreateAnalyticAxis: {
             code?: string;
             name?: string;
@@ -877,8 +928,43 @@ export interface components {
             /** Format: uuid */
             reversalOf?: string;
             reversalReason?: string;
+            /** @description ar_receipt (encaissement) ou ar_credit (imputation d'un avoir, V45) */
+            paymentType: string;
         };
         ArInvoiceLineView: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            lineNo: number;
+            description: string;
+            quantity: number;
+            unitPrice: number;
+            discountPct: number;
+            taxCode?: string;
+            netAmount: number;
+            taxAmount: number;
+            creditedQuantity: number;
+        };
+        ArCreditNoteView: {
+            /** Format: uuid */
+            id: string;
+            creditNoteNumber: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNumber: string;
+            /** Format: uuid */
+            customerId: string;
+            customerName: string;
+            /** Format: date */
+            creditDate: string;
+            reason: string;
+            subtotal: number;
+            taxAmount: number;
+            total: number;
+            amountAllocated: number;
+            lines: components["schemas"]["NoteLine"][];
+        };
+        NoteLine: {
             /** Format: int32 */
             lineNo: number;
             description: string;
@@ -1970,6 +2056,54 @@ export interface operations {
             };
         };
     };
+    createArCreditNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateArCreditNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     createAnalyticAxis: {
         parameters: {
             query?: never;
@@ -2472,6 +2606,50 @@ export interface operations {
                 };
                 content: {
                     "text/csv;charset=UTF-8": string;
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listArCreditNotes: {
+        parameters: {
+            query?: {
+                invoiceId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArCreditNoteView"][];
                 };
             };
             /** @description Jeton absent, expiré ou invalide. */

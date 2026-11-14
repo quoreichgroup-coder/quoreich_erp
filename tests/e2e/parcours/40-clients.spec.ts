@@ -135,6 +135,34 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await expect(panneau.getByRole("region", { name: "Règlements" })).toContainText("Chèque impayé");
   await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("68 000");
   await expect(panneau.getByRole("button", { name: /Enregistrer paiement/ }), "de nouveau encaissable").toBeVisible();
+
+  // V45 : la facture émise se corrige par un avoir lié, motivé, numéroté, imputé sur le reste dû.
+  obs.etape("avoir partiel sur la ligne « Frais de déplacement »");
+  await panneau.getByRole("button", { name: "Créer un avoir" }).click();
+  const av = page.getByRole("dialog", { name: `Avoir sur la facture ${numero}` });
+  await expect(av.getByRole("button", { name: "Émettre l'avoir" }), "motif et ligne requis").toBeDisabled();
+  await av.getByLabel("Motif (obligatoire)").fill("Déplacement non effectué");
+  await av.getByLabel("Quantité à créditer ligne 2").fill("1");
+  await expect(av.getByTestId("credit-preview")).toContainText("18 000");
+  await av.getByRole("button", { name: "Émettre l'avoir" }).click();
+  testInfo.annotations.push({ type: "avoir", description: await dernierToast(page) });
+  await expect(av).toBeHidden();
+  await fermerPanneau(page);
+  await ligne(page, numero).click();
+  panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await expect(panneau.getByRole("region", { name: "Pied" }), "68 000 − 18 000").toContainText("50 000");
+  const avoirs = panneau.getByRole("region", { name: "Avoirs" });
+  await expect(avoirs.getByTestId("credit-note-row")).toHaveCount(1);
+  await expect(avoirs).toContainText("Déplacement non effectué");
+  await avoirs.getByTestId("credit-note-row").click();
+  const vueAvoir = page.getByRole("dialog", { name: /^Avoir / });
+  await expect(vueAvoir.getByRole("region", { name: "Lignes" })).toContainText("Frais de déplacement");
+  await expect(vueAvoir.getByRole("region", { name: "Pied" })).toContainText("18 000");
+  const avoirPdf = page.waitForEvent("download");
+  await vueAvoir.getByTestId("btn-document-pdf").click();
+  expect((await avoirPdf).suggestedFilename()).toMatch(/^avoir-.*\.pdf$/);
+  await page.keyboard.press("Escape");
+  await expect(vueAvoir).toBeHidden();
   await fermerPanneau(page);
 
   await obs.joindre(testInfo);

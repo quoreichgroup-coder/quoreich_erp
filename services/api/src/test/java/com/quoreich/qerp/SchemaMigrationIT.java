@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "44";
+  private static final String DERNIERE_MIGRATION = "45";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -127,7 +127,10 @@ class SchemaMigrationIT {
           // V40 — séries de numérotation des pièces de vente.
           "sales_numbering_series",
           // V41 — file d'approbation des factures fournisseurs.
-          "ap_invoice_approvals");
+          "ap_invoice_approvals",
+          // V45 — avoirs clients.
+          "ar_credit_notes",
+          "ar_credit_note_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -204,7 +207,9 @@ class SchemaMigrationIT {
           "sales_check_lines",
           "customer_credit_exposure",
           // V44 — commande depuis les lignes d'un devis.
-          "create_sales_order_from_quote");
+          "create_sales_order_from_quote",
+          // V45 — avoirs clients.
+          "create_ar_credit_note");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -212,6 +217,8 @@ class SchemaMigrationIT {
           "accounting_journals/Lecture du référentiel",
           "journal_batches/Tenant isolation",
           "ap_invoice_approvals/Tenant isolation",
+          "ar_credit_notes/Tenant isolation",
+          "ar_credit_note_lines/Tenant isolation",
           "sales_numbering_series/Tenant read",
           "sales_numbering_series/Tenant admin update",
           "sales_settings/Tenant read",

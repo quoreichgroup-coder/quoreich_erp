@@ -10,7 +10,7 @@ import { ligne } from "../parcours/champs";
  */
 test.skip(!identifiants(), "identifiants du compte de test absents");
 
-const PERIMETRE = /\/rest\/v1\/(customers|ar_invoices|ar_invoice_lines|payments|rpc\/reverse_settlement)\b/;
+const PERIMETRE = /\/rest\/v1\/(customers|ar_invoices|ar_invoice_lines|payments|rpc\/reverse_settlement|rpc\/create_ar_credit_note)\b/;
 
 function routage(page: Page) {
   const api = process.env.E2E_API_URL!;
@@ -96,6 +96,21 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   await detail.getByRole("button", { name: "Fermer" }).click();
   await expect(ligne(page, numero)).toContainText("Émise");
 
+  // V45 : avoir total par l'API sur site → facture entièrement créditée.
+  obs.etape("avoir total par l'API");
+  await ligne(page, numero).click();
+  const panneauAvoir = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await panneauAvoir.getByRole("button", { name: "Créer un avoir" }).click();
+  const av = page.getByRole("dialog", { name: `Avoir sur la facture ${numero}` });
+  await av.getByLabel("Motif (obligatoire)").fill("Prestation annulée");
+  await av.getByRole("button", { name: "Tout créditer" }).click();
+  await expect(av.getByTestId("credit-preview")).toContainText("250 000");
+  await av.getByRole("button", { name: "Émettre l'avoir" }).click();
+  testInfo.annotations.push({ type: "avoir", description: await dernierToast(page) });
+  await expect(av).toBeHidden();
+  await panneauAvoir.getByRole("button", { name: "Fermer" }).click();
+  await expect(ligne(page, numero)).toContainText("Réglée");
+
   obs.etape("export par l'API");
   const telechargement = page.waitForEvent("download");
   await page.getByTestId("btn-export-csv").click();
@@ -106,6 +121,7 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   expect(flux.versApi.some((x) => x.startsWith("POST /api/v1/customers"))).toBeTruthy();
   expect(flux.versApi.some((x) => x.startsWith("POST /api/v1/ar/invoices"))).toBeTruthy();
   expect(flux.versApi.some((x) => x.endsWith("/reversal"))).toBeTruthy();
+  expect(flux.versApi.some((x) => x.endsWith("/credit-notes"))).toBeTruthy();
   await obs.joindre(testInfo);
   expect(obs.incidents, JSON.stringify(obs.incidents, null, 1)).toEqual([]);
 });

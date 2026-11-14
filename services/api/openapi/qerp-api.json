@@ -1317,6 +1317,71 @@
         }
       }
     },
+    "/api/v1/ar/invoices/{id}/credit-notes" : {
+      "post" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Émettre un avoir sur une facture client",
+        "description" : "Sans lignes : tout ce qui reste à créditer. Numéro légal, écriture miroir et imputation sur le reste dû faits par la base (V45). 404 si la facture n'est pas visible, 422 si la base refuse (motif, quantité, facture non émise, période close), 403 sans le droit ar.credit_note.",
+        "operationId" : "createArCreditNote",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateArCreditNote"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/axes" : {
       "post" : {
         "tags" : [ "Analytique" ],
@@ -1949,6 +2014,64 @@
         }
       }
     },
+    "/api/v1/ar/invoices/credit-notes" : {
+      "get" : {
+        "tags" : [ "Factures clients" ],
+        "summary" : "Lire les avoirs clients",
+        "description" : "Avoirs de la société, ou d'une facture avec invoiceId ; lignes comprises.",
+        "operationId" : "listArCreditNotes",
+        "parameters" : [ {
+          "name" : "invoiceId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ArCreditNoteView"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics" : {
       "get" : {
         "tags" : [ "Analytique" ],
@@ -2529,6 +2652,36 @@
           }
         }
       },
+      "CreateArCreditNote" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "creditDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CreditedLine"
+            }
+          }
+        }
+      },
+      "CreditedLine" : {
+        "type" : "object",
+        "properties" : {
+          "invoiceLineId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "type" : "number"
+          }
+        }
+      },
       "CreateAnalyticAxis" : {
         "type" : "object",
         "properties" : {
@@ -2857,11 +3010,105 @@
           },
           "reversalReason" : {
             "type" : "string"
+          },
+          "paymentType" : {
+            "type" : "string",
+            "description" : "ar_receipt (encaissement) ou ar_credit (imputation d'un avoir, V45)"
           }
         },
-        "required" : [ "amount", "id", "paymentDate", "paymentMethod" ]
+        "required" : [ "amount", "id", "paymentDate", "paymentMethod", "paymentType" ]
       },
       "ArInvoiceLineView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "lineNo" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "quantity" : {
+            "type" : "number"
+          },
+          "unitPrice" : {
+            "type" : "number"
+          },
+          "discountPct" : {
+            "type" : "number"
+          },
+          "taxCode" : {
+            "type" : "string"
+          },
+          "netAmount" : {
+            "type" : "number"
+          },
+          "taxAmount" : {
+            "type" : "number"
+          },
+          "creditedQuantity" : {
+            "type" : "number"
+          }
+        },
+        "required" : [ "creditedQuantity", "description", "discountPct", "id", "lineNo", "netAmount", "quantity", "taxAmount", "unitPrice" ]
+      },
+      "ArCreditNoteView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "creditNoteNumber" : {
+            "type" : "string"
+          },
+          "invoiceId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "invoiceNumber" : {
+            "type" : "string"
+          },
+          "customerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "customerName" : {
+            "type" : "string"
+          },
+          "creditDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "subtotal" : {
+            "type" : "number"
+          },
+          "taxAmount" : {
+            "type" : "number"
+          },
+          "total" : {
+            "type" : "number"
+          },
+          "amountAllocated" : {
+            "type" : "number"
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NoteLine"
+            }
+          }
+        },
+        "required" : [ "amountAllocated", "creditDate", "creditNoteNumber", "customerId", "customerName", "id", "invoiceId", "invoiceNumber", "lines", "reason", "subtotal", "taxAmount", "total" ]
+      },
+      "NoteLine" : {
         "type" : "object",
         "properties" : {
           "lineNo" : {
