@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Plus, ShoppingCart, Package, CheckCircle, Truck, FileSearch, BookOpen, Loader2 } from "lucide-react";
+import { Download, Plus, ShoppingCart, Package, CheckCircle, Truck, FileSearch, BookOpen, Loader2, Undo2 } from "lucide-react";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +39,9 @@ import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-recei
 import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
+import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
+import { useSupplierReturns } from "@/hooks/use-supplier-returns";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -202,7 +205,8 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
 // En-tête (commande, date) puis lignes (quantité reçue par ligne de commande, plafonnée au
 // restant) ; la base crée la réception en attente, ajoute les lignes et la valide (V34).
 
-function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
+function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [] }: {
+  returns?: { po_line_id: string; quantity: number; replacement_expected: boolean }[];
   open: boolean; onOpenChange: (v: boolean) => void; pos: any[]; grs: any[];
 }) {
   const { user } = useAuth();
@@ -220,7 +224,7 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
   ).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
   const receivable = receivableAll.filter((p) => p.supplier_id === supplierId);
   const po = receivable.find((p) => p.id === poId);
-  const lines = po ? linesToReceive(po.id, po.lines ?? [], grs) : [];
+  const lines = po ? linesToReceive(po.id, po.lines ?? [], grs, returns) : [];
 
   // Pied de la réception : quantité et valeur (au coût de la ligne de commande) reçues maintenant.
   const qtyOf = (id: string) => { const n = Number(String(qty[id] ?? "").replace(",", ".")); return Number.isFinite(n) && n > 0 ? n : 0; };
@@ -231,7 +235,7 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
   const choosePo = (id: string) => {
     setPoId(id);
     const p = receivable.find((x) => x.id === id);
-    const l = p ? linesToReceive(p.id, p.lines ?? [], grs) : [];
+    const l = p ? linesToReceive(p.id, p.lines ?? [], grs, returns) : [];
     setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
     setError(null);
   };
@@ -327,7 +331,10 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs }: {
 // ── Lecture d'une pièce d'achat : en-tête, lignes, pied ───────────────
 type DocView = { kind: "pr" | "po" | "gr"; doc: any } | null;
 
-function ProcurementDocDialog({ view, onClose, pos, grs }: { view: DocView; onClose: () => void; pos: any[]; grs: any[] }) {
+function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
+  view: DocView; onClose: () => void; pos: any[]; grs: any[];
+  returns?: { po_line_id: string; quantity: number; replacement_expected: boolean }[];
+}) {
   if (!view) return null;
   const { kind, doc } = view;
   let title = "", header: [string, React.ReactNode][] = [], columns: { label: string; align?: "right" }[] = [],
@@ -340,7 +347,7 @@ function ProcurementDocDialog({ view, onClose, pos, grs }: { view: DocView; onCl
     rows = lines.map((l: any) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.estimated_unit_cost)), fmt(Number(l.total))]);
     footer = [["Lignes", String(lines.length)], ["Total estimé", `${fmt(lines.reduce((s: number, l: any) => s + Number(l.total), 0))} XOF`, true]];
   } else if (kind === "po") {
-    const lines = linesToReceive(doc.id, doc.lines ?? [], grs);
+    const lines = linesToReceive(doc.id, doc.lines ?? [], grs, returns);
     title = `Commande ${doc.po_number}`;
     header = [["Fournisseur", doc.supplier?.name], ["Statut", doc.status], ["Date de commande", doc.order_date], ["Lignes", String(lines.length)]];
     columns = [{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" }, { label: "Montant", align: "right" }, { label: "Reçu", align: "right" }];
@@ -383,6 +390,11 @@ export default function ProcurementTransactions() {
   const [editPR, setEditPR] = useState<any | null>(null);
   const [editPO, setEditPO] = useState<any | null>(null);
   const completeGR = useCompleteGoodsReceipt();
+  const { data: supplierReturns = [] } = useSupplierReturns();
+  const returnLines = supplierReturns.flatMap((r) => r.lines);
+  const { data: access } = useMyAccess();
+  const canReturn = (access?.permissions ?? []).includes("procurement.return");
+  const [returnGR, setReturnGR] = useState<any | null>(null);
 
   const [showCreatePR, setShowCreatePR] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
@@ -446,6 +458,7 @@ export default function ProcurementTransactions() {
           <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Requisitions ({prs.length})</TabsTrigger>
           <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Purchase Orders ({pos.length})</TabsTrigger>
           <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Goods Receipt ({grs.length})</TabsTrigger>
+          <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
           <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Approval Workflow</TabsTrigger>
         </TabsList>
 
@@ -565,6 +578,9 @@ export default function ProcurementTransactions() {
                     <TableCell><Badge className={`text-[10px] ${statusBadge(gr.status)}`} variant="outline">{gr.status}</Badge></TableCell>
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "gr", doc: gr })}>Voir</Button>
+                      {gr.status === "completed" && canReturn && (
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setReturnGR(gr)}>Retour</Button>
+                      )}
                       {gr.status === "pending" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
                           onClick={() => completeGR.mutate(gr.id)}
@@ -577,6 +593,13 @@ export default function ProcurementTransactions() {
                 ))}
               </TableBody></Table>
             )}
+          </CardContent></Card>
+        </TabsContent>
+
+        {/* Retours fournisseurs (V52) */}
+        <TabsContent value="returns">
+          <Card className="border-border"><CardContent className="p-0">
+            <SupplierReturnsList />
           </CardContent></Card>
         </TabsContent>
 
@@ -609,8 +632,12 @@ export default function ProcurementTransactions() {
       <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
       {editPR && <CreateRequisitionDialog open edit={editPR} onOpenChange={(o) => { if (!o) setEditPR(null); }} />}
       {editPO && <CreatePODialog open edit={editPO} onOpenChange={(o) => { if (!o) setEditPO(null); }} />}
-      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} />
-      <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} />
+      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} returns={returnLines} />
+      {returnGR && (
+        <SupplierReturnDialog open gr={returnGR} onClose={() => setReturnGR(null)}
+          poLines={(pos.find((p: any) => p.id === returnGR.po_id)?.lines ?? []) as any[]} />
+      )}
+      <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} returns={returnLines} />
 
       <Dialog open={!!convertPR} onOpenChange={(o) => { if (!o) { setConvertPR(null); setConvertSupplier(""); } }}>
         <DialogContent>

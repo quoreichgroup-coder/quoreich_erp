@@ -18,8 +18,14 @@ export function isReceivable(status: string): boolean {
 
 export type LineToReceive = PoLine & { received: number; remaining: number };
 
-/** Lignes de la commande avec le déjà-reçu (réceptions validées) et le restant. */
-export function linesToReceive(poId: string, poLines: PoLine[], receipts: Receipt[]): LineToReceive[] {
+/**
+ * Lignes de la commande avec le déjà-reçu (réceptions validées) et le restant. Un retour
+ * fournisseur avec remplacement attendu (V52) redevient à recevoir ; un retour sans remplacement non.
+ */
+export function linesToReceive(
+  poId: string, poLines: PoLine[], receipts: Receipt[],
+  returns: { po_line_id: string; quantity: number; replacement_expected: boolean }[] = [],
+): LineToReceive[] {
   const received = new Map<string, number>();
   for (const r of receipts) {
     if (r.po_id !== poId || r.status !== "completed") continue;
@@ -27,6 +33,10 @@ export function linesToReceive(poId: string, poLines: PoLine[], receipts: Receip
       if (!l.po_line_id) continue;
       received.set(l.po_line_id, (received.get(l.po_line_id) ?? 0) + Number(l.quantity_received || 0));
     }
+  }
+  for (const r of returns) {
+    if (!r.replacement_expected || !received.has(r.po_line_id)) continue;
+    received.set(r.po_line_id, (received.get(r.po_line_id) ?? 0) - Number(r.quantity || 0));
   }
   return poLines.map((l) => {
     const done = received.get(l.id) ?? 0;

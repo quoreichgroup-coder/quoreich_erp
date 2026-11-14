@@ -22,10 +22,11 @@ Le référentiel SYSCOHADA de QUOREICH est marqué `is_validated = false` : il d
 | Facture client issue d'une livraison | AR_RECEIVABLE | SALES_REVENUE (HT = total des lignes livrées) | **TVA forcée à 0** | VT | `invoice_from_delivery`, `auto_invoice_on_delivery` → `on_ar_invoice_posted` | 🔴 TVA collectée omise |
 | Encaissement client | BANK | AR_RECEIVABLE | INSERT de `payments` (ar_receipt), daté du paiement | BQ | `on_ap_payment_recorded` | ✅ création ; 🔴 suppression / modification non répercutées |
 | Facture fournisseur approuvée | PURCHASES (HT) ; VAT_INPUT (TVA si > 0) | AP_PAYABLE (TTC) | approved + open ; QG001 si rôle manquant | AC | `ap_invoice_journal_entry` (V37) | ✅ |
+| Avoir fournisseur | AP_PAYABLE (TTC) | PURCHASES (HT) ; VAT_INPUT (TVA) | Facture approuvée, Σ avoirs ≤ facture ; QG001 si rôle manquant | AC | `create_ap_credit_note` (V52) | ✅ imputé sur le reste à payer |
 | Paiement fournisseur | AP_PAYABLE | BANK | INSERT de `payments` (ap_payment), facture approuvée | BQ | `on_ap_payment_recorded` | ✅ création ; 🔴 suppression / modification |
 | Paiement en espèces | — | — | `payment_method = 'cash'` passe quand même en BANK | BQ | idem | 🔴 caisse (571) absente 🧮 |
 | Entrée en stock (réception, retour client, ajustement +) | INVENTORY (311) | STOCK_VARIATION (6031) | Mouvement « posted », valeur > 0, inventaire permanent ; QG001 si rôle manquant | OD | `on_stock_movement_je` (V51) | ✅ plus de crédit fournisseur ; la facture reste DR 601 / CR 401 |
-| Sortie de stock (livraison, ajustement −) | STOCK_VARIATION (6031) | INVENTORY (311) | Valeur au coût moyen (V42) | OD | idem | ✅ 601 + 6031 = coût des marchandises vendues |
+| Sortie de stock (livraison, retour fournisseur, ajustement −) | STOCK_VARIATION (6031) | INVENTORY (311) | Valeur au coût moyen (V42) | OD | idem | ✅ 601 + 6031 = coût des marchandises vendues |
 | Transfert entre dépôts | — | — | Aucune écriture (même compte de stock) | — | idem | ✅ |
 | Paie comptabilisée | **6610** salaires (+ 6630 charges patronales = brut × **16,4 %** codé en dur) | **4210** net ; **4310** organismes sociaux ; 4470 État | Cycle approuvé, droit `hr.execute_payroll` | PA | `post_payroll_run` | 🟡 🧮 comptes et taux non paramétrables (SYSCOHADA : 661, 664, 422, 431, 447) |
 | Dotation aux amortissements | compte charge de la catégorie | compte d'amortissement de la catégorie | Immobilisation en service | OD | `post_monthly_depreciation` | 🔴 ne s'exécute pas (colonnes inexistantes), pas de contrôle de société |

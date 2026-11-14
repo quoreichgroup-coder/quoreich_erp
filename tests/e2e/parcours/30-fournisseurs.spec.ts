@@ -134,7 +134,28 @@ test("chaîne complète : commande → réception → facture hors tolérance re
     await expect(ecriture.locator("tbody tr").filter({ hasText: /^601/ })).toContainText("60 000");
     await expect(ecriture.locator("tbody tr").filter({ hasText: /^4452/ })).toContainText("10 800");
     await expect(ecriture.locator("tbody tr").filter({ hasText: /^401/ })).toContainText("70 800");
+
+    // V52 : avoir fournisseur (remise) imputé sur le reste à payer, TVA au taux de la facture.
+    obs.etape("avoir fournisseur sur la facture approuvée");
+    await panneau.getByRole("button", { name: "Créer un avoir" }).click();
+    const av = page.getByRole("dialog", { name: /Avoir fournisseur sur la facture/ });
+    await av.getByLabel("Motif (obligatoire)").fill(`Remise commerciale ${RUN}`);
+    await av.getByLabel(/Montant HT/).fill("70000");
+    await expect(av.getByRole("alert"), "plafonné au HT de la facture").toContainText("HT au plus");
+    await av.getByLabel(/Montant HT/).fill("10000");
+    await expect(av.getByLabel(/^TVA/)).toHaveValue("1800");
+    await av.getByLabel("N° de l'avoir du fournisseur").fill(`AVF-EXT-${RUN}`);
+    await av.getByRole("button", { name: "Comptabiliser l'avoir" }).click();
+    testInfo.annotations.push({ type: "avoir", description: await dernierToast(page) });
+    await expect(av).toBeHidden();
+    const avoirs = panneau.getByRole("region", { name: "Avoirs sur cette facture" });
+    await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText(/AVF-\d{4}-\d{4}/);
+    await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText("11 800");
+    await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("59 000");
     await panneau.getByRole("button", { name: "Fermer" }).click();
+    await page.getByRole("tab", { name: /^Avoirs/ }).click();
+    await expect(page.getByTestId("ap-credit-note-row").filter({ hasText: numero })).toContainText(`AVF-EXT-${RUN}`);
+    await page.getByRole("tab", { name: /^Factures/ }).click();
 
     obs.etape("paiement");
     await ligne(page, numero).getByRole("button", { name: /Pay/ }).click();

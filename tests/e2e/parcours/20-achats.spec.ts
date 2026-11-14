@@ -235,6 +235,42 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(page.getByRole("dialog").getByLabel("Fournisseur").locator("option", { hasText: fournisseur })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
+  // V52 : retour fournisseur sur la dernière réception (4 reçus en ligne 1), remplacement attendu.
+  obs.etape("retour fournisseur avec remplacement attendu");
+  await page.getByRole("tab", { name: /Goods Receipt/ }).click();
+  await ligne(page, poNumero).getByRole("button", { name: "Retour" }).click();
+  const rt = page.getByRole("dialog");
+  await expect(rt.getByLabel("Quantité à retourner ligne 2"), "ligne 2 non reçue sur cette réception").toHaveCount(0);
+  await rt.getByLabel("Motif (obligatoire)").fill(`Article défectueux ${RUN}`);
+  await rt.getByLabel("Quantité à retourner ligne 1").fill("5");
+  await expect(rt.getByRole("alert"), "pas plus que le reçu de la réception").toContainText("4 retournable");
+  await rt.getByLabel("Quantité à retourner ligne 1").fill("1");
+  await expect(rt.getByTestId("return-value")).toHaveText("3 500 XOF");
+  await rt.getByLabel(/Remplacement attendu/).check();
+  await rt.getByRole("button", { name: "Enregistrer le retour" }).click();
+  const mr = await dernierToast(page);
+  testInfo.annotations.push({ type: "retour", description: mr });
+  await expect(rt, `retour : ${mr}`).toBeHidden();
+  await page.getByRole("tab", { name: /Retours/ }).click();
+  const rl = page.getByTestId("supplier-return-row").filter({ hasText: poNumero });
+  await expect(rl).toContainText(/RTF-\d{4}-\d{4}/);
+  await expect(rl).toContainText("remplacement attendu");
+  await rl.click();
+  await expect(page.getByRole("dialog").getByRole("region", { name: "Pied" })).toContainText("3 500");
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await expect(ligne(page, fournisseur).locator("td").nth(3), "remplacement attendu : la commande se réceptionne de nouveau").toHaveText("partially_received");
+
+  obs.etape("réception du remplacement");
+  await page.getByRole("button", { name: "Nouvelle réception" }).click();
+  r = page.getByRole("dialog");
+  await r.getByLabel("Fournisseur").selectOption({ label: fournisseur });
+  await r.getByLabel("Commande").selectOption(await r.getByLabel("Commande").locator("option").filter({ hasText: poNumero }).getAttribute("value") ?? "");
+  await expect(r.getByLabel("Quantité reçue ligne 1"), "le retourné à remplacer").toHaveValue("1");
+  await r.getByRole("button", { name: "Enregistrer et valider" }).click();
+  await expect(r).toBeHidden();
+  await expect(ligne(page, fournisseur).locator("td").nth(3)).toHaveText("received");
+
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });

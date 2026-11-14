@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "51";
+  private static final String DERNIERE_MIGRATION = "52";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -143,7 +143,11 @@ class SchemaMigrationIT {
           "ar_lettering_counters",
           // V50 — retours clients.
           "customer_returns",
-          "customer_return_lines");
+          "customer_return_lines",
+          // V52 — retours et avoirs fournisseurs.
+          "ap_credit_notes",
+          "supplier_returns",
+          "supplier_return_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -242,7 +246,12 @@ class SchemaMigrationIT {
           // V50 — retours clients.
           "create_customer_return",
           "credit_customer_return",
-          "release_delivery_on_draft_delete");
+          "release_delivery_on_draft_delete",
+          // V52 — retours et avoirs fournisseurs.
+          "po_line_returned",
+          "create_ap_credit_note",
+          "credit_supplier_return",
+          "create_supplier_return");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -257,6 +266,9 @@ class SchemaMigrationIT {
           "ar_letterings/Tenant isolation",
           "customer_returns/Tenant isolation",
           "customer_return_lines/Tenant isolation",
+          "ap_credit_notes/Tenant isolation",
+          "supplier_returns/Tenant isolation",
+          "supplier_return_lines/Tenant isolation",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",

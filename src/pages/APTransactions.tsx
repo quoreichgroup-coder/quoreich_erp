@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { SettlementDialog } from "@/components/SettlementDialog";
 import { DocumentDetail } from "@/components/DocumentDetail";
 import { JournalEntryPreview } from "@/components/JournalEntryPreview";
+import { APCreditNoteDialog, APCreditNotesList } from "@/components/SupplierReturns";
 import { usePurchaseOrders } from "@/hooks/use-procurement-data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -160,6 +161,8 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
   const outstanding = inv.total - inv.amount_paid;
   const { data: access } = useMyAccess();
   const canPay = (access?.permissions ?? []).includes("ap.pay");
+  const canCredit = (access?.permissions ?? []).includes("ap.credit_note");
+  const [creditOpen, setCreditOpen] = useState(false);
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30" onClick={onClose} />
@@ -190,11 +193,16 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
             ]}
           />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
+          <APCreditNotesList invoiceId={inv.id} title="Avoirs sur cette facture" />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2">
           {inv.status !== "paid" && inv.approval_status === "approved" && canPay && (
             <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Payer</Button>
           )}
+          {inv.approval_status === "approved" && canCredit && (
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => setCreditOpen(true)}>Créer un avoir</Button>
+          )}
+          <APCreditNoteDialog inv={inv} open={creditOpen} onClose={() => setCreditOpen(false)} />
         </div>
       </div>
     </div>
@@ -439,7 +447,7 @@ export default function APTransactions() {
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [editInv, setEditInv] = useState<APInvoice | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS = ["invoices", "payments", "approvals", "posting"];
+  const TABS = ["invoices", "payments", "credit-notes", "approvals", "posting"];
   const tab = TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "invoices";
   const { data: approvals = [] } = useAPInvoiceApprovals();
   const { data: myAccess } = useMyAccess();
@@ -500,6 +508,7 @@ export default function APTransactions() {
         <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="invoices">Factures ({invoices.length})</TabsTrigger>
           <TabsTrigger value="payments">Règlements</TabsTrigger>
+          <TabsTrigger value="credit-notes">Avoirs</TabsTrigger>
           <TabsTrigger value="approvals">Approbations ({invoices.filter((i) => i.approval_status === "submitted").length})</TabsTrigger>
           <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
         </TabsList>
@@ -594,6 +603,12 @@ export default function APTransactions() {
 
         <TabsContent value="payments">
           <PaymentsTab onOpenInvoice={(id) => { const inv = invoices.find((i) => i.id === id); if (inv) setSelectedInv(inv); }} />
+        </TabsContent>
+
+        <TabsContent value="credit-notes">
+          <div className="rounded-md border border-border bg-card p-4">
+            <APCreditNotesList />
+          </div>
         </TabsContent>
 
         <TabsContent value="approvals">
