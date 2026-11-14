@@ -190,3 +190,40 @@ test("plan comptable : import guidé, correction, validation, export", async ({ 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });
+
+// V66 (PC-5) : correspondance vers le PCG, proposition (jamais validée d'office), décision, balance convertie.
+test("plan comptable : correspondance vers le PCG, validation, balance convertie", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  const nom = `E2E-${Date.now().toString(36)} vers PCG`;
+  obs.etape("création et proposition");
+  await page.goto("/journal/charts?tab=mappings");
+  await page.getByLabel("Nom de la correspondance").fill(nom);
+  await page.getByLabel("Plan cible").selectOption({ label: "Plan comptable général (France)" });
+  await page.getByRole("button", { name: "Créer la correspondance" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Correspondance créée" }).first()).toBeVisible();
+  await page.getByTestId("mapping-row").filter({ hasText: nom }).click();
+  await page.getByRole("button", { name: "Proposer automatiquement" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "proposée(s), à valider" }).first()).toBeVisible();
+  await expect(page.getByTestId("mapping-summary")).toContainText("0 validée(s)");
+  await expect(page.getByRole("button", { name: "Tout sélectionner (0)" })).toBeVisible();
+
+  obs.etape("décision (séparation des tâches levée le temps du parcours)");
+  const strict = page.getByRole("switch", { name: "Correspondances validées par une autre personne" });
+  await strict.click();
+  await expect(strict).not.toBeChecked();
+  await page.getByRole("button", { name: /^Tout sélectionner \([1-9]/ }).click();
+  await page.getByRole("button", { name: /^Valider la sélection/ }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "ligne(s) traitée(s)" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Valider la correspondance" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Correspondance validée" }).first()).toBeVisible();
+  await strict.click();
+  await expect(strict).toBeChecked();
+
+  obs.etape("balance convertie");
+  await page.getByRole("button", { name: "Calculer" }).click();
+  await expect(page.getByTestId("mapped-balance-line").first()).toBeVisible();
+  await expect(page.getByTestId("mapped-balance-line").filter({ hasText: "411" }).first()).toBeVisible();
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});

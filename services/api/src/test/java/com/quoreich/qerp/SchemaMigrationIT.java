@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "65";
+  private static final String DERNIERE_MIGRATION = "66";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -198,7 +198,11 @@ class SchemaMigrationIT {
           "chart_import_settings",
           "import_profiles",
           "chart_import_runs",
-          "chart_import_rows");
+          "chart_import_rows",
+          // V66 — correspondances et plans secondaires.
+          "secondary_chart_accounts",
+          "chart_mappings",
+          "chart_mapping_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -363,7 +367,19 @@ class SchemaMigrationIT {
           "prepare_chart_import",
           "update_chart_import_row",
           "validate_chart_import",
-          "cancel_chart_import");
+          "cancel_chart_import",
+          // V66 — correspondances et plans secondaires.
+          "create_secondary_chart",
+          "mapping_target",
+          "mapping_for",
+          "create_chart_mapping",
+          "propose_chart_mapping",
+          "set_chart_mapping_lines",
+          "decide_chart_mapping_lines",
+          "compare_chart_mapping",
+          "validate_chart_mapping",
+          "archive_chart_mapping",
+          "mapped_trial_balance");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -453,6 +469,11 @@ class SchemaMigrationIT {
           "import_profiles/Profils de la société",
           "chart_import_runs/Lecture habilitée",
           "chart_import_rows/Lecture habilitée",
+          // V66 — correspondances et plans secondaires.
+          "secondary_chart_accounts/Lecture société",
+          "secondary_chart_accounts/Administration habilitée",
+          "chart_mappings/Lecture société",
+          "chart_mapping_lines/Lecture société",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",

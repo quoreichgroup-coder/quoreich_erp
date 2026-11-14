@@ -15,7 +15,7 @@ export type ImportRunRow = {
   id: string; line_no: number; code: string | null; name: string | null; raw_type: string | null; account_type: string | null; parent_code: string | null;
   is_header: boolean; action: "create" | "update" | "skip"; status: "ok" | "warning" | "error"; messages: string[];
 };
-export type ImportSettings = { require_second_person: boolean; allow_label_updates: boolean };
+export type ImportSettings = { require_second_person: boolean; allow_label_updates: boolean; mapping_second_person: boolean };
 
 const db = supabase as any;
 const KEYS = ["chart-import-runs", "chart-import-rows", "gl-accounts", "gl-accounts-full", "chart-issues"];
@@ -67,9 +67,9 @@ export function useImportSettings() {
     queryKey: ["chart-import-settings", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await db.from("chart_import_settings").select("require_second_person, allow_label_updates").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = await db.from("chart_import_settings").select("require_second_person, allow_label_updates, mapping_second_person").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
-      return (data ?? { require_second_person: true, allow_label_updates: true }) as ImportSettings;
+      return (data ?? { require_second_person: true, allow_label_updates: true, mapping_second_person: true }) as ImportSettings;
     },
   });
 }
