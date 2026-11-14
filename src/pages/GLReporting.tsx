@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { FinancialStatementPanel } from "@/components/FinancialStatementPanel";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -15,6 +16,7 @@ const tabs = [
   { id: "pnl", label: "Compte de Résultat", icon: TrendingUp },
   { id: "balance", label: "Bilan", icon: Layers },
   { id: "sig", label: "SIG (SYSCOHADA)", icon: Activity },
+  { id: "statements", label: "États SYSCOHADA (rubriques)", icon: Layers },
 ];
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR");
@@ -88,6 +90,8 @@ export default function GLReporting() {
           </button>
         ))}
       </div>
+
+      {activeTab === "statements" && <FinancialStatementPanel />}
 
       {/* ═══ TRIAL BALANCE ═══ */}
       {activeTab === "trial" && (

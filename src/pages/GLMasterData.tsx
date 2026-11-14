@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ChartOfAccountsAudit } from "@/components/ChartOfAccountsAudit";
+import { GLAccountFormDialog, AttributeDefinitionsDialog } from "@/components/GLAccountForm";
 import { toast } from "sonner";
 import {
   useGLAccounts, useAccountBalances, buildAccountTree, categorizeAccounts,
@@ -62,73 +63,6 @@ function TreeItem({ account, depth = 0, selectedId, onSelect }: {
   );
 }
 
-// ── Account Form Dialog ─────────────────────────────────────
-function AccountFormDialog({ open, onClose, account, accounts, mode, onCreate, onUpdate }: {
-  open: boolean; onClose: () => void;
-  account: { id?: string; code: string; name: string; account_type: string; parent_id: string | null; is_active: boolean } | null;
-  accounts: AccountWithBalance[];
-  mode: "create" | "edit";
-  onCreate: any; onUpdate: any;
-}) {
-  const [form, setForm] = useState(account || { code: "", name: "", account_type: "asset", parent_id: null as string | null, is_active: true });
-  const update = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const handleSave = () => {
-    if (!form.code || !form.name) { toast.error("Code et nom requis"); return; }
-    if (mode === "create") {
-      onCreate.mutate({ code: form.code, name: form.name, account_type: form.account_type, parent_id: form.parent_id || null });
-    } else if (account?.id) {
-      onUpdate.mutate({ id: account.id, name: form.name, account_type: form.account_type, is_active: form.is_active, parent_id: form.parent_id || null });
-    }
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-sm">{mode === "create" ? "Nouveau compte" : `Modifier ${account?.code}`}</DialogTitle>
-          <DialogDescription className="text-xs">{mode === "create" ? "Ajouter un compte au plan comptable" : "Modifier les propriétés du compte"}</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Code *</Label>
-            <Input className="h-8 text-xs font-mono" value={form.code} onChange={e => update("code", e.target.value)} disabled={mode === "edit"} placeholder="ex: 1040" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nom *</Label>
-            <Input className="h-8 text-xs" value={form.name} onChange={e => update("name", e.target.value)} placeholder="ex: Titres de placement" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Type</Label>
-            <select className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={form.account_type} onChange={e => update("account_type", e.target.value)}>
-              {accountTypes.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Compte parent</Label>
-            <select className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={form.parent_id || ""} onChange={e => update("parent_id", e.target.value || null)}>
-              <option value="">— (Top Level)</option>
-              {accounts.filter(a => a.id !== account?.id).map(a => <option key={a.id} value={a.id}>{a.code} – {a.name}</option>)}
-            </select>
-          </div>
-        </div>
-        {mode === "edit" && (
-          <div className="flex items-center justify-between border-t border-border pt-3">
-            <label className="text-xs">Actif</label>
-            <Switch checked={form.is_active} onCheckedChange={v => update("is_active", v)} />
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
-          <Button size="sm" className="text-xs" onClick={handleSave}>{mode === "create" ? "Créer" : "Enregistrer"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Main ─────────────────────────────────────────────────────
 export default function GLMasterData() {
   const { data: accounts = [], isLoading } = useGLAccounts();
   const { data: balances = {} } = useAccountBalances();
@@ -139,6 +73,7 @@ export default function GLMasterData() {
   const [selectedAccount, setSelectedAccount] = useState<AccountWithBalance | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]));
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showAttributes, setShowAttributes] = useState(false);
   const [editAccount, setEditAccount] = useState<AccountWithBalance | null>(null);
   const [deactivateAccount, setDeactivateAccount] = useState<AccountWithBalance | null>(null);
 
@@ -185,10 +120,11 @@ export default function GLMasterData() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Plan Comptable</h1>
-          <p className="text-xs text-muted-foreground">{totalAccounts} comptes · {activeAccounts} actifs</p>
+          <p className="text-xs text-muted-foreground">Plan comptable principal · {totalAccounts} comptes · {activeAccounts} actifs</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5"><FileText className="w-3.5 h-3.5" /> Export</Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAttributes(true)}>Attributs personnalisés</Button>
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCreateDialog(true)}><Plus className="w-3.5 h-3.5" /> Ajouter un compte</Button>
         </div>
       </div>
@@ -345,13 +281,14 @@ export default function GLMasterData() {
 
       {/* Dialogs */}
       {showCreateDialog && (
-        <AccountFormDialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)}
+        <GLAccountFormDialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)}
           account={null} accounts={flatAccounts} mode="create" onCreate={createAccount} onUpdate={updateAccount} />
       )}
       {editAccount && (
-        <AccountFormDialog open={!!editAccount} onClose={() => setEditAccount(null)}
+        <GLAccountFormDialog open={!!editAccount} onClose={() => setEditAccount(null)}
           account={editAccount} accounts={flatAccounts} mode="edit" onCreate={createAccount} onUpdate={updateAccount} />
       )}
+      <AttributeDefinitionsDialog open={showAttributes} onClose={() => setShowAttributes(false)} />
       <AlertDialog open={!!deactivateAccount} onOpenChange={() => setDeactivateAccount(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

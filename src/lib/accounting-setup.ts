@@ -82,4 +82,5 @@ export const MODULE_LABELS: Record<string, string> = {
   AP: "Fournisseurs",
   TRE: "Trésorerie",
   STK: "Stocks",
+  PAY: "Paie",
 };

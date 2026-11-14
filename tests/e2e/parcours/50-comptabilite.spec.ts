@@ -67,3 +67,54 @@ test("plan comptable : contrôle SYSCOHADA, regroupements, rattachement", async 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });
+
+// V62–V63 (PC-1, PC-2) : fiche compte paramétrable (attribut personnalisé, historique) ; états par rubriques.
+test("plan comptable : attributs de compte, historique ; bilan SYSCOHADA équilibré", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  const suffixe = String(Date.now()).slice(-5);
+  const cle = `axe_${suffixe}`;
+
+  obs.etape("attribut personnalisé (liste, facultatif)");
+  await page.goto("/journal/master-data");
+  await page.getByRole("button", { name: "Attributs personnalisés" }).click();
+  const at = page.getByRole("dialog");
+  await at.getByLabel("Clé (minuscules)").fill(cle);
+  await at.getByLabel("Libellé").fill(`Axe ${suffixe}`);
+  await at.getByLabel("Type").selectOption("list");
+  await at.getByLabel("Valeurs (liste, séparées par des virgules)").fill("siege, usine");
+  await at.getByRole("button", { name: "Ajouter l'attribut" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Attribut enregistré" })).toBeVisible();
+  await at.getByRole("button", { name: "Fermer" }).click();
+
+  obs.etape("compte avec attributs, puis modification historisée");
+  await page.getByRole("button", { name: "Ajouter un compte" }).click();
+  const f = page.getByRole("dialog");
+  await f.getByLabel("Code *").fill(`6389${suffixe}`);
+  await f.getByLabel("Intitulé *").fill(`Frais divers ${suffixe}`);
+  await f.getByLabel("Type").selectOption("expense");
+  await expect(f.getByLabel("Sens normal")).toHaveValue("debit");
+  await f.getByLabel(`Axe ${suffixe}`).selectOption("usine");
+  await f.getByRole("button", { name: "Créer" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Compte créé" })).toBeVisible();
+
+  obs.etape("états par rubriques : bilan équilibré");
+  await page.goto("/journal/reporting");
+  await page.getByRole("button", { name: "États SYSCOHADA (rubriques)" }).click();
+  await page.getByLabel("État", { exact: true }).selectOption("BILAN_SYSCOHADA");
+  const montant = async (ref: string) => (await page.getByTestId("statement-line").filter({ hasText: new RegExp(`^${ref}`) }).locator("td").nth(2).innerText()).trim();
+  await expect(page.getByTestId("statement-line").filter({ hasText: /^BZ/ })).toBeVisible();
+  const actif = await montant("BZ"), passif = await montant("DZ");
+  testInfo.annotations.push({ type: "bilan", description: `actif ${actif} / passif ${passif}` });
+  expect(actif, "total actif = total passif").toBe(passif);
+  await page.getByLabel("État", { exact: true }).selectOption("CR_SYSCOHADA");
+  await expect(page.getByTestId("statement-line").filter({ hasText: /^XI/ })).toBeVisible();
+
+  // Nettoyage : l'attribut de test est désactivé pour ne pas peser sur les autres parcours.
+  await page.goto("/journal/master-data");
+  await page.getByRole("button", { name: "Attributs personnalisés" }).click();
+  await page.getByRole("dialog").getByLabel(`Actif ${cle}`).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Attribut enregistré" }).last()).toBeVisible();
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});

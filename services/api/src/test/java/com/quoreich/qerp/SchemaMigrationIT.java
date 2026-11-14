@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "61";
+  private static final String DERNIERE_MIGRATION = "63";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -176,7 +176,17 @@ class SchemaMigrationIT {
           "purchase_order_followup_log",
           // V60 — référentiel SYSCOHADA.
           "syscohada_reference_accounts",
-          "syscohada_keyword_hints");
+          "syscohada_keyword_hints",
+          // V62 — plans comptables et attributs de compte.
+          "charts",
+          "gl_account_attribute_definitions",
+          "gl_account_history",
+          // V63 — états par rubriques, paramètres de paie.
+          "report_layouts",
+          "report_lines",
+          "report_line_rules",
+          "tenant_report_line_accounts",
+          "hr_payroll_settings");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -320,7 +330,15 @@ class SchemaMigrationIT {
           "replace_gl_account",
           "create_syscohada_headings",
           "link_gl_account_parents",
-          "reclassify_gl_account_balance");
+          "reclassify_gl_account_balance",
+          // V62 — plans comptables et attributs de compte.
+          "operational_chart_id",
+          "default_gl_account_fields",
+          "log_gl_account_changes",
+          // V63 — états par rubriques.
+          "report_line_of_account",
+          "report_compute",
+          "financial_statement");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -381,6 +399,20 @@ class SchemaMigrationIT {
           "gl_accounts/Paramétrage habilité",
           "syscohada_reference_accounts/Lecture du référentiel",
           "syscohada_keyword_hints/Lecture du référentiel",
+          // V62 — plans comptables et attributs de compte.
+          "charts/Lecture société",
+          "charts/Administration habilitée",
+          "gl_account_attribute_definitions/Lecture société",
+          "gl_account_attribute_definitions/Administration habilitée",
+          "gl_account_history/Lecture habilitée",
+          // V63 — états par rubriques, paramètres de paie.
+          "report_layouts/Lecture du référentiel",
+          "report_lines/Lecture du référentiel",
+          "report_line_rules/Lecture du référentiel",
+          "tenant_report_line_accounts/Lecture société",
+          "tenant_report_line_accounts/Paramétrage habilité",
+          "hr_payroll_settings/Lecture société",
+          "hr_payroll_settings/Paramétrage habilité",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -500,7 +532,10 @@ class SchemaMigrationIT {
           "purchase_orders/trg_default_po_dates",
           // V60 — plan comptable : garde des comptes et des imputations.
           "gl_accounts/trg_guard_gl_account",
-          "journal_lines/trg_guard_journal_line_account");
+          "journal_lines/trg_guard_journal_line_account",
+          // V62 — valeurs par défaut, attributs personnalisés, historique des comptes.
+          "gl_accounts/trg_default_gl_account_fields",
+          "gl_accounts/trg_log_gl_account_changes");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PayrollSettingsCard } from "@/components/PayrollSettingsCard";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -72,6 +73,8 @@ export default function HrSettings() {
         title="Paramètres RH / Paie"
         description="Attribuez les rôles hr_clerk, hr_approver, payroll_officer, hr_auditor et hr_admin. La séparation des tâches (SoD) est appliquée côté serveur."
       />
+
+      <PayrollSettingsCard />
 
       {/* Matrix */}
       <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
