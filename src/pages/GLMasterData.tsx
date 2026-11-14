@@ -22,6 +22,10 @@ import { cn } from "@/lib/utils";
 import { ChartOfAccountsAudit } from "@/components/ChartOfAccountsAudit";
 import { GLAccountFormDialog, AttributeDefinitionsDialog } from "@/components/GLAccountForm";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { exportToCSV } from "@/lib/csv-export";
+import { chartExportRows, CHART_EXPORT_COLUMNS } from "@/lib/chart-import";
 import {
   useGLAccounts, useAccountBalances, buildAccountTree, categorizeAccounts,
   useCreateGLAccount, useUpdateGLAccount, type AccountWithBalance,
@@ -68,6 +72,8 @@ export default function GLMasterData() {
   const { data: balances = {} } = useAccountBalances();
   const createAccount = useCreateGLAccount();
   const updateAccount = useUpdateGLAccount();
+  const { data: access } = useMyAccess();
+  const canExport = (access?.permissions ?? []).includes("accounting.export");
 
   const [search, setSearch] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<AccountWithBalance | null>(null);
@@ -123,7 +129,9 @@ export default function GLMasterData() {
           <p className="text-xs text-muted-foreground">Plan comptable principal · {totalAccounts} comptes · {activeAccounts} actifs</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5"><FileText className="w-3.5 h-3.5" /> Export</Button>
+          {canExport && <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" disabled={accounts.length === 0}
+            onClick={() => exportToCSV(chartExportRows(accounts as any[]), CHART_EXPORT_COLUMNS, "plan-comptable")}><FileText className="w-3.5 h-3.5" /> Exporter le plan</Button>}
+          <Button variant="outline" size="sm" className="h-8 text-xs" asChild><Link to="/journal/charts?tab=import">Importer</Link></Button>
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowAttributes(true)}>Attributs personnalisés</Button>
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCreateDialog(true)}><Plus className="w-3.5 h-3.5" /> Ajouter un compte</Button>
         </div>

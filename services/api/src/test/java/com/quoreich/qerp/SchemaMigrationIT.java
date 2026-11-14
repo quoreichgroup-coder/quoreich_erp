@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "64";
+  private static final String DERNIERE_MIGRATION = "65";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -193,7 +193,12 @@ class SchemaMigrationIT {
           "framework_keyword_hints",
           "framework_role_expectations",
           "framework_quality_rules",
-          "tenant_quality_rules");
+          "tenant_quality_rules",
+          // V65 — import guidé du plan comptable.
+          "chart_import_settings",
+          "import_profiles",
+          "chart_import_runs",
+          "chart_import_rows");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -349,7 +354,16 @@ class SchemaMigrationIT {
           // V64 — moteur de qualité générique.
           "chart_framework",
           "quality_rule_severity",
-          "framework_reference_of");
+          "framework_reference_of",
+          // V65 — import guidé du plan comptable.
+          "chart_import_setting",
+          "import_account_type",
+          "chart_import_check",
+          "chart_import_run_for",
+          "prepare_chart_import",
+          "update_chart_import_row",
+          "validate_chart_import",
+          "cancel_chart_import");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -432,6 +446,13 @@ class SchemaMigrationIT {
           "framework_quality_rules/Lecture du référentiel",
           "tenant_quality_rules/Lecture société",
           "tenant_quality_rules/Paramétrage habilité",
+          // V65 — import guidé du plan comptable.
+          "chart_import_settings/Lecture société",
+          "chart_import_settings/Paramétrage habilité",
+          "import_profiles/Lecture des profils",
+          "import_profiles/Profils de la société",
+          "chart_import_runs/Lecture habilitée",
+          "chart_import_rows/Lecture habilitée",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",

@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { ChartImport } from "@/components/ChartImport";
 import { useMyAccess } from "@/hooks/use-my-access";
 import {
   effectiveFramework, effectiveRule, useFrameworks, useOperationalChart, useQualityRules, useSetQualityRule, type Severity,
@@ -15,9 +16,9 @@ import {
 /*
  * Plans et référentiels (lots PC-3 à PC-6, docs/audit-erp/12). PC-3 : référentiels comptables versionnés
  * (données de plateforme, lecture seule) et règles de qualité du plan, activables et de gravité
- * réglable par société (droit accounting.chart_admin).
+ * réglable par société (droit accounting.chart_admin). PC-4 : import guidé (onglet Import).
  */
-const TABS: [string, string][] = [["frameworks", "Référentiels"], ["rules", "Règles de qualité"]];
+const TABS: [string, string][] = [["frameworks", "Référentiels"], ["rules", "Règles de qualité"], ["import", "Import"]];
 const KIND: Record<string, string> = { legal: "Légal", erp: "ERP", group: "Groupe", custom: "Personnalisé" };
 const VERSION_STATUS: Record<string, [string, string]> = { published: ["success", "Publiée"], draft: ["neutral", "Brouillon"], archived: ["neutral", "Archivée"] };
 const SEVERITIES: [Severity, string][] = [["error", "Erreur"], ["warning", "À revoir"], ["info", "Information"]];
@@ -39,7 +40,7 @@ export default function ChartFrameworks() {
             className={cn("px-3 py-2 text-xs border-b-2 -mb-px", tab === v ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}>{l}</button>
         ))}
       </div>
-      {tab === "frameworks" ? <FrameworksTab /> : <RulesTab />}
+      {tab === "frameworks" ? <FrameworksTab /> : tab === "rules" ? <RulesTab /> : <ChartImport />}
     </PageShell>
   );
 }

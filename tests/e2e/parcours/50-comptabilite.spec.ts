@@ -146,3 +146,47 @@ test("plans et référentiels : référentiel appliqué, règle désactivée pui
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });
+
+// V65 (PC-4) : import guidé du plan comptable — préparation, correction, validation (séparation des
+// tâches paramétrable), plan exporté au même format.
+test("plan comptable : import guidé, correction, validation, export", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  const base = `6059${String(Date.now()).slice(-4)}`;
+  const csv = `Code,Intitulé,Type,Parent,Regroupement\n${base},Petit matériel E2E,Charges,,oui\n${base}1,Petit outillage E2E,,${base},non\n${base}1,Doublon E2E,,,non\n`;
+
+  obs.etape("préparation");
+  await page.goto("/journal/charts?tab=import");
+  await page.getByLabel("Profil").selectOption({ label: "Modèle QUOREICH (export / import)" });
+  await page.getByLabel("Fichier CSV").setInputFiles({ name: `plan-${base}.csv`, mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
+  await expect(page.getByTestId("import-file-summary")).toContainText("3 ligne(s) lue(s)");
+  await page.getByRole("button", { name: "Préparer l'import" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Import préparé" }).first()).toBeVisible();
+  const lignes = page.getByTestId("import-row");
+  await expect(lignes).toHaveCount(3);
+  await expect(page.getByTestId("import-run-summary")).toContainText("2 erreur(s)");
+
+  obs.etape("correction");
+  await lignes.nth(2).getByRole("button", { name: "Corriger" }).click();
+  await page.getByRole("button", { name: "Ignorer la ligne" }).click();
+  await expect(page.getByTestId("import-run-summary")).toContainText("0 erreur(s)");
+
+  obs.etape("validation");
+  const valider = page.getByRole("button", { name: "Valider l'import" });
+  await expect(valider).toBeDisabled();
+  await expect(page.getByText("une autre personne doit le valider")).toBeVisible();
+  await page.getByRole("switch", { name: "Validation par une autre personne" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Paramètres d'import enregistrés" }).first()).toBeVisible();
+  await valider.click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Import validé : 2 compte(s) créé(s)" })).toBeVisible();
+  await page.getByRole("switch", { name: "Validation par une autre personne" }).click();
+  await expect(page.getByRole("switch", { name: "Validation par une autre personne" })).toBeChecked();
+
+  obs.etape("export du plan");
+  await page.goto("/journal/master-data");
+  const [telechargement] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exporter le plan" }).click()]);
+  const contenu = await (await import("node:fs/promises")).readFile(await telechargement.path(), "utf-8");
+  expect(contenu).toContain(`${base}1,Petit outillage E2E,Charges,${base},non`);
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});
