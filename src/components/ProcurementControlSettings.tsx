@@ -33,8 +33,10 @@ export function ProcurementControlSettings() {
     setLead(String(s.default_lead_time_days ?? 0));
     setInclReq(s.replenishment_include_requisitions ?? true);
     setInclRes(s.replenishment_include_reservations ?? true);
+    setGrni(s.grni_on_receipt ?? false);
   }, [s]);
 
+  const [grni, setGrni] = useState(false);
   const g = Number(grace), l = Number(lead);
   const error = !Number.isInteger(g) || g < 0 || g > 365 ? "Tolérance : de 0 à 365 jours."
     : !Number.isInteger(l) || l < 0 || l > 3650 ? "Délai par défaut : de 0 à 3 650 jours."
@@ -76,11 +78,13 @@ export function ProcurementControlSettings() {
           "Une demande non convertie évite de proposer deux fois le même besoin.", inclReq, setInclReq)}
         {row("set-res", "Stock prévisionnel : déduire les commandes clients non livrées",
           "Réserve le stock promis aux clients avant de calculer le besoin.", inclRes, setInclRes)}
+        {row("set-grni", "Comptabiliser les réceptions en factures non parvenues (408)",
+          "À la réception : achats / 408 au prix de la commande ; la facture solde le 408 et passe l'écart de prix en charge. À valider avec l'expert-comptable.", grni, setGrni)}
         {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
         {canEdit && (
           <Button size="sm" disabled={!!error || update.isPending || !s?.id} onClick={() => update.mutate({
             id: s.id, bank_dual_control: dual, bank_control_methods: methods, followup_grace_days: g, default_lead_time_days: l,
-            replenishment_include_requisitions: inclReq, replenishment_include_reservations: inclRes,
+            replenishment_include_requisitions: inclReq, replenishment_include_reservations: inclRes, grni_on_receipt: grni,
           })}>Enregistrer</Button>
         )}
       </CardContent>

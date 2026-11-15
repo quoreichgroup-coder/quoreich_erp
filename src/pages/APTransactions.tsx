@@ -1,5 +1,5 @@
 import { exportToCSV } from "@/lib/csv-export";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,12 +21,16 @@ import { DocumentDetail } from "@/components/DocumentDetail";
 import { JournalEntryPreview } from "@/components/JournalEntryPreview";
 import { APCreditNoteDialog, APCreditNotesList } from "@/components/SupplierReturns";
 import { usePurchaseOrders } from "@/hooks/use-procurement-data";
+import { useAPInvoiceLines, usePOLinesToInvoice, useSaveAPInvoiceWithLines } from "@/hooks/use-ap-invoice-lines";
+import { useTaxCodes } from "@/hooks/use-tax-codes";
+import { CommercialLinesEditor, CommercialTotals } from "@/components/CommercialLinesEditor";
+import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { toast } from "sonner";
 import {
-  useAPInvoices, useCreateAPInvoice, useUpdateAPInvoice, useSuppliers,
+  useAPInvoices, useSuppliers,
   useAPInvoiceApprovals, useSubmitAPInvoice, useDecideAPInvoice, useDeleteAPInvoiceDraft,
   type APInvoice, type APInvoiceApproval,
 } from "@/hooks/use-ap-data";
@@ -54,38 +58,59 @@ function approvalType(s: string) {
 }
 
 /* ──────── CREATE INVOICE DIALOG ──────── */
+// Facture à lignes (V72) : lignes libres ou reprises de la commande (reçu non facturé, au prix commandé),
+// pied calculé, montant TTC de contrôle (celui de la facture papier) vérifié à la soumission.
+type APDraftLine = DraftLine & { poLineId: string | null };
 function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: () => void; edit?: APInvoice }) {
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchaseOrders = [] } = usePurchaseOrders();
-  const createInvoice = useCreateAPInvoice();
-  const updateInvoice = useUpdateAPInvoice();
+  const { data: taxCodes = [] } = useTaxCodes();
+  const { data: editLines = [], isFetched: linesLoaded } = useAPInvoiceLines(edit?.id ?? null);
+  const save = useSaveAPInvoiceWithLines();
   const [form, setForm] = useState({
     supplier_id: edit?.supplier_id ?? "",
     po_id: (edit as any)?.po_id ?? "",
     invoice_number: edit?.invoice_number ?? `BILL-${Date.now().toString(36).toUpperCase()}`,
     invoice_date: edit?.invoice_date ?? new Date().toISOString().split("T")[0],
     due_date: edit?.due_date ?? new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    subtotal: edit ? String(edit.subtotal) : "",
-    tax_amount: edit ? String(edit.tax_amount) : "0",
+    control_total: (edit as any)?.control_total != null ? String((edit as any).control_total) : "",
   });
-
-  const subtotal = parseFloat(form.subtotal) || 0;
-  const tax = parseFloat(form.tax_amount) || 0;
-  const total = subtotal + tax;
+  const [lines, setLines] = useState<APDraftLine[]>([{ ...emptyLine(), poLineId: null }]);
+  const [loaded, setLoaded] = useState(!edit);
+  useEffect(() => {
+    if (!edit || loaded || !linesLoaded) return;
+    setLines(editLines.length ? editLines.map((l) => ({ description: l.description, quantity: String(l.quantity), unitPrice: String(l.unit_price),
+      discountPct: l.discount_pct ? String(l.discount_pct) : "", taxCodeId: l.tax_code_id ?? "", poLineId: l.po_line_id }))
+      // Facture saisie en en-tête seul avant V72 : reprise en une ligne.
+      : [{ description: "Montant facturé", quantity: "1", unitPrice: String(edit.subtotal), discountPct: "", taxCodeId: "", poLineId: null }]);
+    setLoaded(true);
+  }, [edit, linesLoaded, editLines, loaded]);
+  const { data: toInvoice = [], isFetching: loadingPO } = usePOLinesToInvoice(form.po_id || null, edit?.id ?? null);
+  const totals = invoiceTotals(lines, taxCodes);
+  const control = form.control_total === "" ? null : Number(form.control_total.replace(",", "."));
+  const controlOk = control == null || Math.round(control * 100) === Math.round(totals.total * 100);
 
   // Commandes du fournisseur choisi seulement (la base refuse une commande d'un autre, V36).
   const supplierOrders = (purchaseOrders as any[]).filter((p) => p.supplier_id === form.supplier_id
     && ["approved", "ordered", "partially_received", "received"].includes(p.status));
+  const reprendre = () => {
+    const open = toInvoice.filter((l) => l.remaining > 0);
+    if (!open.length) { toast.error("Aucune quantité reçue non facturée sur cette commande"); return; }
+    setLines(open.map((l) => ({ description: l.description, quantity: String(l.remaining), unitPrice: String(l.unit_cost), discountPct: "", taxCodeId: "", poLineId: l.po_line_id })));
+  };
 
   const handleCreate = async () => {
-    if (!form.supplier_id || subtotal <= 0) { toast.error("Remplissez tous les champs"); return; }
+    if (!form.supplier_id) { toast.error("Choisissez le fournisseur"); return; }
+    if (!totals.allValid) { toast.error("Chaque ligne a un libellé, une quantité positive et un prix"); return; }
     try {
-      if (edit) {
-        // Brouillon ou facture rejetée seulement : la base refuse au-delà (V41).
-        await updateInvoice.mutateAsync({ id: edit.id, ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total } as any);
-      } else {
-        await createInvoice.mutateAsync({ ...form, po_id: form.po_id || null, subtotal, tax_amount: tax, total });
-      }
+      await save.mutateAsync({
+        id: edit?.id,
+        header: { supplier_id: form.supplier_id, po_id: form.po_id || null, invoice_number: form.invoice_number, invoice_date: form.invoice_date,
+          due_date: form.due_date, control_total: control },
+        lines: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity.replace(",", ".")), unit_price: Number(l.unitPrice.replace(",", ".")),
+          discount_pct: l.discountPct === "" ? 0 : Number(l.discountPct.replace(",", ".")), tax_code_id: l.taxCodeId || null,
+          po_line_id: form.po_id ? l.poLineId : null })),
+      });
       onClose();
     } catch {
       // Le refus est déjà affiché par le hook (toast) ; le formulaire reste ouvert pour corriger.
@@ -94,27 +119,29 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">{edit ? "Modifier la facture " + edit.invoice_number : "Nouvelle facture fournisseur"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fournisseur *</Label>
-            <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "" }))}>
-              <option value="">— Sélectionner —</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="ap-po">Commande d'origine</Label>
-            <select id="ap-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
-              onChange={e => setForm(f => ({ ...f, po_id: e.target.value }))} disabled={!form.supplier_id}>
-              <option value="">{form.supplier_id ? (supplierOrders.length ? "— Aucune —" : "Aucune commande de ce fournisseur") : "Choisissez d'abord le fournisseur"}</option>
-              {supplierOrders.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date} · {Number(p.total).toLocaleString("fr-FR")} XOF</option>)}
-            </select>
-          </div>
           <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Fournisseur *</Label>
+              <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "" }))}>
+                <option value="">— Sélectionner —</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="ap-po">Commande d'origine</Label>
+              <select id="ap-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
+                onChange={e => { setForm(f => ({ ...f, po_id: e.target.value })); setLines((ls) => ls.map((l) => ({ ...l, poLineId: null }))); }} disabled={!form.supplier_id}>
+                <option value="">{form.supplier_id ? (supplierOrders.length ? "— Aucune —" : "Aucune commande de ce fournisseur") : "Choisissez d'abord le fournisseur"}</option>
+                {supplierOrders.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date} · {Number(p.total).toLocaleString("fr-FR")} XOF</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">N° Facture</Label>
               <Input className="h-8 text-xs" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
@@ -123,31 +150,30 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
               <Label className="text-xs">Date</Label>
               <Input type="date" className="h-8 text-xs" value={form.invoice_date} onChange={e => setForm(f => ({ ...f, invoice_date: e.target.value }))} />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Échéance</Label>
               <Input type="date" className="h-8 text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Montant HT</Label>
-              <Input type="number" className="h-8 text-xs" value={form.subtotal} onChange={e => setForm(f => ({ ...f, subtotal: e.target.value }))} />
+              <Label className="text-xs" htmlFor="ap-control">Montant TTC de la facture</Label>
+              <Input id="ap-control" inputMode="decimal" className="h-8 text-xs text-right" placeholder="contrôle" value={form.control_total} onChange={e => setForm(f => ({ ...f, control_total: e.target.value }))} />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">TVA (XOF)</Label>
-            <Input type="number" className="h-8 text-xs" value={form.tax_amount} onChange={e => setForm(f => ({ ...f, tax_amount: e.target.value }))} />
-          </div>
-          <div className="bg-muted/30 rounded p-3 text-xs">
-            <div className="flex justify-between"><span>Sous-total</span><span className="tabular-nums">{fmtCurrency(subtotal)}</span></div>
-            <div className="flex justify-between"><span>TVA</span><span className="tabular-nums">{fmtCurrency(tax)}</span></div>
-            <div className="flex justify-between font-medium border-t border-border mt-1.5 pt-1.5"><span>Total TTC</span><span className="tabular-nums">{fmtCurrency(total)}</span></div>
-          </div>
+          {form.po_id && (
+            <div className="flex items-center justify-between gap-2 text-xs bg-muted/30 rounded p-2">
+              <span className="text-muted-foreground">Commande : {toInvoice.map((l) => `${l.description} ${fmt(l.remaining)} à facturer`).join(" · ") || "—"}</span>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" disabled={loadingPO} onClick={reprendre}>Reprendre les lignes reçues non facturées</Button>
+            </div>
+          )}
+          <CommercialLinesEditor lines={lines} onChange={(ls) => setLines(ls.map((l) => ({ ...l, poLineId: (l as APDraftLine).poLineId ?? null })))}
+            taxCodes={taxCodes} testId="ap-invoice-lines" linePrefix="ap-invoice-line" />
+          <CommercialTotals lines={lines} taxCodes={taxCodes} />
+          {!controlOk && <p className="text-xs text-destructive" role="alert">Le total des lignes ({fmtCurrency(totals.total)}) diffère du montant TTC de la facture ({fmtCurrency(control ?? 0)}).</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
-          <Button size="sm" className="text-xs" onClick={handleCreate} disabled={createInvoice.isPending}>
-            {createInvoice.isPending || updateInvoice.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : edit ? "Enregistrer" : "Créer"}
+          <Button size="sm" className="text-xs" onClick={handleCreate} disabled={save.isPending || !loaded}>
+            {save.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : edit ? "Enregistrer" : "Créer"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -159,6 +185,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
 /* ──────── SIDE PANEL ──────── */
 function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClose: () => void; onCreatePayment: () => void }) {
   const outstanding = inv.total - inv.amount_paid;
+  const { data: panelLines = [] } = useAPInvoiceLines(inv.id);
   const { data: access } = useMyAccess();
   const canPay = (access?.permissions ?? []).includes("ap.pay");
   const canCredit = (access?.permissions ?? []).includes("ap.credit_note");
@@ -183,9 +210,9 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
               ["Fournisseur", inv.supplier?.name], ["Statut", `${statusLabel(inv.status)} · ${approvalLabel(inv.approval_status)}`],
               ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
             ]}
-            columns={[{ label: "Libellé" }, { label: "Montant HT", align: "right" }]}
-            rows={[]}
-            emptyLines="Facture saisie en en-tête seul : les lignes de facture fournisseur arrivent au Lot 3 (étape 4, avec le rapprochement commande / réception)."
+            columns={[{ label: "Libellé" }, { label: "Quantité", align: "right" }, { label: "Prix unitaire", align: "right" }, { label: "Montant HT", align: "right" }, { label: "TVA", align: "right" }]}
+            rows={panelLines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)), fmtCurrency(Number(l.net_amount)), fmtCurrency(Number(l.tax_amount))])}
+            emptyLines="Facture saisie en en-tête seul (avant les factures à lignes)."
             footer={[
               ["Total HT", fmtCurrency(inv.subtotal)], ["TVA déductible", fmtCurrency(inv.tax_amount)],
               ["Total TTC", fmtCurrency(inv.total), true], ["Déjà payé", fmtCurrency(inv.amount_paid)],
@@ -626,7 +653,7 @@ export default function APTransactions() {
       </Tabs>
 
       {/* Dialogs */}
-      <CreateInvoiceDialog open={showCreateInvoice} onClose={() => setShowCreateInvoice(false)} />
+      {showCreateInvoice && <CreateInvoiceDialog open onClose={() => setShowCreateInvoice(false)} />}
       {editInv && <CreateInvoiceDialog open edit={editInv} onClose={() => setEditInv(null)} />}
 
       {selectedInv && (

@@ -13,6 +13,27 @@ import {
  */
 test.skip(!identifiants() || !identifiants("approbateur"), "identifiants des comptes de test absents");
 
+/** Code TVA 18 % de la société de test (créé au premier passage) : les factures se saisissent par lignes (V72). */
+async function assurerTva18(page: Page) {
+  await page.goto("/settings?tab=tax");
+  await expect(page.locator("#new-tax-code")).toBeVisible();
+  if (await page.getByText("TVA18", { exact: true }).count()) return;
+  await page.locator("#new-tax-code").fill("TVA18");
+  await page.locator("#new-tax-name").fill("TVA 18 %");
+  await page.locator("#new-tax-rate").fill("18");
+  await page.getByRole("button", { name: "Créer le code" }).click();
+  await expect(page.getByText("TVA18", { exact: true }).first()).toBeVisible();
+}
+
+async function saisirLigne(d: ReturnType<Page["getByRole"]>, ht: string, tva: string) {
+  await d.getByLabel("Libellé ligne 1").fill("Marchandises");
+  await d.getByLabel("Quantité ligne 1").fill("1");
+  await d.getByLabel("Prix unitaire ligne 1").fill(ht);
+  const codes = await d.getByLabel("Code TVA ligne 1").locator("option").allTextContents();
+  const voulu = Number(tva) > 0 ? codes.find((o) => /18/.test(o)) : codes[0];
+  await d.getByLabel("Code TVA ligne 1").selectOption({ label: voulu! });
+}
+
 async function nouvelleFacture(page: Page, fournisseur: string, numero: string, ht: string, tva: string, commande?: string) {
   await page.goto("/payables/transactions");
   await page.getByRole("button", { name: "Nouvelle facture fournisseur" }).click();
@@ -25,8 +46,7 @@ async function nouvelleFacture(page: Page, fournisseur: string, numero: string, 
   await champ(d, "N° Facture").fill(numero);
   await champ(d, "Date").fill(aujourdhui());
   await champ(d, "Échéance").fill(aujourdhui());
-  await champ(d, "Montant HT").fill(ht);
-  await champ(d, "TVA (XOF)").fill(tva);
+  await saisirLigne(d, ht, tva);
   await d.getByRole("button", { name: "Créer" }).click();
   await expect(d).toBeHidden();
   const f = ligne(page, numero);
@@ -103,6 +123,7 @@ test("chaîne complète : commande → réception → facture hors tolérance re
 
     obs.etape("prérequis : plan comptable, paramètres tels qu'enregistrés, fournisseur");
     await assurerPlanComptable(page);
+    await assurerTva18(page);
     await parametresFournisseurs(page, "mandatory", true);
     await creerFournisseur(page, fournisseur);
 
@@ -119,8 +140,8 @@ test("chaîne complète : commande → réception → facture hors tolérance re
     obs.etape("facture corrigée à la valeur reçue, soumise ; l'auteur ne peut pas l'approuver");
     await ligne(page, numero).getByRole("button", { name: "Modifier" }).click();
     const m = page.getByRole("dialog");
-    await champ(m, "Montant HT").fill("60000");
-    await champ(m, "TVA (XOF)").fill("10800");
+    await expect(m.getByLabel("Prix unitaire ligne 1")).toHaveValue("70000");
+    await m.getByLabel("Prix unitaire ligne 1").fill("60000");
     await m.getByRole("button", { name: "Enregistrer" }).click();
     await expect(m).toBeHidden();
     await soumettreParAuteur(page, numero);
@@ -180,6 +201,7 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
 
     obs.etape("prérequis : factures sans commande permises le temps du parcours");
     await assurerPlanComptable(page);
+    await assurerTva18(page);
     await parametresFournisseurs(page, "optional", false);
     await creerFournisseur(page, fournisseur);
     await creerFournisseur(page, autre);
@@ -226,6 +248,53 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
     await page.getByTestId("btn-export-csv").click();
     expect((await telechargement).suggestedFilename()).toMatch(/^factures-fournisseurs.*\.csv$/);
     await parametresFournisseurs(page, "mandatory", true);
+
+    await obs.joindre(testInfo);
+    expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+  });
+
+// V72 : facture reprise des lignes reçues de la commande, rapprochement à 3 voies ligne à ligne.
+test("facture à lignes reprises de la commande : quantité au-delà du reçu refusée par ligne, puis soumise",
+  async ({ page, browser }, testInfo) => {
+    const obs = surveiller(page);
+    const base = testInfo.project.use.baseURL;
+    const fournisseur = `${RUN} Fournisseur lignes`;
+    const numero = `FF-${RUN}-LG`;
+
+    obs.etape("prérequis et commande réceptionnée (6 sur 10)");
+    await assurerPlanComptable(page);
+    await parametresFournisseurs(page, "mandatory", true);
+    await creerFournisseur(page, fournisseur);
+    const commande = await commandeReceptionnee(page, browser, base, fournisseur);
+
+    obs.etape("lignes reprises de la commande");
+    await page.goto("/payables/transactions");
+    await page.getByRole("button", { name: "Nouvelle facture fournisseur" }).click();
+    const d = page.getByRole("dialog");
+    await d.locator("select").first().selectOption({ label: fournisseur });
+    await d.getByLabel("Commande d'origine").selectOption(await d.getByLabel("Commande d'origine").locator("option").filter({ hasText: commande }).getAttribute("value") ?? "");
+    await champ(d, "N° Facture").fill(numero);
+    await d.getByRole("button", { name: "Reprendre les lignes reçues non facturées" }).click();
+    await expect(d.getByLabel("Quantité ligne 1")).toHaveValue("6");
+    await expect(d.getByLabel("Prix unitaire ligne 1")).toHaveValue("10000");
+    await d.getByLabel("Quantité ligne 1").fill("7");
+    await d.getByRole("button", { name: "Créer" }).click();
+    await expect(d).toBeHidden();
+
+    obs.etape("7 facturés pour 6 reçus : refus de la ligne");
+    obs.refusAttendu(/QG008.*Rapprochement à 3 voies, ligne 1/);
+    await ligne(page, numero).getByRole("button", { name: "Soumettre" }).click();
+    await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Rapprochement à 3 voies, ligne 1" }).first()).toBeVisible();
+
+    obs.etape("quantité corrigée, soumise");
+    await ligne(page, numero).getByRole("button", { name: "Modifier" }).click();
+    const m = page.getByRole("dialog");
+    await expect(m.getByLabel("Quantité ligne 1")).toHaveValue("7");
+    await m.getByLabel("Quantité ligne 1").fill("6");
+    await m.getByLabel("Montant TTC de la facture").fill("60000");
+    await m.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(m).toBeHidden();
+    await soumettreParAuteur(page, numero);
 
     await obs.joindre(testInfo);
     expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);

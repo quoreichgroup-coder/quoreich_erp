@@ -17,7 +17,7 @@ Ordre proposé, chaque étape avec IT + parcours :
 
 1. **Avoirs clients et fournisseurs** (G-12, G-13) puis **annulation par avoir** (complète V43).
 2. **Règlements reliés à la trésorerie** ✅ V70 (lot T1, [13](13-tresorerie-reglements.md)) : compte de trésorerie par règlement, rôles `CASH` / `MOBILE_MONEY` (G-16) ; **acomptes** (G-14) ; **lettrage** automatique et manuel (G-15) ; rapprochements AR ↔ GL, AP ↔ GL (05 §4).
-3. **Facture fournisseur à lignes** et 3 voies ligne à ligne (G-17) ; **écriture de réception** sur 408 (G-18) ; **stock comptabilisé par rôles** (G-19) ; retour fournisseur.
+3. **Facture fournisseur à lignes** et 3 voies ligne à ligne (G-17) ; **écriture de réception** sur 408 (G-18) ✅ V72 ([14](14-factures-fournisseurs-lignes.md)) ; **stock comptabilisé par rôles** (G-19) ; retour fournisseur.
 4. **Engagement budgétaire** refait : engagé / réalisé / disponible, contrôle avant approbation, levée habilitée (G-08 suite).
 5. **Immobilisations** réécrites par rôles (G-20) ; **paie** par rôles et barèmes par pays (G-28 🧮).
 6. **États financiers SYSCOHADA** (G-21 🧮) et **clôture d'exercice** (G-22).

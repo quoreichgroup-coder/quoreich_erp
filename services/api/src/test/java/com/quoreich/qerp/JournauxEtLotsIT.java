@@ -61,14 +61,14 @@ class JournauxEtLotsIT {
         + "UPDATE ap_invoices SET approval_status = 'approved', status = 'open' WHERE invoice_number = 'FF-V38'");
 
     assertThat(texte("SELECT string_agg(e.description || '=' || e.journal_code, ' ; ' ORDER BY e.description) FROM journal_entries e"
-            + " WHERE e.description IN ('AR Invoice: FAC-V38-1', 'AR Invoice: FAC-V38-2', 'AR Receipt: ENC-V38', 'AP Invoice: FF-V38')"))
-        .isEqualTo("AP Invoice: FF-V38=AC ; AR Invoice: FAC-V38-1=VT ; AR Invoice: FAC-V38-2=VT ; AR Receipt: ENC-V38=BQ");
+            + " WHERE e.description IN ('AR Invoice: FAC-V38-1', 'AR Invoice: FAC-V38-2', 'AR Receipt: ENC-V38', 'Facture fournisseur FF-V38')"))
+        .isEqualTo("AR Invoice: FAC-V38-1=VT ; AR Invoice: FAC-V38-2=VT ; AR Receipt: ENC-V38=BQ ; Facture fournisseur FF-V38=AC");
     assertThat(texte("SELECT string_agg(piece_number, ',' ORDER BY piece_number) FROM journal_entries"
             + " WHERE description IN ('AR Invoice: FAC-V38-1', 'AR Invoice: FAC-V38-2')"))
         .as("numéros consécutifs dans le journal des ventes")
         .isEqualTo(String.format("VT-%s-%06d,VT-%s-%06d", annee, avantVt + 1, annee, avantVt + 2));
     assertThat(texte("SELECT b.batch_number FROM journal_entries e JOIN journal_batches b ON b.id = e.batch_id"
-            + " WHERE e.description = 'AP Invoice: FF-V38'"))
+            + " WHERE e.description = 'Facture fournisseur FF-V38'"))
         .isEqualTo("LOT-AC-" + texte("SELECT to_char(CURRENT_DATE, 'YYYY-MM')"));
     assertThat(texte("SELECT (total_debit = total_credit)::text || ' ' || status FROM journal_batch_summary"
             + " WHERE tenant_id = '" + A + "' AND journal_code = 'VT' AND period = to_char(CURRENT_DATE, 'YYYY-MM')"))

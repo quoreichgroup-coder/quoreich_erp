@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "71";
+  private static final String DERNIERE_MIGRATION = "72";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -88,6 +88,8 @@ class SchemaMigrationIT {
           "ar_payment_terms/Tenant isolation",
           "ar_dunning_rules/Tenant isolation",
           "ar_notification_rules/Tenant isolation",
+          // V72 — factures fournisseurs : plus d'écriture pour tout membre.
+          "ap_invoices/Tenant isolation",
           // V70 — trésorerie : plus d'écriture pour tout membre.
           "bank_accounts/Tenant isolation",
           "bank_transactions/Tenant isolation",
@@ -211,7 +213,10 @@ class SchemaMigrationIT {
           "chart_mappings",
           "chart_mapping_lines",
           // V67 — migration du plan opérationnel.
-          "chart_migrations");
+          "chart_migrations",
+          // V72 — factures fournisseurs à lignes, factures non parvenues.
+          "ap_invoice_lines",
+          "grni_ledger");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -420,7 +425,17 @@ class SchemaMigrationIT {
           "cancel_bank_statement",
           "post_statement_line",
           "prepare_bank_reconciliation",
-          "validate_bank_reconciliation");
+          "validate_bank_reconciliation",
+          // V72 — factures fournisseurs à lignes, factures non parvenues.
+          "post_two_line_entry_as",
+          "compute_ap_invoice_line",
+          "sync_ap_invoice_totals",
+          "po_line_received",
+          "po_line_invoiced",
+          "grni_open",
+          "on_gr_grni",
+          "on_supplier_return_grni",
+          "ap_po_lines_to_invoice");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -533,6 +548,14 @@ class SchemaMigrationIT {
           "bank_reconciliations/Rapprochement habilité",
           "treasury_settings/Lecture société",
           "treasury_settings/Paramétrage habilité",
+          // V72 — factures fournisseurs : écriture réservée (droit ap.invoice).
+          "ap_invoices/Lecture société",
+          "ap_invoices/Saisie habilitée",
+          "ap_invoices/Modification habilitée",
+          "ap_invoices/Suppression habilitée",
+          "ap_invoice_lines/Lecture société",
+          "ap_invoice_lines/Saisie habilitée",
+          "grni_ledger/Lecture société",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -589,6 +612,11 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V72 — factures fournisseurs à lignes, factures non parvenues.
+          "ap_invoice_lines/trg_compute_ap_invoice_line",
+          "ap_invoice_lines/trg_sync_ap_invoice_totals",
+          "goods_receipts/trg_gr_grni",
+          "supplier_return_lines/trg_supplier_return_grni",
           // V70 — trésorerie reliée aux règlements.
           "bank_transactions/trg_refresh_bank_account_balance",
           "bank_accounts/trg_guard_bank_account",

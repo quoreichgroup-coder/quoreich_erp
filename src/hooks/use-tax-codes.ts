@@ -33,7 +33,7 @@ export function useTaxCodes() {
     queryFn: async (): Promise<TaxCode[]> => {
       if (isApiEnabled()) return apiGet<TaxCode[]>("/api/v1/accounting/tax-codes");
       const rows = await check<RawTaxCode[]>(
-        db.from("tax_codes").select("id, code, name, rate, gl_account_id, is_active, gl_accounts(code)").order("code"),
+        db.from("tax_codes").select("id, code, name, rate, gl_account_id, is_active, gl_accounts!tax_codes_gl_account_id_tenant_id_fkey(code)").order("code"),
       );
       return rows.map((r) => ({
         id: r.id, code: r.code, name: r.name, rate: Number(r.rate), active: r.is_active,

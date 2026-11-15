@@ -92,7 +92,7 @@ class AccountingSetupApiIT {
         .andExpect(jsonPath("$.framework").doesNotExist())
         .andExpect(jsonPath("$.canEdit").value(true))
         .andExpect(jsonPath("$.complete").value(false))
-        .andExpect(jsonPath("$.roles.length()").value(17))
+        .andExpect(jsonPath("$.roles.length()").value(18))
         .andExpect(jsonPath("$.roles[?(@.ready == true)]").isEmpty());
     mockMvc
         .perform(get("/api/v1/accounting/frameworks").with(admin()))
@@ -122,8 +122,8 @@ class AccountingSetupApiIT {
     mockMvc
         .perform(post("/api/v1/accounting/frameworks/SYSCOHADA_REVISE/apply").with(admin()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.accountsCreated").value(18))
-        .andExpect(jsonPath("$.rolesAssigned").value(17));
+        .andExpect(jsonPath("$.accountsCreated").value(19))
+        .andExpect(jsonPath("$.rolesAssigned").value(18));
     mockMvc
         .perform(post("/api/v1/accounting/frameworks/SYSCOHADA_REVISE/apply").with(admin()))
         .andExpect(jsonPath("$.accountsCreated").value(0))

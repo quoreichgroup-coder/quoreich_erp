@@ -87,12 +87,12 @@ class AuthorizationsApiIT {
 
   @Test
   @Order(1)
-  @DisplayName("lecture : catalogue de 84 droits (45 + ap.approve_l1..l4, V41 ; ar.receipt, ar.reverse_receipt, ap.pay, ap.reverse_payment, V42 ; sales.credit_override, V43 ; ar.credit_note, V45 ; ar.refund, V49 ; procurement.return, ap.credit_note, V52 ; procurement.replenish, V54 ; suppliers.manage / delete / verify_bank, procurement.followup / settings, V57 ; customers.manage / delete, ar.invoice / settings, sales.settings / export, taxes.manage, V58 ; inventory.settings / delete_item / export, V59 ; accounting.chart, V60 ; accounting.chart_admin, V62 ; hr.payroll_settings, V63 ; accounting.import / import_validate / export, V65 ; accounting.mapping / mapping_validate, V66 ; accounting.reclassify, V67 ; treasury.settings, V70), 50 rôles système ; seul l'administrateur gère")
+  @DisplayName("lecture : catalogue de 85 droits (45 + ap.approve_l1..l4, V41 ; ar.receipt, ar.reverse_receipt, ap.pay, ap.reverse_payment, V42 ; sales.credit_override, V43 ; ar.credit_note, V45 ; ar.refund, V49 ; procurement.return, ap.credit_note, V52 ; procurement.replenish, V54 ; suppliers.manage / delete / verify_bank, procurement.followup / settings, V57 ; customers.manage / delete, ar.invoice / settings, sales.settings / export, taxes.manage, V58 ; inventory.settings / delete_item / export, V59 ; accounting.chart, V60 ; accounting.chart_admin, V62 ; hr.payroll_settings, V63 ; accounting.import / import_validate / export, V65 ; accounting.mapping / mapping_validate, V66 ; accounting.reclassify, V67 ; treasury.settings, V70 ; ap.invoice, V72), 50 rôles système ; seul l'administrateur gère")
   void lecture() throws Exception {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(84));
+        .andExpect(jsonPath("$.catalog.length()").value(85));
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -174,7 +174,7 @@ class AuthorizationsApiIT {
         .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.contains("treasury.match")));
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(84));
+        .andExpect(jsonPath("$.permissions.length()").value(85));
   }
 
   @Test
