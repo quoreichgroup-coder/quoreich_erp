@@ -9,54 +9,6 @@ import { REQUIRED_ROLES, ALL_BUDGET_ROLES } from "@/lib/budget-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 
-export function useBudgets() {
-  return useQuery({
-    queryKey: ["budgets"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("budgets").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-}
-
-export function useBudgetLines(budgetId?: string) {
-  return useQuery({
-    queryKey: ["budget-lines", budgetId],
-    queryFn: async () => {
-      let q = supabase.from("budget_lines").select("*, gl_account:gl_accounts(code, name)");
-      if (budgetId) q = q.eq("budget_id", budgetId);
-      const { data, error } = await q.order("period");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!budgetId || budgetId === undefined,
-  });
-}
-
-export function useCreateBudget() {
-  const qc = useQueryClient();
-  const { data: tenantId } = useTenantId();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async (input: { name: string; fiscal_year: string; scenario?: string; total_amount?: number }) => {
-      const { error } = await supabase.from("budgets").insert({ ...input, tenant_id: tenantId!, created_by: user!.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budgets"] }); toast.success("Budget créé"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function useBudgetKpis() {
-  const { data: budgets = [] } = useBudgets();
-  const approved = budgets.filter(b => b.status === "approved");
-  const totalBudgeted = approved.reduce((s, b) => s + Number(b.total_amount), 0);
-  const draft = budgets.filter(b => b.status === "draft").length;
-
-  return { budgets, approved, totalBudgeted, draft };
-}
-
 // =====================================================================
 // RBAC — Budget roles (mirrors fixed-assets pattern)
 // =====================================================================

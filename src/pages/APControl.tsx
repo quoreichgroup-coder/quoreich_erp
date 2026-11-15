@@ -14,7 +14,8 @@ import {
   useAPApprovalThresholds,
   useAPAuditTrail,
 } from "@/hooks/use-ap-data";
-import { useBudgets } from "@/hooks/use-budget-data";
+import { DEFAULT_BUDGET_SETTINGS, useBudgetControlSettings, useBudgetStatus } from "@/hooks/use-budget-control";
+import { consumed, consumptionPct } from "@/lib/budget-forecast";
 
 const tabs = [
   { id: "validation", label: "File de validation", icon: Clock },
@@ -33,19 +34,18 @@ export default function APControl() {
   const resolve = useResolveAPApproval();
   const { data: thresholds = [] } = useAPApprovalThresholds();
   const { data: audit = [] } = useAPAuditTrail(100);
-  const { data: budgets = [] } = useBudgets();
-
+  // Budget de contrôle de l'exercice en cours (charges) : consommé = pré-engagé + engagé + réalisé ; seuil d'alerte
+  // des paramètres du budget (dépassement = disponible négatif).
+  const { data: budgetRows = [] } = useBudgetStatus(String(new Date().getFullYear()));
+  const { data: budgetSettings } = useBudgetControlSettings();
+  const alertPct = budgetSettings?.alert_threshold_pct ?? DEFAULT_BUDGET_SETTINGS.alert_threshold_pct;
   const budgetAlerts = useMemo(() => {
-    return (budgets as any[])
-      .map((b) => {
-        const total = Number(b.total_amount || 0);
-        const spent = 0; // engagement aggregation TBD via budget_lines view
-        const pct = total > 0 ? Math.round((spent / total) * 100) : 0;
-        const remaining = total - spent;
-        const severity = pct >= 90 ? "critical" : pct >= 75 ? "warning" : "info";
-        return { id: b.id, category: b.name, budget: total, spent, pct, remaining, severity };
-      });
-  }, [budgets]);
+    return budgetRows.filter((r) => r.nature === "expense").map((r) => {
+      const pct = Math.round(consumptionPct(r) ?? 0);
+      const severity = r.available < 0 ? "critical" : pct >= alertPct ? "warning" : "info";
+      return { id: r.line_id, category: `${r.account_code} ${r.account_name}${r.analytic_code ? ` · ${r.analytic_code}` : ""}`, budget: r.planned, spent: consumed(r), pct, remaining: r.available, severity };
+    });
+  }, [budgetRows, alertPct]);
 
   const slaBreaches = queue.filter((v: any) => v.elapsed_hours > v.sla_hours).length;
   const criticalBudgets = budgetAlerts.filter((b) => b.severity === "critical").length;
@@ -148,7 +148,7 @@ export default function APControl() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border bg-muted/30">
-                {["Poste", "Budget (XOF)", "Engagé (XOF)", "Utilisation", "Reste", "Statut"].map(h => (
+                {["Ligne de budget", "Budget (XOF)", "Consommé (XOF)", "Utilisation", "Disponible", "État"].map(h => (
                   <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr></thead>
@@ -160,16 +160,16 @@ export default function APControl() {
                     <td className="px-3 py-2 font-mono text-right">{fmt(b.spent)}</td>
                     <td className="px-3 py-2 w-36">
                       <div className="flex items-center gap-2">
-                        <Progress value={Math.min(b.pct, 100)} className={cn("h-1.5", b.pct >= 90 ? "[&>div]:bg-destructive" : b.pct >= 75 ? "[&>div]:bg-amber-500" : "")} />
-                        <span className={cn("text-[10px] font-semibold tabular-nums", b.pct >= 90 ? "text-destructive" : b.pct >= 75 ? "text-amber-600" : "text-muted-foreground")}>{b.pct}%</span>
+                        <Progress value={Math.min(b.pct, 100)} className={cn("h-1.5", b.severity === "critical" ? "[&>div]:bg-destructive" : b.severity === "warning" ? "[&>div]:bg-warning" : "")} />
+                        <span className={cn("text-[10px] font-semibold tabular-nums", b.severity === "critical" ? "text-destructive" : b.severity === "warning" ? "text-warning" : "text-muted-foreground")}>{b.pct}%</span>
                       </div>
                     </td>
-                    <td className={cn("px-3 py-2 font-mono text-right", b.remaining < 2000000 && "text-destructive")}>{fmt(b.remaining)}</td>
-                    <td className="px-3 py-2"><StatusBadge status={b.severity === "critical" ? "error" : b.severity === "warning" ? "warning" : "success"} label={b.severity} /></td>
+                    <td className={cn("px-3 py-2 font-mono text-right", b.remaining < 0 && "text-destructive")}>{fmt(b.remaining)}</td>
+                    <td className="px-3 py-2"><StatusBadge status={b.severity === "critical" ? "error" : b.severity === "warning" ? "warning" : "success"} label={b.severity === "critical" ? "Dépassement" : b.severity === "warning" ? `Seuil (${alertPct} %)` : "Dans le budget"} /></td>
                   </tr>
                 ))}
                 {budgetAlerts.length === 0 && (
-                  <tr><td colSpan={6} className="text-center text-muted-foreground py-6">Aucun budget configuré</td></tr>
+                  <tr><td colSpan={6} className="text-center text-muted-foreground py-6">Aucun budget de contrôle approuvé pour l'exercice en cours</td></tr>
                 )}
               </tbody>
             </table>

@@ -46,6 +46,13 @@ export function useBudgetForecastLines(forecastId: string | null) {
 
 const refused = "Refusé : droit « Saisir et publier les prévisions budgétaires » requis.";
 
+/** Lignes d'une version avec code de compte et de section (rapports de comparaison). */
+export async function fetchForecastAmounts(forecastId: string) {
+  const { data, error } = await db.from("budget_forecast_lines").select("amount, account:gl_accounts(code), section:analytic_values(code)").eq("forecast_id", forecastId).range(0, 9999);
+  if (error) throw error;
+  return (data ?? []).map((l: any) => ({ account: l.account?.code ?? "", section: l.section?.code ?? "", amount: Number(l.amount) }));
+}
+
 /** Nouvelle version, éventuellement initialisée (atterrissage calculé, budget ou version précédente). */
 export function useCreateBudgetForecast() {
   const qc = useQueryClient();

@@ -9,21 +9,23 @@ import { ExportButtons } from "@/components/ExportButtons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useBudgetControlSettings, useBudgetMonthlyActual, useBudgetStatus } from "@/hooks/use-budget-control";
-import { elapsedMonths, forecastRows, monthlySeries, totals, type ForecastRow } from "@/lib/budget-forecast";
+import { DEFAULT_BUDGET_SETTINGS, useBudgetControlSettings, useBudgetMonthlyActual, useBudgetPriorYearMonthly, useBudgetStatus } from "@/hooks/use-budget-control";
+import { ANNUAL_SPREAD_LABELS, FORECAST_METHOD_LABELS, elapsedMonths, forecastRows, monthlySeries, natureOf, totals, type BudgetNature, type ForecastRow } from "@/lib/budget-forecast";
 import { cn } from "@/lib/utils";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { BudgetForecastVersions } from "@/components/BudgetForecastVersions";
 
 /*
- * Budget et prévisions — tableau de bord (V77). Budget de contrôle approuvé de l'exercice, consommation
- * (pré-engagé, engagé, réalisé) et atterrissage de fin d'exercice : le plus prudent entre ce qui est déjà
- * acquis ou réservé et le réalisé extrapolé au rythme mensuel moyen. Aucune donnée de démonstration.
+ * Budget et prévisions — tableau de bord (V77, V79). Budget de contrôle approuvé de l'exercice, consommation
+ * (pré-engagé, engagé, réalisé) et atterrissage de fin d'exercice selon la méthode des paramètres ; charges
+ * (plafond) et produits (objectif) séparés. Aucune donnée de démonstration.
  */
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: 0 });
-const STATUS: Record<ForecastRow["status"], [string, string]> = {
-  over: ["Dépassement prévu", "text-destructive"], risk: ["Proche du budget", "text-warning"], ok: ["Dans le budget", "text-success"],
+const STATUS: Record<BudgetNature, Record<ForecastRow["status"], [string, string]>> = {
+  expense: { over: ["Dépassement prévu", "text-destructive"], risk: ["Proche du budget", "text-warning"], ok: ["Dans le budget", "text-success"] },
+  revenue: { over: ["Objectif non atteint", "text-destructive"], risk: ["Proche de l'objectif", "text-warning"], ok: ["Objectif atteint", "text-success"] },
 };
+const NATURE_LABEL: Record<BudgetNature, string> = { expense: "Charges", revenue: "Produits" };
 
 function Kpi({ id, label, value, hint, tone }: { id: string; label: string; value: string; hint?: string; tone?: string }) {
   return (
@@ -43,11 +45,20 @@ export default function BudgetForecast() {
   const { data: settings } = useBudgetControlSettings();
   const today = useMemo(() => new Date(), []);
   const rows = useMemo(() => status.data ?? [], [status.data]);
-  const threshold = settings?.alert_threshold_pct ?? 90;
-  const forecast = useMemo(() => forecastRows(rows, year, today, threshold), [rows, year, today, threshold]);
-  const series = useMemo(() => monthlySeries(rows, monthly.data ?? [], year, today), [rows, monthly.data, year, today]);
-  const t = totals(rows);
+  const threshold = settings?.alert_threshold_pct ?? DEFAULT_BUDGET_SETTINGS.alert_threshold_pct;
+  const method = settings?.forecast_method ?? DEFAULT_BUDGET_SETTINGS.forecast_method;
+  const spread = settings?.annual_spread ?? DEFAULT_BUDGET_SETTINGS.annual_spread;
+  const prior = useBudgetPriorYearMonthly(validYear ? year : "", spread === "prior_year");
+  const natures = (["expense", "revenue"] as BudgetNature[]).filter((n) => rows.some((r) => natureOf(r) === n));
+  const [natureChoice, setNature] = useState<BudgetNature>("expense");
+  const nature = natures.includes(natureChoice) ? natureChoice : natures[0] ?? "expense";
+  const allForecast = useMemo(() => forecastRows(rows, year, today, threshold, method), [rows, year, today, threshold, method]);
+  const forecast = allForecast.filter((f) => f.nature === nature);
+  const series = useMemo(() => monthlySeries(rows, monthly.data ?? [], year, today, { nature, spread, prior: prior.data, method }),
+    [rows, monthly.data, year, today, nature, spread, prior.data, method]);
+  const t = totals(rows, nature);
   const landing = forecast.reduce((s, f) => s + f.landing, 0);
+  const rev = nature === "revenue";
   const m = elapsedMonths(year, today);
   const permissions = useMyAccess().data?.permissions ?? [];
   const canExport = permissions.includes("budget.export");
@@ -57,16 +68,16 @@ export default function BudgetForecast() {
     <PageShell>
       <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Budget et prévisions", href: "/budget" }, { label: "Tableau de bord" }]} />
       <GuidanceBanner title="Budget et prévisions"
-        description="Budget de contrôle approuvé de l'exercice, consommé (demandes d'achat pré-engagées, commandes engagées, écritures réalisées) et atterrissage de fin d'exercice. L'atterrissage retient le plus prudent de deux estimations : ce qui est déjà acquis ou réservé, ou le réalisé extrapolé au rythme mensuel moyen." />
+        description={`Budget de contrôle approuvé de l'exercice, consommé (demandes d'achat pré-engagées, commandes engagées, écritures réalisées) et atterrissage de fin d'exercice. Méthode : ${FORECAST_METHOD_LABELS[method]} ; lignes annuelles réparties ${ANNUAL_SPREAD_LABELS[spread].toLowerCase()} (Paramètres du budget).`} />
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <h1 className="text-lg font-semibold text-foreground">Budget et prévisions {validYear ? year : ""}</h1>
         <div className="flex items-end gap-2">
           <div className="space-y-1"><Label className="text-xs" htmlFor="bf-year">Exercice</Label>
             <Input id="bf-year" className="h-8 w-24 text-xs" maxLength={4} value={year} onChange={(e) => setYear(e.target.value.trim())} /></div>
           {canExport && <ExportButtons label="Exporter les prévisions" filename={`previsions-budgetaires-${year}`} sheetName="Prévisions"
-            rows={forecast.map((f) => ({ compte: f.account_code, intitule: f.account_name, section: f.section ?? "Toutes", budget: f.planned, realise: f.actual, engage: f.committed,
-              preengage: f.precommitted, connu: f.known, rythme: f.runRate ?? "", atterrissage: f.landing, ecart: f.variance, etat: STATUS[f.status][0] }))}
-            columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 34 }, { key: "section", header: "Section", width: 22 },
+            rows={allForecast.map((f) => ({ nature: NATURE_LABEL[f.nature], compte: f.account_code, intitule: f.account_name, section: f.section ?? "Toutes", budget: f.planned, realise: f.actual, engage: f.committed,
+              preengage: f.precommitted, connu: f.known, rythme: f.runRate ?? "", atterrissage: f.landing, ecart: f.variance, etat: STATUS[f.nature][f.status][0] }))}
+            columns={[{ key: "nature", header: "Nature", width: 10 }, { key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 34 }, { key: "section", header: "Section", width: 22 },
               { key: "budget", header: "Budget", width: 15 }, { key: "realise", header: "Réalisé", width: 15 }, { key: "engage", header: "Engagé", width: 15 },
               { key: "preengage", header: "Pré-engagé", width: 15 }, { key: "connu", header: "Acquis et réservé", width: 17 }, { key: "rythme", header: "Rythme actuel", width: 15 },
               { key: "atterrissage", header: "Atterrissage", width: 15 }, { key: "ecart", header: "Écart", width: 15 }, { key: "etat", header: "État", width: 18 }]} />}
@@ -80,17 +91,24 @@ export default function BudgetForecast() {
         </CardContent></Card>
       ) : (
         <>
+          {natures.length > 1 && (
+            <div className="flex gap-1 mb-3" role="tablist" aria-label="Nature">
+              {natures.map((n) => (
+                <button key={n} role="tab" aria-selected={nature === n} onClick={() => setNature(n)}
+                  className={cn("px-3 py-1.5 text-xs rounded-md border", nature === n ? "border-primary text-primary bg-primary/5 font-medium" : "border-border text-muted-foreground")}>{NATURE_LABEL[n]}</button>))}
+            </div>)}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-            <Kpi id="planned" label="Budget" value={fmt(t.planned)} hint="Lignes racines, sans double compte" />
-            <Kpi id="consumed" label="Consommé" value={fmt(t.precommitted + t.committed + t.actual)}
-              hint={`Pré-engagé ${fmt(t.precommitted)} · engagé ${fmt(t.committed)} · réalisé ${fmt(t.actual)}`} />
-            <Kpi id="available" label="Disponible" value={fmt(t.available)} tone={t.available < 0 ? "text-destructive" : undefined} />
+            <Kpi id="planned" label={rev ? "Objectif de produits" : "Budget de charges"} value={fmt(t.planned)} hint="Lignes racines, sans double compte" />
+            <Kpi id="consumed" label={rev ? "Réalisé" : "Consommé"} value={fmt(t.precommitted + t.committed + t.actual)}
+              hint={rev ? "Écritures comptabilisées au crédit des produits" : `Pré-engagé ${fmt(t.precommitted)} · engagé ${fmt(t.committed)} · réalisé ${fmt(t.actual)}`} />
+            <Kpi id="available" label={rev ? "Reste à réaliser" : "Disponible"} value={fmt(t.available)} tone={!rev && t.available < 0 ? "text-destructive" : undefined} />
             <Kpi id="landing" label="Atterrissage prévu" value={fmt(landing)} hint={m === 0 ? "Exercice non commencé : engagements connus" : `${m} mois écoulé(s) sur 12`} />
-            <Kpi id="variance" label="Écart prévu" value={fmt(t.planned - landing)} tone={t.planned - landing < 0 ? "text-destructive" : "text-success"} hint="Budget − atterrissage" />
+            <Kpi id="variance" label="Écart prévu" value={fmt(t.planned - landing)}
+              tone={(rev ? landing - t.planned : t.planned - landing) < 0 ? "text-destructive" : "text-success"} hint={rev ? "Objectif − atterrissage" : "Budget − atterrissage"} /> 
           </div>
 
           <Card className="border-border mb-4">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Cumul de l'exercice : budget, réalisé et prévision</CardTitle></CardHeader>
+            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Cumul de l'exercice ({NATURE_LABEL[nature].toLowerCase()}) : budget, réalisé et prévision</CardTitle></CardHeader>
             <CardContent className="p-4 pt-0" data-testid="budget-forecast-chart">
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={series}>
@@ -104,7 +122,7 @@ export default function BudgetForecast() {
                   <Line type="monotone" dataKey="cumulForecast" name="Prévision cumulée" stroke="hsl(var(--chart-3))" strokeDasharray="5 4" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-              <p className="text-[10px] text-muted-foreground">Une ligne annuelle est répartie par douzièmes ; la prévision prolonge le réalisé jusqu'à l'atterrissage, réparti également sur les mois restants.</p>
+              <p className="text-[10px] text-muted-foreground">Lignes annuelles réparties {ANNUAL_SPREAD_LABELS[spread].toLowerCase()} ; la prévision prolonge le réalisé jusqu'à l'atterrissage, réparti également sur les mois restants.</p>
             </CardContent>
           </Card>
 
@@ -124,8 +142,8 @@ export default function BudgetForecast() {
                       <td className="text-right tabular-nums">{fmt(f.committed)}</td><td className="text-right tabular-nums">{fmt(f.precommitted)}</td>
                       <td className="text-right tabular-nums">{fmt(f.known)}</td><td className="text-right tabular-nums">{f.runRate == null ? "—" : fmt(f.runRate)}</td>
                       <td className="text-right tabular-nums font-medium">{fmt(f.landing)}</td>
-                      <td className={cn("text-right tabular-nums", f.variance < 0 && "text-destructive")}>{fmt(f.variance)}</td>
-                      <td className={cn("pl-3 pr-2 whitespace-nowrap", STATUS[f.status][1])}>{STATUS[f.status][0]}</td>
+                      <td className={cn("text-right tabular-nums", (f.nature === "revenue" ? -f.variance : f.variance) < 0 && "text-destructive")}>{fmt(f.variance)}</td>
+                      <td className={cn("pl-3 pr-2 whitespace-nowrap", STATUS[f.nature][f.status][1])}>{STATUS[f.nature][f.status][0]}</td>
                     </tr>))}
                 </tbody>
               </table>
@@ -133,7 +151,7 @@ export default function BudgetForecast() {
           </Card>
         </>
       )}
-      {validYear && <BudgetForecastVersions year={year} status={rows} forecast={forecast} canForecast={canForecast} canExport={canExport} />}
+      {validYear && <BudgetForecastVersions year={year} status={rows} forecast={allForecast} canForecast={canForecast} canExport={canExport} />}
     </PageShell>
   );
 }

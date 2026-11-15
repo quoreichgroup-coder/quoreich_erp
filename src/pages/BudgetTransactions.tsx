@@ -16,7 +16,7 @@ import { useGLAccounts } from "@/hooks/use-gl-data";
 import {
   useBudgetApprove, useBudgetClose, useBudgetLinesOf, useBudgetList, useBudgetReject, useBudgetReviseLine, useBudgetStatus, useBudgetSubmit,
   useCreateBudgetV73, useDeleteBudgetLine, useSaveBudgetLine, type Budget, type BudgetLine,
-  useBudgetControlSettings, useBudgetRevisionDecide, useImportBudgetLines, usePendingBudgetRevisions,
+  useBudgetControlSettings, useBudgetRevisionDecide, useImportBudgetLines, usePendingBudgetRevisions, useBudgetScenarios, DEFAULT_BUDGET_SETTINGS,
 } from "@/hooks/use-budget-control";
 import { exportToXLSX } from "@/lib/xlsx";
 import { readTableFile, TABLE_FILE_ACCEPT } from "@/lib/table-file";
@@ -61,9 +61,12 @@ function BudgetsTab() {
   const p = access?.permissions ?? [];
   const can = { manage: p.includes("budget.manage"), approve: p.includes("budget.approve"), export: p.includes("budget.export") };
   const { data: budgets = [], isPending } = useBudgetList();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [selected, setSelected] = useState<string | null>(params.get("budget"));
   const [creating, setCreating] = useState(false);
   const budget = budgets.find((b) => b.id === selected) ?? budgets[0] ?? null;
+  const { data: scenarios = [] } = useBudgetScenarios();
+  const scenarioName = new Map(scenarios.map((s) => [s.code, s.name]));
   if (isPending) return <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
   return (
     <div className="space-y-3">
@@ -73,12 +76,12 @@ function BudgetsTab() {
       </div>
       <div className="card-elevated overflow-x-auto">
         <table className="w-full text-xs" data-testid="budgets">
-          <thead><tr className="bg-muted/30 text-muted-foreground"><th className="text-left p-2">Budget</th><th className="text-left">Exercice</th><th className="text-right">Total</th><th className="text-left pl-3">État</th></tr></thead>
+          <thead><tr className="bg-muted/30 text-muted-foreground"><th className="text-left p-2">Budget</th><th className="text-left">Exercice</th><th className="text-left">Scénario</th><th className="text-right">Total</th><th className="text-left pl-3">État</th></tr></thead>
           <tbody>
-            {budgets.length === 0 && <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Aucun budget : créez celui de l'exercice.</td></tr>}
+            {budgets.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">Aucun budget : créez celui de l'exercice.</td></tr>}
             {budgets.map((b) => (
               <tr key={b.id} data-testid="budget-row" onClick={() => setSelected(b.id)} className={cn("border-t border-border/50 cursor-pointer hover:bg-muted/30", budget?.id === b.id && "bg-primary/5")}>
-                <td className="p-2 font-medium">{b.name}</td><td>{b.fiscal_year}</td><td className="text-right tabular-nums">{fmt(b.total_amount)}</td>
+                <td className="p-2 font-medium">{b.name}</td><td>{b.fiscal_year}</td><td>{scenarioName.get(b.scenario) ?? b.scenario}</td><td className="text-right tabular-nums">{fmt(b.total_amount)}</td>
                 <td className="pl-3 space-x-1"><StatusBadge status={STATUS[b.status][0]} label={STATUS[b.status][1]} />{b.is_control && <StatusBadge status="info" label="Contrôle" />}</td>
               </tr>))}
           </tbody>
@@ -92,7 +95,9 @@ function BudgetsTab() {
 
 function CreateBudgetDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const create = useCreateBudgetV73();
-  const [f, setF] = useState({ name: `Budget ${year}`, fiscal_year: year });
+  const { data: scenarios = [] } = useBudgetScenarios();
+  const active = scenarios.filter((s) => s.is_active);
+  const [f, setF] = useState({ name: `Budget ${year}`, fiscal_year: year, scenario: "" });
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-md">
@@ -100,9 +105,15 @@ function CreateBudgetDialog({ onClose, onCreated }: { onClose: () => void; onCre
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2 space-y-1.5"><Label className="text-xs" htmlFor="bg-name">Nom du budget</Label><Input id="bg-name" className="h-8 text-xs" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="bg-year">Exercice</Label><Input id="bg-year" className="h-8 text-xs" maxLength={4} value={f.fiscal_year} onChange={(e) => setF({ ...f, fiscal_year: e.target.value })} /></div>
+          <div className="col-span-3 space-y-1.5"><Label className="text-xs" htmlFor="bg-scenario">Scénario</Label>
+            <select id="bg-scenario" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.scenario} onChange={(e) => setF({ ...f, scenario: e.target.value })}>
+              <option value="">{active[0] ? `Par défaut (${active[0].name})` : "Par défaut"}</option>
+              {active.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
+            </select>
+            <p className="text-[10px] text-muted-foreground">Scénarios : Budget → Données de base.</p></div>
         </div>
         <DialogFooter><Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
-          <Button size="sm" disabled={!f.name.trim() || !/^\d{4}$/.test(f.fiscal_year) || create.isPending} onClick={() => create.mutate(f, { onSuccess: onCreated })}>Créer le budget</Button></DialogFooter>
+          <Button size="sm" disabled={!f.name.trim() || !/^\d{4}$/.test(f.fiscal_year) || create.isPending} onClick={() => create.mutate({ ...f, scenario: f.scenario || undefined }, { onSuccess: onCreated })}>Créer le budget</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -139,7 +150,8 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
   const canRevise = can.approve || (can.manage && !!settings?.revision_second_person);
   const draft = budget.status === "draft";
   const modele = () => {
-    const accounts = (gl as any[]).filter((g) => g.is_active && ["expense", "revenue"].includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code));
+    const types = settings?.budgetable_types ?? DEFAULT_BUDGET_SETTINGS.budgetable_types;
+    const accounts = (gl as any[]).filter((g) => g.is_active && types.includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code));
     const rows = lines.length
       ? lines.map((l) => ({ compte: byId.get(l.gl_account_id)?.code ?? "", intitule: byId.get(l.gl_account_id)?.name ?? "",
           section: l.analytic_value_id ? sectionCode.get(l.analytic_value_id) ?? "" : "", periode: l.period, montant: l.planned_amount as number | string, commentaire: "" }))
@@ -224,7 +236,9 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
 
 function LineDialog({ budget, line, gl, onClose }: { budget: Budget; line: BudgetLine | null; gl: any[]; onClose: () => void }) {
   const save = useSaveBudgetLine();
-  const accounts = gl.filter((g) => g.is_active && ["expense", "revenue"].includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code));
+  const { data: settings } = useBudgetControlSettings();
+  const types = settings?.budgetable_types ?? DEFAULT_BUDGET_SETTINGS.budgetable_types;
+  const accounts = gl.filter((g) => g.is_active && types.includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code));
   const [f, setF] = useState({ account: line?.gl_account_id ?? "", period: line?.period ?? budget.fiscal_year, amount: line ? String(line.planned_amount) : "",
     section: line?.analytic_value_id ?? "" });
   const n = Number(f.amount.replace(",", "."));
@@ -234,7 +248,7 @@ function LineDialog({ budget, line, gl, onClose }: { budget: Budget; line: Budge
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle className="text-sm">{line ? "Modifier la ligne" : "Nouvelle ligne de budget"}</DialogTitle>
-          <DialogDescription className="text-xs">Un compte couvre ses sous-comptes (« 60 » contrôle 601, 604…). Période : l'année, ou un mois si le contrôle est mensuel.</DialogDescription></DialogHeader>
+          <DialogDescription className="text-xs">Un compte couvre ses sous-comptes (« 60 » contrôle 601, 604…). Période : l'année, ou un mois si le contrôle est mensuel. Comptes proposés : les types budgétables des paramètres.</DialogDescription></DialogHeader>
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-3 space-y-1.5"><Label className="text-xs" htmlFor="bl-account">Compte</Label>
             <select id="bl-account" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.account} onChange={(e) => setF({ ...f, account: e.target.value })}>

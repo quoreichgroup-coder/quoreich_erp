@@ -1,4 +1,4 @@
-# 15 — Contrôle budgétaire (lot B1, V73 ; lot B2, V77 ; fin du module, V78)
+# 15 — Contrôle budgétaire (lot B1, V73 ; lot B2, V77 ; fin du module, V78 ; revue complète, V79)
 
 Audit de l'existant du 15 nov. 2026, comparé à SAP et Sage, puis livraison. Écart traité : **G-08**
 (engagement budgétaire). Étape 4 de la priorité P1 de la feuille de route (09).
@@ -111,6 +111,25 @@ Livré :
   aucun nom de rôle ; les messages de verrouillage nomment le droit et les rôles qui le portent par défaut.
 * Tests : `BudgetLignesPrevisionsImportIT`, `budget-import.test.ts`, parcours `93-budget-preparation`.
 
-## 6. Restant
+## 6. Revue complète du module (V79)
+
+Demande du propriétaire : « tout ce qui est mouvement, transaction et rapport doit fonctionner normalement, sans données
+fictives ; tout paramètre doit être paramétrable ». Revue écran par écran (Tableau de bord, Transactions, Données de base,
+Rapports, Contrôle, Paramètres) et des calculs.
+
+| # | Constat (avant V79) | Correction |
+|---|---|---|
+| B-14 | **Réalisé faux sur les produits** : `budget_actual` additionnait débit − crédit pour tous les comptes ; une ligne de ventes (70x) affichait un réalisé négatif | Réalisé au sens normal du compte (`gl_accounts.normal_balance`) ; `budget_status` dit la nature (charges = plafond, produits = objectif) ; écrans et alertes distinguent les deux (un dépassement d'objectif de produits n'est pas une alerte) |
+| B-15 | Données de base : tableau anglais, « Forecast » = budget × 1,02, utilisation lue sur `actual_amount` (toujours 0), boutons sans effet | Budgets de la société, **scénarios** (CRUD), comptes budgétables, sections analytiques |
+| B-16 | Rapports : scénarios « optimistic / pessimistic / stress » = budget × 1,10 / 0,85 / 0,70, bouton PDF inactif | Budget / réalisé, par section, mensuel, comparaison de deux budgets ou versions ; exports Excel, CSV, PDF |
+| B-17 | Règles codées : méthode d'atterrissage, répartition des lignes annuelles par douzièmes, comptes budgétables = charges et produits (écran, import et base), scénario `'base'` (valeur par défaut de colonne) | Paramètres : méthode (prudente / rythme / engagements), répartition (douzièmes / profil N−1), types budgétables (contrôlés par la base) ; scénarios par société, le premier actif dans l'ordre est le défaut |
+| B-18 | Contrôle des comptes fournisseurs : « alertes budget » avec `spent = 0` (« TBD ») et seuils 75 / 90 % codés | Lit le budget de contrôle de l'exercice et le seuil des paramètres |
+
+Livré : `budget_scenarios` (FK composite depuis `budgets`, `guard_budget_scenario`, `ensure_budget_scenarios`), paramètres
+`forecast_method`, `annual_spread`, `budgetable_types` (`budget_account_ok`, dans `guard_budget_line`, `guard_budget_forecast_line`,
+`budget_import_resolve`), `budget_prior_year_monthly`, `budget_status.nature`. Tests : `BudgetParametresScenariosIT`,
+`budget-forecast.test.ts` (produits, répartition, section, comparaison), parcours `94-budget-rapports`.
+
+## 7. Restant
 
 * Contrôle budgétaire des notes de frais et de la paie (modules encore hors catalogue) ; budget pluriannuel / par projet.

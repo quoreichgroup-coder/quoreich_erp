@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "78";
+  private static final String DERNIERE_MIGRATION = "79";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -245,7 +245,9 @@ class SchemaMigrationIT {
           "po_line_analytics",
           "ap_invoice_line_analytics",
           "budget_forecasts",
-          "budget_forecast_lines");
+          "budget_forecast_lines",
+          // V79 — scénarios de budget.
+          "budget_scenarios");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -517,7 +519,12 @@ class SchemaMigrationIT {
           "budget_import_resolve",
           "import_budget_lines",
           "import_budget_forecast_lines",
-          "budget_revision_decide");
+          "budget_revision_decide",
+          // V79.
+          "budget_account_ok",
+          "ensure_budget_scenarios",
+          "guard_budget_scenario",
+          "budget_prior_year_monthly");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -674,6 +681,9 @@ class SchemaMigrationIT {
           "budget_forecasts/Prévision habilitée",
           "budget_forecast_lines/Lecture société",
           "budget_forecast_lines/Prévision habilitée",
+          // V79.
+          "budget_scenarios/Lecture société",
+          "budget_scenarios/Paramétrage habilité",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -747,6 +757,8 @@ class SchemaMigrationIT {
           "ap_invoice_lines/trg_copy_po_line_analytics_to_ap_line",
           "budget_forecasts/trg_guard_budget_forecast",
           "budget_forecast_lines/trg_guard_budget_forecast_line",
+          // V79.
+          "budgets/trg_guard_budget_scenario",
           "depreciation_entries/trg_refresh_asset_depreciation",
           // V73 — contrôle budgétaire.
           "budgets/trg_guard_budget",

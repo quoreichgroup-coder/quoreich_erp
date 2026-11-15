@@ -187,7 +187,7 @@ export function AttributeDefinitionsDialog({ open, onClose }: { open: boolean; o
   const keyOk = /^[a-z][a-z0-9_]{0,39}$/.test(n.key);
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm">Attributs personnalisés des comptes</DialogTitle>
           <DialogDescription className="text-xs">Champs propres à la société (texte, nombre, date, oui/non, liste), obligatoires ou non ; contrôlés par la base à chaque saisie.</DialogDescription>

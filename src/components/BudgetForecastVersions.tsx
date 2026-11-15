@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ExportButtons } from "@/components/ExportButtons";
 import { useGLAccounts } from "@/hooks/use-gl-data";
 import { useAnalyticsSetup } from "@/hooks/use-analytics-setup";
-import type { BudgetStatusRow } from "@/hooks/use-budget-control";
+import { DEFAULT_BUDGET_SETTINGS, useBudgetControlSettings, type BudgetStatusRow } from "@/hooks/use-budget-control";
 import {
   useBudgetForecastLines, useBudgetForecasts, useCreateBudgetForecast, useDeleteBudgetForecast, useDeleteBudgetForecastLine,
   useImportBudgetForecast, usePublishBudgetForecast, useSaveBudgetForecastLine, type BudgetForecastLine,
@@ -55,6 +55,8 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
   const landing = useMemo(() => new Map(forecast.map((f) => [f.key, f.landing])), [forecast]);
   const landingOf = (l: BudgetForecastLine) => landing.get(`${accById.get(l.gl_account_id)?.code ?? ""}|${l.analytic_value_id ?? ""}`);
 
+  const { data: settings } = useBudgetControlSettings();
+  const budgetableTypes = settings?.budgetable_types ?? DEFAULT_BUDGET_SETTINGS.budgetable_types;
   const create = useCreateBudgetForecast(), save = useSaveBudgetForecastLine(), del = useDeleteBudgetForecastLine();
   const publish = usePublishBudgetForecast(), remove = useDeleteBudgetForecast(), importer = useImportBudgetForecast();
   const [creating, setCreating] = useState(false);
@@ -154,7 +156,7 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
                 <div className="space-y-1"><Label className="text-xs" htmlFor="fv-account">Compte</Label>
                   <select id="fv-account" className="h-8 w-56 rounded-md border border-input bg-background px-2 text-xs" value={adding.account} onChange={(e) => setAdding({ ...adding, account: e.target.value })}>
                     <option value="">— choisir —</option>
-                    {(gl as any[]).filter((g) => g.is_active && ["expense", "revenue"].includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code))
+                    {(gl as any[]).filter((g) => g.is_active && budgetableTypes.includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code))
                       .map((g) => <option key={g.id} value={g.id}>{g.code} — {g.name}</option>)}
                   </select></div>
                 {values.length > 0 && <div className="space-y-1"><Label className="text-xs" htmlFor="fv-section">Section</Label>

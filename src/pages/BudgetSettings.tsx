@@ -15,6 +15,9 @@ import { Switch } from "@/components/ui/switch";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { useFiscalCalendar } from "@/hooks/use-fiscal-calendar";
 import { FISCAL_YEAR_STATUS_LABELS } from "@/lib/fiscal-calendar";
+import { ANNUAL_SPREAD_LABELS, FORECAST_METHOD_LABELS, type AnnualSpread, type ForecastMethod } from "@/lib/budget-forecast";
+
+const ACCOUNT_TYPES: [string, string][] = [["expense", "Charges"], ["revenue", "Produits"], ["asset", "Actif (immobilisations…)"], ["liability", "Passif"], ["equity", "Capitaux propres"]];
 import { useBudgetControlSettings, useSaveBudgetControlSettings, DEFAULT_BUDGET_SETTINGS, type BudgetControlSettings } from "@/hooks/use-budget-control";
 
 const tabs = [
@@ -182,7 +185,31 @@ function BudgetControlSettingsCard() {
         {toggle("bc-precommit", "Pré-engager les demandes d'achat", "Une demande soumise ou approuvée, non encore convertie en commande, réserve le budget.", "precommit_requisitions")}
         {toggle("bc-control-pr", "Contrôler les demandes d'achat à la soumission", "Comme une commande : refus ou avertissement selon le mode.", "control_requisitions", !v.precommit_requisitions)}
         {toggle("bc-analytic", "Contrôler les budgets par section analytique", "Une ligne de budget sur une section contrôle les pièces de cette section et de ses sous-sections.", "analytic_control")}
-        {canEdit ? <Button size="sm" className="h-8 text-xs" disabled={!f || save.isPending} onClick={() => save.mutate(v, { onSuccess: () => setF(null) })}>Enregistrer</Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border/60 pt-2">
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-method">Méthode d'atterrissage (prévisions)</Label>
+            <select id="bc-method" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.forecast_method} disabled={!canEdit}
+              onChange={(e) => set({ forecast_method: e.target.value as ForecastMethod })}>
+              {(Object.keys(FORECAST_METHOD_LABELS) as ForecastMethod[]).map((k) => <option key={k} value={k}>{FORECAST_METHOD_LABELS[k]}</option>)}
+            </select></div>
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-spread">Répartition mensuelle des lignes annuelles</Label>
+            <select id="bc-spread" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.annual_spread} disabled={!canEdit}
+              onChange={(e) => set({ annual_spread: e.target.value as AnnualSpread })}>
+              {(Object.keys(ANNUAL_SPREAD_LABELS) as AnnualSpread[]).map((k) => <option key={k} value={k}>{ANNUAL_SPREAD_LABELS[k]}</option>)}
+            </select></div>
+        </div>
+        <fieldset className="border-t border-border/60 pt-2 space-y-1.5">
+          <legend className="text-xs font-medium">Types de comptes budgétables</legend>
+          <p className="text-[11px] text-muted-foreground">Comptes proposés et admis par la base dans les budgets, les imports et les prévisions (ex. immobilisations pour un budget d'investissement).</p>
+          <div className="flex flex-wrap gap-3">
+            {ACCOUNT_TYPES.map(([t, l]) => (
+              <label key={t} className="inline-flex items-center gap-1.5 text-xs">
+                <input type="checkbox" checked={v.budgetable_types.includes(t)} disabled={!canEdit}
+                  onChange={(e) => set({ budgetable_types: e.target.checked ? [...v.budgetable_types, t] : v.budgetable_types.filter((x) => x !== t) })} />{l}
+              </label>))}
+          </div>
+          {v.budgetable_types.length === 0 && <p className="text-[11px] text-destructive">Au moins un type.</p>}
+        </fieldset>
+        {canEdit ? <Button size="sm" className="h-8 text-xs" disabled={!f || v.budgetable_types.length === 0 || save.isPending} onClick={() => save.mutate(v, { onSuccess: () => setF(null) })}>Enregistrer</Button>
           : <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres du contrôle budgétaire » est requis.</p>}
       </CardContent>
     </Card>

@@ -3,23 +3,26 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
 import type { BudgetImportRow } from "@/lib/budget-import";
+import type { AnnualSpread, BudgetNature, ForecastMethod } from "@/lib/budget-forecast";
 
 /* Contrôle budgétaire (V73) : budgets et lignes sous droit budget.manage ; cycle de vie par fonctions. */
 const db = supabase as any;
 const KEYS = ["budgets-v73", "budget-lines-v73", "budget-status", "budget-revisions", "budget-settings", "budgets", "budget-lines", "budget-monthly", "budget-alert-documents", "purchase-requisitions"];
 const invalidate = (qc: ReturnType<typeof useQueryClient>) => { for (const k of KEYS) qc.invalidateQueries({ queryKey: [k] }); };
 
-export type Budget = { id: string; name: string; fiscal_year: string; scenario: string; status: "draft" | "submitted" | "approved" | "closed"; is_control: boolean;
+export type Budget = { id: string; name: string; fiscal_year: string; scenario: string; created_at?: string; status: "draft" | "submitted" | "approved" | "closed"; is_control: boolean;
   total_amount: number; created_by: string; submitted_by: string | null; approved_by: string | null; approved_at: string | null };
 export type BudgetLine = { id: string; budget_id: string; gl_account_id: string; period: string; planned_amount: number; analytic_value_id: string | null };
 /** Situation d'une ligne du budget de contrôle (V77 : section analytique et pré-engagé des demandes d'achat). */
 export type BudgetStatusRow = { line_id: string; account_id: string; account_code: string; account_name: string; period: string;
-  analytic_value_id: string | null; analytic_code: string | null; analytic_name: string | null;
+  analytic_value_id: string | null; analytic_code: string | null; analytic_name: string | null; nature: BudgetNature;
   planned: number; precommitted: number; committed: number; actual: number; available: number };
 export type BudgetControlSettings = { control_mode: "off" | "warn" | "block"; control_level: "year" | "month"; precommit_requisitions: boolean;
-  control_requisitions: boolean; analytic_control: boolean; alert_threshold_pct: number; revision_second_person: boolean; revision_threshold_pct: number };
+  control_requisitions: boolean; analytic_control: boolean; alert_threshold_pct: number; revision_second_person: boolean; revision_threshold_pct: number;
+  forecast_method: ForecastMethod; annual_spread: AnnualSpread; budgetable_types: string[] };
 export const DEFAULT_BUDGET_SETTINGS: BudgetControlSettings = { control_mode: "off", control_level: "year", precommit_requisitions: true,
-  control_requisitions: true, analytic_control: true, alert_threshold_pct: 90, revision_second_person: false, revision_threshold_pct: 0 };
+  control_requisitions: true, analytic_control: true, alert_threshold_pct: 90, revision_second_person: false, revision_threshold_pct: 0,
+  forecast_method: "prudent", annual_spread: "even", budgetable_types: ["expense", "revenue"] };
 
 export function useBudgetList() {
   const { data: tenantId } = useTenantId();
@@ -65,7 +68,7 @@ export function useBudgetControlSettings() {
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await db.from("budget_settings")
-        .select("control_mode, control_level, precommit_requisitions, control_requisitions, analytic_control, alert_threshold_pct, revision_second_person, revision_threshold_pct")
+        .select("control_mode, control_level, precommit_requisitions, control_requisitions, analytic_control, alert_threshold_pct, revision_second_person, revision_threshold_pct, forecast_method, annual_spread, budgetable_types")
         .eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return (data ? { ...data, alert_threshold_pct: Number(data.alert_threshold_pct), revision_threshold_pct: Number(data.revision_threshold_pct) } : DEFAULT_BUDGET_SETTINGS) as BudgetControlSettings;
@@ -90,9 +93,11 @@ export function useSaveBudgetControlSettings() {
 export function useCreateBudgetV73() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { name: string; fiscal_year: string }) => {
+    mutationFn: async (v: { name: string; fiscal_year: string; scenario?: string }) => {
       const tenantId = await fetchTenantId();
-      const { data, error } = await db.from("budgets").insert({ tenant_id: tenantId, name: v.name, fiscal_year: v.fiscal_year, scenario: "base", total_amount: 0, status: "draft", created_by: (await supabase.auth.getUser()).data.user?.id })
+      // Sans choix, le scénario par défaut de la société (créé par la base à la première utilisation).
+      const { data, error } = await db.from("budgets").insert({ tenant_id: tenantId, name: v.name, fiscal_year: v.fiscal_year, ...(v.scenario ? { scenario: v.scenario } : {}),
+        total_amount: 0, status: "draft", created_by: (await supabase.auth.getUser()).data.user?.id })
         .select("id").single();
       if (error) throw error;
       return data.id as string;
@@ -184,6 +189,90 @@ export const useBudgetOverrideDocument = () => useRpc((v: { docType: "PR" | "PO"
   rpc("budget_override_document", { _doc_type: v.docType, _id: v.id, _reason: v.reason }), "Dépassement de budget autorisé : la pièce peut être soumise");
 
 const isYear = (y: string) => /^\d{4}$/.test(y);
+
+/** Réalisé mensuel de l'exercice précédent, ligne à ligne (profil de saisonnalité des lignes annuelles, V79). */
+export function useBudgetPriorYearMonthly(year: string, enabled = true) {
+  return useQuery({
+    queryKey: ["budget-monthly", "prior", year],
+    enabled: enabled && /^\d{4}$/.test(year),
+    queryFn: async () => {
+      const { data, error } = await db.rpc("budget_prior_year_monthly", { _fiscal_year: year });
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({ line_id: r.line_id as string, month: Number(r.month), actual: Number(r.actual) }));
+    },
+  });
+}
+
+/** Comptes budgétables selon les paramètres (types admis), actifs. */
+export function useBudgetableAccounts() {
+  const { data: settings } = useBudgetControlSettings();
+  const { data: tenantId } = useTenantId();
+  const types = settings?.budgetable_types ?? DEFAULT_BUDGET_SETTINGS.budgetable_types;
+  return useQuery({
+    queryKey: ["budgetable-accounts", tenantId, types.join(",")],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await db.from("gl_accounts").select("id, code, name, account_type, is_header, normal_balance").eq("tenant_id", tenantId)
+        .eq("is_active", true).in("account_type", types).order("code").range(0, 4999);
+      if (error) throw error;
+      return (data ?? []) as { id: string; code: string; name: string; account_type: string; is_header: boolean; normal_balance: string }[];
+    },
+  });
+}
+
+export type BudgetScenario = { id: string; code: string; name: string; description: string | null; is_active: boolean; sort_order: number };
+
+/** Scénarios de budget de la société (données de base, V79). */
+export function useBudgetScenarios() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["budget-scenarios", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await db.from("budget_scenarios").select("id, code, name, description, is_active, sort_order").eq("tenant_id", tenantId)
+        .order("sort_order").order("name");
+      if (error) throw error;
+      return (data ?? []) as BudgetScenario[];
+    },
+  });
+}
+
+export function useSaveBudgetScenario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { id?: string; code: string; name: string; description?: string | null; is_active?: boolean; sort_order?: number }) => {
+      const tenantId = await fetchTenantId();
+      const fields = { code: v.code.trim().toLowerCase(), name: v.name.trim(), description: v.description?.trim() || null, is_active: v.is_active ?? true, sort_order: v.sort_order ?? 0 };
+      const q = v.id ? db.from("budget_scenarios").update(fields).eq("id", v.id) : db.from("budget_scenarios").insert({ tenant_id: tenantId, ...fields });
+      const { data, error } = await q.select("id");
+      if (error) throw new Error(/budget_scenarios_tenant_id_code_key/.test(error.message) ? "Ce code de scénario existe déjà"
+        : /code_check/.test(error.message) ? "Code : minuscules, chiffres et _ (30 caractères au plus)" : error.message);
+      if (!data?.length) throw new Error("Refusé : droit « Modifier les paramètres du contrôle budgétaire » requis.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget-scenarios"] }); toast.success("Scénario enregistré"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteBudgetScenario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await db.from("budget_scenarios").delete().eq("id", id).select("id");
+      if (error) throw new Error(/budgets_scenario_fkey/.test(error.message) ? "Scénario utilisé par un budget : le désactiver plutôt" : error.message);
+      if (!data?.length) throw new Error("Refusé : droit « Modifier les paramètres du contrôle budgétaire » requis.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget-scenarios"] }); toast.success("Scénario supprimé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Lignes d'un budget avec code de compte et de section (rapports de comparaison). */
+export async function fetchBudgetAmounts(budgetId: string) {
+  const { data, error } = await db.from("budget_lines").select("planned_amount, account:gl_accounts(code), section:analytic_values(code)").eq("budget_id", budgetId).range(0, 9999);
+  if (error) throw error;
+  return (data ?? []).map((l: any) => ({ account: l.account?.code ?? "", section: l.section?.code ?? "", amount: Number(l.planned_amount) }));
+}
 
 /** Réalisé mois par mois de chaque ligne du budget de contrôle (écran Prévisions). */
 export function useBudgetMonthlyActual(year: string) {
