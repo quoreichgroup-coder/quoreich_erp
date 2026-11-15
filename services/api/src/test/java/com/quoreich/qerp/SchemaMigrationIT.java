@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "77";
+  private static final String DERNIERE_MIGRATION = "78";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -239,7 +239,13 @@ class SchemaMigrationIT {
           // V77 — imputation analytique des pièces d'achat.
           "purchase_requisition_analytics",
           "purchase_order_analytics",
-          "ap_invoice_analytics");
+          "ap_invoice_analytics",
+          // V78 — sections par ligne, prévisions saisies.
+          "requisition_line_analytics",
+          "po_line_analytics",
+          "ap_invoice_line_analytics",
+          "budget_forecasts",
+          "budget_forecast_lines");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -496,7 +502,22 @@ class SchemaMigrationIT {
           "budget_precommitted",
           "budget_monthly_actual",
           "check_budget_on_pr",
-          "budget_override_document");
+          "budget_override_document",
+          // V78.
+          "guard_line_analytics",
+          "analytic_key",
+          "line_effective_analytics",
+          "document_all_values",
+          "document_amount_in_scope",
+          "impute_line_analytics",
+          "copy_po_line_analytics_to_ap_line",
+          "guard_budget_forecast",
+          "guard_budget_forecast_line",
+          "budget_forecast_publish",
+          "budget_import_resolve",
+          "import_budget_lines",
+          "import_budget_forecast_lines",
+          "budget_revision_decide");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -642,6 +663,17 @@ class SchemaMigrationIT {
           "purchase_order_analytics/Écriture avec la pièce",
           "ap_invoice_analytics/Lecture société",
           "ap_invoice_analytics/Écriture factures habilitée",
+          // V78.
+          "requisition_line_analytics/Lecture société",
+          "requisition_line_analytics/Écriture avec la pièce",
+          "po_line_analytics/Lecture société",
+          "po_line_analytics/Écriture avec la pièce",
+          "ap_invoice_line_analytics/Lecture société",
+          "ap_invoice_line_analytics/Écriture factures habilitée",
+          "budget_forecasts/Lecture société",
+          "budget_forecasts/Prévision habilitée",
+          "budget_forecast_lines/Lecture société",
+          "budget_forecast_lines/Prévision habilitée",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -708,6 +740,13 @@ class SchemaMigrationIT {
           "purchase_requisitions/trg_copy_requisition_analytics",
           "ap_invoices/trg_copy_po_analytics_to_ap_invoice",
           "purchase_requisitions/trg_check_budget_on_pr",
+          // V78.
+          "requisition_line_analytics/trg_guard_line_analytics",
+          "po_line_analytics/trg_guard_line_analytics",
+          "ap_invoice_line_analytics/trg_guard_line_analytics",
+          "ap_invoice_lines/trg_copy_po_line_analytics_to_ap_line",
+          "budget_forecasts/trg_guard_budget_forecast",
+          "budget_forecast_lines/trg_guard_budget_forecast_line",
           "depreciation_entries/trg_refresh_asset_depreciation",
           // V73 — contrôle budgétaire.
           "budgets/trg_guard_budget",

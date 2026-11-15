@@ -54,11 +54,21 @@ describe("droits dits par la base (my_access)", () => {
     expect(result.current.canCreateEmployee).toBe(false);
   });
 
-  it("budget (contrôlé par rôle en base) : rôles de la société courante, via my_access", async () => {
-    mocks.rpc.mockResolvedValue({ data: { roles: ["budget_planner"], permissions: [] }, error: null });
+  it("budget (V78) : les droits du catalogue décident, pas le nom du rôle", async () => {
+    mocks.rpc.mockResolvedValue({ data: { roles: ["budget_planner"], permissions: ["budget.manage", "budget.forecast"] }, error: null });
     const { result } = renderHook(() => useMyBudgetRoles(), { wrapper });
     await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("my_access"));
-    await waitFor(() => expect(Object.values(result.current).some(Boolean)).toBe(true));
+    await waitFor(() => expect(result.current.canCreate).toBe(true));
+    expect(result.current.canManageScenarios).toBe(true);
+    expect(result.current.canApprove).toBe(false);
+    expect(result.current.canExport).toBe(false);
+  });
+
+  it("budget (V78) : un rôle sans droit n'ouvre rien", async () => {
+    mocks.rpc.mockResolvedValue({ data: { roles: ["budget_admin"], permissions: [] }, error: null });
+    const { result } = renderHook(() => useMyBudgetRoles(), { wrapper });
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("my_access"));
+    expect(Object.values(result.current).some(Boolean)).toBe(false);
   });
 
   it("moduleCan : un droit d'un autre module ne compte pas", () => {

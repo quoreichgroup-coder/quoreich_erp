@@ -1,4 +1,4 @@
-# 15 — Contrôle budgétaire (lot B1, V73 ; lot B2, V77)
+# 15 — Contrôle budgétaire (lot B1, V73 ; lot B2, V77 ; fin du module, V78)
 
 Audit de l'existant du 15 nov. 2026, comparé à SAP et Sage, puis livraison. Écart traité : **G-08**
 (engagement budgétaire). Étape 4 de la priorité P1 de la feuille de route (09).
@@ -71,8 +71,46 @@ Livré :
   totaux sans double compte (`src/lib/budget-forecast.ts`).
 * Tests : `BudgetPreEngagementAnalytiqueIT`, `budget-forecast.test.ts`, parcours `92-budget-analytique`.
 
-## 5. Restant
+## 5. Fin du module (V78)
 
-* Section par **ligne** de pièce (aujourd'hui une section par axe et par pièce) ; contrôle des notes de frais et de la paie.
-* Autres onglets des Paramètres du budget encore fictifs (UX-1) ; scénarios et versions de prévision saisis (aujourd'hui
-  l'atterrissage est calculé, pas saisi).
+Restants de B2, plus deux demandes du propriétaire : **préparer, exporter, importer** côté budget, et **tenir compte de la
+gestion des droits et des rôles**. Références : SAP (imputation par poste de commande, versions de planification, chargement
+de budget par tableur), Sage X3 (ventilation analytique par ligne, budgets par version, import de budgets).
+
+| # | Constat (avant V78) | Conséquence |
+|---|---|---|
+| B-9 | Une section par axe et par **pièce** seulement | Une commande mêlant atelier et administration engageait tout sur une section |
+| B-10 | Prévision toujours calculée, jamais saisie ni versionnée | Pas de révision budgétaire « officielle » (T1, T2…) |
+| B-11 | Budget saisi ligne à ligne à l'écran, aucun import | Préparation d'un budget de centaines de lignes impraticable |
+| B-12 | Paramètres : « GL Posting », « Fiscal Periods », « Alert Thresholds », « Approval Rules » = tableaux codés en dur, en anglais | Réglages affichés sans effet |
+| B-13 | Écrans du budget ouverts par **listes de rôles** codées en dur (`useMyBudgetRoles`) ; prévisions réservées à l'administrateur | Droits non attribuables à un rôle sur mesure, écran en désaccord avec la base |
+
+Livré :
+
+* **Section par ligne** de demande, de commande et de facture fournisseur (`requisition_line_analytics`, `po_line_analytics`,
+  `ap_invoice_line_analytics`) ; la section de la ligne l'emporte, axe par axe, sur celle de l'en-tête
+  (`line_effective_analytics`). Reprise ligne de demande → ligne de commande (`po_lines.requisition_line_id`, posé par
+  `convert_pr_to_po`) → ligne de facture (ligne citant la ligne de commande). Pré-engagé, engagé et contrôles calculés
+  **ligne à ligne** (`document_amount_in_scope`) : la ligne générale contre le total, chaque ligne de section contre la part de
+  la pièce qui la concerne. L'écriture de la facture (et des factures non parvenues à la réception) est ventilée en une ligne de
+  charge par compte × ensemble de sections. Écran : « Ventiler les sections analytiques par ligne » sous les lignes.
+* **Versions de prévision** (`budget_forecasts`, `budget_forecast_lines`) : créées depuis l'atterrissage calculé, le budget de
+  contrôle, une version précédente ou vides ; montants modifiables (ou importés) en brouillon ; **publiées = figées**
+  (`budget_forecast_publish`) ; comparées au budget et à l'atterrissage calculé ; export.
+* **Préparation par fichier** : « Modèle de budget (Excel) » (pré-rempli des lignes, ou de tous les comptes de charges et
+  produits), « Importer le budget » (Excel ou CSV `;`, en-têtes reconnus, montants à la française, périodes « 2041 »,
+  « 03/2041 », « mars 2041 »…, ligne sans montant ignorée) ; même chose pour une version de prévision. Tout ou rien : la base
+  (`import_budget_lines`, `import_budget_forecast_lines`) refuse le fichier entier en listant les anomalies (compte inconnu ou
+  hors charges / produits, section inconnue ou ambiguë — écrire AXE/CODE —, période hors exercice, doublon, montant).
+* **Paramètres réels** : Contrôle budgétaire ; Alertes (seuil) ; **Approbation et révisions** (règles appliquées, et
+  paramètre « Révisions validées par une autre personne » au-delà d'un seuil d'écart : la révision devient une demande,
+  validée ou refusée par un autre approbateur — `budget_revision_decide`) ; Exercices (calendrier fiscal central) ; Rôles et
+  droits. L'onglet « GL Posting » est retiré : le budget ne passe aucune écriture.
+* **Droits du catalogue** : `budget.forecast` (prévisions : administrateurs et préparateur) et `budget.export` (exports :
+  exactement les rôles qui exportaient avant) — catalogue 95 ; tous les boutons du module lisent les droits (`my_access`), plus
+  aucun nom de rôle ; les messages de verrouillage nomment le droit et les rôles qui le portent par défaut.
+* Tests : `BudgetLignesPrevisionsImportIT`, `budget-import.test.ts`, parcours `93-budget-preparation`.
+
+## 6. Restant
+
+* Contrôle budgétaire des notes de frais et de la paie (modules encore hors catalogue) ; budget pluriannuel / par projet.

@@ -16,7 +16,12 @@ import { useGLAccounts } from "@/hooks/use-gl-data";
 import {
   useBudgetApprove, useBudgetClose, useBudgetLinesOf, useBudgetList, useBudgetReject, useBudgetReviseLine, useBudgetStatus, useBudgetSubmit,
   useCreateBudgetV73, useDeleteBudgetLine, useSaveBudgetLine, type Budget, type BudgetLine,
+  useBudgetControlSettings, useBudgetRevisionDecide, useImportBudgetLines, usePendingBudgetRevisions,
 } from "@/hooks/use-budget-control";
+import { exportToXLSX } from "@/lib/xlsx";
+import { readTableFile, TABLE_FILE_ACCEPT } from "@/lib/table-file";
+import { budgetImportRows } from "@/lib/budget-import";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAnalyticsSetup } from "@/hooks/use-analytics-setup";
 import { consumptionPct, totals } from "@/lib/budget-forecast";
@@ -54,7 +59,7 @@ function BudgetsTab() {
   const { user } = useAuth();
   const { data: access } = useMyAccess();
   const p = access?.permissions ?? [];
-  const can = { manage: p.includes("budget.manage"), approve: p.includes("budget.approve") };
+  const can = { manage: p.includes("budget.manage"), approve: p.includes("budget.approve"), export: p.includes("budget.export") };
   const { data: budgets = [], isPending } = useBudgetList();
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -103,7 +108,18 @@ function CreateBudgetDialog({ onClose, onCreated }: { onClose: () => void; onCre
   );
 }
 
-function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: boolean; approve: boolean }; userId: string }) {
+/** Code de section relu par l'import : « CODE », ou « AXE/CODE » si le code existe sur plusieurs axes. */
+function useSectionCodes() {
+  const { data: setup } = useAnalyticsSetup();
+  return useMemo(() => {
+    const all = (setup?.axes ?? []).flatMap((a) => a.values.map((v) => ({ axis: a.code, id: v.id, code: v.code })));
+    const count = new Map<string, number>();
+    for (const v of all) count.set(v.code.toUpperCase(), (count.get(v.code.toUpperCase()) ?? 0) + 1);
+    return new Map(all.map((v) => [v.id, (count.get(v.code.toUpperCase()) ?? 0) > 1 ? `${v.axis}/${v.code}` : v.code]));
+  }, [setup]);
+}
+
+function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: boolean; approve: boolean; export: boolean }; userId: string }) {
   const { data: lines = [] } = useBudgetLinesOf(budget.id);
   const { data: gl = [] } = useGLAccounts();
   const byId = useMemo(() => new Map((gl as any[]).map((g) => [g.id, g])), [gl]);
@@ -113,7 +129,36 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
   const [edit, setEdit] = useState<BudgetLine | "new" | null>(null);
   const [revise, setRevise] = useState<BudgetLine | null>(null);
   const [rejecting, setRejecting] = useState(false);
+  const sectionCode = useSectionCodes();
+  const importLines = useImportBudgetLines();
+  const { data: settings } = useBudgetControlSettings();
+  const { data: pending = [] } = usePendingBudgetRevisions(budget.status === "approved" ? budget.id : null);
+  const decide = useBudgetRevisionDecide();
+  const [refusing, setRefusing] = useState<string | null>(null);
+  // Révision : directe pour l'approbateur ; demande possible pour le préparateur si les paramètres l'organisent.
+  const canRevise = can.approve || (can.manage && !!settings?.revision_second_person);
   const draft = budget.status === "draft";
+  const modele = () => {
+    const accounts = (gl as any[]).filter((g) => g.is_active && ["expense", "revenue"].includes(g.account_type)).sort((a, b) => a.code.localeCompare(b.code));
+    const rows = lines.length
+      ? lines.map((l) => ({ compte: byId.get(l.gl_account_id)?.code ?? "", intitule: byId.get(l.gl_account_id)?.name ?? "",
+          section: l.analytic_value_id ? sectionCode.get(l.analytic_value_id) ?? "" : "", periode: l.period, montant: l.planned_amount as number | string, commentaire: "" }))
+      : accounts.map((g) => ({ compte: g.code, intitule: g.name, section: "", periode: budget.fiscal_year, montant: "" as number | string, commentaire: "" }));
+    exportToXLSX(rows, [{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 40 }, { key: "section", header: "Section", width: 16 },
+      { key: "periode", header: "Période", width: 12 }, { key: "montant", header: "Montant", width: 16 }, { key: "commentaire", header: "Commentaire", width: 30 }],
+      `modele-budget-${budget.fiscal_year}`, "Budget");
+  };
+  const importer = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const t = await readTableFile(file);
+      const r = budgetImportRows(t.records, t.headers, budget.fiscal_year, true);
+      if (r.missing.length) { toast.error(`Colonne(s) introuvable(s) : ${r.missing.join(", ")}. Partir du modèle de budget.`); return; }
+      if (!r.rows.length) { toast.error("Aucune ligne avec un montant dans le fichier"); return; }
+      if (lines.length && !window.confirm(`Les ${lines.length} ligne(s) du budget seront remplacées par les ${r.rows.length} ligne(s) du fichier. Continuer ?`)) return;
+      importLines.mutate({ budget: budget.id, rows: r.rows });
+    } catch (e) { toast.error((e as Error).message); }
+  };
   const own = userId === budget.created_by || userId === budget.submitted_by;
   return (
     <section aria-label="Détail du budget" className="card-elevated p-4 space-y-3">
@@ -122,9 +167,18 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
           <p className="text-xs text-muted-foreground" data-testid="budget-summary">{STATUS[budget.status][1]}{budget.is_control ? " · budget de contrôle" : ""} · {lines.length} ligne(s) · total {fmt(budget.total_amount)}</p>
           {budget.status === "submitted" && own && can.approve && <p className="text-[11px] text-muted-foreground">Vous avez préparé ce budget : une autre personne doit l'approuver.</p>}</div>
         <div className="flex gap-2 flex-wrap">
-          <ExportButtons label="Exporter le budget" filename={`budget-${budget.fiscal_year}`} sheetName="Budget"
-            rows={lines.map((l) => ({ compte: byId.get(l.gl_account_id)?.code ?? "", intitule: byId.get(l.gl_account_id)?.name ?? "", periode: periodLabel(l.period), montant: l.planned_amount }))}
-            columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 40 }, { key: "periode", header: "Période", width: 18 }, { key: "montant", header: "Montant", width: 16 }]} />
+          {can.export && <ExportButtons label="Exporter le budget" filename={`budget-${budget.fiscal_year}`} sheetName="Budget"
+            rows={lines.map((l) => ({ compte: byId.get(l.gl_account_id)?.code ?? "", intitule: byId.get(l.gl_account_id)?.name ?? "",
+              section: l.analytic_value_id ? sectionCode.get(l.analytic_value_id) ?? "" : "", periode: l.period, montant: l.planned_amount }))}
+            columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 40 }, { key: "section", header: "Section", width: 16 },
+              { key: "periode", header: "Période", width: 12 }, { key: "montant", header: "Montant", width: 16 }]} />}
+          {draft && can.manage && <>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={modele}>Modèle de budget (Excel)</Button>
+            <label className="inline-flex items-center h-8 px-3 rounded-md border border-input bg-background text-xs cursor-pointer hover:bg-muted/50">
+              {importLines.isPending ? "Import…" : "Importer le budget"}
+              <input type="file" className="sr-only" accept={TABLE_FILE_ACCEPT} aria-label="Importer le budget (Excel ou CSV)"
+                onChange={(e) => { void importer(e.target.files?.[0]); e.target.value = ""; }} />
+            </label></>}
           {draft && can.manage && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEdit("new")}>Ajouter une ligne</Button>}
           {draft && can.manage && <Button size="sm" className="h-8 text-xs" disabled={submit.isPending || lines.length === 0} onClick={() => submit.mutate(budget.id)}>Soumettre</Button>}
           {budget.status === "submitted" && can.approve && !own && <>
@@ -145,13 +199,24 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
               <td className="pl-2 text-right whitespace-nowrap">
                 {draft && can.manage && <><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEdit(l)}>Modifier</Button>
                   <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => del.mutate(l.id)}>Supprimer</Button></>}
-                {budget.status === "approved" && can.approve && <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setRevise(l)}>Réviser</Button>}
+                {budget.status === "approved" && canRevise && !pending.some((r) => r.line_id === l.id) &&
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setRevise(l)}>Réviser</Button>}
+                {pending.filter((r) => r.line_id === l.id).map((r) => (
+                  <span key={r.id} className="inline-flex items-center gap-1" data-testid="budget-revision-pending">
+                    <span className="text-[10px] text-warning" title={r.reason}>Révision demandée : {fmt(r.old_amount)} → {fmt(r.new_amount)}</span>
+                    {can.approve && r.created_by !== userId && <>
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success" disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, approve: true })}>Valider</Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" onClick={() => setRefusing(r.id)}>Refuser</Button></>}
+                    {r.created_by === userId && <span className="text-[10px] text-muted-foreground">(vous : une autre personne valide)</span>}
+                  </span>))}
               </td>
             </tr>))}
         </tbody>
       </table>
       {edit && <LineDialog budget={budget} line={edit === "new" ? null : edit} gl={gl as any[]} onClose={() => setEdit(null)} />}
       {revise && <ReviseDialog line={revise} label={byId.get(revise.gl_account_id)?.code ?? ""} onClose={() => setRevise(null)} />}
+      {refusing && <ReasonDialog title="Refuser la demande de révision" action="Refuser" onClose={() => setRefusing(null)}
+        onConfirm={(r) => decide.mutate({ id: refusing, approve: false, comment: r }, { onSuccess: () => setRefusing(null) })} />}
       {rejecting && <ReasonDialog title="Renvoyer le budget en brouillon" action="Renvoyer" onClose={() => setRejecting(false)} onConfirm={(r) => reject.mutate({ id: budget.id, reason: r }, { onSuccess: () => setRejecting(false) })} />}
     </section>
   );
@@ -230,18 +295,19 @@ function ReasonDialog({ title, action, onClose, onConfirm }: { title: string; ac
 function AvailabilityTab() {
   const [fy, setFy] = useState(year);
   const { data: rows = [], isFetching, error } = useBudgetStatus(fy);
+  const canExport = (useMyAccess().data?.permissions ?? []).includes("budget.export");
   // Totaux sur les lignes non couvertes par une autre (« 60 » et « 601 », ou une section et le budget général, ne s'additionnent pas).
   const total = totals(rows);
   return (
     <div className="space-y-3">
       <div className="flex items-end gap-2">
         <div className="space-y-1"><Label className="text-xs" htmlFor="av-year">Exercice</Label><Input id="av-year" className="h-8 text-xs w-24" maxLength={4} value={fy} onChange={(e) => setFy(e.target.value)} /></div>
-        <ExportButtons label="Exporter le suivi" filename={`suivi-budgetaire-${fy}`} sheetName="Suivi budgétaire"
+        {canExport && <ExportButtons label="Exporter le suivi" filename={`suivi-budgetaire-${fy}`} sheetName="Suivi budgétaire"
           rows={rows.map((r) => ({ compte: r.account_code, intitule: r.account_name, section: r.analytic_code ? `${r.analytic_code} ${r.analytic_name}` : "Toutes", periode: periodLabel(r.period),
             budget: r.planned, preengage: r.precommitted, engage: r.committed, realise: r.actual, disponible: r.available }))}
           columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 36 }, { key: "section", header: "Section", width: 24 }, { key: "periode", header: "Période", width: 18 },
             { key: "budget", header: "Budget", width: 16 }, { key: "preengage", header: "Pré-engagé", width: 16 }, { key: "engage", header: "Engagé", width: 16 }, { key: "realise", header: "Réalisé", width: 16 },
-            { key: "disponible", header: "Disponible", width: 16 }]} />
+            { key: "disponible", header: "Disponible", width: 16 }]} />}
       </div>
       {error && <p className="text-xs text-destructive" role="alert">{(error as Error).message}</p>}
       {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : (

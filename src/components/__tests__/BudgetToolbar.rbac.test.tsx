@@ -74,7 +74,7 @@ describe("Budget toolbar — RBAC integration (matches role × action matrix)", 
     expect(screen.getByTestId("amount")).not.toHaveTextContent("•••••");
   });
 
-  it("budget_planner: create/edit/submit enabled; approve/lock/export/scenarios disabled", () => {
+  it("budget_planner: create/edit/submit/scenarios enabled; approve/lock/export disabled", () => {
     render(<BudgetToolbar perms={permsFor(["budget_planner"])} />);
     expect(screen.getByTestId("btn-create_budget")).toBeEnabled();
     expect(screen.getByTestId("btn-edit_budget")).toBeEnabled();
@@ -82,7 +82,7 @@ describe("Budget toolbar — RBAC integration (matches role × action matrix)", 
     expect(screen.getByTestId("btn-approve_budget")).toBeDisabled();
     expect(screen.getByTestId("btn-lock_period")).toBeDisabled();
     expect(screen.getByTestId("btn-export")).toBeDisabled();
-    expect(screen.getByTestId("btn-manage_scenarios")).toBeDisabled();
+    expect(screen.getByTestId("btn-manage_scenarios")).toBeEnabled();
     // Planner can view sensitive amounts (needs them to plan)
     expect(screen.getByTestId("amount")).not.toHaveTextContent("•••••");
   });
@@ -108,12 +108,12 @@ describe("Budget toolbar — RBAC integration (matches role × action matrix)", 
     }
   });
 
-  it("manage_scenarios is admin-only across all single-role users", () => {
+  it("manage_scenarios (budget.forecast) : préparateur et administrateur seulement", () => {
     for (const role of ALL_BUDGET_ROLES) {
       cleanup();
       render(<BudgetToolbar perms={permsFor([role])} />);
       const btn = screen.getByTestId("btn-manage_scenarios");
-      if (role === "budget_admin") expect(btn).toBeEnabled();
+      if (role === "budget_admin" || role === "budget_planner") expect(btn).toBeEnabled();
       else expect(btn).toBeDisabled();
     }
   });

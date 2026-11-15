@@ -62,22 +62,19 @@ export function useBudgetKpis() {
 // =====================================================================
 
 export function useMyBudgetRoles(): BudgetPerms {
-  const { user } = useAuth();
-  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
-  // par has_role, d'où une logique encore par rôle.
-  const roles = useMyAccess().data?.roles ?? [];
-  const has = (r: BudgetRole | "admin") => roles.includes(r);
-  const admin = has("budget_admin") || has("admin");
-  const any = admin || has("budget_planner") || has("budget_approver") || has("budget_controller");
+  // Droits du catalogue dans la société courante (my_access) : attribuables à un rôle sur mesure depuis
+  // Paramètres → Rôles et autorisations (V78 ; avant, listes de rôles codées en dur).
+  const permissions = useMyAccess().data?.permissions ?? [];
+  const can = (code: string) => permissions.includes(code);
   return {
-    canCreate:          admin || has("budget_planner"),
-    canEdit:            admin || has("budget_planner"),
-    canSubmit:          admin || has("budget_planner"),
-    canApprove:         admin || has("budget_approver"),
-    canLockPeriod:      admin || has("budget_approver"),
-    canManageScenarios: admin,
-    canExport:          admin || has("budget_approver") || has("budget_controller"),
-    canViewSensitive:   any,
+    canCreate:          can("budget.manage"),
+    canEdit:            can("budget.manage"),
+    canSubmit:          can("budget.manage"),
+    canApprove:         can("budget.approve"),
+    canLockPeriod:      can("budget.approve"),
+    canManageScenarios: can("budget.forecast"),
+    canExport:          can("budget.export"),
+    canViewSensitive:   permissions.some((p) => p.startsWith("budget.")),
   };
 }
 

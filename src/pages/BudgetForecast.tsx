@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { useBudgetControlSettings, useBudgetMonthlyActual, useBudgetStatus } from "@/hooks/use-budget-control";
 import { elapsedMonths, forecastRows, monthlySeries, totals, type ForecastRow } from "@/lib/budget-forecast";
 import { cn } from "@/lib/utils";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { BudgetForecastVersions } from "@/components/BudgetForecastVersions";
 
 /*
  * Budget et prévisions — tableau de bord (V77). Budget de contrôle approuvé de l'exercice, consommation
@@ -47,6 +49,9 @@ export default function BudgetForecast() {
   const t = totals(rows);
   const landing = forecast.reduce((s, f) => s + f.landing, 0);
   const m = elapsedMonths(year, today);
+  const permissions = useMyAccess().data?.permissions ?? [];
+  const canExport = permissions.includes("budget.export");
+  const canForecast = permissions.includes("budget.forecast");
 
   return (
     <PageShell>
@@ -58,13 +63,13 @@ export default function BudgetForecast() {
         <div className="flex items-end gap-2">
           <div className="space-y-1"><Label className="text-xs" htmlFor="bf-year">Exercice</Label>
             <Input id="bf-year" className="h-8 w-24 text-xs" maxLength={4} value={year} onChange={(e) => setYear(e.target.value.trim())} /></div>
-          <ExportButtons label="Exporter les prévisions" filename={`previsions-budgetaires-${year}`} sheetName="Prévisions"
+          {canExport && <ExportButtons label="Exporter les prévisions" filename={`previsions-budgetaires-${year}`} sheetName="Prévisions"
             rows={forecast.map((f) => ({ compte: f.account_code, intitule: f.account_name, section: f.section ?? "Toutes", budget: f.planned, realise: f.actual, engage: f.committed,
               preengage: f.precommitted, connu: f.known, rythme: f.runRate ?? "", atterrissage: f.landing, ecart: f.variance, etat: STATUS[f.status][0] }))}
             columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 34 }, { key: "section", header: "Section", width: 22 },
               { key: "budget", header: "Budget", width: 15 }, { key: "realise", header: "Réalisé", width: 15 }, { key: "engage", header: "Engagé", width: 15 },
               { key: "preengage", header: "Pré-engagé", width: 15 }, { key: "connu", header: "Acquis et réservé", width: 17 }, { key: "rythme", header: "Rythme actuel", width: 15 },
-              { key: "atterrissage", header: "Atterrissage", width: 15 }, { key: "ecart", header: "Écart", width: 15 }, { key: "etat", header: "État", width: 18 }]} />
+              { key: "atterrissage", header: "Atterrissage", width: 15 }, { key: "ecart", header: "Écart", width: 15 }, { key: "etat", header: "État", width: 18 }]} />}
         </div>
       </div>
 
@@ -128,6 +133,7 @@ export default function BudgetForecast() {
           </Card>
         </>
       )}
+      {validYear && <BudgetForecastVersions year={year} status={rows} forecast={forecast} canForecast={canForecast} canExport={canExport} />}
     </PageShell>
   );
 }

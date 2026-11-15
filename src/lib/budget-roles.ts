@@ -23,7 +23,7 @@ export const REQUIRED_ROLES: Record<BudgetAction, BudgetRole[]> = {
   submit_for_approval: ["budget_planner", "budget_admin"],
   approve_budget:      ["budget_approver", "budget_admin"],
   lock_period:         ["budget_approver", "budget_admin"],
-  manage_scenarios:    ["budget_admin"],
+  manage_scenarios:    ["budget_planner", "budget_admin"],
   export:              ["budget_approver", "budget_controller", "budget_admin"],
   view_sensitive:      ["budget_planner", "budget_approver", "budget_controller", "budget_admin"],
 };
@@ -80,9 +80,22 @@ export function canDo(perms: BudgetPerms | undefined, action: BudgetAction): boo
   }
 }
 
+/** Droit du catalogue qui ouvre chaque action (V78) ; REQUIRED_ROLES = rôles système qui le portent par défaut. */
+export const ACTION_PERMISSION: Record<BudgetAction, { code: string; label: string }> = {
+  create_budget:       { code: "budget.manage", label: "Préparer les budgets (saisie, soumission)" },
+  edit_budget:         { code: "budget.manage", label: "Préparer les budgets (saisie, soumission)" },
+  submit_for_approval: { code: "budget.manage", label: "Préparer les budgets (saisie, soumission)" },
+  approve_budget:      { code: "budget.approve", label: "Approuver et réviser les budgets" },
+  lock_period:         { code: "budget.approve", label: "Approuver et réviser les budgets" },
+  manage_scenarios:    { code: "budget.forecast", label: "Saisir et publier les prévisions budgétaires" },
+  export:              { code: "budget.export", label: "Exporter les budgets, le suivi et les prévisions" },
+  view_sensitive:      { code: "budget.*", label: "un droit du module Budget" },
+};
+
 export function missingRoleHint(action: BudgetAction): string {
+  const p = ACTION_PERMISSION[action];
   const roles = REQUIRED_ROLES[action].map((r) => ROLE_LABELS[r]).join(", ");
-  return `Action verrouillée — rôle requis : ${roles}.`;
+  return `Action verrouillée — droit requis : « ${p.label} » (${p.code}), porté par défaut par : ${roles} ; attribuable à tout rôle depuis Paramètres → Rôles et autorisations.`;
 }
 
 export function actionTooltip(

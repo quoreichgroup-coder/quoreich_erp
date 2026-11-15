@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { saveDocumentAnalytics } from "@/hooks/use-document-analytics";
+import { saveDocumentAnalytics, saveLineAnalytics, type LineAnalytics } from "@/hooks/use-document-analytics";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 // ── Requisitions ──────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export function useCreateRequisition() {
       estimated_total: number;
       tenant_id: string;
       requested_by: string;
-      lines: { description: string; quantity: number; estimated_unit_cost: number; item_id?: string }[];
+      lines: { description: string; quantity: number; estimated_unit_cost: number; item_id?: string; analytics?: LineAnalytics }[];
       analytics?: Record<string, string>;
     }) => {
       const { lines, analytics, ...header } = input;
@@ -51,11 +51,15 @@ export function useCreateRequisition() {
           // total : colonne calculée par la base (quantité × coût), jamais envoyée.
           item_id: l.item_id || null,
         }));
-        const { error: lineErr } = await supabase.from("requisition_lines").insert(lineRows);
+        const { data: inserted, error: lineErr } = await (supabase as any).from("requisition_lines").insert(lineRows).select("id");
         if (lineErr) {
           // En-tête puis lignes : sans ses lignes, la demande n'existe pas.
           await supabase.from("purchase_requisitions").delete().eq("id", data.id);
           throw lineErr;
+        }
+        try { await saveLineAnalytics("PR", (inserted ?? []).map((r: { id: string }) => r.id), lines.map((l) => l.analytics)); } catch (e) {
+          await supabase.from("purchase_requisitions").delete().eq("id", data.id);
+          throw e;
         }
       }
       try { await saveDocumentAnalytics("PR", data.id, analytics); } catch (e) {
@@ -101,7 +105,7 @@ export function useCreatePurchaseOrder() {
       total: number;
       tenant_id: string;
       created_by: string;
-      lines: { description: string; quantity: number; unit_cost: number; item_id?: string }[];
+      lines: { description: string; quantity: number; unit_cost: number; item_id?: string; analytics?: LineAnalytics }[];
       analytics?: Record<string, string>;
     }) => {
       // En-tête puis lignes ; le total d'en-tête est recalculé par la base (recompute_po_total).
@@ -122,10 +126,14 @@ export function useCreatePurchaseOrder() {
           // total : colonne calculée par la base, jamais envoyée.
           item_id: l.item_id || null,
         }));
-        const { error: lineErr } = await supabase.from("po_lines").insert(lineRows);
+        const { data: inserted, error: lineErr } = await (supabase as any).from("po_lines").insert(lineRows).select("id");
         if (lineErr) {
           await supabase.from("purchase_orders").delete().eq("id", data.id);
           throw lineErr;
+        }
+        try { await saveLineAnalytics("PO", (inserted ?? []).map((r: { id: string }) => r.id), lines.map((l) => l.analytics)); } catch (e) {
+          await supabase.from("purchase_orders").delete().eq("id", data.id);
+          throw e;
         }
       }
       try { await saveDocumentAnalytics("PO", data.id, analytics); } catch (e) {
@@ -601,7 +609,7 @@ export function useUpdateProcurementDraft() {
   return useMutation({
     mutationFn: async (input: {
       docType: ProcurementDocType; id: string; header: Record<string, unknown>;
-      lines: { description: string; quantity: number; unitPrice: number }[];
+      lines: { description: string; quantity: number; unitPrice: number; analytics?: LineAnalytics }[];
       analytics?: Record<string, string>;
     }) => {
       const db = supabase as any;
@@ -615,9 +623,10 @@ export function useUpdateProcurementDraft() {
       const rows = input.lines.map((l) => input.docType === "PR"
         ? { requisition_id: input.id, description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice }
         : { po_id: input.id, description: l.description, quantity: l.quantity, unit_cost: l.unitPrice });
-      const { error: insErr } = await db.from(lineTable).insert(rows);
+      const { data: inserted, error: insErr } = await db.from(lineTable).insert(rows).select("id");
       if (insErr) throw insErr;
       await saveDocumentAnalytics(input.docType, input.id, input.analytics);
+      await saveLineAnalytics(input.docType, (inserted ?? []).map((r: { id: string }) => r.id), input.lines.map((l) => l.analytics));
     },
     onSuccess: () => { invalidateProcurement(qc); toast.success("Pièce modifiée"); },
     onError: (e: any) => toast.error(e.message),

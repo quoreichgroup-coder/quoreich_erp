@@ -37,3 +37,35 @@ export async function saveDocumentAnalytics(kind: AnalyticDocKind, id: string, v
   const { error } = await db.from(TABLE[kind]).insert(rows);
   if (error) throw error;
 }
+
+/* Sections par ligne (V78) : la section d'une ligne l'emporte, axe par axe, sur celle de l'en-tête. */
+const LINE_TABLE: Record<AnalyticDocKind, string> = { PR: "requisition_line_analytics", PO: "po_line_analytics", AP: "ap_invoice_line_analytics" };
+export type LineAnalytics = Record<string, string>;
+
+export async function fetchLineAnalytics(kind: AnalyticDocKind, lineIds: string[]): Promise<Map<string, LineAnalytics>> {
+  const out = new Map<string, LineAnalytics>();
+  if (!lineIds.length) return out;
+  const { data, error } = await db.from(LINE_TABLE[kind]).select("line_id, axis_id, value_id").in("line_id", lineIds);
+  if (error) throw error;
+  for (const r of (data ?? []) as { line_id: string; axis_id: string; value_id: string }[]) out.set(r.line_id, { ...(out.get(r.line_id) ?? {}), [r.axis_id]: r.value_id });
+  return out;
+}
+
+export function useLineAnalytics(kind: AnalyticDocKind, lineIds: string[]) {
+  return useQuery({
+    queryKey: ["line-analytics", kind, lineIds.join(",")],
+    enabled: lineIds.length > 0,
+    queryFn: () => fetchLineAnalytics(kind, lineIds),
+  });
+}
+
+/** Sections choisies ligne à ligne (même ordre que les lignes enregistrées) ; axe vide = section de l'en-tête. */
+export async function saveLineAnalytics(kind: AnalyticDocKind, lineIds: string[], perLine: (LineAnalytics | undefined)[] | undefined) {
+  if (!perLine?.some((v) => v && Object.values(v).some(Boolean))) return;
+  const tenantId = await fetchTenantId();
+  const rows = lineIds.flatMap((id, i) => Object.entries(perLine[i] ?? {}).filter(([, v]) => !!v)
+    .map(([axis, value]) => ({ tenant_id: tenantId, line_id: id, axis_id: axis, value_id: value })));
+  if (!rows.length) return;
+  const { error } = await db.from(LINE_TABLE[kind]).upsert(rows, { onConflict: "line_id,axis_id" });
+  if (error) throw error;
+}

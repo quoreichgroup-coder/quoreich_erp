@@ -29,6 +29,8 @@ async function saisirLigne(d: ReturnType<Page["getByRole"]>, ht: string, tva: st
   await d.getByLabel("Libellé ligne 1").fill("Marchandises");
   await d.getByLabel("Quantité ligne 1").fill("1");
   await d.getByLabel("Prix unitaire ligne 1").fill(ht);
+  // Les codes TVA se chargent avec le formulaire : attendre le 18 % avant de lire la liste.
+  if (Number(tva) > 0) await expect(d.getByLabel("Code TVA ligne 1").locator("option", { hasText: /18/ }).first()).toBeAttached();
   const codes = await d.getByLabel("Code TVA ligne 1").locator("option").allTextContents();
   const voulu = Number(tva) > 0 ? codes.find((o) => /18/.test(o)) : codes[0];
   await d.getByLabel("Code TVA ligne 1").selectOption({ label: voulu! });

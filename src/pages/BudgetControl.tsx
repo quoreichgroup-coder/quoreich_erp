@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useBudgetAlertDocuments, useBudgetControlSettings, useBudgetRevisionsOfYear, useBudgetStatus } from "@/hooks/use-budget-control";
 import { budgetAlerts } from "@/lib/budget-forecast";
 import { cn } from "@/lib/utils";
+import { useMyAccess } from "@/hooks/use-my-access";
 
 /*
  * Contrôle budgétaire (V77) : lignes en dépassement ou au seuil d'alerte paramétré, pièces d'achat passées
@@ -44,6 +45,8 @@ export default function BudgetControl() {
   const alerts = useMemo(() => budgetAlerts(status.data ?? [], threshold), [status.data, threshold]);
   const over = alerts.filter((a) => a.level === "over").length;
   const overridden = (docs.data ?? []).filter((d) => d.overrideReason).length;
+  const canExport = (useMyAccess().data?.permissions ?? []).includes("budget.export");
+  const REV_STATUS: Record<string, string> = { pending: "En attente", applied: "Appliquée", rejected: "Refusée" };
 
   return (
     <PageShell>
@@ -74,13 +77,13 @@ export default function BudgetControl() {
       <Card className="border-border mb-4">
         <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-sm">Lignes en alerte</CardTitle>
-          <ExportButtons label="Exporter" filename={`alertes-budgetaires-${year}`} sheetName="Alertes"
+          {canExport && <ExportButtons label="Exporter" filename={`alertes-budgetaires-${year}`} sheetName="Alertes"
             rows={alerts.map((a) => ({ compte: a.row.account_code, intitule: a.row.account_name, section: a.row.analytic_code ? `${a.row.analytic_code} ${a.row.analytic_name}` : "Toutes",
               periode: periodLabel(a.row.period), budget: a.row.planned, consomme: a.row.precommitted + a.row.committed + a.row.actual, disponible: a.row.available,
               taux: a.pct ?? "", alerte: a.level === "over" ? "Dépassement" : "Seuil atteint" }))}
             columns={[{ key: "compte", header: "Compte", width: 12 }, { key: "intitule", header: "Intitulé", width: 34 }, { key: "section", header: "Section", width: 22 },
               { key: "periode", header: "Période", width: 14 }, { key: "budget", header: "Budget", width: 15 }, { key: "consomme", header: "Consommé", width: 15 },
-              { key: "disponible", header: "Disponible", width: 15 }, { key: "taux", header: "Taux (%)", width: 10 }, { key: "alerte", header: "Alerte", width: 16 }]} />
+              { key: "disponible", header: "Disponible", width: 15 }, { key: "taux", header: "Taux (%)", width: 10 }, { key: "alerte", header: "Alerte", width: 16 }]} />}
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {status.error && <p className="text-xs text-destructive p-3" role="alert">{(status.error as Error).message}</p>}
@@ -135,15 +138,16 @@ export default function BudgetControl() {
             {revisions.error && <p className="text-xs text-destructive p-3" role="alert">{(revisions.error as Error).message}</p>}
             <table className="w-full text-xs" data-testid="budget-revisions">
               <thead><tr className="bg-muted/30 text-muted-foreground"><th className="text-left p-2">Date</th><th className="text-left">Ligne</th><th className="text-right">Avant</th>
-                <th className="text-right">Après</th><th className="text-left pl-3 pr-2">Motif</th></tr></thead>
+                <th className="text-right">Après</th><th className="text-left pl-3">État</th><th className="text-left pl-3 pr-2">Motif</th></tr></thead>
               <tbody>
-                {(revisions.data ?? []).length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">Aucune révision.</td></tr>}
+                {(revisions.data ?? []).length === 0 && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Aucune révision.</td></tr>}
                 {(revisions.data ?? []).map((r) => (
                   <tr key={r.id} data-testid="budget-revision-row" className="border-t border-border/50">
                     <td className="p-2 whitespace-nowrap">{new Date(r.created_at).toLocaleDateString("fr-FR")}</td>
                     <td>{r.account}{r.section ? ` · ${r.section}` : ""} · {periodLabel(r.period)}</td>
                     <td className="text-right tabular-nums">{fmt(r.old_amount)}</td><td className="text-right tabular-nums">{fmt(r.new_amount)}</td>
-                    <td className="pl-3 pr-2">{r.reason}</td>
+                    <td className={cn("pl-3 whitespace-nowrap", r.status === "pending" && "text-warning", r.status === "rejected" && "text-destructive")}>{REV_STATUS[r.status] ?? r.status}</td>
+                    <td className="pl-3 pr-2">{r.reason}{r.decision_comment ? ` — décision : ${r.decision_comment}` : ""}</td>
                   </tr>))}
               </tbody>
             </table>

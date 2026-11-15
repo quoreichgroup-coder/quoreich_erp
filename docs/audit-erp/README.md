@@ -40,7 +40,7 @@ Légende utilisée dans tous les livrables :
 | 12 | [12-plan-comptable-multi-referentiels.md](12-plan-comptable-multi-referentiels.md) | Plan comptable multi-référentiels : audit de l'existant, diagnostic ROXGOLD, architecture, modèle de données, droits et rôles, écrans, plan PC-0 à PC-6 |
 | 13 | [13-tresorerie-reglements.md](13-tresorerie-reglements.md) | Trésorerie reliée aux règlements (lot T1, V70) : audit, références SAP / Sage / SYSCOHADA, livré, restant |
 | 14 | [14-factures-fournisseurs-lignes.md](14-factures-fournisseurs-lignes.md) | Factures fournisseurs à lignes, 3 voies ligne à ligne, factures non parvenues 408 (lot A4, V72) |
-| 15 | [15-controle-budgetaire.md](15-controle-budgetaire.md) | Contrôle budgétaire : engagé / réalisé / disponible, cycle de vie du budget (lot B1, V73) ; pré-engagement des demandes, budgets par section, Contrôle et Prévisions (lot B2, V77) |
+| 15 | [15-controle-budgetaire.md](15-controle-budgetaire.md) | Contrôle budgétaire : engagé / réalisé / disponible, cycle de vie du budget (lot B1, V73) ; pré-engagement des demandes, budgets par section, Contrôle et Prévisions (lot B2, V77) ; sections par ligne, prévisions saisies, import / export, droits (V78) |
 | 16 | [16-immobilisations.md](16-immobilisations.md) | Immobilisations : amortissements, cessions SYSCOHADA (lot F1, V75) |
 
 ## Synthèse pour la direction

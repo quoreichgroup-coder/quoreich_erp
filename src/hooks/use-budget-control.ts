@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
+import type { BudgetImportRow } from "@/lib/budget-import";
 
 /* Contrôle budgétaire (V73) : budgets et lignes sous droit budget.manage ; cycle de vie par fonctions. */
 const db = supabase as any;
@@ -12,13 +13,13 @@ export type Budget = { id: string; name: string; fiscal_year: string; scenario: 
   total_amount: number; created_by: string; submitted_by: string | null; approved_by: string | null; approved_at: string | null };
 export type BudgetLine = { id: string; budget_id: string; gl_account_id: string; period: string; planned_amount: number; analytic_value_id: string | null };
 /** Situation d'une ligne du budget de contrôle (V77 : section analytique et pré-engagé des demandes d'achat). */
-export type BudgetStatusRow = { line_id: string; account_code: string; account_name: string; period: string;
+export type BudgetStatusRow = { line_id: string; account_id: string; account_code: string; account_name: string; period: string;
   analytic_value_id: string | null; analytic_code: string | null; analytic_name: string | null;
   planned: number; precommitted: number; committed: number; actual: number; available: number };
 export type BudgetControlSettings = { control_mode: "off" | "warn" | "block"; control_level: "year" | "month"; precommit_requisitions: boolean;
-  control_requisitions: boolean; analytic_control: boolean; alert_threshold_pct: number };
+  control_requisitions: boolean; analytic_control: boolean; alert_threshold_pct: number; revision_second_person: boolean; revision_threshold_pct: number };
 export const DEFAULT_BUDGET_SETTINGS: BudgetControlSettings = { control_mode: "off", control_level: "year", precommit_requisitions: true,
-  control_requisitions: true, analytic_control: true, alert_threshold_pct: 90 };
+  control_requisitions: true, analytic_control: true, alert_threshold_pct: 90, revision_second_person: false, revision_threshold_pct: 0 };
 
 export function useBudgetList() {
   const { data: tenantId } = useTenantId();
@@ -64,9 +65,10 @@ export function useBudgetControlSettings() {
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await db.from("budget_settings")
-        .select("control_mode, control_level, precommit_requisitions, control_requisitions, analytic_control, alert_threshold_pct").eq("tenant_id", tenantId).maybeSingle();
+        .select("control_mode, control_level, precommit_requisitions, control_requisitions, analytic_control, alert_threshold_pct, revision_second_person, revision_threshold_pct")
+        .eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
-      return (data ? { ...data, alert_threshold_pct: Number(data.alert_threshold_pct) } : DEFAULT_BUDGET_SETTINGS) as BudgetControlSettings;
+      return (data ? { ...data, alert_threshold_pct: Number(data.alert_threshold_pct), revision_threshold_pct: Number(data.revision_threshold_pct) } : DEFAULT_BUDGET_SETTINGS) as BudgetControlSettings;
     },
   });
 }
@@ -142,7 +144,42 @@ export const useBudgetSubmit = () => useRpc((id: string) => rpc("budget_submit",
 export const useBudgetApprove = () => useRpc((id: string) => rpc("budget_approve", { _budget: id, _control: true }), "Budget approuvé : budget de contrôle de l'exercice");
 export const useBudgetReject = () => useRpc((v: { id: string; reason: string }) => rpc("budget_reject", { _budget: v.id, _reason: v.reason }), "Budget renvoyé en brouillon");
 export const useBudgetClose = () => useRpc((id: string) => rpc("budget_close", { _budget: id }), "Budget clos");
-export const useBudgetReviseLine = () => useRpc((v: { line: string; amount: number; reason: string }) => rpc("budget_revise_line", { _line: v.line, _amount: v.amount, _reason: v.reason }), "Ligne révisée");
+/** Révision : appliquée directement, ou demande en attente d'une autre personne selon les paramètres (V78). */
+export function useBudgetReviseLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { line: string; amount: number; reason: string }) => rpc("budget_revise_line", { _line: v.line, _amount: v.amount, _reason: v.reason }),
+    onSuccess: (r) => { invalidate(qc); toast.success(r === "pending" ? "Demande de révision enregistrée : à valider par une autre personne" : "Ligne révisée"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export const useBudgetRevisionDecide = () => useRpc((v: { id: string; approve: boolean; comment?: string }) =>
+  rpc("budget_revision_decide", { _revision: v.id, _approve: v.approve, _comment: v.comment ?? null }), "Demande de révision traitée");
+
+/** Demandes de révision en attente sur les lignes d'un budget. */
+export function usePendingBudgetRevisions(budgetId: string | null) {
+  return useQuery({
+    queryKey: ["budget-revisions", "pending", budgetId],
+    enabled: !!budgetId,
+    queryFn: async () => {
+      const { data, error } = await db.from("budget_revisions").select("id, budget_line_id, old_amount, new_amount, reason, created_by, created_at, line:budget_lines!inner(budget_id)")
+        .eq("status", "pending").eq("line.budget_id", budgetId);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({ id: r.id as string, line_id: r.budget_line_id as string, old_amount: Number(r.old_amount), new_amount: Number(r.new_amount),
+        reason: r.reason as string, created_by: r.created_by as string, created_at: r.created_at as string }));
+    },
+  });
+}
+
+/** Préparation par fichier : les lignes du fichier remplacent celles du budget en brouillon (tout ou rien). */
+export function useImportBudgetLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { budget: string; rows: BudgetImportRow[] }) => Number(await rpc("import_budget_lines", { _budget: v.budget, _rows: v.rows })),
+    onSuccess: (n) => { invalidate(qc); toast.success(`Budget importé : ${n} ligne(s)`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
 export const useBudgetOverrideDocument = () => useRpc((v: { docType: "PR" | "PO"; id: string; reason: string }) =>
   rpc("budget_override_document", { _doc_type: v.docType, _id: v.id, _reason: v.reason }), "Dépassement de budget autorisé : la pièce peut être soumise");
 
@@ -191,7 +228,8 @@ export function useBudgetAlertDocuments(year: string) {
   });
 }
 
-export type BudgetRevision = { id: string; created_at: string; reason: string; old_amount: number; new_amount: number; account: string; period: string; section: string | null };
+export type BudgetRevision = { id: string; created_at: string; reason: string; old_amount: number; new_amount: number; account: string; period: string; section: string | null;
+  status: "pending" | "applied" | "rejected"; decision_comment: string | null };
 
 /** Révisions des lignes des budgets de l'exercice. */
 export function useBudgetRevisionsOfYear(year: string) {
@@ -201,12 +239,12 @@ export function useBudgetRevisionsOfYear(year: string) {
     enabled: !!tenantId && isYear(year),
     queryFn: async () => {
       const { data, error } = await db.from("budget_revisions")
-        .select("id, created_at, reason, old_amount, new_amount, line:budget_lines!inner(period, budget:budgets!inner(fiscal_year), account:gl_accounts(code, name), section:analytic_values(code, name))")
+        .select("id, created_at, reason, old_amount, new_amount, status, decision_comment, line:budget_lines!inner(period, budget:budgets!inner(fiscal_year), account:gl_accounts(code, name), section:analytic_values(code, name))")
         .eq("tenant_id", tenantId).eq("line.budget.fiscal_year", year).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ id: r.id, created_at: r.created_at, reason: r.reason, old_amount: Number(r.old_amount), new_amount: Number(r.new_amount),
         account: r.line?.account ? `${r.line.account.code} ${r.line.account.name}` : "", period: r.line?.period ?? "",
-        section: r.line?.section ? `${r.line.section.code} ${r.line.section.name}` : null })) as BudgetRevision[];
+        section: r.line?.section ? `${r.line.section.code} ${r.line.section.name}` : null, status: r.status ?? "applied", decision_comment: r.decision_comment ?? null })) as BudgetRevision[];
     },
   });
 }

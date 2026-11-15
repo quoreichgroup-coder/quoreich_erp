@@ -39,7 +39,7 @@ describe("budget RBAC matrix", () => {
     expect(p.canApprove).toBe(false);
     expect(p.canLockPeriod).toBe(false);
     expect(p.canExport).toBe(false);
-    expect(p.canManageScenarios).toBe(false);
+    expect(p.canManageScenarios).toBe(true);
   });
 
   it("approver can approve/lock/export but cannot create or edit", () => {
@@ -63,10 +63,10 @@ describe("budget RBAC matrix", () => {
     }
   });
 
-  it("manage_scenarios is admin-exclusive", () => {
-    expect(REQUIRED_ROLES.manage_scenarios).toEqual(["budget_admin"]);
+  it("manage_scenarios (budget.forecast, V78) : le préparateur établit les prévisions, l'approbateur non", () => {
+    expect(REQUIRED_ROLES.manage_scenarios).toEqual(["budget_planner", "budget_admin"]);
     for (const r of ALL_BUDGET_ROLES) {
-      expect(permsFor([r]).canManageScenarios).toBe(r === "budget_admin");
+      expect(permsFor([r]).canManageScenarios).toBe(r === "budget_admin" || r === "budget_planner");
     }
   });
 

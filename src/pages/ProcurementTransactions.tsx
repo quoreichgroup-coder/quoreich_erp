@@ -38,7 +38,8 @@ import { useSuppliers } from "@/hooks/use-ap-data";
 import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
 import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
-import { useDocumentAnalytics } from "@/hooks/use-document-analytics";
+import { useDocumentAnalytics, useLineAnalytics, type LineAnalytics } from "@/hooks/use-document-analytics";
+import { LineAnalyticsEditor } from "@/components/LineAnalyticsEditor";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
@@ -87,6 +88,25 @@ const toDraftLines = (rows: any[] | undefined, price: string): DraftDocLine[] =>
     ? rows.map((l) => ({ description: l.description ?? "", quantity: String(l.quantity), unitPrice: String(l[price] ?? "") }))
     : [emptyDocLine()];
 
+type LineWithAnalytics = DraftDocLine & { analytics?: LineAnalytics };
+
+/** Lignes enregistrables (libellé renseigné), chacune avec ses sections. */
+function withAnalytics(lines: DraftDocLine[]) {
+  const kept = (lines as LineWithAnalytics[]).filter((l) => l.description.trim() !== "");
+  return toLines(kept).map((l, i) => ({ ...l, analytics: kept[i].analytics }));
+}
+
+/** En modification : sections de chaque ligne existante, reportées sur les lignes du formulaire (même ordre). */
+function useEditLineAnalytics(kind: "PR" | "PO", rows: any[] | undefined, setLines: (f: (ls: DraftDocLine[]) => DraftDocLine[]) => void) {
+  const ids = (rows ?? []).map((r) => r.id as string).filter(Boolean);
+  const { data } = useLineAnalytics(kind, ids);
+  useEffect(() => {
+    if (!data || data.size === 0) return;
+    setLines((ls) => ls.map((l, i) => (ids[i] && data.get(ids[i]) ? { ...l, analytics: data.get(ids[i]) } as DraftDocLine : l)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+}
+
 function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any }) {
   const { user } = useAuth();
   const tenantId = useMyTenantId();
@@ -99,6 +119,7 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
   const [analytics, setAnalytics] = useState<Record<string, string>>({});
   const saved = useDocumentAnalytics("PR", edit?.id);
   useEffect(() => { if (saved.data) setAnalytics(saved.data); }, [saved.data]);
+  useEditLineAnalytics("PR", edit?.lines, setLines);
   const reset = () => { setDesc(""); setReqDate(new Date().toISOString().slice(0, 10)); setLines([emptyDocLine()]); setError(null); setAnalytics({}); };
 
   const handleSubmit = () => {
@@ -106,7 +127,7 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
     const problem = validateDocLines(lines);
     if (problem) { setError(problem); return; }
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
-    const rows = toLines(lines);
+    const rows = withAnalytics(lines);
     if (edit) {
       updateDraft.mutate(
         { docType: "PR", id: edit.id, header: { description: desc.trim(), request_date: reqDate, estimated_total: documentFooter(lines).total }, lines: rows, analytics },
@@ -120,7 +141,7 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
       estimated_total: documentFooter(lines).total,
       tenant_id: tenantId,
       requested_by: user.id,
-      lines: rows.map((l) => ({ description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice })),
+      lines: rows.map((l) => ({ description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics })),
       analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
@@ -139,6 +160,7 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
           <DocumentLinesEditor lines={lines} onChange={setLines} priceLabel="Coût estimé" />
           <AnalyticSelectors date={reqDate} value={analytics} idPrefix="pr"
             onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
+          <LineAnalyticsEditor lines={lines as LineWithAnalytics[]} onChange={(ls) => setLines(ls)} date={reqDate} idPrefix="pr" />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
@@ -168,6 +190,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
   const [analytics, setAnalytics] = useState<Record<string, string>>({});
   const saved = useDocumentAnalytics("PO", edit?.id);
   useEffect(() => { if (saved.data) setAnalytics(saved.data); }, [saved.data]);
+  useEditLineAnalytics("PO", edit?.lines, setLines);
   const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); setAnalytics({}); };
 
   const handleSubmit = () => {
@@ -177,7 +200,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
     if (edit) {
       updateDraft.mutate(
-        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: toLines(lines), analytics },
+        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: withAnalytics(lines), analytics },
         { onSuccess: () => onOpenChange(false) });
       return;
     }
@@ -190,7 +213,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       total: documentFooter(lines).total,
       tenant_id: tenantId,
       created_by: user.id,
-      lines: toLines(lines).map((l) => ({ description: l.description, quantity: l.quantity, unit_cost: l.unitPrice })),
+      lines: withAnalytics(lines).map((l) => ({ description: l.description, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics })),
       analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
@@ -222,6 +245,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
           <DocumentLinesEditor lines={lines} onChange={setLines} />
           <AnalyticSelectors date={orderDate} value={analytics} idPrefix="po"
             onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
+          <LineAnalyticsEditor lines={lines as LineWithAnalytics[]} onChange={(ls) => setLines(ls)} date={orderDate} idPrefix="po" />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>

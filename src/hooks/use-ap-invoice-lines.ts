@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { saveDocumentAnalytics } from "@/hooks/use-document-analytics";
+import { saveDocumentAnalytics, saveLineAnalytics, type LineAnalytics } from "@/hooks/use-document-analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
@@ -13,13 +13,16 @@ const db = supabase as any;
 
 export type APLineInput = {
   description: string; quantity: number; unit_price: number; discount_pct: number; tax_code_id: string | null;
-  po_line_id: string | null; expense_account_id?: string | null;
+  po_line_id: string | null; expense_account_id?: string | null; analytics?: LineAnalytics;
 };
 export type APInvoiceHeader = {
   supplier_id: string; po_id: string | null; invoice_number: string; invoice_date: string; due_date: string; control_total: number | null;
 };
-export type APInvoiceLine = APLineInput & { id: string; line_no: number; net_amount: number; tax_amount: number; grni_cleared: number };
+export type APInvoiceLine = Omit<APLineInput, "analytics"> & { id: string; line_no: number; net_amount: number; tax_amount: number; grni_cleared: number };
 export type POLineToInvoice = { po_line_id: string; description: string; unit_cost: number; ordered: number; received: number; invoiced: number; remaining: number };
+
+/** Identifiants des lignes enregistrées, dans l'ordre des numéros de ligne. */
+const lineIds = (data: { id: string; line_no: number }[] | null) => [...(data ?? [])].sort((a, b) => a.line_no - b.line_no).map((r) => r.id);
 
 const rows = (invoiceId: string, tenantId: string, lines: APLineInput[]) => lines.map((l, i) => ({
   tenant_id: tenantId, invoice_id: invoiceId, line_no: i + 1, description: l.description.trim(), quantity: l.quantity, unit_price: l.unit_price,
@@ -64,22 +67,26 @@ export function useSaveAPInvoiceWithLines() {
         if (!data?.length) throw new Error("Refusé : droit « Saisir et modifier les factures fournisseurs » requis.");
         const del = await db.from("ap_invoice_lines").delete().eq("invoice_id", v.id);
         if (del.error) throw del.error;
-        const ins = await db.from("ap_invoice_lines").insert(rows(v.id, tenantId, v.lines));
+        const ins = await db.from("ap_invoice_lines").insert(rows(v.id, tenantId, v.lines)).select("id, line_no");
         if (ins.error) throw ins.error;
         await saveDocumentAnalytics("AP", v.id, v.analytics);
+        await saveLineAnalytics("AP", lineIds(ins.data), v.lines.map((l) => l.analytics));
         return v.id;
       }
       const { data: inv, error } = await db.from("ap_invoices").insert({
         ...v.header, tenant_id: tenantId, created_by: user!.id, status: "draft", approval_status: "draft", amount_paid: 0, subtotal: 0, tax_amount: 0, total: 0,
       }).select("id").single();
       if (error) throw error;
-      const ins = await db.from("ap_invoice_lines").insert(rows(inv.id, tenantId, v.lines));
+      const ins = await db.from("ap_invoice_lines").insert(rows(inv.id, tenantId, v.lines)).select("id, line_no");
       if (ins.error) {
         await db.from("ap_invoices").delete().eq("id", inv.id);
         throw ins.error;
       }
       // Sans choix explicite, la base reprend les sections de la commande citée (V77).
-      try { await saveDocumentAnalytics("AP", inv.id, v.analytics); } catch (e) {
+      try {
+        await saveDocumentAnalytics("AP", inv.id, v.analytics);
+        await saveLineAnalytics("AP", lineIds(ins.data), v.lines.map((l) => l.analytics));
+      } catch (e) {
         await db.from("ap_invoices").delete().eq("id", inv.id);
         throw e;
       }
