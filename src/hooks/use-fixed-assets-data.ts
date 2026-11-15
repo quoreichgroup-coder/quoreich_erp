@@ -91,51 +91,8 @@ export function useAssetDisposals() {
   });
 }
 
-export function useRunMonthlyDepreciation() {
-  const qc = useQueryClient();
-  const { data: tenantId } = useTenantId();
-  return useMutation({
-    mutationFn: async (period: string) => {
-      const { data, error } = await supabase.rpc("post_monthly_depreciation" as never, {
-        _tenant_id: tenantId!, _period: period,
-      } as never);
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (rows: unknown) => {
-      const count = Array.isArray(rows) ? rows.length : 0;
-      qc.invalidateQueries({ queryKey: ["assets"] });
-      qc.invalidateQueries({ queryKey: ["asset-kpis"] });
-      qc.invalidateQueries({ queryKey: ["assets-register"] });
-      toast.success(`Dotation comptabilisée : ${count} actif(s)`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function usePostAssetDisposal() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      asset_id: string; disposal_date: string; disposal_type: string; sale_price: number; notes?: string;
-    }) => {
-      const { data, error } = await supabase.rpc("post_asset_disposal" as never, {
-        _asset_id: input.asset_id, _disposal_date: input.disposal_date,
-        _disposal_type: input.disposal_type, _sale_price: input.sale_price,
-        _notes: input.notes ?? null,
-      } as never);
-      if (error) throw error;
-      return data as string;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["assets"] });
-      qc.invalidateQueries({ queryKey: ["asset-disposals"] });
-      qc.invalidateQueries({ queryKey: ["asset-kpis"] });
-      toast.success("Cession enregistrée");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
+// V75 : run_depreciation / dispose_asset (les anciennes fonctions, inutilisables, sont supprimées).
+export { useRunDepreciation as useRunMonthlyDepreciation, useDisposeAsset as usePostAssetDisposal } from "@/hooks/use-asset-accounting";
 
 /* ===== RBAC ===== */
 

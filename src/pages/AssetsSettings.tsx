@@ -8,9 +8,10 @@ import { ArrowRight, Settings, BookOpen, Calculator, Link, Wrench, Shield } from
 import { cn } from "@/lib/utils";
 import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
 import { FixedAssetsRolesPanel } from "@/components/FixedAssetsRolesPanel";
+import { AssetCategoriesPanel, AssetSettingsCard } from "@/components/AssetAccountingPanels";
 
 const tabs = [
-  { id: "general", label: "General", icon: Settings },
+  { id: "general", label: "Catégories et amortissements", icon: Settings },
   { id: "roles", label: "Rôles & Audit", icon: Shield },
   { id: "glposting", label: "GL Posting", icon: BookOpen },
   { id: "depreciation", label: "Depreciation", icon: Calculator },
@@ -66,33 +67,7 @@ export default function AssetsSettings() {
         ))}
       </div>
 
-      {activeTab === "general" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Depreciation Methods</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2">
-              {depreciationMethods.map(m => (
-                <div key={m.method} className="flex items-center gap-3 p-3 rounded-lg border border-border text-xs">
-                  <div className="flex-1">
-                    <div className="font-medium text-foreground">{m.method}</div>
-                    <div className="text-muted-foreground font-mono mt-0.5">{m.formula}</div>
-                  </div>
-                  {m.default && <Badge variant="default" className="text-[10px]">Default</Badge>}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Posting Rules</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2 text-xs text-muted-foreground">
-              {postingRules.map((r, i) => (
-                <div key={i} className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />{r}</div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {activeTab === "general" && <div className="space-y-4"><AssetCategoriesPanel /><AssetSettingsCard /></div>}
 
       {activeTab === "roles" && <FixedAssetsRolesPanel />}
 

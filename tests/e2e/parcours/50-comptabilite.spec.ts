@@ -208,6 +208,10 @@ test("plan comptable : correspondance vers le PCG, validation, balance convertie
   await page.getByRole("button", { name: "Créer la correspondance" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Correspondance créée" }).first()).toBeVisible();
   await page.getByTestId("mapping-row").filter({ hasText: nom }).click();
+  // Un passage interrompu a pu laisser la séparation des tâches levée : la rétablir d'abord.
+  const strict = page.getByRole("switch", { name: "Correspondances validées par une autre personne" });
+  await page.waitForLoadState("networkidle");
+  if (!(await strict.isChecked())) { await strict.click(); await expect(strict).toBeChecked(); }
   await page.getByRole("button", { name: "Proposer automatiquement" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "proposée(s), à valider" }).first()).toBeVisible();
   await expect(page.getByTestId("mapping-summary")).toContainText("0 validée(s)");
@@ -223,8 +227,19 @@ test("plan comptable : correspondance vers le PCG, validation, balance convertie
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Modèle importé : 1 compte(s), 2 ligne(s)" }).first()).toBeVisible();
   await expect(page.getByTestId("mapping-line").filter({ hasText: "521" }).filter({ hasText: "60 %" })).toHaveCount(1);
 
+  obs.etape("comptes mouvementés sans équivalent automatique (ex. 812 / 822 HAO, absents du PCG) : saisie manuelle");
+  const nonCouvert = page.getByTestId("mapping-line").filter({ hasText: "Compte non couvert" }).filter({ hasText: / l\.$|· \d+ l\./ });
+  for (let n = await nonCouvert.count(); n > 0; n--) {
+    const ligne = nonCouvert.first();
+    await ligne.getByRole("button", { name: "Modifier" }).click();
+    const d = page.getByRole("dialog");
+    await d.getByLabel("Compte cible 1").fill("47");
+    await d.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(d).toBeHidden();
+    await expect.poll(async () => nonCouvert.count()).toBe(n - 1);
+  }
+
   obs.etape("décision (séparation des tâches levée le temps du parcours)");
-  const strict = page.getByRole("switch", { name: "Correspondances validées par une autre personne" });
   await strict.click();
   await expect(strict).not.toBeChecked();
   await page.getByRole("button", { name: /^Tout sélectionner \([1-9]/ }).click();

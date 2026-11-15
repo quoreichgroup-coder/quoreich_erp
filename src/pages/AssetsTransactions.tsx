@@ -23,6 +23,7 @@ import {
   useRunMonthlyDepreciation,
 } from "@/hooks/use-fixed-assets-data";
 import { actionTooltip, canDo, maskAmount } from "@/lib/fixed-assets-roles";
+import { useReverseLastDepreciation } from "@/hooks/use-asset-accounting";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToCSV } from "@/lib/csv-export";
@@ -52,6 +53,7 @@ export default function AssetsTransactions() {
   const { data: depEntries = [], isLoading: ld } = useDepreciationEntries();
   const { data: disposals = [], isLoading: ldis } = useAssetDisposals();
   const runDep = useRunMonthlyDepreciation();
+  const reverseDep = useReverseLastDepreciation();
   const [period, setPeriod] = usePersistentState<string>("fa-tx:period", new Date().toISOString().slice(0, 7));
   const [dateFrom, setDateFrom] = usePersistentState<string>("fa-tx:dateFrom", "");
   const [dateTo, setDateTo] = usePersistentState<string>("fa-tx:dateTo", "");
@@ -128,14 +130,20 @@ export default function AssetsTransactions() {
         <h1 className="text-lg font-semibold text-foreground">Transactions</h1>
         <div className="flex gap-2 items-center">
           <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="h-8 w-[140px] text-xs" />
+          {canDo(perms, "run_depreciation") && (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={reverseDep.isPending}
+              onClick={() => { const r = window.prompt("Motif de la contre-passation du dernier calcul d'amortissements"); if (r && r.trim()) reverseDep.mutate(r.trim()); }}>
+              Contre-passer le dernier calcul
+            </Button>
+          )}
           <Button
             size="sm" className="gap-1.5"
             disabled={!canDo(perms, "run_depreciation") || runDep.isPending}
             onClick={() => runDep.mutate(`${period}-01`)}
-            aria-label={depTooltip} title={depTooltip}
+            title={depTooltip}
           >
             {canDo(perms, "run_depreciation") ? <Play className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            Dotation mensuelle
+            Calculer les amortissements
           </Button>
           <Button
             size="sm" variant="outline" className="gap-1.5"

@@ -18,6 +18,7 @@ import { Download, Plus, Lock } from "lucide-react";
 import { useTableFeatures } from "@/hooks/use-table-features";
 import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
 import { useAssets, useAssetCategories, useCreateAsset } from "@/hooks/use-asset-data";
+import { AssetDisposalForm } from "@/components/AssetAccountingPanels";
 import { useMyFixedAssetRoles } from "@/hooks/use-fixed-assets-data";
 import { actionTooltip, canDo, maskAmount } from "@/lib/fixed-assets-roles";
 import { exportToCSV } from "@/lib/csv-export";
@@ -28,7 +29,7 @@ const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
 // UI-side allowlist mirroring DB column allowlist for new asset creation
 const ASSET_CREATE_ALLOWLIST = [
   "asset_code", "name", "category_id", "acquisition_date", "acquisition_cost",
-  "salvage_value", "useful_life_months", "depreciation_method", "location",
+  "salvage_value", "useful_life_months", "depreciation_method", "location", "in_service_date", "opening_accumulated", "opening_date",
 ] as const;
 
 export default function AssetsMasterData() {
@@ -91,7 +92,7 @@ export default function AssetsMasterData() {
     for (const k of ASSET_CREATE_ALLOWLIST) {
       const v = form[k];
       if (v === "" || v == null) continue;
-      if (k === "acquisition_cost" || k === "salvage_value" || k === "useful_life_months") {
+      if (k === "acquisition_cost" || k === "salvage_value" || k === "useful_life_months" || k === "opening_accumulated") {
         payload[k] = Number(v);
       } else {
         payload[k] = v;
@@ -129,32 +130,35 @@ export default function AssetsMasterData() {
             <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Créer une immobilisation</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><Label className="text-xs">Code *</Label><Input value={form.asset_code} onChange={(e) => setForm({ ...form, asset_code: e.target.value })} /></div>
-                <div><Label className="text-xs">Nom *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-code">Code *</Label><Input id="as-code" value={form.asset_code} onChange={(e) => setForm({ ...form, asset_code: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-name">Nom *</Label><Input id="as-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="col-span-2">
-                  <Label className="text-xs">Catégorie</Label>
+                  <Label className="text-xs" htmlFor="as-category">Catégorie</Label>
                   <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger>
+                    <SelectTrigger id="as-category"><SelectValue placeholder="Choisir…" /></SelectTrigger>
                     <SelectContent>
                       {(categories as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label className="text-xs">Date acquisition</Label><Input type="date" value={form.acquisition_date} onChange={(e) => setForm({ ...form, acquisition_date: e.target.value })} /></div>
-                <div><Label className="text-xs">Coût (XOF) *</Label><Input type="number" value={form.acquisition_cost} onChange={(e) => setForm({ ...form, acquisition_cost: e.target.value })} /></div>
-                <div><Label className="text-xs">Valeur résiduelle</Label><Input type="number" value={form.salvage_value} onChange={(e) => setForm({ ...form, salvage_value: e.target.value })} /></div>
-                <div><Label className="text-xs">Durée (mois)</Label><Input type="number" value={form.useful_life_months} onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-date">Date acquisition</Label><Input id="as-date" type="date" value={form.acquisition_date} onChange={(e) => setForm({ ...form, acquisition_date: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-cost">Coût (XOF) *</Label><Input id="as-cost" type="number" value={form.acquisition_cost} onChange={(e) => setForm({ ...form, acquisition_cost: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-salvage">Valeur résiduelle</Label><Input id="as-salvage" type="number" value={form.salvage_value} onChange={(e) => setForm({ ...form, salvage_value: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-life">Durée (mois)</Label><Input id="as-life" type="number" value={form.useful_life_months} onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} /></div>
                 <div className="col-span-2">
-                  <Label className="text-xs">Méthode</Label>
+                  <Label className="text-xs" htmlFor="as-method">Méthode</Label>
                   <Select value={form.depreciation_method} onValueChange={(v) => setForm({ ...form, depreciation_method: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="as-method"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="straight_line">Linéaire</SelectItem>
                       <SelectItem value="declining_balance">Dégressif</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="col-span-2"><Label className="text-xs">Localisation</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-in-service">Mise en service</Label><Input id="as-in-service" type="date" value={form.in_service_date ?? ""} onChange={(e) => setForm({ ...form, in_service_date: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-opening">Amortissements déjà pratiqués</Label><Input id="as-opening" type="number" value={form.opening_accumulated ?? ""} placeholder="0" onChange={(e) => setForm({ ...form, opening_accumulated: e.target.value })} /></div>
+                <div className="col-span-2"><Label className="text-xs" htmlFor="as-opening-date">…arrêtés au (reprise d'un registre existant)</Label><Input id="as-opening-date" type="date" value={form.opening_date ?? ""} onChange={(e) => setForm({ ...form, opening_date: e.target.value })} /></div>
+                <div className="col-span-2"><Label className="text-xs" htmlFor="as-location">Localisation</Label><Input id="as-location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
@@ -194,7 +198,7 @@ export default function AssetsMasterData() {
               {table.pagedData.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">Aucun actif trouvé.</TableCell></TableRow>
               ) : table.pagedData.map((a) => (
-                <TableRow key={a.id} className="text-xs cursor-pointer hover:bg-muted/20" onClick={() => setSelected(a)}>
+                <TableRow key={a.id} data-testid="asset-row" className="text-xs cursor-pointer hover:bg-muted/20" onClick={() => setSelected(a)}>
                   <TableCell className="font-mono text-primary">{a.asset_code}</TableCell>
                   <TableCell className="font-medium max-w-[180px] truncate">{a.name}</TableCell>
                   <TableCell className="text-muted-foreground">{a.categoryName}</TableCell>
@@ -241,6 +245,7 @@ export default function AssetsMasterData() {
                 {selected.acquisitionCost - selected.salvageValue > 0 && (
                   <Progress value={(selected.accumulatedDepreciation / (selected.acquisitionCost - selected.salvageValue)) * 100} className="h-2" />
                 )}
+                <AssetDisposalForm asset={selected} onDone={() => setSelected(null)} />
               </div>
               <SheetFooter className="mt-4 text-xs text-muted-foreground">
                 {!canDo(perms, "edit_asset") && <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Édition verrouillée</span>}

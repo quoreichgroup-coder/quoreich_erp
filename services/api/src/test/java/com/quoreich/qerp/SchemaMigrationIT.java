@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "74";
+  private static final String DERNIERE_MIGRATION = "76";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -72,7 +72,7 @@ class SchemaMigrationIT {
           "purchase_orders/trg_commit_budget_on_po");
 
   /** V73 — fonction de la base de référence supprimée (remplacée par le contrôle budgétaire). */
-  private static final Set<String> FONCTIONS_RETIREES = Set.of("commit_budget_on_po");
+  private static final Set<String> FONCTIONS_RETIREES = Set.of("commit_budget_on_po", "post_monthly_depreciation", "post_asset_disposal");
 
   /** V32 — user_roles, table de transition depuis V23, est supprimée avec ses politiques. */
   private static final Set<String> TABLES_RETIREES = Set.of("user_roles");
@@ -93,6 +93,11 @@ class SchemaMigrationIT {
           "ar_payment_terms/Tenant isolation",
           "ar_dunning_rules/Tenant isolation",
           "ar_notification_rules/Tenant isolation",
+          // V75 — immobilisations : plus d'écriture pour tout membre.
+          "asset_categories/Tenant isolation",
+          "assets/Tenant isolation",
+          "depreciation_entries/Access via asset",
+          "asset_disposals/tenant access asset_disposals",
           // V73 — budgets : plus d'écriture pour tout membre.
           "budgets/Tenant isolation",
           "budget_lines/Access via budget",
@@ -227,7 +232,10 @@ class SchemaMigrationIT {
           "grni_ledger",
           // V73 — contrôle budgétaire.
           "budget_settings",
-          "budget_revisions");
+          "budget_revisions",
+          // V75 — immobilisations.
+          "asset_settings",
+          "depreciation_runs");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -464,7 +472,16 @@ class SchemaMigrationIT {
           "budget_status",
           "check_budget_on_po",
           "budget_override_po",
-          "check_budget_on_ap_invoice");
+          "check_budget_on_ap_invoice",
+          // V75 — immobilisations.
+          "asset_setting",
+          "guard_asset_category",
+          "guard_asset",
+          "refresh_asset_depreciation",
+          "asset_depreciation_amount",
+          "run_depreciation",
+          "reverse_last_depreciation",
+          "dispose_asset");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -593,6 +610,16 @@ class SchemaMigrationIT {
           "budgets/Préparation habilitée",
           "budget_lines/Lecture société",
           "budget_lines/Préparation habilitée",
+          // V75 — immobilisations : écriture réservée, amortissements et cessions par fonctions.
+          "asset_settings/Lecture société",
+          "asset_settings/Paramétrage habilité",
+          "asset_categories/Lecture société",
+          "asset_categories/Paramétrage habilité",
+          "assets/Lecture société",
+          "assets/Gestion habilitée",
+          "depreciation_runs/Lecture société",
+          "depreciation_entries/Lecture société",
+          "asset_disposals/Lecture société",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -649,6 +676,10 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V75 — immobilisations.
+          "asset_categories/trg_guard_asset_category",
+          "assets/trg_guard_asset",
+          "depreciation_entries/trg_refresh_asset_depreciation",
           // V73 — contrôle budgétaire.
           "budgets/trg_guard_budget",
           "budget_lines/trg_guard_budget_line",
