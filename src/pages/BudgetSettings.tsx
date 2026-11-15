@@ -10,8 +10,10 @@ import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLP
 import { BudgetRolesPanel } from "@/components/BudgetRolesPanel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { useBudgetControlSettings, useSaveBudgetControlSettings } from "@/hooks/use-budget-control";
+import { useBudgetControlSettings, useSaveBudgetControlSettings, DEFAULT_BUDGET_SETTINGS, type BudgetControlSettings } from "@/hooks/use-budget-control";
 
 const tabs = [
   { id: "general", label: "Contrôle budgétaire", icon: Settings },
@@ -122,30 +124,48 @@ export default function BudgetSettings() {
   );
 }
 
-/* Contrôle budgétaire (V73) : mode (désactivé / avertissement / blocage) et niveau (année / mois). */
+/* Contrôle budgétaire (V73, V77) : mode, niveau, pré-engagement des demandes d'achat, contrôle par section, seuil d'alerte. */
 function BudgetControlSettingsCard() {
   const { data: access } = useMyAccess();
   const canEdit = (access?.permissions ?? []).includes("budget.settings");
   const { data } = useBudgetControlSettings();
   const save = useSaveBudgetControlSettings();
-  const [f, setF] = useState<{ control_mode: string; control_level: string } | null>(null);
-  const v = f ?? data ?? { control_mode: "off", control_level: "year" };
+  const [f, setF] = useState<BudgetControlSettings | null>(null);
+  const v = f ?? data ?? DEFAULT_BUDGET_SETTINGS;
+  const set = (patch: Partial<BudgetControlSettings>) => setF({ ...v, ...patch });
+  const threshold = Number(v.alert_threshold_pct);
+  const thresholdOk = threshold > 0 && threshold <= 100;
+  const toggle = (id: string, label: string, hint: string, key: "precommit_requisitions" | "control_requisitions" | "analytic_control", disabled = false) => (
+    <div className="flex items-start justify-between gap-3 border-t border-border/60 pt-2">
+      <div><Label className="text-xs" htmlFor={id}>{label}</Label><p className="text-[11px] text-muted-foreground">{hint}</p></div>
+      <Switch id={id} checked={v[key]} disabled={!canEdit || disabled} onCheckedChange={(c) => set({ [key]: c } as Partial<BudgetControlSettings>)} />
+    </div>
+  );
   return (
-    <Card className="border-border max-w-2xl">
+    <Card className="border-border max-w-2xl" data-testid="budget-control-settings">
       <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Contrôle budgétaire</CardTitle></CardHeader>
       <CardContent className="p-4 pt-0 space-y-3 text-xs">
-        <p className="text-muted-foreground">Contrôle à la soumission et à l'approbation des commandes, et à la soumission des factures fournisseurs sans commande, contre le budget de contrôle approuvé de l'exercice : disponible = budget − engagé − réalisé.</p>
+        <p className="text-muted-foreground">Contrôle à la soumission des demandes d'achat, à la soumission et à l'approbation des commandes, et à la soumission des factures fournisseurs sans commande, contre le budget de contrôle approuvé de l'exercice : disponible = budget − pré-engagé (demandes) − engagé (commandes) − réalisé.</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-mode">Mode</Label>
-            <select id="bc-mode" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_mode} disabled={!canEdit} onChange={(e) => setF({ ...v, control_mode: e.target.value })}>
+            <select id="bc-mode" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_mode} disabled={!canEdit} onChange={(e) => set({ control_mode: e.target.value as BudgetControlSettings["control_mode"] })}>
               <option value="off">Désactivé</option><option value="warn">Avertir (la pièce passe, le dépassement est signalé)</option><option value="block">Bloquer (dépassement autorisé par un habilité)</option>
             </select></div>
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-level">Niveau</Label>
-            <select id="bc-level" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_level} disabled={!canEdit} onChange={(e) => setF({ ...v, control_level: e.target.value })}>
+            <select id="bc-level" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_level} disabled={!canEdit} onChange={(e) => set({ control_level: e.target.value as BudgetControlSettings["control_level"] })}>
               <option value="year">Annuel (budget de l'exercice)</option><option value="month">Mensuel (lignes du mois)</option>
             </select></div>
         </div>
-        {canEdit ? <Button size="sm" className="h-8 text-xs" disabled={!f || save.isPending} onClick={() => save.mutate(v, { onSuccess: () => setF(null) })}>Enregistrer</Button>
+        {toggle("bc-precommit", "Pré-engager les demandes d'achat", "Une demande soumise ou approuvée, non encore convertie en commande, réserve le budget.", "precommit_requisitions")}
+        {toggle("bc-control-pr", "Contrôler les demandes d'achat à la soumission", "Comme une commande : refus ou avertissement selon le mode.", "control_requisitions", !v.precommit_requisitions)}
+        {toggle("bc-analytic", "Contrôler les budgets par section analytique", "Une ligne de budget sur une section contrôle les pièces de cette section et de ses sous-sections.", "analytic_control")}
+        <div className="flex items-start justify-between gap-3 border-t border-border/60 pt-2">
+          <div><Label className="text-xs" htmlFor="bc-threshold">Seuil d'alerte (%)</Label>
+            <p className="text-[11px] text-muted-foreground">Écran Contrôle : une ligne consommée (pré-engagé + engagé + réalisé) à ce pourcentage ou plus est signalée.</p></div>
+          <Input id="bc-threshold" type="number" min={1} max={100} className="h-8 w-24 text-xs" value={String(v.alert_threshold_pct)} disabled={!canEdit}
+            onChange={(e) => set({ alert_threshold_pct: e.target.value === "" ? 0 : Number(e.target.value) })} />
+        </div>
+        {canEdit ? <Button size="sm" className="h-8 text-xs" disabled={!f || !thresholdOk || save.isPending} onClick={() => save.mutate(v, { onSuccess: () => setF(null) })}>Enregistrer</Button>
           : <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres du contrôle budgétaire » est requis.</p>}
       </CardContent>
     </Card>

@@ -24,6 +24,8 @@ import { usePurchaseOrders } from "@/hooks/use-procurement-data";
 import { useAPInvoiceLines, usePOLinesToInvoice, useSaveAPInvoiceWithLines } from "@/hooks/use-ap-invoice-lines";
 import { useTaxCodes } from "@/hooks/use-tax-codes";
 import { CommercialLinesEditor, CommercialTotals } from "@/components/CommercialLinesEditor";
+import { AnalyticSelectors } from "@/components/AnalyticSelectors";
+import { useDocumentAnalytics } from "@/hooks/use-document-analytics";
 import { emptyLine, invoiceTotals, type DraftLine } from "@/lib/invoice-lines";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,6 +79,11 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   });
   const [lines, setLines] = useState<APDraftLine[]>([{ ...emptyLine(), poLineId: null }]);
   const [loaded, setLoaded] = useState(!edit);
+  // Sections analytiques : envoyées seulement si l'utilisateur en choisit (sinon reprise de la commande par la base).
+  const [analytics, setAnalytics] = useState<Record<string, string>>({});
+  const [analyticsTouched, setAnalyticsTouched] = useState(false);
+  const savedAnalytics = useDocumentAnalytics("AP", edit?.id);
+  useEffect(() => { if (savedAnalytics.data && !analyticsTouched) setAnalytics(savedAnalytics.data); }, [savedAnalytics.data, analyticsTouched]);
   useEffect(() => {
     if (!edit || loaded || !linesLoaded) return;
     setLines(editLines.length ? editLines.map((l) => ({ description: l.description, quantity: String(l.quantity), unitPrice: String(l.unit_price),
@@ -110,6 +117,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
         lines: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity.replace(",", ".")), unit_price: Number(l.unitPrice.replace(",", ".")),
           discount_pct: l.discountPct === "" ? 0 : Number(l.discountPct.replace(",", ".")), tax_code_id: l.taxCodeId || null,
           po_line_id: form.po_id ? l.poLineId : null })),
+        analytics: analyticsTouched ? analytics : undefined,
       });
       onClose();
     } catch {
@@ -168,6 +176,9 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
           <CommercialLinesEditor lines={lines} onChange={(ls) => setLines(ls.map((l) => ({ ...l, poLineId: (l as APDraftLine).poLineId ?? null })))}
             taxCodes={taxCodes} testId="ap-invoice-lines" linePrefix="ap-invoice-line" />
           <CommercialTotals lines={lines} taxCodes={taxCodes} />
+          <AnalyticSelectors date={form.invoice_date} value={analytics} idPrefix="ap-invoice"
+            onChange={(axis, value) => { setAnalyticsTouched(true); setAnalytics((a) => ({ ...a, [axis]: value })); }} />
+          {form.po_id && !analyticsTouched && !edit && <p className="text-[11px] text-muted-foreground">Sans choix, les sections analytiques de la commande sont reprises.</p>}
           {!controlOk && <p className="text-xs text-destructive" role="alert">Le total des lignes ({fmtCurrency(totals.total)}) diffère du montant TTC de la facture ({fmtCurrency(control ?? 0)}).</p>}
         </div>
         <DialogFooter>

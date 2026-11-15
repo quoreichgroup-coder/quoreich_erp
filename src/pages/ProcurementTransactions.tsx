@@ -1,5 +1,5 @@
 import { exportToCSV } from "@/lib/csv-export";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -37,6 +37,8 @@ import {
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { isReceivable, linesToReceive, validateReceipt } from "@/lib/goods-receipt";
 import { DocumentLinesEditor } from "@/components/DocumentLinesEditor";
+import { AnalyticSelectors } from "@/components/AnalyticSelectors";
+import { useDocumentAnalytics } from "@/hooks/use-document-analytics";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
@@ -91,9 +93,13 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
   const createPR = useCreateRequisition();
   const updateDraft = useUpdateProcurementDraft();
   const [desc, setDesc] = useState(edit?.description ?? "");
+  const [reqDate, setReqDate] = useState<string>(() => edit?.request_date ?? new Date().toISOString().slice(0, 10));
   const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "estimated_unit_cost"));
   const [error, setError] = useState<string | null>(null);
-  const reset = () => { setDesc(""); setLines([emptyDocLine()]); setError(null); };
+  const [analytics, setAnalytics] = useState<Record<string, string>>({});
+  const saved = useDocumentAnalytics("PR", edit?.id);
+  useEffect(() => { if (saved.data) setAnalytics(saved.data); }, [saved.data]);
+  const reset = () => { setDesc(""); setReqDate(new Date().toISOString().slice(0, 10)); setLines([emptyDocLine()]); setError(null); setAnalytics({}); };
 
   const handleSubmit = () => {
     if (!desc.trim()) { setError("Objet de la demande requis."); return; }
@@ -103,17 +109,19 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
     const rows = toLines(lines);
     if (edit) {
       updateDraft.mutate(
-        { docType: "PR", id: edit.id, header: { description: desc.trim(), estimated_total: documentFooter(lines).total }, lines: rows },
+        { docType: "PR", id: edit.id, header: { description: desc.trim(), request_date: reqDate, estimated_total: documentFooter(lines).total }, lines: rows, analytics },
         { onSuccess: () => onOpenChange(false) });
       return;
     }
     createPR.mutate({
       pr_number: `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       description: desc.trim(),
+      request_date: reqDate,
       estimated_total: documentFooter(lines).total,
       tenant_id: tenantId,
       requested_by: user.id,
       lines: rows.map((l) => ({ description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice })),
+      analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
@@ -122,9 +130,15 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la demande " + edit.pr_number : "Nouvelle demande d'achat"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div><Label className="text-xs" htmlFor="pr-desc">Objet de la demande</Label>
-            <Input id="pr-desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex : équipement informatique du service comptable" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-3"><Label className="text-xs" htmlFor="pr-desc">Objet de la demande</Label>
+              <Input id="pr-desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex : équipement informatique du service comptable" /></div>
+            <div><Label className="text-xs" htmlFor="pr-date">Date de la demande</Label>
+              <Input id="pr-date" type="date" value={reqDate} onChange={e => setReqDate(e.target.value)} /></div>
+          </div>
           <DocumentLinesEditor lines={lines} onChange={setLines} priceLabel="Coût estimé" />
+          <AnalyticSelectors date={reqDate} value={analytics} idPrefix="pr"
+            onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
@@ -151,7 +165,10 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
   const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "unit_cost"));
   const supplier: any = (suppliers || []).find((s: any) => s.id === supplierId);
   const [error, setError] = useState<string | null>(null);
-  const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); };
+  const [analytics, setAnalytics] = useState<Record<string, string>>({});
+  const saved = useDocumentAnalytics("PO", edit?.id);
+  useEffect(() => { if (saved.data) setAnalytics(saved.data); }, [saved.data]);
+  const reset = () => { setSupplierId(""); setLines([emptyDocLine()]); setError(null); setAnalytics({}); };
 
   const handleSubmit = () => {
     if (!supplierId) { setError("Choisissez le fournisseur."); return; }
@@ -160,7 +177,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
     if (edit) {
       updateDraft.mutate(
-        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: toLines(lines) },
+        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: toLines(lines), analytics },
         { onSuccess: () => onOpenChange(false) });
       return;
     }
@@ -174,6 +191,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       tenant_id: tenantId,
       created_by: user.id,
       lines: toLines(lines).map((l) => ({ description: l.description, quantity: l.quantity, unit_cost: l.unitPrice })),
+      analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
@@ -202,6 +220,8 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
               </select></div>
           </div>
           <DocumentLinesEditor lines={lines} onChange={setLines} />
+          <AnalyticSelectors date={orderDate} value={analytics} idPrefix="po"
+            onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>

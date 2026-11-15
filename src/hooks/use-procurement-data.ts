@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { saveDocumentAnalytics } from "@/hooks/use-document-analytics";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 // ── Requisitions ──────────────────────────────────────────────────────────
@@ -26,12 +27,14 @@ export function useCreateRequisition() {
     mutationFn: async (input: {
       pr_number: string;
       description: string;
+      request_date?: string;
       estimated_total: number;
       tenant_id: string;
       requested_by: string;
       lines: { description: string; quantity: number; estimated_unit_cost: number; item_id?: string }[];
+      analytics?: Record<string, string>;
     }) => {
-      const { lines, ...header } = input;
+      const { lines, analytics, ...header } = input;
       const { data, error } = await supabase
         .from("purchase_requisitions")
         .insert(header)
@@ -54,6 +57,10 @@ export function useCreateRequisition() {
           await supabase.from("purchase_requisitions").delete().eq("id", data.id);
           throw lineErr;
         }
+      }
+      try { await saveDocumentAnalytics("PR", data.id, analytics); } catch (e) {
+        await supabase.from("purchase_requisitions").delete().eq("id", data.id);
+        throw e;
       }
       return data;
     },
@@ -95,9 +102,10 @@ export function useCreatePurchaseOrder() {
       tenant_id: string;
       created_by: string;
       lines: { description: string; quantity: number; unit_cost: number; item_id?: string }[];
+      analytics?: Record<string, string>;
     }) => {
       // En-tête puis lignes ; le total d'en-tête est recalculé par la base (recompute_po_total).
-      const { lines, ...header } = input;
+      const { lines, analytics, ...header } = input;
       const { data, error } = await (supabase as any)
         .from("purchase_orders")
         .insert(header)
@@ -119,6 +127,10 @@ export function useCreatePurchaseOrder() {
           await supabase.from("purchase_orders").delete().eq("id", data.id);
           throw lineErr;
         }
+      }
+      try { await saveDocumentAnalytics("PO", data.id, analytics); } catch (e) {
+        await supabase.from("purchase_orders").delete().eq("id", data.id);
+        throw e;
       }
 
       // Une demande devient commande par convert_pr_to_po (V35 : approbation vérifiée, lignes
@@ -537,6 +549,8 @@ function invalidateProcurement(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["procurement-approvals"] });
   qc.invalidateQueries({ queryKey: ["purchase-requisitions"] });
   qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+  qc.invalidateQueries({ queryKey: ["document-analytics"] });
+  qc.invalidateQueries({ queryKey: ["budget-status"] });
 }
 
 export function useSubmitProcurement() {
@@ -588,6 +602,7 @@ export function useUpdateProcurementDraft() {
     mutationFn: async (input: {
       docType: ProcurementDocType; id: string; header: Record<string, unknown>;
       lines: { description: string; quantity: number; unitPrice: number }[];
+      analytics?: Record<string, string>;
     }) => {
       const db = supabase as any;
       const { data, error } = await db.from(TABLE[input.docType]).update(input.header).eq("id", input.id).select("id");
@@ -602,6 +617,7 @@ export function useUpdateProcurementDraft() {
         : { po_id: input.id, description: l.description, quantity: l.quantity, unit_cost: l.unitPrice });
       const { error: insErr } = await db.from(lineTable).insert(rows);
       if (insErr) throw insErr;
+      await saveDocumentAnalytics(input.docType, input.id, input.analytics);
     },
     onSuccess: () => { invalidateProcurement(qc); toast.success("Pièce modifiée"); },
     onError: (e: any) => toast.error(e.message),

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { saveDocumentAnalytics } from "@/hooks/use-document-analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
@@ -54,7 +55,7 @@ export function useSaveAPInvoiceWithLines() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (v: { id?: string; header: APInvoiceHeader; lines: APLineInput[] }) => {
+    mutationFn: async (v: { id?: string; header: APInvoiceHeader; lines: APLineInput[]; analytics?: Record<string, string> }) => {
       const tenantId = await fetchTenantId();
       if (v.lines.length === 0) throw new Error("Au moins une ligne de facture");
       if (v.id) {
@@ -65,6 +66,7 @@ export function useSaveAPInvoiceWithLines() {
         if (del.error) throw del.error;
         const ins = await db.from("ap_invoice_lines").insert(rows(v.id, tenantId, v.lines));
         if (ins.error) throw ins.error;
+        await saveDocumentAnalytics("AP", v.id, v.analytics);
         return v.id;
       }
       const { data: inv, error } = await db.from("ap_invoices").insert({
@@ -76,10 +78,15 @@ export function useSaveAPInvoiceWithLines() {
         await db.from("ap_invoices").delete().eq("id", inv.id);
         throw ins.error;
       }
+      // Sans choix explicite, la base reprend les sections de la commande citée (V77).
+      try { await saveDocumentAnalytics("AP", inv.id, v.analytics); } catch (e) {
+        await db.from("ap_invoices").delete().eq("id", inv.id);
+        throw e;
+      }
       return inv.id as string;
     },
     onSuccess: (_d, v) => {
-      for (const k of ["ap-invoices", "ap-invoice-lines", "ap-po-lines-to-invoice"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["ap-invoices", "ap-invoice-lines", "ap-po-lines-to-invoice", "document-analytics"]) qc.invalidateQueries({ queryKey: [k] });
       toast.success(v.id ? "Facture fournisseur modifiée" : "Facture fournisseur créée");
     },
     onError: (e: Error) => toast.error(e.message),

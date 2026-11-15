@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "76";
+  private static final String DERNIERE_MIGRATION = "77";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -235,7 +235,11 @@ class SchemaMigrationIT {
           "budget_revisions",
           // V75 — immobilisations.
           "asset_settings",
-          "depreciation_runs");
+          "depreciation_runs",
+          // V77 — imputation analytique des pièces d'achat.
+          "purchase_requisition_analytics",
+          "purchase_order_analytics",
+          "ap_invoice_analytics");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -481,7 +485,18 @@ class SchemaMigrationIT {
           "asset_depreciation_amount",
           "run_depreciation",
           "reverse_last_depreciation",
-          "dispose_asset");
+          "dispose_asset",
+          // V77 — pré-engagement et budgets par section.
+          "guard_document_analytics",
+          "document_analytic_values",
+          "copy_requisition_analytics",
+          "copy_po_analytics_to_ap_invoice",
+          "impute_entry_analytics",
+          "analytic_value_scope",
+          "budget_precommitted",
+          "budget_monthly_actual",
+          "check_budget_on_pr",
+          "budget_override_document");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -620,6 +635,13 @@ class SchemaMigrationIT {
           "depreciation_runs/Lecture société",
           "depreciation_entries/Lecture société",
           "asset_disposals/Lecture société",
+          // V77 — imputation analytique des pièces d'achat.
+          "purchase_requisition_analytics/Lecture société",
+          "purchase_requisition_analytics/Écriture avec la pièce",
+          "purchase_order_analytics/Lecture société",
+          "purchase_order_analytics/Écriture avec la pièce",
+          "ap_invoice_analytics/Lecture société",
+          "ap_invoice_analytics/Écriture factures habilitée",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -679,6 +701,13 @@ class SchemaMigrationIT {
           // V75 — immobilisations.
           "asset_categories/trg_guard_asset_category",
           "assets/trg_guard_asset",
+          // V77.
+          "purchase_requisition_analytics/trg_guard_document_analytics",
+          "purchase_order_analytics/trg_guard_document_analytics",
+          "ap_invoice_analytics/trg_guard_document_analytics",
+          "purchase_requisitions/trg_copy_requisition_analytics",
+          "ap_invoices/trg_copy_po_analytics_to_ap_invoice",
+          "purchase_requisitions/trg_check_budget_on_pr",
           "depreciation_entries/trg_refresh_asset_depreciation",
           // V73 — contrôle budgétaire.
           "budgets/trg_guard_budget",
