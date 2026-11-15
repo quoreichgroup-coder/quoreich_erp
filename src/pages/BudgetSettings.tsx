@@ -8,9 +8,13 @@ import { Settings, BookOpen, Calendar, AlertTriangle, Users, ShieldCheck } from 
 import { cn } from "@/lib/utils";
 import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
 import { BudgetRolesPanel } from "@/components/BudgetRolesPanel";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { useBudgetControlSettings, useSaveBudgetControlSettings } from "@/hooks/use-budget-control";
 
 const tabs = [
-  { id: "general", label: "General", icon: Settings },
+  { id: "general", label: "Contrôle budgétaire", icon: Settings },
   { id: "glposting", label: "GL Posting", icon: BookOpen },
   { id: "periods", label: "Fiscal Periods", icon: Calendar },
   { id: "alerts", label: "Alert Thresholds", icon: AlertTriangle },
@@ -58,33 +62,7 @@ export default function BudgetSettings() {
         ))}
       </div>
 
-      {activeTab === "general" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl">
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Fiscal Periods</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2">
-              {fiscalPeriods.map(p => (
-                <div key={p.period} className="flex items-center justify-between p-3 border border-border rounded text-xs">
-                  <div><div className="font-medium">{p.period}</div><div className="text-muted-foreground">{p.start} → {p.end}</div></div>
-                  <Badge variant={p.status === "Active" ? "default" : "outline"} className="text-[10px]">{p.status}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Alert Thresholds</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2">
-              {alertThresholds.map((t, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 border border-border rounded text-xs">
-                  <Badge variant={t.level === "Critical" ? "destructive" : "secondary"} className="text-[10px]">{t.level}</Badge>
-                  <div className="flex-1"><div className="font-medium">{t.rule}</div><div className="text-muted-foreground">{t.action}</div></div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {activeTab === "general" && <BudgetControlSettingsCard />}
 
       {activeTab === "glposting" && (
         <div className="max-w-3xl">
@@ -141,5 +119,35 @@ export default function BudgetSettings() {
         </div>
       )}
     </PageShell>
+  );
+}
+
+/* Contrôle budgétaire (V73) : mode (désactivé / avertissement / blocage) et niveau (année / mois). */
+function BudgetControlSettingsCard() {
+  const { data: access } = useMyAccess();
+  const canEdit = (access?.permissions ?? []).includes("budget.settings");
+  const { data } = useBudgetControlSettings();
+  const save = useSaveBudgetControlSettings();
+  const [f, setF] = useState<{ control_mode: string; control_level: string } | null>(null);
+  const v = f ?? data ?? { control_mode: "off", control_level: "year" };
+  return (
+    <Card className="border-border max-w-2xl">
+      <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Contrôle budgétaire</CardTitle></CardHeader>
+      <CardContent className="p-4 pt-0 space-y-3 text-xs">
+        <p className="text-muted-foreground">Contrôle à la soumission et à l'approbation des commandes, et à la soumission des factures fournisseurs sans commande, contre le budget de contrôle approuvé de l'exercice : disponible = budget − engagé − réalisé.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-mode">Mode</Label>
+            <select id="bc-mode" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_mode} disabled={!canEdit} onChange={(e) => setF({ ...v, control_mode: e.target.value })}>
+              <option value="off">Désactivé</option><option value="warn">Avertir (la pièce passe, le dépassement est signalé)</option><option value="block">Bloquer (dépassement autorisé par un habilité)</option>
+            </select></div>
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="bc-level">Niveau</Label>
+            <select id="bc-level" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={v.control_level} disabled={!canEdit} onChange={(e) => setF({ ...v, control_level: e.target.value })}>
+              <option value="year">Annuel (budget de l'exercice)</option><option value="month">Mensuel (lignes du mois)</option>
+            </select></div>
+        </div>
+        {canEdit ? <Button size="sm" className="h-8 text-xs" disabled={!f || save.isPending} onClick={() => save.mutate(v, { onSuccess: () => setF(null) })}>Enregistrer</Button>
+          : <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres du contrôle budgétaire » est requis.</p>}
+      </CardContent>
+    </Card>
   );
 }

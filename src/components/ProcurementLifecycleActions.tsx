@@ -1,3 +1,4 @@
+import { useBudgetOverridePO } from "@/hooks/use-budget-control";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,9 +44,19 @@ export function ProcurementLifecycleActions({ docType, doc, approvals, onEdit, e
     && (access?.permissions ?? []).includes(`procurement.approve_l${Math.min(pending.level_order, 3)}`);
   const s = doc.status as string;
   const btn = "h-6 text-[10px]";
+  const overrideBudget = useBudgetOverridePO();
+  const canOverride = docType === "PO" && (access?.permissions ?? []).includes("budget.override") && !doc.budget_override_reason
+    && ["draft", "rejected", "pending_approval"].includes(s);
 
   return (
     <>
+      {docType === "PO" && doc.budget_warning && (
+        <span className="text-[10px] text-warning" data-testid="budget-warning" title={doc.budget_warning}>Budget dépassé{doc.budget_override_reason ? " (autorisé)" : ""}</span>
+      )}
+      {canOverride && (
+        <Button size="sm" variant="ghost" className={btn} disabled={overrideBudget.isPending}
+          onClick={() => { const r = window.prompt("Motif de l'autorisation de dépassement de budget"); if (r && r.trim()) overrideBudget.mutate({ po: doc.id, reason: r.trim() }); }}>Autoriser le dépassement</Button>
+      )}
       {(s === "draft" || s === "rejected") && (
         <>
           <Button size="sm" variant="ghost" className={btn} onClick={onEdit}>Modifier</Button>

@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "72";
+  private static final String DERNIERE_MIGRATION = "74";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -67,7 +67,12 @@ class SchemaMigrationIT {
           "payments/trg_payment_gl",
           "payments/trg_payment_gl_posting",
           "goods_receipts/trg_gr_completed",
-          "journal_entries/trg_journal_entry_audit");
+          "journal_entries/trg_journal_entry_audit",
+          // V73 — faux engagement budgétaire (réalisé gonflé deux fois, jamais libéré).
+          "purchase_orders/trg_commit_budget_on_po");
+
+  /** V73 — fonction de la base de référence supprimée (remplacée par le contrôle budgétaire). */
+  private static final Set<String> FONCTIONS_RETIREES = Set.of("commit_budget_on_po");
 
   /** V32 — user_roles, table de transition depuis V23, est supprimée avec ses politiques. */
   private static final Set<String> TABLES_RETIREES = Set.of("user_roles");
@@ -88,6 +93,9 @@ class SchemaMigrationIT {
           "ar_payment_terms/Tenant isolation",
           "ar_dunning_rules/Tenant isolation",
           "ar_notification_rules/Tenant isolation",
+          // V73 — budgets : plus d'écriture pour tout membre.
+          "budgets/Tenant isolation",
+          "budget_lines/Access via budget",
           // V72 — factures fournisseurs : plus d'écriture pour tout membre.
           "ap_invoices/Tenant isolation",
           // V70 — trésorerie : plus d'écriture pour tout membre.
@@ -216,7 +224,10 @@ class SchemaMigrationIT {
           "chart_migrations",
           // V72 — factures fournisseurs à lignes, factures non parvenues.
           "ap_invoice_lines",
-          "grni_ledger");
+          "grni_ledger",
+          // V73 — contrôle budgétaire.
+          "budget_settings",
+          "budget_revisions");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -435,7 +446,25 @@ class SchemaMigrationIT {
           "grni_open",
           "on_gr_grni",
           "on_supplier_return_grni",
-          "ap_po_lines_to_invoice");
+          "ap_po_lines_to_invoice",
+          // V73 — contrôle budgétaire.
+          "budget_setting",
+          "guard_budget",
+          "guard_budget_line",
+          "refresh_budget_total",
+          "budget_for",
+          "budget_submit",
+          "budget_approve",
+          "budget_reject",
+          "budget_close",
+          "budget_revise_line",
+          "budget_actual",
+          "budget_committed",
+          "budget_availability",
+          "budget_status",
+          "check_budget_on_po",
+          "budget_override_po",
+          "check_budget_on_ap_invoice");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -556,6 +585,14 @@ class SchemaMigrationIT {
           "ap_invoice_lines/Lecture société",
           "ap_invoice_lines/Saisie habilitée",
           "grni_ledger/Lecture société",
+          // V73 — budgets : écriture réservée (droit budget.manage).
+          "budget_settings/Lecture société",
+          "budget_settings/Paramétrage habilité",
+          "budget_revisions/Lecture société",
+          "budgets/Lecture société",
+          "budgets/Préparation habilitée",
+          "budget_lines/Lecture société",
+          "budget_lines/Préparation habilitée",
           "purchase_order_followup_log/Lecture société",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
@@ -612,6 +649,12 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V73 — contrôle budgétaire.
+          "budgets/trg_guard_budget",
+          "budget_lines/trg_guard_budget_line",
+          "budget_lines/trg_refresh_budget_total",
+          "purchase_orders/trg_check_budget_on_po",
+          "ap_invoices/trg_check_budget_on_ap_invoice",
           // V72 — factures fournisseurs à lignes, factures non parvenues.
           "ap_invoice_lines/trg_compute_ap_invoice_line",
           "ap_invoice_lines/trg_sync_ap_invoice_totals",
@@ -791,7 +834,7 @@ class SchemaMigrationIT {
         WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')
         """)), "vues");
 
-    memeEnsemble(avec(MANIFESTE.colonne("functions", 0), FONCTIONS_AJOUTEES), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(sans(MANIFESTE.colonne("functions", 0), FONCTIONS_RETIREES), FONCTIONS_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT DISTINCT p.proname FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
