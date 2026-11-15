@@ -1,3 +1,4 @@
+import { BankReconciliation } from "@/components/BankReconciliation";
 import { useMemo, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -17,7 +18,7 @@ import { safeExportTreasuryCloseReport } from "@/lib/treasury-close-report";
 import { toast } from "sonner";
 
 const tabs = [
-  { id: "reconciliation", label: "Bank Reconciliation", icon: CheckCircle },
+  { id: "reconciliation", label: "Rapprochement bancaire", icon: CheckCircle },
   { id: "close", label: "Clôture de période", icon: Lock },
   { id: "limits", label: "Limit Monitoring", icon: AlertTriangle },
   { id: "audit", label: "Audit Trail", icon: Eye },
@@ -124,33 +125,7 @@ export default function TreasuryControl() {
         ))}
       </div>
 
-      {activeTab === "reconciliation" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Bank Reconciliation Status</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Bank Account", "Book Balance", "Statement", "Difference", "Open Items", "Status", "Actions"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {reconciliationItems.map(r => (
-                <tr key={r.bank} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{r.bank}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(r.bookBalance)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(r.bankStatement)}</td>
-                  <td className={cn("px-3 py-2 text-right font-mono", r.diff > 0 ? "text-amber-600" : "")}>{fmt(r.diff)}</td>
-                  <td className="px-3 py-2 text-center">{r.items}</td>
-                  <td className="px-3 py-2"><StatusBadge status={r.status === "reconciled" ? "success" : "warning"} label={r.status.replace("_", " ")} /></td>
-                  <td className="px-3 py-2">
-                    {r.status !== "reconciled" && <Button size="sm" variant="outline" className="h-6 text-[10px]">Reconcile</Button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {activeTab === "reconciliation" && <BankReconciliation />}
 
       {activeTab === "close" && (
         <div className="space-y-3">

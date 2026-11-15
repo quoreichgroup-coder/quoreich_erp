@@ -45,6 +45,29 @@ membre). Étape 2 de la priorité P1 de la feuille de route (09).
 
 ## 4. Restant (lots suivants)
 
-* Import de relevé (CSV / MT940 / CFONB) et rapprochement assisté sur les nouveaux mouvements (écran existant à reprendre).
+* Formats bancaires structurés MT940 / CAMT.053 / CFONB (le lot T2 lit les exports Excel et CSV des banques).
 * Change : comptes en devise et écarts de change (lot I1, G-46).
 * Écrans de trésorerie encore fictifs : instruments financiers, contreparties, prévisions par défaut (UX-1).
+
+## 5. Lot T2 — relevés et rapprochement bancaire (V71)
+
+Constats : tables de relevés et de rapprochement présentes mais aucun écran d'import ni de rapprochement
+(onglet « Bank Reconciliation » de démonstration) ; aucun contrôle d'équilibre ni de continuité des relevés ;
+validation d'un rapprochement sans contrôle ; un même mouvement rapprochable de deux lignes.
+
+Livré :
+
+* **Import du relevé** de la banque (Excel ou CSV : colonnes Date, Libellé, Montant ou Débit / Crédit, Référence
+  reconnues ; montants « 1 234,50 », dates jj/mm/aaaa ou série Excel ; lignes de solde ignorées) ; la base refuse
+  un relevé déséquilibré (solde initial + mouvements ≠ solde final), non continu avec le précédent (paramètre
+  `statement_continuity_check`), chevauchant une période déjà importée, ou des lignes déjà importées.
+* **Rapprochement automatique** sans ambiguïté (un seul mouvement possible : montant à la tolérance près, date dans
+  la fenêtre paramétrée, même référence si les deux en ont une), puis **manuel** (propositions, tous les mouvements
+  non rapprochés), annulation ; un mouvement ne se rapproche que d'une ligne.
+* **Ligne inconnue de l'ERP** (frais, agios, SMS, intérêts) : comptabilisée en un clic (écriture BQ, mouvement
+  créé et rapproché).
+* **État de rapprochement** à la date du dernier relevé : solde du relevé + encaissements en suspens − décaissements
+  en suspens = solde comptable ; validation (droit `treasury.validate_recon`) refusée tant qu'une ligne du relevé
+  est sans contrepartie ou que l'égalité ne tient pas ; rapprochement validé figé (V70) ; relevé annulable tant
+  qu'aucune ligne n'est rapprochée.
+* Écran : Trésorerie → Contrôle → « Rapprochement bancaire » (`BankReconciliation.tsx`).

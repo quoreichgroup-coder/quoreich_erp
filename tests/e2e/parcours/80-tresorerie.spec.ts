@@ -31,6 +31,22 @@ async function assurerCompte(page: Page, nom: string, type: "Banque" | "Caisse",
   await expect(rangee).toHaveCount(1);
 }
 
+/** Relevé du jour laissé par un passage interrompu : rapprochements annulés puis relevé annulé. */
+async function annulerReleveDuJour(page: Page, jour: string) {
+  const resume = page.getByTestId("statement-summary");
+  if (!(await resume.count()) || !(await page.locator("#rec-statement").inputValue())) return;
+  const libelle = await page.locator("#rec-statement").locator("option:checked").innerText();
+  if (!libelle.includes(`au ${jour}`)) return;
+  const annuler = page.getByTestId("statement-line").getByRole("button", { name: "Annuler" });
+  for (let reste = await annuler.count(); reste > 0; reste--) {
+    await expect(annuler).toHaveCount(reste);
+    await annuler.first().click();
+  }
+  await expect(annuler).toHaveCount(0);
+  await page.getByRole("button", { name: "Annuler le relevé" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Relevé annulé" }).first()).toBeVisible();
+}
+
 async function solde(page: Page, nom: string) {
   return nombre(await page.getByTestId("treasury-account-row").filter({ hasText: nom }).getByTestId("treasury-account-balance").innerText());
 }
@@ -79,6 +95,66 @@ test("trésorerie : comptes reliés au plan, frais bancaires et virement comptab
   await page.goto("/treasury/master-data");
   await expect.poll(async () => solde(page, BANQUE)).toBe(avant.banque - 2500);
   expect(await solde(page, CAISSE)).toBe(avant.caisse + 1000);
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});
+
+// V71 (lot T2) : relevé de la banque importé (CSV « ; », Débit / Crédit), contrôle d'équilibre,
+// rapprochement automatique, ligne inconnue de l'ERP comptabilisée, état de rapprochement ; le relevé
+// est ensuite annulé pour que le parcours se rejoue (périodes non chevauchantes).
+test("rapprochement bancaire : relevé importé, rapproché, frais comptabilisés, état calculé", async ({ page }, testInfo) => {
+  const obs = surveiller(page);
+  const jour = new Date().toLocaleDateString("fr-FR");
+  const csv = `Date;Libellé;Débit;Crédit;Référence\r\n${jour};FRAIS TENUE AGIOS-${RUN};1 500,00;;AGIOS-${RUN}\r\n${jour};VIREMENT VERS CAISSE;1 000,00;;VIR-${RUN}\r\n${jour};FRAIS SMS ${RUN};300,00;;\r\n`;
+
+  obs.etape("import du relevé");
+  await page.goto("/treasury/control");
+  await page.getByLabel("Compte", { exact: true }).selectOption({ label: `${BANQUE} (Banque)` });
+  await page.waitForLoadState("networkidle");
+  await annulerReleveDuJour(page, jour);
+  await page.getByRole("button", { name: "Importer un relevé" }).click();
+  const d = page.getByRole("dialog");
+  await d.getByLabel("Fichier du relevé").setInputFiles({ name: `releve-${RUN}.csv`, mimeType: "text/csv", buffer: Buffer.from("﻿" + csv, "utf-8") });
+  await expect(d.getByTestId("statement-file-summary")).toContainText("3 ligne(s) lue(s)");
+  if (!(await d.getByLabel("Solde initial").inputValue())) await d.getByLabel("Solde initial").fill("100000");
+  const ouverture = nombre(await d.getByLabel("Solde initial").inputValue());
+  await d.getByLabel("Solde final du relevé").fill(String(ouverture - 2801));
+  await expect(d.getByTestId("statement-balance-check")).toContainText("écart");
+  await d.getByLabel("Solde final du relevé").fill(String(ouverture - 2800));
+  await expect(d.getByTestId("statement-balance-check")).toContainText("relevé équilibré");
+  await d.getByRole("button", { name: "Importer et rapprocher" }).click();
+  // 2 rapprochements sûrs (références) ; la ligne SMS sans référence peut trouver le mouvement d'un passage précédent.
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: /3 ligne\(s\), [23] rapprochée\(s\) automatiquement/ }).first()).toBeVisible();
+
+  obs.etape("ligne inconnue de l'ERP");
+  const sms = page.getByTestId("statement-line").filter({ hasText: `FRAIS SMS ${RUN}` });
+  await expect(sms).toHaveCount(1);
+  if (await sms.getByRole("button", { name: "Comptabiliser" }).count()) {
+  await sms.getByRole("button", { name: "Comptabiliser" }).click();
+  const p = page.getByRole("dialog");
+  await expect.poll(async () => p.getByLabel("Contrepartie").locator("option").count()).toBeGreaterThan(1);
+  const options = await p.getByLabel("Contrepartie").locator("option").allTextContents();
+  await p.getByLabel("Contrepartie").selectOption({ label: options.find((o) => /^6/.test(o))! });
+  await p.getByRole("button", { name: "Comptabiliser et rapprocher" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Ligne comptabilisée et rapprochée" }).first()).toBeVisible();
+  }
+  await expect(page.getByTestId("statement-summary")).toContainText("0 à rapprocher");
+
+  obs.etape("état de rapprochement");
+  await page.getByRole("button", { name: /^Calculer l'état au/ }).click();
+  await expect(page.getByTestId("reconciliation-draft")).toBeVisible();
+
+  obs.etape("annulation pour rejouer le parcours");
+  const annuler = page.getByTestId("statement-line").getByRole("button", { name: "Annuler" });
+  for (let reste = 3; reste > 0; reste--) {
+    await expect(annuler).toHaveCount(reste);
+    await annuler.first().click();
+  }
+  await expect(annuler).toHaveCount(0);
+  await expect(page.getByTestId("statement-summary")).toContainText("3 à rapprocher");
+  await page.getByRole("button", { name: "Annuler le relevé" }).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Relevé annulé" }).first()).toBeVisible();
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);

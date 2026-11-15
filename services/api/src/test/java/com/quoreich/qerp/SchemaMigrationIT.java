@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "70";
+  private static final String DERNIERE_MIGRATION = "71";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -413,7 +413,14 @@ class SchemaMigrationIT {
           "guard_bank_statement_line",
           "guard_bank_reconciliation",
           "record_treasury_movement",
-          "transfer_between_treasury_accounts");
+          "transfer_between_treasury_accounts",
+          // V71 — relevés et rapprochement bancaire.
+          "auto_match_statement",
+          "import_bank_statement",
+          "cancel_bank_statement",
+          "post_statement_line",
+          "prepare_bank_reconciliation",
+          "validate_bank_reconciliation");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(

@@ -45,6 +45,7 @@ test("stocks : article, dépôts, ajustement comptabilisé, transfert, exports",
   await a.getByLabel("Unité").fill("sac");
   await a.getByRole("button", { name: "Enregistrer" }).click();
   await expect(a).toBeHidden();
+  await page.getByPlaceholder("Code, libellé, catégorie…").fill(code);
   const ligneArticle = page.getByTestId("item-row").filter({ hasText: code });
   await expect(ligneArticle).toContainText("0 sac");
   await ligneArticle.click();
@@ -89,6 +90,7 @@ test("stocks : article, dépôts, ajustement comptabilisé, transfert, exports",
 
   obs.etape("stock de l'article : 10, valorisé au coût moyen");
   await page.goto("/inventory/master-data");
+  await page.getByPlaceholder("Code, libellé, catégorie…").fill(code);
   await expect(page.getByTestId("item-row").filter({ hasText: code })).toContainText("10 sac");
   await expect(ligne(page, code)).toContainText("40 000");
   testInfo.annotations.push({ type: "export articles", description: await exporter(page, /^articles.*\.csv$/) });
