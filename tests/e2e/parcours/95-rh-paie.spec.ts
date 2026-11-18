@@ -130,6 +130,14 @@ test("RH et paie : règles confirmées, référentiels, salarié, cycle approuv�
   await page.getByRole("alertdialog").getByRole("button", { name: /Comptabiliser|Confirmer/ }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Cycle comptabilisé" }).first()).toBeVisible();
 
+  obs.etape("bulletin de paie du salarié, export PDF");
+  await rc.getByRole("tab", { name: /^Lignes/ }).click();
+  await rc.locator("tr").filter({ hasText: nom }).getByRole("button", { name: "Bulletin" }).click();
+  const bulletin = page.getByRole("dialog", { name: new RegExp(`Bulletin de paie · Awa ${nom}`) });
+  await expect(bulletin).toBeVisible();
+  const [pdf] = await Promise.all([page.waitForEvent("download"), bulletin.getByRole("button", { name: "PDF" }).click()]);
+  expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
+
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });

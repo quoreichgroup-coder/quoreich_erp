@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "103";
+  private static final String DERNIERE_MIGRATION = "104";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -552,6 +552,10 @@ class SchemaMigrationIT {
           "payroll_line_department_label",
           // V103 — séparation des fonctions de paie.
           "stamp_payroll_run_creator",
+          // V104 — écritures directes de paie fermées.
+          "guard_payroll_run_direct_write",
+          "guard_payroll_line_direct_write",
+          "guard_payroll_rules_confirmation",
           // V80 — règles de paie par pays.
           "payroll_rules_valid",
           "compute_progressive_payroll_tax",
@@ -844,6 +848,9 @@ class SchemaMigrationIT {
           "employee_movements/trg_guard_employee_movement_values",
           "payroll_lines/trg_payroll_line_department_label",
           "payroll_runs/trg_stamp_payroll_run_creator",
+          "payroll_runs/trg_guard_payroll_run_direct_write",
+          "payroll_lines/trg_guard_payroll_line_direct_write",
+          "hr_payroll_settings/trg_guard_payroll_rules_confirmation",
           // V80.
           "payroll_runs/trg_audit_payroll_run_change",
           "depreciation_entries/trg_refresh_asset_depreciation",

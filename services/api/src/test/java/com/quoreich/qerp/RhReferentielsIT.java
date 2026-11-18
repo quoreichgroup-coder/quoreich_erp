@@ -77,6 +77,31 @@ class RhReferentielsIT {
     assertThatThrownBy(() -> asUser(ADMIN, "SELECT approve_payroll_run('" + run + "')::text")).hasMessageContaining("préparateur ne peut pas approuver");
   }
 
+  @Test
+  @DisplayName("V104 : ni le cycle ni ses lignes ne s'écrivent directement (approbation, totaux, nets)")
+  void ecrituresDirectesFermees() throws SQLException {
+    String run = asUser(ADMIN, "INSERT INTO payroll_runs (tenant_id, period, pay_date, status, gross_total, approved_by) VALUES ('" + A
+        + "', '2062-01', '2062-01-31', 'approved', 999999, '" + ADMIN + "') RETURNING id::text");
+    assertThat(texte("SELECT status || ' ' || trim_scale(gross_total) || ' ' || (approved_by IS NULL) FROM payroll_runs WHERE id = '" + run + "'"))
+        .as("créé en brouillon vierge quoi qu'on envoie").isEqualTo("draft 0 true");
+    assertThatThrownBy(() -> asUser(ADMIN, "UPDATE payroll_runs SET status = 'approved' WHERE id = '" + run + "' RETURNING id::text"))
+        .as("approbation sans précontrôle ni seconde personne").hasMessageContaining("ne se modifie que par ses fonctions");
+    String emp = java.util.UUID.randomUUID().toString();
+    owner("INSERT INTO hr_movement_references (tenant_id, kind, code, label) VALUES ('" + A + "', 'contract_type', 'cdi', 'CDI') ON CONFLICT (tenant_id, kind, code) DO NOTHING;"
+        + "INSERT INTO employees (id, tenant_id, matricule, first_name, last_name, contract_type, currency) VALUES ('" + emp + "', '" + A + "', 'V104-1', 'Awa', 'Test', 'cdi', 'XOF')");
+    owner("INSERT INTO payroll_lines (tenant_id, run_id, employee_id, gross, deductions, taxes, net, employer_charges) VALUES ('" + A + "', '" + run
+        + "', '" + emp + "', 100, 0, 0, 100, 0); UPDATE payroll_runs SET status = 'posted' WHERE id = '" + run + "'");
+    assertThatThrownBy(() -> asUser(ADMIN, "UPDATE payroll_lines SET net = 1 WHERE run_id = '" + run + "' RETURNING id::text"))
+        .hasMessageContaining("génération du cycle");
+    assertThatThrownBy(() -> asUser(ADMIN, "DELETE FROM payroll_lines WHERE run_id = '" + run + "' RETURNING id::text"))
+        .hasMessageContaining("génération du cycle");
+    assertThatThrownBy(() -> asUser(ADMIN, "DELETE FROM payroll_runs WHERE id = '" + run + "' RETURNING id::text"))
+        .hasMessageContaining("brouillon");
+    owner("INSERT INTO hr_payroll_settings (tenant_id, currency_code, employer_contribution_pct) VALUES ('" + A + "', 'XOF', 0) ON CONFLICT (tenant_id) DO NOTHING");
+    assertThatThrownBy(() -> asUser(ADMIN, "UPDATE hr_payroll_settings SET rules_validated_at = now() WHERE tenant_id = '" + A + "' RETURNING tenant_id::text"))
+        .as("règles incomplètes « confirmées » sans contrôle").hasMessageContaining("Confirmer les barèmes");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {
