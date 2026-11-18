@@ -219,7 +219,10 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
-          emptyLines="Chargement des lignes…" />
+          emptyLines="Chargement des lignes…"
+          print={kind === "dn" ? { amountInWords: false, signatures: ["Livré par", "Reçu par le client (nom, date, cachet)"] }
+            : kind === "qt" ? { notes: doc.valid_until ? `Offre valable jusqu'au ${new Date(doc.valid_until).toLocaleDateString("fr-FR")}.` : null, signatures: ["Bon pour accord du client"] }
+            : { signatures: ["Le client", "La société"] }} />
       </DialogContent>
     </Dialog>
   );

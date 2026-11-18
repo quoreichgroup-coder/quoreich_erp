@@ -2,7 +2,7 @@ import { isValidElement, type ReactNode } from "react";
 import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportToCSV } from "@/lib/csv-export";
-import { printDocumentPDF, type CompanyIdentity } from "@/lib/document-pdf";
+import { exportDocumentXLSX, printDocumentPDF, type DocumentPdf, type CompanyIdentity } from "@/lib/document-pdf";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { isApiEnabled } from "@/api/client";
@@ -28,35 +28,40 @@ function texte(v: ReactNode): string {
   return "";
 }
 
+/** Options d'impression d'une pièce (devise, mentions, signatures, orientation, sous-titre). */
+export type DocumentPrintOptions = Pick<DocumentPdf, "currency" | "notes" | "signatures" | "orientation" | "subtitle" | "amountInWords">;
+
 /**
- * Export de la pièce affichée : CSV (lignes, puis en-tête et pied en lignes de libellé) et PDF
- * imprimable (en-tête en sous-titre, lignes, pied). L'édition officielle (modèles versionnés,
- * archivage) reste au Lot 6 ; ceci imprime exactement ce que l'écran montre.
+ * Export d'une pièce, utilisable par tout écran : PDF A4 (identité de la société, en-tête, lignes, totaux,
+ * mentions, signatures), Excel (même mise en page, nombres conservés) ou CSV (« ; »).
  */
-function exporter(kind: "csv" | "pdf", title: string, fileName: string, header: [string, ReactNode][],
-  columns: DetailColumn[], rows: ReactNode[][], footer: [string, ReactNode, boolean?][]) {
-  const keys = columns.map((_, i) => `c${i}`);
-  const data: Record<string, string>[] = rows.map((r) => Object.fromEntries(keys.map((k, i) => [k, texte(r[i])])));
-  const extra = (pairs: [string, ReactNode][]) => pairs.map(([l, v]) => {
-    const row: Record<string, string> = Object.fromEntries(keys.map((k) => [k, ""]));
-    row[keys[0]] = l;
-    row[keys[keys.length - 1]] = texte(v);
-    return row;
-  });
+export async function exportDocument(kind: "pdf" | "xlsx" | "csv", d: Omit<DocumentPdf, "company">) {
   if (kind === "csv") {
-    exportToCSV([...extra(header), ...data, ...extra(footer.map(([l, v]) => [l, v]))],
-      keys.map((k, i) => ({ key: k, header: columns[i].label })), fileName);
+    const keys = d.columns.map((_, i) => `c${i}`);
+    const extra = (pairs: [string, string][]) => pairs.map(([l, v]) => {
+      const row: Record<string, string> = Object.fromEntries(keys.map((k) => [k, ""]));
+      row[keys[0]] = l;
+      row[keys[keys.length - 1]] = v;
+      return row;
+    });
+    const data = d.rows.map((r) => Object.fromEntries(keys.map((k, i) => [k, r[i] ?? ""])));
+    exportToCSV([...extra(d.header), ...data, ...extra(d.footer.map(([l, v]) => [l, v]))], keys.map((k, i) => ({ key: k, header: d.columns[i].label })), d.fileName);
     return;
   }
-  void (async () => {
-    void printDocumentPDF({
-      title, fileName, company: await companyIdentity(),
-      header: header.map(([l, v]) => [l, texte(v)]),
-      columns,
-      rows: rows.map((r) => columns.map((_, i) => texte(r[i]))),
-      footer: footer.map(([l, v, strong]) => [l, texte(v), strong]),
-    });
-  })();
+  const full: DocumentPdf = { ...d, company: await companyIdentity() };
+  if (kind === "xlsx") exportDocumentXLSX(full);
+  else await printDocumentPDF(full);
+}
+
+function exporter(kind: "csv" | "pdf" | "xlsx", title: string, fileName: string, header: [string, ReactNode][],
+  columns: DetailColumn[], rows: ReactNode[][], footer: [string, ReactNode, boolean?][], options: DocumentPrintOptions) {
+  void exportDocument(kind, {
+    title, fileName, ...options,
+    header: header.map(([l, v]) => [l, texte(v)]),
+    columns,
+    rows: rows.map((r) => columns.map((_, i) => texte(r[i]))),
+    footer: footer.map(([l, v, strong]) => [l, texte(v), strong]),
+  });
 }
 
 /** Identité légale de la société (V47) pour l'en-tête imprimé ; sans elle, mentions « à renseigner ». */
@@ -72,26 +77,32 @@ async function companyIdentity(): Promise<CompanyIdentity | null> {
   }
 }
 
-export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Aucune ligne.", title, fileName }: {
+export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Aucune ligne.", title, fileName, print = {} }: {
   header: [string, ReactNode][];
   columns: DetailColumn[];
   rows: ReactNode[][];
   footer: [string, ReactNode, boolean?][];
   emptyLines?: string;
-  /** Avec un titre et un nom de fichier : boutons « Exporter » (CSV) et « Imprimer » (PDF). */
+  /** Avec un titre et un nom de fichier : boutons « Imprimer » (PDF), « Excel » et « CSV ». */
   title?: string;
   fileName?: string;
+  /** Devise, mentions, signatures, orientation de la pièce imprimée. */
+  print?: DocumentPrintOptions;
 }) {
   return (
     <div className="space-y-4" data-testid="document-detail">
       {title && fileName && (
         <div className="flex justify-end gap-2">
           <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-document-csv"
-            onClick={() => exporter("csv", title, fileName, header, columns, rows, footer)}>
-            <Download className="w-3 h-3" /> Exporter
+            onClick={() => exporter("csv", title, fileName, header, columns, rows, footer, print)}>
+            <Download className="w-3 h-3" /> CSV
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-document-xlsx"
+            onClick={() => exporter("xlsx", title, fileName, header, columns, rows, footer, print)}>
+            <Download className="w-3 h-3" /> Excel
           </Button>
           <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-document-pdf"
-            onClick={() => exporter("pdf", title, fileName, header, columns, rows, footer)}>
+            onClick={() => exporter("pdf", title, fileName, header, columns, rows, footer, print)}>
             <Printer className="w-3 h-3" /> Imprimer
           </Button>
         </div>
@@ -132,6 +143,26 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
           </div>
         ))}
       </section>
+    </div>
+  );
+}
+
+/** Boutons « Imprimer » (PDF A4) et « Excel » d'une pièce construite à la demande, pour tout écran. */
+export function DocumentPrintButtons({ build, disabled = false, testId = "document-print", excel = true }: {
+  build: () => Omit<DocumentPdf, "company">; disabled?: boolean; testId?: string;
+  /** Faux quand l'écran offre déjà un Excel dédié (ex. feuille de comptage réimportable). */
+  excel?: boolean;
+}) {
+  return (
+    <div className="inline-flex gap-1" data-testid={testId}>
+      <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={disabled} onClick={() => void exportDocument("pdf", build())}>
+        <Printer className="w-3 h-3" /> Imprimer
+      </Button>
+      {excel && (
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={disabled} onClick={() => void exportDocument("xlsx", build())}>
+          <Download className="w-3 h-3" /> Excel
+        </Button>
+      )}
     </div>
   );
 }

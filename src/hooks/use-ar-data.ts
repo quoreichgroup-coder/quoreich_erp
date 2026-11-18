@@ -436,7 +436,7 @@ export function useARInvoices() {
       }
       const { data, error } = await supabase
         .from("ar_invoices")
-        .select("*, customer:customers(id, name, credit_limit, payment_terms)")
+        .select("*, customer:customers(id, name, credit_limit, payment_terms, address, tax_id, phone, email)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as ARInvoice[];

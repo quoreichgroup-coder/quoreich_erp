@@ -42,6 +42,7 @@ Légende utilisée dans tous les livrables :
 | 14 | [14-factures-fournisseurs-lignes.md](14-factures-fournisseurs-lignes.md) | Factures fournisseurs à lignes, 3 voies ligne à ligne, factures non parvenues 408 (lot A4, V72) |
 | 15 | [15-controle-budgetaire.md](15-controle-budgetaire.md) | Contrôle budgétaire : engagé / réalisé / disponible, cycle de vie du budget (lot B1, V73) ; pré-engagement des demandes, budgets par section, Contrôle et Prévisions (lot B2, V77) ; sections par ligne, prévisions saisies, import / export, droits (V78) ; revue complète, scénarios, rapports (V79) |
 | 16 | [16-immobilisations.md](16-immobilisations.md) | Immobilisations : amortissements, cessions SYSCOHADA (lot F1, V75) |
+| 19 | [19-impressions-actions-groupees-mvp.md](19-impressions-actions-groupees-mvp.md) | Impression des pièces (PDF / Excel), exports de listes, actions groupées dans le cœur ; écarts restants pour le MVP |
 
 ## Synthèse pour la direction
 

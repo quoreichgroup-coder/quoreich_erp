@@ -162,10 +162,10 @@ export function useAPInvoices() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ap_invoices")
-        .select("*, supplier:suppliers(id, name, payment_terms)")
+        .select("*, supplier:suppliers(id, name, payment_terms, legal_name, address, city, country, tax_id, rccm)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []) as APInvoice[];
+      return (data || []) as unknown as APInvoice[];
     },
   });
 }

@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import { BulkBar, SelectAllHead, SelectCell, useSelection } from "@/components/BulkSelection";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { BookOpen, Loader2, Search } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -26,6 +30,8 @@ const TABS: [string, string][] = [["all", "Mouvements"], ["transfer", "Virements
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 const today = () => new Date().toISOString().slice(0, 10);
 
+const moveId = (m: { id: string }) => m.id;
+
 export default function TreasuryTransactions() {
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -41,12 +47,34 @@ export default function TreasuryTransactions() {
 
   const shown = moves.filter((m) => (tab === "all" || m.source === tab) && (!accountFilter || m.bank_account_id === accountFilter)
     && `${m.description ?? ""} ${m.reference ?? ""} ${m.journal_entry?.piece_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const sel = useSelection<(typeof shown)[number]>(shown, moveId);
   const rows = shown.map((m) => ({
     date: m.transaction_date, compte: byId.get(m.bank_account_id)?.name ?? "", origine: SOURCE_LABEL[m.source] ?? m.source, libelle: m.description ?? "",
     reference: m.reference ?? "", piece: m.journal_entry?.piece_number ?? "",
     entree: canSensitive && Number(m.amount) > 0 ? Number(m.amount) : canSensitive ? "" : "•••••",
     sortie: canSensitive && Number(m.amount) < 0 ? -Number(m.amount) : canSensitive ? "" : "•••••", rapproche: m.is_reconciled ? "oui" : "non",
   }));
+
+  const chosen = sel.chosen;
+  const transferts = chosen.filter((m) => m.source === "transfer");
+  // Ordre de virement quand la sélection n'est faite que de virements entre comptes ; sinon bordereau des mouvements.
+  const slip = () => {
+    const ordre = transferts.length > 0 && transferts.length === chosen.length;
+    const entrees = chosen.reduce((t, m) => t + Math.max(0, Number(m.amount)), 0);
+    const sorties = chosen.reduce((t, m) => t + Math.max(0, -Number(m.amount)), 0);
+    return {
+      title: ordre ? "Ordre de virement entre comptes" : "Bordereau des mouvements de trésorerie",
+      fileName: `${ordre ? "ordre-de-virement" : "bordereau-tresorerie"}-${today()}`, amountInWords: false,
+      header: [["Mouvements", String(chosen.length)], ["Comptes", [...new Set(chosen.map((m) => byId.get(m.bank_account_id)?.name ?? "—"))].join(", ")],
+        ["Du", chosen.map((m) => m.transaction_date).sort()[0] ?? "—"], ["Au", chosen.map((m) => m.transaction_date).sort().at(-1) ?? "—"]] as [string, string][],
+      columns: [{ label: "Date" }, { label: "Compte" }, { label: "Origine" }, { label: "Libellé" }, { label: "Référence" }, { label: "Pièce" },
+        { label: "Entrée", align: "right" as const }, { label: "Sortie", align: "right" as const }],
+      rows: chosen.map((m) => [new Date(m.transaction_date).toLocaleDateString("fr-FR"), byId.get(m.bank_account_id)?.name ?? "", SOURCE_LABEL[m.source] ?? m.source,
+        m.description ?? "", m.reference ?? "", m.journal_entry?.piece_number ?? "", Number(m.amount) > 0 ? fmt(m.amount) : "", Number(m.amount) < 0 ? fmt(-m.amount) : ""]),
+      footer: [["Total des entrées", fmt(entrees)], ["Total des sorties", fmt(sorties)], ["Solde des mouvements", fmt(entrees - sorties), true]] as [string, string, boolean?][],
+      signatures: ordre ? ["Ordonnateur", "Signataire autorisé (banque)"] : ["Trésorier", "Contrôleur"],
+    };
+  };
 
   return (
     <PageShell>
@@ -79,16 +107,29 @@ export default function TreasuryTransactions() {
 
       {la || lm ? <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div> : (
         <div className="card-elevated overflow-x-auto">
+          {canSensitive && canExport && (
+            <BulkBar count={chosen.length} onClear={sel.clear} testId="bulk-bar-treasury">
+              <DocumentPrintButtons testId="treasury-slip-print" build={slip} />
+              <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, chosen.map((m) => ({
+                date: m.transaction_date, compte: byId.get(m.bank_account_id)?.name ?? "", origine: SOURCE_LABEL[m.source] ?? m.source, libelle: m.description ?? "",
+                reference: m.reference ?? "", piece: m.journal_entry?.piece_number ?? "", montant: Number(m.amount) })), [
+                { key: "date", header: "Date" }, { key: "compte", header: "Compte" }, { key: "origine", header: "Origine" }, { key: "libelle", header: "Libellé" },
+                { key: "reference", header: "Référence" }, { key: "piece", header: "Pièce" }, { key: "montant", header: "Montant (+ entrée / − sortie)" }],
+                "mouvements-tresorerie-selection", "Mouvements de trésorerie")}>Exporter</ExportMenu>
+            </BulkBar>
+          )}
           <table className="w-full text-xs" data-testid="treasury-movements">
             <thead><tr className="bg-muted/30 text-muted-foreground">
+              {canSensitive && canExport && <SelectAllHead sel={sel} pageIds={shown.map((m) => m.id)} label="Sélectionner tous les mouvements" />}
               <th className="text-left p-2">Date</th><th className="text-left">Compte</th><th className="text-left">Origine</th><th className="text-left">Libellé</th>
               <th className="text-left">Référence</th><th className="text-left">Pièce</th>
               {canSensitive && <><th className="text-right">Entrée</th><th className="text-right">Sortie</th></>}<th className="text-left pl-3">Rapproché</th>
             </tr></thead>
             <tbody>
-              {shown.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Aucun mouvement{accounts.length === 0 ? " : créez d'abord vos comptes de trésorerie (Données de base)" : ""}.</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Aucun mouvement{accounts.length === 0 ? " : créez d'abord vos comptes de trésorerie (Données de base)" : ""}.</td></tr>}
               {shown.map((m) => (
                 <tr key={m.id} data-testid="treasury-movement-row" className="border-t border-border/50">
+                  {canSensitive && canExport && <SelectCell sel={sel} id={m.id} label={`Sélectionner le mouvement ${m.reference ?? m.description ?? ""}`} />}
                   <td className="p-2 whitespace-nowrap">{new Date(m.transaction_date).toLocaleDateString("fr-FR")}</td>
                   <td>{byId.get(m.bank_account_id)?.name ?? "—"}</td><td>{SOURCE_LABEL[m.source] ?? m.source}</td><td>{m.description}</td>
                   <td className="font-mono">{m.reference ?? ""}</td><td className="font-mono">{m.journal_entry?.piece_number ?? ""}</td>

@@ -16,7 +16,7 @@ import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableCo
 import { useCreateItem, useCreateWarehouse, useInventoryItemCatalog, useUpdateItem, useUpdateWarehouse, useWarehouses } from "@/hooks/use-inventory-data";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { StatusBadge } from "@/components/StatusBadge";
-import { exportToCSV } from "@/lib/csv-export";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { exportToXLSX, type XlsxColumn } from "@/lib/xlsx";
 import { ReplenishmentRulesPanel } from "@/components/Replenishment";
 
@@ -185,14 +185,13 @@ export default function InventoryMasterData() {
     filterConfigs: [{ key: "category", label: "Catégorie", options: Array.from(new Set(rows.map((r) => r.category).filter(Boolean))).sort() as string[] }],
   });
 
-  const exporter = (format: "csv" | "xlsx") => {
+  const exporter = (format: ExportFormat) => {
     if (tab === "warehouses") {
       const columns: XlsxColumn<typeof warehouses[number]>[] = [
         { key: "code", header: "Code dépôt" }, { key: "name", header: "Nom" },
         { key: "address", header: "Adresse" }, { key: "status", header: "Statut" },
       ];
-      if (format === "xlsx") exportToXLSX(warehouses, columns, "catalogue-depots", "Dépôts");
-      else exportToCSV(warehouses, columns, "depots");
+      exportTable(format, warehouses, columns, format === "csv" ? "depots" : "catalogue-depots", "Dépôts");
     } else if (tab === "items") {
       const columns: XlsxColumn<typeof rows[number]>[] = [
       { key: "code", header: "Code article" }, { key: "name", header: "Désignation" }, { key: "category", header: "Catégorie" }, { key: "unit", header: "Unité" },
@@ -201,8 +200,7 @@ export default function InventoryMasterData() {
       { key: "reorder_level", header: "Seuil de réapprovisionnement" }, { key: "safety_stock", header: "Stock de sécurité" },
       { key: "selling_price", header: "Prix de vente" }, { key: "status", header: "Statut" },
       ];
-      if (format === "xlsx") exportToXLSX(t.processedData, columns, "catalogue-articles", "Articles");
-      else exportToCSV(t.processedData, columns, "articles");
+      exportTable(format, t.processedData, columns, format === "csv" ? "articles" : "catalogue-articles", "Catalogue des articles");
     }
   };
   const exportDisabled = tab === "warehouses"
@@ -224,6 +222,8 @@ export default function InventoryMasterData() {
               onClick={() => exporter("csv")}><Download className="w-3.5 h-3.5" />Exporter CSV</Button>
             <Button size="sm" variant="outline" className="gap-1.5" disabled={exportDisabled}
               onClick={() => exporter("xlsx")}><FileSpreadsheet className="w-3.5 h-3.5" />Exporter Excel</Button>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={exportDisabled}
+              onClick={() => exporter("pdf")}><FileSpreadsheet className="w-3.5 h-3.5" />Exporter PDF</Button>
           </>}
         </div>
       </div>

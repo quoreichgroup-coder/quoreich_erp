@@ -6,6 +6,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ExportButtons } from "@/components/ExportButtons";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -179,6 +180,18 @@ function BudgetDetail({ budget, can, userId }: { budget: Budget; can: { manage: 
           <p className="text-xs text-muted-foreground" data-testid="budget-summary">{STATUS[budget.status][1]}{budget.is_control ? " · budget de contrôle" : ""} · {lines.length} ligne(s) · total {fmt(budget.total_amount)}</p>
           {budget.status === "submitted" && own && can.approve && <p className="text-[11px] text-muted-foreground">Vous avez préparé ce budget : une autre personne doit l'approuver.</p>}</div>
         <div className="flex gap-2 flex-wrap">
+          {can.export && <DocumentPrintButtons testId="budget-print" disabled={lines.length === 0} build={() => ({
+            title: `Budget ${budget.name}`, fileName: `budget-${budget.fiscal_year}-${budget.name}`, amountInWords: false,
+            subtitle: `Exercice ${budget.fiscal_year} · ${STATUS[budget.status][1]}${budget.is_control ? " · budget de contrôle" : ""}`,
+            header: [["Exercice", budget.fiscal_year], ["Statut", STATUS[budget.status][1]], ["Budget de contrôle", budget.is_control ? "Oui" : "Non"],
+              ["Approuvé le", budget.approved_at ? new Date(budget.approved_at).toLocaleDateString("fr-FR") : "—"]],
+            columns: [{ label: "Compte" }, { label: "Intitulé" }, { label: "Section" }, { label: "Période" }, { label: "Montant", align: "right" }],
+            rows: lines.map((l) => [byId.get(l.gl_account_id)?.code ?? "", byId.get(l.gl_account_id)?.name ?? "",
+              l.analytic_value_id ? sectionLabel.get(l.analytic_value_id) ?? "" : "Toutes", periodLabel(l.period), fmt(l.planned_amount)]),
+            footer: [["Total des lignes", fmt(lines.reduce((t, l) => t + l.planned_amount, 0)), true]],
+            notes: "Un compte couvre ses sous-comptes ; une ligne de section couvre ses sous-sections.",
+            signatures: ["Préparé par", "Approuvé par"],
+          })} />}
           {can.export && <ExportButtons label="Exporter le budget" filename={`budget-${budget.fiscal_year}`} sheetName="Budget"
             rows={lines.map((l) => ({ compte: byId.get(l.gl_account_id)?.code ?? "", intitule: byId.get(l.gl_account_id)?.name ?? "",
               section: l.analytic_value_id ? sectionCode.get(l.analytic_value_id) ?? "" : "", periode: l.period, montant: l.planned_amount }))}

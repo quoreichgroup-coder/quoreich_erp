@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,12 +105,12 @@ export function SupplierCatalogPanel() {
         <p className="text-xs text-muted-foreground">Fiches d'achat : quel fournisseur livre quel article, à quel prix, en combien de jours.</p>
         <div className="flex gap-2">
           {canEdit && <Button size="sm" className="gap-1.5" onClick={() => setEdit(null)}><Plus className="w-3.5 h-3.5" />Nouvelle ligne de catalogue</Button>}
-          <Button size="sm" variant="outline" data-testid="btn-export-csv" onClick={() => exportToCSV(rows.map((r) => ({
+          <ExportMenu size="sm" variant="outline" data-testid="btn-export-csv" onPick={(f) => exportTable(f, rows.map((r) => ({
             fournisseur: r.supplier?.name, article: `${r.item?.code} ${r.item?.name}`, reference: r.supplier_ref ?? "", prix: Number(r.unit_price),
             devise: r.currency, delai: r.lead_time_days, minimum: Number(r.min_order_qty), multiple: Number(r.order_multiple), prefere: r.is_preferred ? "oui" : "",
           })), [{ key: "fournisseur", header: "Fournisseur" }, { key: "article", header: "Article" }, { key: "reference", header: "Réf. fournisseur" },
             { key: "prix", header: "Prix" }, { key: "devise", header: "Devise" }, { key: "delai", header: "Délai (j)" }, { key: "minimum", header: "Minimum" },
-            { key: "multiple", header: "Multiple" }, { key: "prefere", header: "Préféré" }], "catalogue-fournisseurs")}>Exporter</Button>
+            { key: "multiple", header: "Multiple" }, { key: "prefere", header: "Préféré" }], "catalogue-fournisseurs")}>Exporter</ExportMenu>
         </div>
       </div>
       <div className="overflow-x-auto rounded-md border border-border">

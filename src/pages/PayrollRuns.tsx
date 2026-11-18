@@ -131,7 +131,7 @@ export default function PayrollRuns() {
         </h1>
         <div className="flex items-center gap-2">
           <CreateRunButton open={createOpen} onOpenChange={setCreateOpen} disabled={!canCreate} tip={createTip} />
-          <ExportButtons label="Cycles" rows={exportRows} columns={[...exportColumns]} filename={`cycles-paie-${new Date().toISOString().slice(0, 10)}`} sheetName="Cycles de paie" disabled={!canExport || kpis.isError} />
+          <ExportButtons pdf={false} label="Cycles" rows={exportRows} columns={[...exportColumns]} filename={`cycles-paie-${new Date().toISOString().slice(0, 10)}`} sheetName="Cycles de paie" disabled={!canExport || kpis.isError} />
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={!canExport || filtered.length === 0 || kpis.isError} aria-label={exportTip} title={exportTip} onClick={handleExportPdf}>
             {canExport ? <FileText className="w-3 h-3" /> : <Lock className="w-3 h-3" />} PDF
           </Button>

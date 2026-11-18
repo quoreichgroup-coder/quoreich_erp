@@ -153,7 +153,7 @@ test("budget préparé par fichier, révision validée par un tiers, sections pa
   await page.getByRole("tab", { name: /Requisitions/ }).click();
   const dem = ligne(page, `${RUN} Demande ventilée`);
   await dem.getByRole("button", { name: "Soumettre" }).click();
-  await expect(dem).toContainText("pending_approval");
+  await expect(dem).toContainText("En approbation");
 
   await page.goto("/budget/transactions");
   await page.getByRole("tab", { name: "Engagé et disponible" }).click();

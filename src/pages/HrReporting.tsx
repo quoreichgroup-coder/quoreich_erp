@@ -213,7 +213,7 @@ export default function HrReporting() {
               <Input type="month" value={reportTo} onChange={(e) => setTo(e.target.value)} className="h-7 text-xs w-36" />
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
-              <ExportButtons label="Registre" rows={monthlyExportRows} columns={[...monthlyExportColumns]} filename={`hr-register-${reportFrom}-to-${reportTo}`} sheetName="Registre paie" disabled={!canExport || !!rangeError || hasDataError || lr || register.isLoading} />
+              <ExportButtons pdf={false} label="Registre" rows={monthlyExportRows} columns={[...monthlyExportColumns]} filename={`hr-register-${reportFrom}-to-${reportTo}`} sheetName="Registre paie" disabled={!canExport || !!rangeError || hasDataError || lr || register.isLoading} />
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={!canExport || !!rangeError || hasDataError || monthly.length === 0 || lr} title={exportTip} onClick={onExportPdf}>
                 {canExport ? <FileText className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />} Registre PDF
               </Button>
@@ -296,7 +296,7 @@ export default function HrReporting() {
           <CardHeader className="py-2 flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-xs">Brut comptabilisé par département et devise</CardTitle>
             <div className="flex gap-2">
-              <ExportButtons label="Départements" rows={departmentExportRows} columns={[...departmentExportColumns]} filename={`hr-departments-${reportFrom}-to-${reportTo}`} sheetName="Départements" disabled={!canExport || !canViewAmounts || !!rangeError || hasDataError || register.isLoading} />
+              <ExportButtons pdf={false} label="Départements" rows={departmentExportRows} columns={[...departmentExportColumns]} filename={`hr-departments-${reportFrom}-to-${reportTo}`} sheetName="Départements" disabled={!canExport || !canViewAmounts || !!rangeError || hasDataError || register.isLoading} />
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={!canExport || !canViewAmounts || !!rangeError || hasDataError || departmentExportRows.length === 0 || register.isLoading} title={exportTip} onClick={onExportDepartmentPdf}>
                 {canExport ? <FileText className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />} PDF
               </Button>

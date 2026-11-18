@@ -36,7 +36,7 @@ function ReportActions<T extends Record<string, unknown>>({ canExport, title, fi
   if (!canExport) return null;
   return (
     <div className="flex gap-2">
-      <ExportButtons label="Exporter" filename={filename} sheetName={title.slice(0, 30)} rows={rows} columns={columns.map((c) => ({ key: c.key, header: c.header, width: c.width }))} />
+      <ExportButtons pdf={false} label="Exporter" filename={filename} sheetName={title.slice(0, 30)} rows={rows} columns={columns.map((c) => ({ key: c.key, header: c.header, width: c.width }))} />
       <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" disabled={rows.length === 0}
         onClick={() => void exportToPDF({ filename, title, orientation: "landscape", rows,
           columns: columns.map((c) => ({ key: c.key, header: c.header, format: c.num ? (r: T) => fmt(Number(r[c.key] ?? 0)) : undefined })) })}>

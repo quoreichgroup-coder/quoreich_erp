@@ -1,4 +1,9 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -31,6 +36,43 @@ const ASSET_CREATE_ALLOWLIST = [
   "asset_code", "name", "category_id", "acquisition_date", "acquisition_cost",
   "salvage_value", "useful_life_months", "depreciation_method", "location", "in_service_date", "opening_accumulated", "opening_date",
 ] as const;
+
+
+/** Fiche d'immobilisation imprimable : identification, valeurs, amortissements comptabilisés mois par mois. */
+function AssetSheetPrint({ asset }: { asset: any }) {
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ["asset-depreciation-entries", asset.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("depreciation_entries")
+        .select("period_date, amount, accumulated, net_book_value, kind, entry:journal_entries(piece_number)")
+        .eq("asset_id", asset.id).order("period_date");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const f = (n: number) => Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+  const base = Number(asset.acquisitionCost) - Number(asset.salvageValue ?? 0);
+  const done = entries.filter((e) => e.kind === "periodic").length;
+  return (
+    <DocumentPrintButtons testId="asset-sheet-print" disabled={isLoading} build={() => ({
+      title: "Fiche d'immobilisation", fileName: `fiche-immobilisation-${asset.asset_code}`, amountInWords: false,
+      subtitle: `${asset.asset_code} — ${asset.name}`,
+      header: [["Code", asset.asset_code], ["Désignation", asset.name], ["Catégorie", asset.categoryName ?? "—"], ["Localisation", asset.location || "—"],
+        ["Date d'acquisition", asset.acquisition_date ?? "—"], ["Mise en service", asset.in_service_date ?? asset.acquisition_date ?? "—"],
+        ["Méthode", asset.depreciation_method === "declining_balance" ? "Dégressif" : "Linéaire"], ["Durée d'usage", `${asset.useful_life_months} mois`],
+        ["Reprise (cumul à l'ouverture)", asset.opening_accumulated ? `${f(asset.opening_accumulated)} au ${asset.opening_date ?? "—"}` : "—"], ["Statut", String(asset.status)]],
+      columns: [{ label: "Mois" }, { label: "Nature" }, { label: "Dotation", align: "right" }, { label: "Cumul", align: "right" }, { label: "VNC", align: "right" }, { label: "Pièce" }],
+      rows: entries.map((e) => [String(e.period_date).slice(0, 7), e.kind === "disposal" ? "Dotation de sortie" : "Dotation mensuelle",
+        f(e.amount), f(e.accumulated), f(e.net_book_value), e.entry?.piece_number ?? ""]),
+      footer: [["Coût d'acquisition", f(asset.acquisitionCost)], ["Valeur résiduelle", f(asset.salvageValue ?? 0)], ["Base amortissable", f(base)],
+        ["Amortissements cumulés", f(asset.accumulatedDepreciation)], ["Valeur nette comptable", f(asset.netBookValue), true],
+        ["Reste à amortir", f(Math.max(0, base - Number(asset.accumulatedDepreciation)))],
+        ["Mois restants (durée d'usage)", String(Math.max(0, Number(asset.useful_life_months) - done))]],
+      notes: "Dotations comptabilisées par le calcul mensuel des amortissements ; les mois futurs sont calculés au moment de chaque clôture mensuelle selon les paramètres de la société.",
+      signatures: ["Responsable des immobilisations", "Comptable"],
+    })} />
+  );
+}
 
 export default function AssetsMasterData() {
   const perms = useMyFixedAssetRoles();
@@ -67,9 +109,9 @@ export default function AssetsMasterData() {
     ],
   });
 
-  const handleExport = () => {
+  const handleExport = (f: ExportFormat = "csv") => {
     if (!canDo(perms, "export")) return;
-    exportToCSV(
+    exportTable(f, 
       enriched.map((a) => ({
         Code: a.asset_code, Nom: a.name, Catégorie: a.categoryName, Localisation: a.location || "",
         Méthode: a.depreciation_method, Acquisition: a.acquisition_date,
@@ -166,13 +208,13 @@ export default function AssetsMasterData() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button size="sm" variant="outline" className="gap-1.5"
+          <ExportMenu size="sm" variant="outline" className="gap-1.5"
             disabled={!canDo(perms, "export") || enriched.length === 0}
-            onClick={handleExport}
+            onPick={(f) => void handleExport(f)}
             aria-label={exportTooltip} title={exportTooltip}>
             {canDo(perms, "export") ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             Export CSV
-          </Button>
+          </ExportMenu>
         </div>
       </div>
 
@@ -245,6 +287,7 @@ export default function AssetsMasterData() {
                 {selected.acquisitionCost - selected.salvageValue > 0 && (
                   <Progress value={(selected.accumulatedDepreciation / (selected.acquisitionCost - selected.salvageValue)) * 100} className="h-2" />
                 )}
+                {canDo(perms, "export") && <AssetSheetPrint asset={selected} />}
                 <AssetDisposalForm asset={selected} onDone={() => setSelected(null)} />
               </div>
               <SheetFooter className="mt-4 text-xs text-muted-foreground">

@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -42,9 +44,9 @@ export default function Treasury() {
 
   const iconMap: Record<string, any> = { checking: Building2, savings: Landmark, petty_cash: Wallet };
 
-  const handleExport = () => {
+  const handleExport = (f: ExportFormat = "csv") => {
     if (!canExport) return;
-    exportToCSV(
+    exportTable(f, 
       filteredTxns.map(t => ({
         date: t.transaction_date, account: (t.bank_account as any)?.name ?? "",
         type: t.transaction_type, amount: t.amount, reconciled: t.is_reconciled ? "yes" : "no",
@@ -74,13 +76,13 @@ export default function Treasury() {
               {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button
+          <ExportMenu
             size="sm" variant="outline" className="h-8 text-xs gap-1"
-            onClick={handleExport} disabled={!canExport}
+            onPick={(f) => void handleExport(f)} disabled={!canExport}
             aria-label={exportTip} title={exportTip}
           >
             {canExport ? <Download className="w-3 h-3" /> : <Lock className="w-3 h-3" />} Export
-          </Button>
+          </ExportMenu>
         </div>
       </div>
 

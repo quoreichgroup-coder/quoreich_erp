@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import { BulkBar, SelectAllHead, SelectCell, useSelection } from "@/components/BulkSelection";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -41,7 +45,30 @@ type Row = {
   quantite: number; cout: number; valeur: number; piece: string; motif: string; campaignId: string;
 };
 
+const rowId = (r: Row) => r.id;
+
+/** Bon de mouvements de stock (ajustement, transfert, ou sélection mixte) : article, dépôt, quantités, valeurs, motif. */
+function movementSlip(rows: Row[]) {
+  const types = [...new Set(rows.map((r) => r.libelle))];
+  const titre = types.length === 1 && /transfert/i.test(types[0]) ? "Bon de transfert de stock"
+    : types.length === 1 && /ajustement/i.test(types[0]) ? "Bon d'ajustement de stock" : "Bon de mouvements de stock";
+  const dates = rows.map((r) => r.date).sort();
+  const valeur = rows.reduce((t, r) => t + r.valeur, 0);
+  return {
+    title: titre, fileName: `${titre.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}-${dates.at(-1) ?? ""}`, amountInWords: false, orientation: "landscape" as const,
+    header: [["Mouvements", String(rows.length)], ["Période", dates.length ? `${dates[0]} → ${dates.at(-1)}` : "—"],
+      ["Types", types.join(", ")], ["Dépôts", [...new Set(rows.map((r) => r.depot || "—"))].join(", ")]] as [string, string][],
+    columns: [{ label: "Date" }, { label: "Type" }, { label: "Code" }, { label: "Article" }, { label: "Dépôt" },
+      { label: "Quantité", align: "right" as const }, { label: "Coût unitaire", align: "right" as const }, { label: "Valeur", align: "right" as const },
+      { label: "Pièce comptable" }, { label: "Motif" }],
+    rows: rows.map((r) => [r.date, r.libelle, r.code, r.article, r.depot, fmt(r.quantite), fmt(r.cout), fmt(r.valeur), r.piece, r.motif]),
+    footer: [["Quantité nette", fmt(rows.reduce((t, r) => t + r.quantite, 0))], ["Valeur nette", fmt(valeur), true]] as [string, string, boolean?][],
+    signatures: ["Magasinier", "Contrôleur de stock"],
+  };
+}
+
 function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string; canReview: boolean }) {
+  const sel = useSelection<Row>(rows, rowId);
   const t = useTableFeatures({
     data: rows, pageSize: 15, searchableKeys: ["article", "code", "depot", "piece", "motif", "libelle", "campaignId"],
     filterConfigs: [{ key: "libelle", label: "Type", options: Array.from(new Set(rows.map((r) => r.libelle))).sort() }],
@@ -50,8 +77,16 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
     <Card className="border-border"><CardContent className="p-0">
       <FilterBar search={t.search} onSearch={t.setSearch} filters={t.filters} onFilter={t.setFilter} onClear={t.clearFilters}
         filterConfigs={t.filterConfigs} activeCount={t.activeFilterCount} searchPlaceholder="Article, dépôt, pièce, motif…" />
+      <BulkBar count={sel.chosen.length} onClear={sel.clear} testId="bulk-bar-stock">
+        <DocumentPrintButtons testId="stock-slip-print" build={() => movementSlip(sel.chosen)} />
+        <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, sel.chosen, [
+          { key: "date", header: "Date" }, { key: "libelle", header: "Type" }, { key: "code", header: "Code article" }, { key: "article", header: "Article" },
+          { key: "depot", header: "Dépôt" }, { key: "quantite", header: "Quantité" }, { key: "cout", header: "Coût unitaire" }, { key: "valeur", header: "Valeur" },
+          { key: "piece", header: "Pièce comptable" }, { key: "motif", header: "Motif" }], "mouvements-selection", "Mouvements de stock")}>Exporter</ExportMenu>
+      </BulkBar>
       <div className="overflow-x-auto">
         <Table><TableHeader><TableRow className="bg-muted/30">
+          <SelectAllHead sel={sel} pageIds={t.pagedData.map((r) => r.id)} label="Sélectionner les mouvements de la page" />
           <SortableHead label="Date" sortKey="date" sort={t.sort} onSort={t.toggleSort} />
           <SortableHead label="Type" sortKey="libelle" sort={t.sort} onSort={t.toggleSort} />
           <SortableHead label="Article" sortKey="article" sort={t.sort} onSort={t.toggleSort} />
@@ -64,9 +99,10 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
         </TableRow></TableHeader>
         <TableBody>
           {t.pagedData.length === 0 ? (
-            <TableRow><TableCell colSpan={9} className="text-center text-xs text-muted-foreground py-8">{empty}</TableCell></TableRow>
+            <TableRow><TableCell colSpan={10} className="text-center text-xs text-muted-foreground py-8">{empty}</TableCell></TableRow>
           ) : t.pagedData.map((r) => (
             <TableRow key={r.id} className="text-xs" data-testid="stock-movement-row">
+              <SelectCell sel={sel} id={r.id} label={`Sélectionner le mouvement du ${r.date} (${r.article})`} />
               <TableCell className="tabular-nums">{r.date}</TableCell>
               <TableCell>{r.libelle}</TableCell>
               <TableCell><span className="font-mono text-muted-foreground mr-1">{r.code}</span>{r.article}</TableCell>
@@ -255,9 +291,9 @@ export default function InventoryTransactions() {
   })), [movements]);
   const shown = (t: MovementTab) => movementsOfTab(rows.map((r) => ({ ...r, movement_type: r.type })), t);
 
-  const exporter = () => {
+  const exporter = (f: ExportFormat = "csv") => {
     const t = (tab === "posting" ? "movements" : tab) as MovementTab;
-    exportToCSV(shown(t), [
+    exportTable(f, shown(t), [
       { key: "date", header: "Date" }, { key: "libelle", header: "Type" }, { key: "code", header: "Code article" },
       { key: "article", header: "Article" }, { key: "depot", header: "Dépôt" }, { key: "quantite", header: "Quantité" },
       { key: "cout", header: "Coût unitaire" }, { key: "valeur", header: "Valeur" }, { key: "piece", header: "Pièce comptable" },
@@ -282,7 +318,7 @@ export default function InventoryTransactions() {
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrOpen(true)}><ArrowLeftRight className="w-3.5 h-3.5" />Transfert</Button>
           )}
           {["movements", "transfers", "adjustments", "posting"].includes(tab) &&
-            <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exporter}><Download className="w-3.5 h-3.5" />Exporter</Button>}
+            <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exporter(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>}
         </div>
       </div>
 

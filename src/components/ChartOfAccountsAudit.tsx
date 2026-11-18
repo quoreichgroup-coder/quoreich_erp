@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -76,12 +78,12 @@ export function ChartOfAccountsAudit() {
             onClick={() => run.mutate({ fn: "create_syscohada_headings", ok: "Comptes de regroupement créés" })}>Créer les comptes de regroupement</Button>}
           {canFix && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={run.isPending}
             onClick={() => run.mutate({ fn: "link_gl_account_parents", ok: "Sous-comptes rattachés" })}>Rattacher les sous-comptes</Button>}
-          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={issues.length === 0} onClick={() => exportToCSV(issues.map((i) => ({
+          <ExportMenu size="sm" variant="outline" className="h-8 text-xs" disabled={issues.length === 0} onPick={(f) => exportTable(f, issues.map((i) => ({
             code: i.code, intitule: i.name, gravite: SEV[i.severity]?.[1] ?? i.severity, anomalie: i.issue, detail: i.detail,
             proposition: i.suggested_code ? `${i.suggested_code} ${i.suggested_name ?? ""}` : "", lignes: i.lines,
           })), [{ key: "code", header: "Compte" }, { key: "intitule", header: "Intitulé" }, { key: "gravite", header: "Gravité" },
             { key: "anomalie", header: "Anomalie" }, { key: "detail", header: "Détail" }, { key: "proposition", header: "Correction proposée" },
-            { key: "lignes", header: "Lignes d'écriture" }], "controle-plan-comptable")}>Exporter</Button>
+            { key: "lignes", header: "Lignes d'écriture" }], "controle-plan-comptable")}>Exporter</ExportMenu>
         </div>
       </div>
       {issues.length > 0 && (

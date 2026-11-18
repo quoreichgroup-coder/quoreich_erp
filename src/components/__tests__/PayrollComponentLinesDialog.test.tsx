@@ -4,7 +4,7 @@ import { PayrollComponentLinesDialog } from "../PayrollComponentLinesDialog";
 
 const mocks = vi.hoisted(() => ({
   company: { data: { name: "Entreprise A" } as { name: string } | undefined, isLoading: false, isError: false },
-  csv: vi.fn(), xlsx: vi.fn(), pdf: vi.fn().mockResolvedValue(true),
+  csv: vi.fn(), doc: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/hooks/use-hr-data", () => ({
   useHrCompanyContext: () => mocks.company,
@@ -15,8 +15,8 @@ vi.mock("@/hooks/use-hr-data", () => ({
   ] }),
 }));
 vi.mock("@/lib/csv-export", () => ({ exportToCSV: mocks.csv }));
-vi.mock("@/lib/xlsx", () => ({ exportToXLSX: mocks.xlsx }));
-vi.mock("@/lib/pdf-export", () => ({ exportToPDF: mocks.pdf }));
+// Bulletin en PDF et en Excel : même pièce (identité, salarié, rubriques, totaux, signatures).
+vi.mock("@/components/DocumentDetail", () => ({ exportDocument: mocks.doc }));
 
 function show(canExport = true) {
   render(<PayrollComponentLinesDialog open onOpenChange={vi.fn()} canExport={canExport}
@@ -35,16 +35,17 @@ describe("bulletin individuel", () => {
     fireEvent.click(screen.getByRole("button", { name: "CSV" }));
     fireEvent.click(screen.getByRole("button", { name: "Excel" }));
     fireEvent.click(screen.getByRole("button", { name: "PDF" }));
-    await waitFor(() => expect(mocks.pdf).toHaveBeenCalledOnce());
+    await waitFor(() => expect(mocks.doc).toHaveBeenCalledTimes(2));
     const csvRows = mocks.csv.mock.calls[0][0];
-    const xlsxRows = mocks.xlsx.mock.calls[0][0];
-    const pdfRows = mocks.pdf.mock.calls[0][0].rows;
-    for (const rows of [csvRows, xlsxRows, pdfRows]) {
-      expect(rows.filter((r: { code: string }) => ["FIRST", "LAST", "HIDDEN"].includes(r.code)).map((r: { code: string }) => r.code)).toEqual(["LAST", "FIRST"]);
-    }
-    for (const rows of [csvRows, xlsxRows]) {
-      expect(rows).toContainEqual(expect.objectContaining({ label: "Awa Diallo · MAT-42" }));
-      expect(rows).toContainEqual(expect.objectContaining({ code: "NET_A_PAYER", amount: 1150 }));
+    expect(csvRows.filter((r: { code: string }) => ["FIRST", "LAST", "HIDDEN"].includes(r.code)).map((r: { code: string }) => r.code)).toEqual(["LAST", "FIRST"]);
+    expect(csvRows).toContainEqual(expect.objectContaining({ label: "Awa Diallo · MAT-42" }));
+    expect(csvRows).toContainEqual(expect.objectContaining({ code: "NET_A_PAYER", amount: 1150 }));
+    expect(mocks.doc.mock.calls.map((c) => c[0])).toEqual(["xlsx", "pdf"]);
+    for (const [, d] of mocks.doc.mock.calls) {
+      expect(d.rows.map((r: string[]) => r[0]).filter((c: string) => ["FIRST", "LAST", "HIDDEN"].includes(c))).toEqual(["LAST", "FIRST"]);
+      expect(d.header).toContainEqual(["Salarié", "Awa Diallo · MAT-42"]);
+      expect(d.footer).toContainEqual(["Net à payer", expect.stringContaining("1"), true]);
+      expect(d.currency).toBe("XAF");
     }
   });
   it("attend l'identité de l'employeur avant d'autoriser les documents", () => {

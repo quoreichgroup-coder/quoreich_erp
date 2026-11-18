@@ -1,4 +1,7 @@
 import { exportToCSV } from "@/lib/csv-export";
+import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { useEffect, useState } from "react";
 import type React from "react";
 import { PageShell } from "@/components/PageShell";
@@ -398,6 +401,59 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
 }
 
 // ── Lecture d'une pièce d'achat : en-tête, lignes, pied ───────────────
+
+/* ──────── ACTIONS GROUPÉES (demandes, commandes) ──────── */
+const STATUT_ACHAT: Record<string, string> = {
+  draft: "Brouillon", pending_approval: "En approbation", approved: "Approuvée", rejected: "Rejetée", cancelled: "Annulée",
+  converted: "Convertie", ordered: "Commandée", partially_received: "Reçue partiellement", received: "Reçue", closed: "Clôturée",
+};
+const statutAchat = (s: string) => STATUT_ACHAT[s] ?? s;
+
+function ProcurementBulkBar({ docType, sel, approvals }: { docType: "PR" | "PO"; sel: Selection<any>; approvals: any[] }) {
+  const bulk = useBulkRun();
+  const db = supabase as any;
+  const docs = sel.chosen;
+  const pendingOf = (id: string) => approvals.filter((a) => a.doc_id === id && a.status === "pending").sort((a, b) => a.level_order - b.level_order)[0];
+  const editables = docs.filter((d) => d.status === "draft" || d.status === "rejected").map((d) => d.id);
+  const enApprobation = docs.filter((d) => d.status === "pending_approval" && pendingOf(d.id)).map((d) => d.id);
+  const annulables = docs.filter((d) => !["cancelled", "converted", "received", "closed"].includes(d.status)).map((d) => d.id);
+  const invalidate = ["purchase-requisitions", "purchase-orders", "procurement-approvals", "budget-status"];
+  const nom = docType === "PR" ? "demande(s)" : "commande(s)";
+  const go = (ids: string[], question: string, done: string, run: (id: string) => Promise<void>) => {
+    if (ids.length && window.confirm(question)) bulk.mutate({ ids, run, done, invalidate }, { onSuccess: sel.clear });
+  };
+  const cols = docType === "PR"
+    ? [{ key: "numero", header: "N° demande" }, { key: "objet", header: "Objet" }, { key: "total", header: "Total estimé" }, { key: "statut", header: "Statut" }, { key: "date", header: "Date" }]
+    : [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }, { key: "date", header: "Date" }];
+  const rows = docs.map((d) => docType === "PR"
+    ? { numero: d.pr_number, objet: d.description ?? "", total: Number(d.estimated_total ?? 0), statut: statutAchat(d.status), date: d.request_date }
+    : { numero: d.po_number, fournisseur: d.supplier?.name ?? "", total: Number(d.total ?? 0), statut: statutAchat(d.status), date: d.order_date });
+  return (
+    <BulkBar count={docs.length} onClear={sel.clear} testId={`bulk-bar-${docType.toLowerCase()}`}>
+      <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, rows as any[], cols as any, docType === "PR" ? "demandes-achat-selection" : "commandes-selection", docType === "PR" ? "Demandes d'achat" : "Commandes d'achat")}>Exporter</ExportMenu>
+      <BulkButton count={editables.length} label="Soumettre" disabled={bulk.isPending}
+        onClick={() => go(editables, `Soumettre ${editables.length} ${nom} à l'approbation ?`, `${nom} soumise(s)`,
+          async (id) => check(await db.rpc("procurement_submit", { _doc_type: docType, _doc_id: id })))} />
+      <BulkButton count={enApprobation.length} label="Approuver le niveau en cours" disabled={bulk.isPending}
+        onClick={() => go(enApprobation, `Approuver le niveau en cours de ${enApprobation.length} ${nom} ? (refusé pour vos propres pièces et sans le droit du niveau)`, "étape(s) approuvée(s)",
+          async (id) => check(await db.rpc("approve_procurement_step", { _approval_id: pendingOf(id).id, _comment: "Approbation groupée" })))} />
+      <BulkButton count={annulables.length} label="Annuler" disabled={bulk.isPending}
+        onClick={() => {
+          const r = window.prompt(`Motif de l'annulation de ${annulables.length} ${nom}`);
+          if (r && r.trim()) bulk.mutate({ ids: annulables, done: `${nom} annulée(s)`, invalidate,
+            run: async (id) => check(await db.rpc("procurement_cancel", { _doc_type: docType, _doc_id: id, _reason: r.trim() })) }, { onSuccess: sel.clear });
+        }} />
+      <BulkButton count={editables.length} label="Supprimer" danger disabled={bulk.isPending}
+        onClick={() => go(editables, `Supprimer ${editables.length} ${nom} (brouillons ou rejetées) ?`, `${nom} supprimée(s)`, async (id) => {
+          const { data, error } = await db.from(docType === "PR" ? "purchase_requisitions" : "purchase_orders").delete().eq("id", id).select("id");
+          if (error) throw new Error(error.message);
+          if (!data?.length) throw new Error("Pièce introuvable ou non supprimable.");
+        })} />
+    </BulkBar>
+  );
+}
+
+const rowId = (r: any) => r.id as string;
 type DocView = { kind: "pr" | "po" | "gr"; doc: any } | null;
 
 function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
@@ -444,7 +500,8 @@ function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title}
-          fileName={documentFileName(title)} />
+          fileName={documentFileName(title)} print={{ amountInWords: false,
+            signatures: view.kind === "gr" ? ["Réceptionné par", "Contrôlé par"] : view.kind === "pr" ? ["Demandeur", "Approbateur"] : ["Émis par", "Approuvé par"] }} />
       </DialogContent>
     </Dialog>
   );
@@ -471,12 +528,12 @@ export default function ProcurementTransactions() {
   const [docView, setDocView] = useState<DocView>(null);
   const [tab, setTab] = useState("requisitions");
   // Export de l'onglet affiché, avec les mêmes lignes que l'écran.
-  const exportTab = () => {
-    if (tab === "po") exportToCSV(pos.map((p: any) => ({ numero: p.po_number, fournisseur: p.supplier?.name ?? "", date: p.order_date, total: p.total, statut: p.status, lignes: p.lines?.length ?? 0 })),
+  const exportTab = (f: ExportFormat = "csv") => {
+    if (tab === "po") exportTable(f, pos.map((p: any) => ({ numero: p.po_number, fournisseur: p.supplier?.name ?? "", date: p.order_date, total: p.total, statut: p.status, lignes: p.lines?.length ?? 0 })),
       [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "commandes");
-    else if (tab === "gr") exportToCSV(grs.map((g: any) => ({ numero: g.gr_number, commande: g.po?.po_number ?? "", fournisseur: g.po?.supplier?.name ?? "", date: g.receipt_date, statut: g.status, lignes: g.lines?.length ?? 0 })),
+    else if (tab === "gr") exportTable(f, grs.map((g: any) => ({ numero: g.gr_number, commande: g.po?.po_number ?? "", fournisseur: g.po?.supplier?.name ?? "", date: g.receipt_date, statut: g.status, lignes: g.lines?.length ?? 0 })),
       [{ key: "numero", header: "N° réception" }, { key: "commande", header: "Commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "receptions");
-    else exportToCSV(prs.map((r: any) => ({ numero: r.pr_number, objet: r.description, total: r.estimated_total, statut: r.status, date: r.request_date, commande: r.po_id ? "oui" : "" })),
+    else exportTable(f, prs.map((r: any) => ({ numero: r.pr_number, objet: r.description, total: r.estimated_total, statut: r.status, date: r.request_date, commande: r.po_id ? "oui" : "" })),
       [{ key: "numero", header: "N° demande" }, { key: "objet", header: "Objet" }, { key: "total", header: "Total estimé" }, { key: "statut", header: "Statut" }, { key: "date", header: "Date" }, { key: "commande", header: "Convertie" }], "demandes-achat");
   };
   const [convertPR, setConvertPR] = useState<any | null>(null);
@@ -489,6 +546,8 @@ export default function ProcurementTransactions() {
 
   const prs = requisitions || [];
   const pos = purchaseOrders || [];
+  const selPR = useSelection<any>(prs, rowId);
+  const selPO = useSelection<any>(pos, rowId);
   const grs = goodsReceipts || [];
 
   return (
@@ -502,7 +561,7 @@ export default function ProcurementTransactions() {
           <Button size="sm" className="gap-1.5" onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exportTab}><Download className="w-3.5 h-3.5" />Export</Button>
+          <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Export</ExportMenu>
         </div>
       </div>
 
@@ -539,25 +598,29 @@ export default function ProcurementTransactions() {
             {loadingPR ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
             ) : (
+              <>
+              <ProcurementBulkBar docType="PR" sel={selPR} approvals={approvals} />
               <Table><TableHeader><TableRow className="bg-muted/30">
-                <TableHead className="text-xs">PR #</TableHead>
-                <TableHead className="text-xs">Description</TableHead>
-                <TableHead className="text-xs text-right">Est. Total</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">PO Ref</TableHead>
+                <SelectAllHead sel={selPR} pageIds={prs.map((r: any) => r.id)} label="Sélectionner toutes les demandes" />
+                <TableHead className="text-xs">N° demande</TableHead>
+                <TableHead className="text-xs">Objet</TableHead>
+                <TableHead className="text-xs text-right">Total estimé</TableHead>
+                <TableHead className="text-xs">Statut</TableHead>
+                <TableHead className="text-xs">Commande</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {prs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No requisitions yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">Aucune demande d'achat</TableCell></TableRow>
                 ) : prs.map((pr: any) => (
                   <TableRow key={pr.id} className="text-xs">
+                    <SelectCell sel={selPR} id={pr.id} label={`Sélectionner ${pr.pr_number}`} />
                     <TableCell className="font-mono text-primary">{pr.pr_number}</TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate">{pr.description}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(pr.estimated_total)}</TableCell>
-                    <TableCell><Badge className={`text-[10px] ${statusBadge(pr.status)}`} variant="outline">{pr.status}</Badge></TableCell>
-                    <TableCell className="font-mono text-[10px]">{pr.po_id ? "→ PO" : "—"}</TableCell>
+                    <TableCell><Badge className={`text-[10px] ${statusBadge(pr.status)}`} variant="outline">{statutAchat(pr.status)}</Badge></TableCell>
+                    <TableCell className="font-mono text-[10px]">{pr.po_id ? "→ commande" : "—"}</TableCell>
                     <TableCell>{pr.request_date}</TableCell>
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "pr", doc: pr })}>Voir</Button>
@@ -580,6 +643,7 @@ export default function ProcurementTransactions() {
                   </TableRow>
                 ))}
               </TableBody></Table>
+              </>
             )}
           </CardContent></Card>
         </TabsContent>
@@ -590,25 +654,29 @@ export default function ProcurementTransactions() {
             {loadingPO ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
             ) : (
+              <>
+              <ProcurementBulkBar docType="PO" sel={selPO} approvals={approvals} />
               <Table><TableHeader><TableRow className="bg-muted/30">
-                <TableHead className="text-xs">PO #</TableHead>
-                <TableHead className="text-xs">Supplier</TableHead>
+                <SelectAllHead sel={selPO} pageIds={pos.map((r: any) => r.id)} label="Sélectionner toutes les commandes" />
+                <TableHead className="text-xs">N° commande</TableHead>
+                <TableHead className="text-xs">Fournisseur</TableHead>
                 <TableHead className="text-xs text-right">Total</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Lines</TableHead>
+                <TableHead className="text-xs">Statut</TableHead>
+                <TableHead className="text-xs">Lignes</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {pos.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No purchase orders yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">Aucune commande d'achat</TableCell></TableRow>
                 ) : pos.map((po: any) => (
                   <TableRow key={po.id} className="text-xs">
+                    <SelectCell sel={selPO} id={po.id} label={`Sélectionner ${po.po_number}`} />
                     <TableCell className="font-mono text-primary">{po.po_number}</TableCell>
                     <TableCell className="font-medium">{(po.supplier as any)?.name || "—"}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(po.total)}</TableCell>
-                    <TableCell><Badge className={`text-[10px] ${statusBadge(po.status)}`} variant="outline">{po.status}</Badge></TableCell>
-                    <TableCell className="text-[10px]">{po.lines?.length || 0} items</TableCell>
+                    <TableCell><Badge className={`text-[10px] ${statusBadge(po.status)}`} variant="outline">{statutAchat(po.status)}</Badge></TableCell>
+                    <TableCell className="text-[10px]">{po.lines?.length || 0} ligne(s)</TableCell>
                     <TableCell>{po.order_date}</TableCell>
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "po", doc: po })}>Voir</Button>
@@ -617,6 +685,7 @@ export default function ProcurementTransactions() {
                   </TableRow>
                 ))}
               </TableBody></Table>
+              </>
             )}
           </CardContent></Card>
         </TabsContent>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ExportButtons } from "@/components/ExportButtons";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { useGLAccounts } from "@/hooks/use-gl-data";
 import { useTreasuryAccounts, useTreasuryMovements } from "@/hooks/use-treasury-accounts";
@@ -59,7 +60,7 @@ export function BankReconciliation() {
         {can.import && <Button size="sm" className="h-8 text-xs ml-auto" onClick={() => setImporting(true)}>Importer un relevé</Button>}
       </div>
       {statement && <StatementPanel accountId={current.id} statement={statement} can={can} />}
-      <ReconciliationPanel accountId={current.id} can={can} lastStatementEnd={statements[0]?.period_end ?? null} />
+      <ReconciliationPanel accountId={current.id} accountLabel={`${current.name ?? ""}${(current as any).account_number ? ` · ${(current as any).account_number}` : ""}`} can={can} lastStatementEnd={statements[0]?.period_end ?? null} />
       {importing && <ImportStatementDialog accountId={current.id} accountName={current.name} lastClosing={statements[0]?.closing_balance ?? null} lastEnd={statements[0]?.period_end ?? null}
         onClose={() => setImporting(false)} onDone={(id) => { setStatementId(id); setImporting(false); }} />}
     </div>
@@ -256,7 +257,7 @@ function ImportStatementDialog({ accountId, accountName, lastClosing, lastEnd, o
   );
 }
 
-function ReconciliationPanel({ accountId, can, lastStatementEnd }: { accountId: string; can: Record<string, boolean>; lastStatementEnd: string | null }) {
+function ReconciliationPanel({ accountId, accountLabel, can, lastStatementEnd }: { accountId: string; accountLabel: string; can: Record<string, boolean>; lastStatementEnd: string | null }) {
   const { data: recs = [] } = useReconciliationsFor(accountId);
   const prepare = usePrepareReconciliation();
   const validate = useValidateReconciliation();
@@ -280,13 +281,25 @@ function ReconciliationPanel({ accountId, can, lastStatementEnd }: { accountId: 
       )}
       <table className="w-full text-xs" data-testid="reconciliations">
         <thead><tr className="text-muted-foreground border-b border-border"><th className="text-left p-1">Au</th><th className="text-right">Relevé</th><th className="text-right">Comptable</th>
-          <th className="text-right">En suspens (+ / −)</th><th className="text-left pl-3">État</th></tr></thead>
+          <th className="text-right">En suspens (+ / −)</th><th className="text-left pl-3">État</th><th /></tr></thead>
         <tbody>{recs.map((r) => (
           <tr key={r.id} data-testid="reconciliation-row" className="border-b border-border/50"><td className="p-1">{d(r.period_end)}</td>
             <td className="text-right tabular-nums">{fmt(r.bank_balance)}</td><td className="text-right tabular-nums">{fmt(r.book_balance)}</td>
             <td className="text-right tabular-nums">{fmt(r.outstanding_receipts)} / {fmt(r.outstanding_payments)}</td>
-            <td className="pl-3">{r.status === "validated" ? <StatusBadge status="success" label="Validé" /> : <StatusBadge status="warning" label="Brouillon" />}</td></tr>))}
-          {recs.length === 0 && <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">Aucun rapprochement : importer le relevé puis calculer l'état.</td></tr>}
+            <td className="pl-3">{r.status === "validated" ? <StatusBadge status="success" label="Validé" /> : <StatusBadge status="warning" label="Brouillon" />}</td>
+            <td className="pr-1 text-right"><DocumentPrintButtons testId="reconciliation-print" build={() => ({
+              title: "État de rapprochement bancaire", fileName: `rapprochement-${r.period_end}`, amountInWords: false,
+              subtitle: `${accountLabel} · au ${d(r.period_end)} · ${r.status === "validated" ? "validé" : "brouillon"}`,
+              header: [["Compte de trésorerie", accountLabel], ["Arrêté au", d(r.period_end)], ["État", r.status === "validated" ? "Validé" : "Brouillon"],
+                ["Lignes du relevé sans contrepartie", String((r as any).unmatched_statement_lines ?? 0)]],
+              columns: [{ label: "Rubrique" }, { label: "Montant", align: "right" }],
+              rows: [["Solde du relevé bancaire", fmt(r.bank_balance)], ["+ Encaissements comptabilisés non encore au relevé", fmt(r.outstanding_receipts)],
+                ["− Décaissements comptabilisés non encore au relevé", fmt(r.outstanding_payments)]],
+              footer: [["Solde comptable", fmt(r.book_balance), true],
+                ["Écart", fmt(Number(r.bank_balance) + Number(r.outstanding_receipts) - Number(r.outstanding_payments) - Number(r.book_balance))]],
+              signatures: ["Établi par", "Validé par"],
+            })} /></td></tr>))}
+          {recs.length === 0 && <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">Aucun rapprochement : importer le relevé puis calculer l'état.</td></tr>}
         </tbody>
       </table>
     </section>

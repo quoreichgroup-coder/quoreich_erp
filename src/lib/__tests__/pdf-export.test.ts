@@ -56,10 +56,10 @@ describe("exportToPDF", () => {
     expect(mocks.error).not.toHaveBeenCalled();
   });
 
-  it("formate les valeurs numériques avec les séparateurs français", async () => {
+  it("formate les valeurs numériques avec les séparateurs français, en espaces imprimables par la police du PDF", async () => {
     await exportToPDF({ ...opts, rows: [{ a: 1234.5 }] });
     const tableOptions = mocks.autoTable.mock.calls[0][1];
-    expect(tableOptions.body).toEqual([["1\u202f234,5"]]);
+    expect(tableOptions.body).toEqual([["1 234,5"]]); // l'espace fine insécable du format fr-FR s'imprimait « / »
   });
 
   it("échec : un toast d'erreur, la promesse se résout à false (pas de rejet non géré)", async () => {

@@ -146,21 +146,21 @@ test("budget par section : approbation par un tiers, demandes pré-engagées, re
     obs.etape("demande 20 000 sur la section : soumise, pré-engagée");
     const d1 = await demande(page, `${RUN} Demande section 1`, `${annee}-03-02`, "20000");
     await d1.getByRole("button", { name: "Soumettre" }).click();
-    await expect(d1).toContainText("pending_approval");
+    await expect(d1).toContainText("En approbation");
 
     obs.etape("demande 15 000 : au-delà des 10 000 disponibles de la section, refusée");
     const d2 = await demande(page, `${RUN} Demande section 2`, `${annee}-03-05`, "15000");
     obs.refusAttendu(/Budget dépassé/);
     await d2.getByRole("button", { name: "Soumettre" }).click();
     await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Budget dépassé" }).first()).toBeVisible();
-    await expect(d2).toContainText("draft");
+    await expect(d2).toContainText("Brouillon");
 
     obs.etape("dérogation motivée, puis soumission");
     page.once("dialog", (dl) => dl.accept("Panne de la ligne de production"));
     await d2.getByRole("button", { name: "Autoriser le dépassement" }).click();
     await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Dépassement de budget autorisé" }).first()).toBeVisible();
     await d2.getByRole("button", { name: "Soumettre" }).click();
-    await expect(d2).toContainText("pending_approval");
+    await expect(d2).toContainText("En approbation");
     await expect(d2.getByTestId("budget-warning")).toContainText("Budget dépassé (autorisé)");
 
     obs.etape("engagé et disponible : pré-engagé par section");

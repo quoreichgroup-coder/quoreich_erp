@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Download, FileText, Loader2, RefreshCcw, RotateCcw, Search } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
@@ -8,7 +11,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
+import { DocumentDetail, DocumentPrintButtons, documentFileName } from "@/components/DocumentDetail";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { isApiEnabled } from "@/api/client";
@@ -69,6 +72,44 @@ function useGLEntries() {
   });
 }
 
+const entryId = (e: Entry) => e.id;
+
+/* ──────── ACTIONS GROUPÉES (écritures) ──────── */
+// Impression des pièces choisies en un seul brouillard ; contre-passation des seules écritures manuelles
+// comptabilisées (une écriture issue d'un livre auxiliaire s'annule par sa pièce : avoir, annulation de règlement…).
+function GLBulkBar({ sel }: { sel: Selection<Entry> }) {
+  const bulk = useBulkRun();
+  const docs = sel.chosen;
+  const reversibles = docs.filter((e) => e.source === "manual" && e.status === "posted").map((e) => e.id);
+  const debit = docs.reduce((t, e) => t + sum(e, "debit"), 0);
+  const credit = docs.reduce((t, e) => t + sum(e, "credit"), 0);
+  return (
+    <BulkBar count={docs.length} onClear={sel.clear} testId="bulk-bar-gl">
+      <DocumentPrintButtons testId="gl-bulk-print" build={() => ({
+        title: "Brouillard des écritures", fileName: `brouillard-${new Date().toISOString().slice(0, 10)}`, amountInWords: false,
+        subtitle: `${docs.length} pièce(s)`, orientation: "landscape",
+        header: [["Pièces", String(docs.length)], ["Du", docs.map((e) => e.entry_date).sort()[0] ?? "—"],
+          ["Au", docs.map((e) => e.entry_date).sort().at(-1) ?? "—"], ["Journaux", [...new Set(docs.map((e) => e.journal_code ?? "—"))].join(", ")]],
+        columns: [{ label: "Pièce" }, { label: "Date" }, { label: "Journal" }, { label: "Compte" }, { label: "Intitulé" }, { label: "Libellé" },
+          { label: "Débit", align: "right" }, { label: "Crédit", align: "right" }],
+        rows: [...docs].sort((a, b) => (a.piece_number ?? "").localeCompare(b.piece_number ?? "")).flatMap((e) => e.lines.map((l) => [
+          e.piece_number ?? e.entry_number, e.entry_date, e.journal_code ?? "", l.account?.code ?? "", l.account?.name ?? "", l.description ?? e.description ?? "",
+          Number(l.debit) ? fmt(Number(l.debit)) : "", Number(l.credit) ? fmt(Number(l.credit)) : ""])),
+        footer: [["Total débit", fmt(debit)], ["Total crédit", fmt(credit)], ["Écart", fmt(debit - credit), true]],
+        signatures: ["Établi par", "Validé par"],
+      })} />
+      <BulkButton count={reversibles.length} label="Contre-passer" danger disabled={bulk.isPending}
+        onClick={() => {
+          const r = window.prompt(`Motif de la contre-passation de ${reversibles.length} écriture(s) manuelle(s)`);
+          if (r && r.trim()) bulk.mutate({ ids: reversibles, done: "écriture(s) contre-passée(s)",
+            invalidate: ["gl-transactions", "journal-entries", "gl-trial-balance", "account-balances"],
+            run: async (id) => check(await (supabase as any).rpc("reverse_journal_entry", { _entry_id: id, _reverse_date: new Date().toISOString().slice(0, 10), _reason: r.trim() })) },
+            { onSuccess: sel.clear });
+        }} />
+    </BulkBar>
+  );
+}
+
 function EntryDialog({ entry, onClose }: { entry: Entry | null; onClose: () => void }) {
   if (!entry) return null;
   const title = `Écriture ${entry.piece_number ?? entry.entry_number}`;
@@ -77,7 +118,7 @@ function EntryDialog({ entry, onClose }: { entry: Entry | null; onClose: () => v
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
-          title={title} fileName={documentFileName(title)}
+          title={title} fileName={documentFileName(title)} print={{ amountInWords: false, signatures: ["Établi par", "Validé par"] }}
           header={[
             ["Journal", entry.journal_code ? `${entry.journal_code} — ${JOURNAUX[entry.journal_code] ?? ""}` : "—"],
             ["Date", entry.entry_date], ["Origine", ORIGINES[entry.source] ?? entry.source],
@@ -111,10 +152,11 @@ export default function GLTransactions() {
     && (!search || `${e.piece_number ?? ""} ${e.entry_number} ${e.description ?? ""} ${ORIGINES[e.source] ?? ""}`.toLowerCase().includes(search.toLowerCase()))),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [entries, activeTab, journal, period, search]);
+  const sel = useSelection<Entry>(rows, entryId);
   const counts = useMemo(() => Object.fromEntries(tabs.map((t) => [t.id, entries.filter((e) =>
     t.id === "manual" ? e.source === "manual" : t.id === "reversal" ? e.source === "reversal" : !["manual", "reversal"].includes(e.source)).length])), [entries]);
 
-  const exporter = () => exportToCSV(rows.map((e) => ({
+  const exporter = (f: ExportFormat = "csv") => exportTable(f, rows.map((e) => ({
     piece: e.piece_number ?? e.entry_number, date: e.entry_date, journal: e.journal_code ?? "", origine: ORIGINES[e.source] ?? e.source,
     libelle: e.description ?? "", debit: sum(e, "debit"), credit: sum(e, "credit"), statut: STATUTS[e.status] ?? e.status, lot: e.batch?.batch_number ?? "",
   })), [{ key: "piece", header: "N° pièce" }, { key: "date", header: "Date" }, { key: "journal", header: "Journal" },
@@ -150,14 +192,16 @@ export default function GLTransactions() {
               {Object.entries(JOURNAUX).map(([c, l]) => <option key={c} value={c}>{c} — {l}</option>)}
             </select>
             <Input aria-label="Période" type="month" className="h-8 text-xs w-40" value={period} onChange={(e) => setPeriod(e.target.value)} />
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1 ml-auto" data-testid="btn-export-csv" onClick={exporter}>
+            <ExportMenu variant="outline" size="sm" className="h-8 text-xs gap-1 ml-auto" data-testid="btn-export-csv" onPick={(f) => void exporter(f)}>
               <Download className="w-3.5 h-3.5" /> Exporter
-            </Button>
+            </ExportMenu>
           </div>
           <div className="mt-3 rounded-md border border-border overflow-x-auto">
+            <GLBulkBar sel={sel} />
             <table className="w-full text-xs">
               <thead className="bg-muted/30 text-muted-foreground">
                 <tr>
+                  <SelectAllHead sel={sel} pageIds={rows.map((e) => e.id)} label="Sélectionner toutes les écritures" />
                   <th className="p-2 text-left">N° pièce</th><th className="p-2 text-left">Date</th><th className="p-2 text-left">Journal</th>
                   <th className="p-2 text-left">Origine</th><th className="p-2 text-left">Libellé</th>
                   <th className="p-2 text-right">Débit</th><th className="p-2 text-right">Crédit</th><th className="p-2 text-left">Statut</th><th className="p-2 text-left">Lot</th>
@@ -165,13 +209,14 @@ export default function GLTransactions() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={9} className="p-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></td></tr>
+                  <tr><td colSpan={10} className="p-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></td></tr>
                 ) : error ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-destructive">{(error as Error).message}</td></tr>
+                  <tr><td colSpan={10} className="p-6 text-center text-destructive">{(error as Error).message}</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground"><BookOpen className="w-4 h-4 inline mr-1" />Aucune écriture pour ces critères.</td></tr>
+                  <tr><td colSpan={10} className="p-6 text-center text-muted-foreground"><BookOpen className="w-4 h-4 inline mr-1" />Aucune écriture pour ces critères.</td></tr>
                 ) : rows.map((e) => (
                   <tr key={e.id} data-testid="gl-entry-row" className="border-t border-border cursor-pointer hover:bg-muted/40" onClick={() => setSelected(e)}>
+                    <SelectCell sel={sel} id={e.id} label={`Sélectionner ${e.piece_number ?? e.entry_number}`} />
                     <td className="p-2 font-mono text-primary">{e.piece_number ?? e.entry_number}</td>
                     <td className="p-2 tabular-nums">{e.entry_date}</td>
                     <td className="p-2">{e.journal_code ?? "—"}</td>

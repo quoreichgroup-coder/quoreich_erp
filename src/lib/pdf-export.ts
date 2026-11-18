@@ -1,6 +1,16 @@
 import type { RowInput } from "jspdf-autotable";
 import { toast } from "sonner";
 
+/**
+ * Texte imprimable par les polices standard du PDF (jeu WinAnsi) : les espaces insécables que
+ * produit `toLocaleString("fr-FR")` (U+202F, U+00A0) s'imprimaient « 125/000 », et quelques signes
+ * (flèche, moins typographique, ≤ ≥) n'existent pas dans la police.
+ */
+export function pdfSafe(s: string): string {
+  return s.replace(/[\u202f\u00a0\u2007\u2009]/g, " ").replace(/\u2192/g, "->").replace(/\u2190/g, "<-")
+    .replace(/\u2212/g, "-").replace(/\u2264/g, "<=").replace(/\u2265/g, ">=").replace(/\u2713/g, "oui");
+}
+
 export type PdfColumn<T> = {
   key: keyof T | string;
   header: string;
@@ -58,7 +68,7 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
   const margin = 32;
 
   doc.setFontSize(13);
-  doc.text(opts.title, margin, margin);
+  doc.text(pdfSafe(opts.title), margin, margin);
 
   doc.setFontSize(9);
   doc.setTextColor(110);
@@ -66,18 +76,18 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
   doc.text(`Généré le ${stamp}`, margin, margin + 14);
   // Sous-titre replié à la largeur de la page (en-tête d'une pièce : plusieurs champs).
   const subtitleLines: string[] = opts.subtitle
-    ? doc.splitTextToSize(opts.subtitle, doc.internal.pageSize.getWidth() - 2 * margin)
+    ? doc.splitTextToSize(pdfSafe(opts.subtitle), doc.internal.pageSize.getWidth() - 2 * margin)
     : [];
   if (subtitleLines.length) doc.text(subtitleLines, margin, margin + 28);
 
-  const head = [opts.columns.map((c) => c.header)];
+  const head = [opts.columns.map((c) => pdfSafe(c.header))];
   const body: RowInput[] = opts.rows.map((row) =>
     opts.columns.map((c) => {
       const v = c.format ? c.format(row) : (row[c.key as keyof T] as unknown);
       if (v === null || v === undefined) return "";
-      return typeof v === "number" && Number.isFinite(v)
+      return pdfSafe(typeof v === "number" && Number.isFinite(v)
         ? v.toLocaleString("fr-FR", { maximumFractionDigits: 2 })
-        : String(v);
+        : String(v));
     }),
   );
 

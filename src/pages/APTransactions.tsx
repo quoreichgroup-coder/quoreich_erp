@@ -1,4 +1,7 @@
 import { exportToCSV } from "@/lib/csv-export";
+import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SettlementDialog } from "@/components/SettlementDialog";
-import { DocumentDetail } from "@/components/DocumentDetail";
+import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { JournalEntryPreview } from "@/components/JournalEntryPreview";
 import { APCreditNoteDialog, APCreditNotesList } from "@/components/SupplierReturns";
 import { usePurchaseOrders } from "@/hooks/use-procurement-data";
@@ -225,8 +228,13 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-5">
           <DocumentDetail
+            title={`Facture fournisseur ${inv.invoice_number}`}
+            fileName={documentFileName(`facture-fournisseur-${inv.invoice_number}`)}
+            print={{ currency: (inv as any).currency ?? "XOF", amountInWords: false, signatures: ["Vérifié par", "Bon à payer (approbateur)"] }}
             header={[
-              ["Fournisseur", inv.supplier?.name], ["Statut", `${statusLabel(inv.status)} · ${approvalLabel(inv.approval_status)}`],
+              ["Fournisseur", (inv.supplier as any)?.legal_name || inv.supplier?.name], ["Statut", `${statusLabel(inv.status)} · ${approvalLabel(inv.approval_status)}`],
+              ["Adresse", [(inv.supplier as any)?.address, (inv.supplier as any)?.city, (inv.supplier as any)?.country].filter(Boolean).join(", ") || "—"],
+              ["IFU / NIF · RCCM", [(inv.supplier as any)?.tax_id, (inv.supplier as any)?.rccm].filter(Boolean).join(" · ") || "—"],
               ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
             ]}
             columns={[{ label: "Libellé" }, { label: "Quantité", align: "right" }, { label: "Prix unitaire", align: "right" }, { label: "Montant HT", align: "right" }, { label: "TVA", align: "right" }]}
@@ -256,6 +264,43 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
 }
 
 /* ──────── CYCLE DE VIE (V41) ──────── */
+const apId = (i: APInvoice) => i.id;
+/* ──────── ACTIONS GROUPÉES (factures fournisseurs) ──────── */
+function APBulkBar({ sel, approvals }: { sel: Selection<APInvoice>; approvals: APInvoiceApproval[] }) {
+  const bulk = useBulkRun();
+  const db = supabase as any;
+  const docs = sel.chosen;
+  const pendingOf = (id: string) => approvals.filter((a) => a.invoice_id === id && a.status === "pending").sort((a, b) => a.level_order - b.level_order)[0];
+  const editables = docs.filter((d) => ["draft", "pending", "rejected"].includes(d.approval_status)).map((d) => d.id);
+  const aDecider = docs.filter((d) => d.approval_status === "submitted" && pendingOf(d.id)).map((d) => d.id);
+  const invalidate = ["ap-invoices", "ap-invoice-approvals", "ap-aging", "journal-entries"];
+  const go = (ids: string[], question: string, done: string, run: (id: string) => Promise<void>) => {
+    if (ids.length && window.confirm(question)) bulk.mutate({ ids, run, done, invalidate }, { onSuccess: sel.clear });
+  };
+  const rows = docs.map((d) => ({ numero: d.invoice_number, fournisseur: d.supplier?.name ?? "", date: d.invoice_date, echeance: d.due_date,
+    total: Number(d.total), reste: Number(d.total) - Number(d.amount_paid), statut: statusLabel(d.status), approbation: approvalLabel(d.approval_status) }));
+  return (
+    <BulkBar count={docs.length} onClear={sel.clear} testId="bulk-bar-ap">
+      <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, rows, [
+        { key: "numero", header: "N° facture" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "echeance", header: "Échéance" },
+        { key: "total", header: "Total TTC" }, { key: "reste", header: "Reste à payer" }, { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" },
+      ], "factures-fournisseurs-selection", "Factures fournisseurs")}>Exporter</ExportMenu>
+      <BulkButton count={editables.length} label="Soumettre" disabled={bulk.isPending}
+        onClick={() => go(editables, `Soumettre ${editables.length} facture(s) à l'approbation ? (contrôles commande / réception appliqués à chacune)`, "facture(s) soumise(s)",
+          async (id) => check(await db.rpc("ap_invoice_submit", { _id: id })))} />
+      <BulkButton count={aDecider.length} label="Approuver le niveau en cours" disabled={bulk.isPending}
+        onClick={() => go(aDecider, `Approuver le niveau en cours de ${aDecider.length} facture(s) ? (refusé pour vos propres factures et sans le droit du niveau)`, "approbation(s) enregistrée(s)",
+          async (id) => check(await db.rpc("ap_invoice_decide", { _approval_id: pendingOf(id)!.id, _approve: true, _comment: "Approbation groupée" })))} />
+      <BulkButton count={editables.length} label="Supprimer" danger disabled={bulk.isPending}
+        onClick={() => go(editables, `Supprimer ${editables.length} facture(s) non soumise(s) ?`, "facture(s) supprimée(s)", async (id) => {
+          const { data, error } = await db.from("ap_invoices").delete().eq("id", id).select("id");
+          if (error) throw new Error(error.message);
+          if (!data?.length) throw new Error("Facture introuvable ou non supprimable.");
+        })} />
+    </BulkBar>
+  );
+}
+
 // Brouillon / rejetée → Modifier, Soumettre, Supprimer ; soumise → niveau en cours, et pour un tiers
 // habilité Approuver / Rejeter. La base applique paramètres, seuils, ordre et séparation des tâches.
 function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approvals: APInvoiceApproval[]; onEdit: () => void }) {
@@ -365,14 +410,14 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
           <input type="text" aria-label="Rechercher un paiement" placeholder="Rechercher par référence, facture ou fournisseur..."
             className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => exportToCSV(shown.map((r) => ({
+        <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" onPick={(f) => exportTable(f, shown.map((r) => ({
           date: r.payment_date, reference: r.reference ?? "", fournisseur: r.invoice?.supplier?.name ?? "", facture: r.invoice?.invoice_number ?? "",
           montant: Number(r.amount), mode: METHOD_LABELS[r.payment_method] ?? r.payment_method,
           etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
         })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "fournisseur", header: "Fournisseur" },
           { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "paiements-fournisseurs")}>
           <Download className="w-3.5 h-3.5" /> Export
-        </Button>
+        </ExportMenu>
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} paiements · Net : {fmtCurrency(total)}</span>
       </div>
       <div className="card-elevated overflow-hidden">
@@ -509,6 +554,7 @@ export default function APTransactions() {
     if (search && !inv.invoice_number.toLowerCase().includes(search.toLowerCase()) && !(inv.supplier?.name || "").toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+  const selAP = useSelection<APInvoice>(filtered, apId);
 
   const totalPayable = filtered.filter(i => i.status !== "paid").reduce((s, i) => s + (i.total - i.amount_paid), 0);
 
@@ -525,12 +571,12 @@ export default function APTransactions() {
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Nouvelle facture fournisseur</Button>
           {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
-          <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={() => exportToCSV(
+          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => exportTable(f, 
             filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
             [{ key: "numero", header: "N° facture" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "echeance", header: "Échéance" },
              { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" }, { key: "paye", header: "Payé" }, { key: "reste", header: "Reste" },
-             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Export</Button>
+             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
         </div>
       </div>
 
@@ -591,10 +637,12 @@ export default function APTransactions() {
 
       {/* Data Table */}
       <div className="card-elevated overflow-hidden">
+        <APBulkBar sel={selAP} approvals={approvals} />
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
+                <SelectAllHead sel={selAP} pageIds={filtered.map((i) => i.id)} label="Sélectionner toutes les factures" />
                 <th>N° Facture</th>
                 <th>Fournisseur</th>
                 <th>Date</th>
@@ -608,9 +656,9 @@ export default function APTransactions() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={9} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+                <tr><td colSpan={10} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">
+                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">
                   {invoices.length === 0 ? "Aucune facture — créez votre première facture AP" : "Aucun résultat"}
                 </td></tr>
               ) : (
@@ -618,6 +666,7 @@ export default function APTransactions() {
                   const outstanding = inv.total - inv.amount_paid;
                   return (
                     <tr key={inv.id} className="cursor-pointer" onClick={() => setSelectedInv(inv)}>
+                      <SelectCell sel={selAP} id={inv.id} label={`Sélectionner ${inv.invoice_number}`} />
                       <td className="font-medium text-foreground tabular-nums">{inv.invoice_number}</td>
                       <td>{inv.supplier?.name || "—"}</td>
                       <td className="tabular-nums text-muted-foreground">{inv.invoice_date}</td>

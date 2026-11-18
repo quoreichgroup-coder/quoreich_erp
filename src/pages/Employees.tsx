@@ -141,7 +141,7 @@ export default function Employees() {
             placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)}
             className="h-8 text-xs w-[220px]"
           />
-        <ExportButtons label="Salariés" rows={exportRows} columns={[...exportColumns]} filename={`annuaire-salaries-${new Date().toISOString().slice(0, 10)}`} sheetName="Annuaire RH" disabled={!canExport || isError} />
+        <ExportButtons pdf={false} label="Salariés" rows={exportRows} columns={[...exportColumns]} filename={`annuaire-salaries-${new Date().toISOString().slice(0, 10)}`} sheetName="Annuaire RH" disabled={!canExport || isError} />
           {canCreate && <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setImportOpen(true)}><Upload className="w-3 h-3" />Importer CSV</Button>}
           {perms.canCreateEmployeeMovement && selectedIds.length > 0 && <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setBulkOpen(true)}><Layers className="w-3 h-3" />Mouvement ({selectedIds.length})</Button>}
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={!canExport || filtered.length === 0 || isError} aria-label={exportTip} title={exportTip} onClick={handleExportPdf}>

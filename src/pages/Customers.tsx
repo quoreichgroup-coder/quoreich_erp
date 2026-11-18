@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { TopNav } from "@/components/TopNav";
@@ -134,14 +136,14 @@ const Customers = () => {
                 {selected.size > 0 && (
                   <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border bg-muted/30 text-xs" data-testid="customers-bulk-bar">
                     <span className="font-medium">{selected.size} fiche(s) sélectionnée(s)</span>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(
+                    <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, 
                       customers.filter((c) => selected.has(c.id)).map((c) => ({ nom: c.name, email: c.email ?? "", telephone: c.phone ?? "",
                         identifiant_fiscal: c.tax_id ?? "", adresse: c.address ?? "", limite_credit: c.credit_limit ?? 0,
                         delai_paiement: c.payment_terms ?? "", statut: c.status })),
                       [{ key: "nom", header: "Nom" }, { key: "email", header: "E-mail" }, { key: "telephone", header: "Téléphone" },
                         { key: "identifiant_fiscal", header: "IFU / NIF" }, { key: "adresse", header: "Adresse" },
                         { key: "limite_credit", header: "Limite de crédit" }, { key: "delai_paiement", header: "Délai de paiement (jours)" },
-                        { key: "statut", header: "Statut" }], "clients-selection")}>Exporter la sélection</Button>
+                        { key: "statut", header: "Statut" }], "clients-selection")}>Exporter la sélection</ExportMenu>
                     <Button size="sm" variant="outline" className="h-7 text-xs" disabled={setStatus.isPending}
                       onClick={() => setStatus.mutate({ ids: [...selected], status: "inactive" }, { onSuccess: () => setSelected(new Set()) })}>Désactiver</Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" disabled={setStatus.isPending}

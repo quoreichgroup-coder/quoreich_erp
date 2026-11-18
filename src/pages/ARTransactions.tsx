@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SettlementDialog } from "@/components/SettlementDialog";
-import { DocumentDetail } from "@/components/DocumentDetail";
+import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { JournalEntryPreview } from "@/components/JournalEntryPreview";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -329,8 +331,13 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-5">
           <DocumentDetail
+            title={inv.status === "draft" ? `Facture (brouillon) ${inv.invoice_number}` : `Facture ${inv.invoice_number}`}
+            fileName={documentFileName(`facture-${inv.invoice_number}`)}
+            print={{ currency: (inv as any).currency ?? "XOF",
+              notes: (inv as any).customer?.payment_terms ? `Conditions de paiement : ${(inv as any).customer.payment_terms} jours à compter de la date de facture.` : null }}
             header={[
               ["Client", inv.customer?.name], ["Statut", statusLabel(inv.status)],
+              ["Adresse du client", (inv as any).customer?.address ?? "—"], ["IFU / NIF du client", (inv as any).customer?.tax_id ?? "—"],
               ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
             ]}
             columns={[{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" },
@@ -397,14 +404,14 @@ function ReceiptsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
           <input type="text" aria-label="Rechercher un encaissement" placeholder="Rechercher par référence, facture ou client..."
             className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => exportToCSV(shown.map((r) => ({
+        <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" onPick={(f) => exportTable(f, shown.map((r) => ({
           date: r.payment_date, reference: r.reference ?? "", client: r.invoice?.customer?.name ?? "", facture: r.invoice?.invoice_number ?? "",
           montant: Number(r.amount), mode: METHOD_LABELS[r.payment_method] ?? r.payment_method,
           etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
         })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "client", header: "Client" },
           { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "encaissements-clients")}>
           <Download className="w-3.5 h-3.5" /> Export
-        </Button>
+        </ExportMenu>
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} encaissements · Net : {fmtCurrency(total)}</span>
       </div>
       <div className="card-elevated overflow-hidden">
@@ -468,13 +475,13 @@ export default function ARTransactions() {
   // Avec l'API, l'export est celui du serveur (périmètre société garanti côté serveur, AR-REC) :
   // il couvre toutes les factures visibles, pas seulement le filtre affiché. Sans API, on
   // exporte les lignes filtrées déjà chargées.
-  const handleExport = async () => {
+  const handleExport = async (f: ExportFormat = "csv") => {
     try {
-      if (isApiEnabled()) {
+      if (isApiEnabled() && f === "csv") {
         await apiDownloadCsv("/api/v1/ar/invoices/export", "factures-clients.csv");
         return;
       }
-      exportToCSV(
+      exportTable(f, 
         filtered.map((i) => ({
           invoice_number: i.invoice_number,
           customer: i.customer?.name ?? "",
@@ -529,7 +536,7 @@ export default function ARTransactions() {
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
           {canReceive && !isApiEnabled() && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}><Receipt className="w-3.5 h-3.5" /> Acompte client</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setStatementOpen(true)}><BookOpen className="w-3.5 h-3.5" /> Relevé de compte</Button>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onClick={handleExport}><Download className="w-3.5 h-3.5" /> Export</Button>
+          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => void handleExport(f)}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
         </div>
       </div>
 
@@ -569,14 +576,14 @@ export default function ARTransactions() {
         return (
           <div className="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs" data-testid="ar-bulk-bar">
             <span className="font-medium">{choix.length} facture(s) sélectionnée(s)</span>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(choix.map((i) => ({
+            <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, choix.map((i) => ({
               numero: i.invoice_number, client: i.customer?.name ?? "", date: i.invoice_date, echeance: i.due_date,
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, regle: i.amount_paid, reste: i.total - i.amount_paid, statut: statusLabel(i.status),
             })), [{ key: "numero", header: "N° facture" }, { key: "client", header: "Client" }, { key: "date", header: "Date" },
               { key: "echeance", header: "Échéance" }, { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" },
               { key: "regle", header: "Réglé" }, { key: "reste", header: "Reste dû" }, { key: "statut", header: "Statut" }], "factures-clients-selection")}>
               Exporter la sélection
-            </Button>
+            </ExportMenu>
             {isWriter && !isApiEnabled() && brouillons.length > 0 && (
               <>
                 <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulk.isPending}

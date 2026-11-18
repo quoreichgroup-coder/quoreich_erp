@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { type CampaignCountEntry, type CampaignStage, type InventoryCampaignItem } from "@/lib/inventory-campaign";
 import { countSheetColumns, countSheetRows, parseCampaignCountWorkbook } from "@/lib/inventory-campaign-workbook";
 import { exportToXLSX } from "@/lib/xlsx";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
 
 export function InventoryCampaignSheet({ campaignId, reference, stage, items, disabled, onImport }: {
   campaignId: string; reference: string | null; stage: CampaignStage; items: InventoryCampaignItem[];
@@ -57,6 +58,16 @@ export function InventoryCampaignSheet({ campaignId, reference, stage, items, di
           `feuille-${stage === "first" ? "comptage" : "recomptage"}-${reference ?? campaignId}`, sheetName)}>
         <FileSpreadsheet className="mr-1 h-4 w-4" />Télécharger la feuille Excel
       </Button>
+      <DocumentPrintButtons testId="count-sheet-print" excel={false} disabled={blocked || !items.length} build={() => ({
+        title: stage === "first" ? "Feuille de comptage" : "Feuille de recomptage", fileName: `feuille-${stage === "first" ? "comptage" : "recomptage"}-${reference ?? campaignId}`,
+        amountInWords: false, subtitle: `Campagne ${reference ?? campaignId} · comptage à l'aveugle (quantité théorique non communiquée)`,
+        header: [["Campagne", reference ?? campaignId], ["Passage", stage === "first" ? "Premier comptage" : "Recomptage"], ["Articles", String(items.length)], ["Date du comptage", "____ / ____ / ________"]],
+        columns: [{ label: "Code" }, { label: "Désignation" }, { label: "Unité" }, { label: "Quantité comptée", align: "right" }, { label: "Observations" }],
+        rows: items.map((i) => [i.code, i.name, i.unit ?? "", "", ""]),
+        footer: [],
+        notes: "Compter physiquement chaque article, inscrire la quantité dans l'unité indiquée, puis saisir ou importer la feuille dans QUOREICH.",
+        signatures: ["Compteur", "Contrôleur (autre personne)"],
+      })} />
       <div className="space-y-1">
         <Label htmlFor={inputId}>Importer la feuille remplie (.xlsx)</Label>
         <Input id={inputId} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

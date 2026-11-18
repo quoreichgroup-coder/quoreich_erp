@@ -1,4 +1,6 @@
 import { useSearchParams } from "react-router-dom";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
@@ -91,9 +93,9 @@ export default function AssetsTransactions() {
     persistKey: "fa-tx:table",
   });
 
-  const handleExport = () => {
+  const handleExport = (f: ExportFormat = "csv") => {
     if (!canDo(perms, "export")) return;
-    exportToCSV(
+    exportTable(f, 
       rows.map((r) => ({
         Reference: r.ref, Date: r.date, Type: r.type, Actif: r.asset,
         Montant: r.amount, Statut: r.status,
@@ -145,15 +147,15 @@ export default function AssetsTransactions() {
             {canDo(perms, "run_depreciation") ? <Play className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             Calculer les amortissements
           </Button>
-          <Button
+          <ExportMenu
             size="sm" variant="outline" className="gap-1.5"
             disabled={!canDo(perms, "export") || rows.length === 0}
-            onClick={handleExport}
+            onPick={(f) => void handleExport(f)}
             aria-label={exportTooltip} title={exportTooltip}
           >
             {canDo(perms, "export") ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             Export CSV
-          </Button>
+          </ExportMenu>
         </div>
       </div>
 

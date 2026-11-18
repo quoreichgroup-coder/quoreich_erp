@@ -94,14 +94,14 @@ async function commandeReceptionnee(page: Page, browser: Browser, base: string |
   await page.goto("/procurement/transactions");
   await page.getByRole("tab", { name: /Purchase Orders/ }).click();
   const bc = ligne(page, fournisseur);
-  const numero = (await bc.locator("td").first().innerText()).trim();
+  const numero = (await bc.locator("td").nth(1).innerText()).trim();
   await bc.getByRole("button", { name: "Soumettre" }).click();
-  await expect(bc).toContainText("pending_approval");
+  await expect(bc).toContainText("En approbation");
   const { ctx, page: pa } = await pageApprobateur(browser, base);
   await pa.goto("/procurement/transactions");
   await pa.getByRole("tab", { name: /Purchase Orders/ }).click();
   await ligne(pa, fournisseur).getByRole("button", { name: "Approuver" }).click();
-  await expect(ligne(pa, fournisseur)).toContainText("approved");
+  await expect(ligne(pa, fournisseur)).toContainText("Approuvée");
   await ctx.close();
   if (exigeait) await exigerDemande(page, true);
 
@@ -151,7 +151,7 @@ test("chaîne complète : commande → réception → facture hors tolérance re
     obs.etape("approbation par un tiers → comptabilisée (601 / 4452 / 401)");
     await approuverFactureFournisseur(browser, base, numero);
     await page.reload();
-    await ligne(page, numero).locator("td").first().click();
+    await ligne(page, numero).locator("td").nth(1).click();
     const panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
     const ecriture = panneau.getByTestId("journal-entry-preview");
     await expect(ecriture.locator("tbody tr").filter({ hasText: /^601/ })).toContainText("60 000");
@@ -242,7 +242,7 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
     await page.getByRole("tab", { name: /Factures/ }).click();
 
     obs.etape("détail, export, paramètres rétablis");
-    await ligne(page, ff1).locator("td").first().click();
+    await ligne(page, ff1).locator("td").nth(1).click();
     const panneau = page.getByRole("dialog", { name: `Facture ${ff1}` });
     await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Reste à payer");
     await panneau.getByRole("button", { name: "Fermer" }).click();

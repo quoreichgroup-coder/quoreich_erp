@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -75,12 +77,12 @@ export function PurchaseFollowupPanel() {
             <Button key={v} size="sm" variant={filtre === v ? "default" : "outline"} className="h-7 text-xs" onClick={() => setFiltre(v)}>{l}</Button>
           ))}
         </div>
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportToCSV(shown.map((r) => ({
+        <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, shown.map((r) => ({
           commande: r.po_number, fournisseur: r.supplier_name, date: r.order_date, promise: r.promised_date, retard: r.days_late,
           reste: Number(r.value_remaining), etat: STATES[r.followup_state]?.[1] ?? r.followup_state, ref: r.supplier_reference ?? "",
         })), [{ key: "commande", header: "Commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date de commande" },
           { key: "promise", header: "Livraison promise" }, { key: "retard", header: "Retard (j)" }, { key: "reste", header: "Reste à recevoir" },
-          { key: "etat", header: "État" }, { key: "ref", header: "Réf. fournisseur" }], "suivi-livraisons-fournisseurs")}>Exporter</Button>
+          { key: "etat", header: "État" }, { key: "ref", header: "Réf. fournisseur" }], "suivi-livraisons-fournisseurs")}>Exporter</ExportMenu>
       </div>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-xs">
