@@ -10,13 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Package, Plus, Warehouse } from "lucide-react";
+import { Download, FileSpreadsheet, Package, Plus, Warehouse } from "lucide-react";
 import { useTableFeatures } from "@/hooks/use-table-features";
 import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
-import { useCreateItem, useCreateWarehouse, useItems, useUpdateItem, useUpdateWarehouse, useWarehouses } from "@/hooks/use-inventory-data";
+import { useCreateItem, useCreateWarehouse, useInventoryItemCatalog, useUpdateItem, useUpdateWarehouse, useWarehouses } from "@/hooks/use-inventory-data";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { StatusBadge } from "@/components/StatusBadge";
 import { exportToCSV } from "@/lib/csv-export";
+import { exportToXLSX, type XlsxColumn } from "@/lib/xlsx";
 import { ReplenishmentRulesPanel } from "@/components/Replenishment";
 
 /*
@@ -160,17 +161,22 @@ function WarehouseDialog({ wh, open, onClose }: { wh: any | null; open: boolean;
 }
 
 export default function InventoryMasterData() {
-  const { data: items = [] } = useItems();
-  const { data: warehouses = [] } = useWarehouses();
+  const itemsQuery = useInventoryItemCatalog();
+  const warehousesQuery = useWarehouses();
+  const items = itemsQuery.data ?? [];
+  const warehouses = warehousesQuery.data ?? [];
   const { data: access } = useMyAccess();
   const canEdit = (access?.permissions ?? []).includes("inventory.move");
+  const canExport = (access?.permissions ?? []).includes("inventory.export");
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = ["warehouses", "replenishment"].includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "items";
   const [itemDialog, setItemDialog] = useState<{ item: any | null } | null>(null);
   const [whDialog, setWhDialog] = useState<{ wh: any | null } | null>(null);
 
-  const rows = items.map((i: any) => ({
+  const warehouseCodes = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.code]));
+  const rows = items.map((i) => ({
     ...i, stock: Number(i.quantity_on_hand ?? 0), cmp: Number(i.average_cost ?? 0),
+    depot: i.default_warehouse_id ? warehouseCodes.get(i.default_warehouse_id) ?? "" : "",
     valeur: Math.round(Number(i.quantity_on_hand ?? 0) * Number(i.average_cost ?? 0) * 100) / 100,
     alerte: Number(i.reorder_level ?? 0) > 0 && Number(i.quantity_on_hand ?? 0) <= Number(i.reorder_level ?? 0),
   }));
@@ -179,13 +185,29 @@ export default function InventoryMasterData() {
     filterConfigs: [{ key: "category", label: "Catégorie", options: Array.from(new Set(rows.map((r) => r.category).filter(Boolean))).sort() as string[] }],
   });
 
-  const exporter = () => tab === "warehouses"
-    ? exportToCSV(warehouses as any[], [{ key: "code", header: "Code" }, { key: "name", header: "Nom" }, { key: "address", header: "Adresse" }, { key: "status", header: "Statut" }], "depots")
-    : exportToCSV(t.processedData, [
-      { key: "code", header: "Code" }, { key: "name", header: "Libellé" }, { key: "category", header: "Catégorie" }, { key: "unit", header: "Unité" },
+  const exporter = (format: "csv" | "xlsx") => {
+    if (tab === "warehouses") {
+      const columns: XlsxColumn<typeof warehouses[number]>[] = [
+        { key: "code", header: "Code dépôt" }, { key: "name", header: "Nom" },
+        { key: "address", header: "Adresse" }, { key: "status", header: "Statut" },
+      ];
+      if (format === "xlsx") exportToXLSX(warehouses, columns, "catalogue-depots", "Dépôts");
+      else exportToCSV(warehouses, columns, "depots");
+    } else if (tab === "items") {
+      const columns: XlsxColumn<typeof rows[number]>[] = [
+      { key: "code", header: "Code article" }, { key: "name", header: "Désignation" }, { key: "category", header: "Catégorie" }, { key: "unit", header: "Unité" },
+      { key: "depot", header: "Dépôt par défaut" },
       { key: "stock", header: "Stock" }, { key: "cmp", header: "Coût moyen" }, { key: "valeur", header: "Valeur" },
-      { key: "reorder_level", header: "Seuil" }, { key: "selling_price", header: "Prix de vente" }, { key: "status", header: "Statut" },
-    ], "articles");
+      { key: "reorder_level", header: "Seuil de réapprovisionnement" }, { key: "safety_stock", header: "Stock de sécurité" },
+      { key: "selling_price", header: "Prix de vente" }, { key: "status", header: "Statut" },
+      ];
+      if (format === "xlsx") exportToXLSX(t.processedData, columns, "catalogue-articles", "Articles");
+      else exportToCSV(t.processedData, columns, "articles");
+    }
+  };
+  const exportDisabled = tab === "warehouses"
+    ? !warehousesQuery.isSuccess || !warehouses.length
+    : !itemsQuery.isSuccess || !warehousesQuery.isSuccess || !t.processedData.length;
 
   return (
     <PageShell>
@@ -194,10 +216,15 @@ export default function InventoryMasterData() {
 
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <h1 className="text-lg font-semibold text-foreground">Stocks — Données de base</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEdit && tab === "items" && <Button size="sm" className="gap-1.5" onClick={() => setItemDialog({ item: null })}><Plus className="w-3.5 h-3.5" />Nouvel article</Button>}
           {canEdit && tab === "warehouses" && <Button size="sm" className="gap-1.5" onClick={() => setWhDialog({ wh: null })}><Plus className="w-3.5 h-3.5" />Nouveau dépôt</Button>}
-          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exporter}><Download className="w-3.5 h-3.5" />Exporter</Button>
+          {canExport && tab !== "replenishment" && <>
+            <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" disabled={exportDisabled}
+              onClick={() => exporter("csv")}><Download className="w-3.5 h-3.5" />Exporter CSV</Button>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={exportDisabled}
+              onClick={() => exporter("xlsx")}><FileSpreadsheet className="w-3.5 h-3.5" />Exporter Excel</Button>
+          </>}
         </div>
       </div>
 
@@ -209,6 +236,13 @@ export default function InventoryMasterData() {
         </TabsList>
 
         <TabsContent value="items">
+          {itemsQuery.isPending && <p role="status" className="mb-3 text-sm">Chargement du catalogue des articles…</p>}
+          {itemsQuery.isError && <div role="alert" className="mb-3 text-sm text-destructive">{itemsQuery.error.message}{" "}
+            <Button size="sm" variant="outline" onClick={() => void itemsQuery.refetch()}>Réessayer</Button>
+          </div>}
+          {warehousesQuery.isError && <div role="alert" className="mb-3 text-sm text-destructive">Les dépôts du catalogue n’ont pas pu être chargés.{" "}
+            <Button size="sm" variant="outline" onClick={() => void warehousesQuery.refetch()}>Réessayer</Button>
+          </div>}
           <Card className="border-border"><CardContent className="p-0">
             <FilterBar search={t.search} onSearch={t.setSearch} filters={t.filters} onFilter={t.setFilter} onClear={t.clearFilters}
               filterConfigs={t.filterConfigs} activeCount={t.activeFilterCount} searchPlaceholder="Code, libellé, catégorie…" />

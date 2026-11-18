@@ -14,15 +14,17 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Wallet, CalendarClock, Users, TrendingUp, Lock, Download, Plus, ExternalLink,
+  Wallet, CalendarClock, Users, TrendingUp, Lock, Plus, ExternalLink, FileText,
   Search, ArrowUpDown, X,
 } from "lucide-react";
 import {
   usePayrollKpis, useMyHrRoles, useCreatePayrollRun, type PayrollRun,
 } from "@/hooks/use-hr-data";
 import { canDo, actionTooltip, maskAmount } from "@/lib/hr-roles";
-import { exportToCSV } from "@/lib/csv-export";
+import { ExportButtons } from "@/components/ExportButtons";
+import { exportToPDF } from "@/lib/pdf-export";
 import { PayrollRunDialog } from "@/components/PayrollRunDialog";
+import { validatePayrollRunInput } from "@/lib/hr-periods";
 
 const STATUS_STYLES: Record<string, string> = {
   draft:    "bg-muted text-muted-foreground border-muted",
@@ -39,7 +41,7 @@ export default function PayrollRuns() {
   const perms = useMyHrRoles();
   const canExport = canDo(perms, "export");
   const canCreate = canDo(perms, "create_payroll_run");
-  const exportTip = actionTooltip(perms, "export", "Exporter CSV");
+  const exportTip = actionTooltip(perms, "export", "Exporter les cycles");
   const createTip = actionTooltip(perms, "create_payroll_run", "Créer un cycle");
   const kpis = usePayrollKpis();
   const [openRun, setOpenRun] = useState<PayrollRun | null>(null);
@@ -78,24 +80,33 @@ export default function PayrollRuns() {
 
   const resetFilters = () => { setQ(""); setStatus("all"); setPeriodFilter(""); };
 
-  const handleExport = () => {
+  const exportRows = filtered.map((r) => ({
+    period: r.period,
+    pay_date: r.pay_date,
+    currency: r.payroll_currency_code ?? "Devise non enregistrée",
+    status: STATUS_LABEL[r.status] ?? r.status,
+    employees: r.employee_count,
+    gross: canDo(perms, "view_sensitive") ? Number(r.gross_total) : "Masqué",
+    net: canDo(perms, "view_sensitive") ? Number(r.net_total) : "Masqué",
+  }));
+  const exportColumns = [
+    { key: "period", header: "Période", width: 14 },
+    { key: "pay_date", header: "Date de paie", width: 16 },
+    { key: "currency", header: "Devise", width: 16 },
+    { key: "status", header: "Statut", width: 18 },
+    { key: "employees", header: "Effectif", width: 12 },
+    { key: "gross", header: "Brut", width: 18 },
+    { key: "net", header: "Net", width: 18 },
+  ] as const;
+  const handleExportPdf = () => {
     if (!canExport) return;
-    exportToCSV(
-      filtered.map((r) => ({
-        period: r.period,
-        pay_date: r.pay_date,
-        status: STATUS_LABEL[r.status] ?? r.status,
-        employees: r.employee_count,
-        gross: canDo(perms, "view_sensitive") ? r.gross_total : 0,
-        net: canDo(perms, "view_sensitive") ? r.net_total : 0,
-      })),
-      [
-        { key: "period", header: "Période" }, { key: "pay_date", header: "Date paie" },
-        { key: "status", header: "Statut" }, { key: "employees", header: "Employés" },
-        { key: "gross", header: "Brut" }, { key: "net", header: "Net" },
-      ],
-      `payroll-runs-${new Date().toISOString().slice(0, 10)}`,
-    );
+    void exportToPDF({
+      filename: `cycles-paie-${new Date().toISOString().slice(0, 10)}`,
+      title: "Cycles de paie",
+      subtitle: `Filtres appliqués · ${filtered.length} cycle(s) · ${new Date().toLocaleDateString("fr-FR")}`,
+      columns: exportColumns.map((column) => ({ key: column.key, header: column.header })),
+      rows: exportRows,
+    });
   };
 
   return (
@@ -107,30 +118,34 @@ export default function PayrollRuns() {
         description="KPI, derniers cycles et prochaines échéances. Montants masqués sans rôle hr_*."
       />
 
+      {kpis.isError && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs">
+          <span className="text-destructive">Les données de paie ne sont pas disponibles. Aucun total ne peut être confirmé.</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void kpis.refetch()}>Réessayer</Button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg font-semibold flex items-center gap-2">
           <Wallet className="w-4 h-4 text-primary" /> Cycles de paie
         </h1>
         <div className="flex items-center gap-2">
           <CreateRunButton open={createOpen} onOpenChange={setCreateOpen} disabled={!canCreate} tip={createTip} />
-          <Button
-            variant="outline" size="sm" className="h-8 text-xs gap-1"
-            disabled={!canExport || filtered.length === 0}
-            aria-label={exportTip} title={exportTip} onClick={handleExport}
-          >
-            {canExport ? <Download className="w-3 h-3" /> : <Lock className="w-3 h-3" />} CSV
+          <ExportButtons label="Cycles" rows={exportRows} columns={[...exportColumns]} filename={`cycles-paie-${new Date().toISOString().slice(0, 10)}`} sheetName="Cycles de paie" disabled={!canExport || kpis.isError} />
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={!canExport || filtered.length === 0 || kpis.isError} aria-label={exportTip} title={exportTip} onClick={handleExportPdf}>
+            {canExport ? <FileText className="w-3 h-3" /> : <Lock className="w-3 h-3" />} PDF
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <Kpi label="Employés actifs" value={String(kpis.activeEmployees)} icon={Users} />
-        <Kpi label="Cycles enregistrés" value={String(kpis.runsCount)} icon={CalendarClock} />
-        <Kpi label="Brut YTD" value={maskAmount(perms, kpis.ytdGross)} suffix="XOF" icon={TrendingUp} />
+        <Kpi label="Employés actifs" value={kpis.isError ? "—" : String(kpis.activeEmployees)} icon={Users} />
+        <Kpi label="Cycles enregistrés" value={kpis.isError ? "—" : String(kpis.runsCount)} icon={CalendarClock} />
+        <Kpi label="Brut exercice" value={kpis.isError ? "Indisponible" : kpis.ytdGross == null ? "Non comparable" : maskAmount(perms, kpis.ytdGross)} suffix={kpis.currency} icon={TrendingUp} />
         <Kpi
           label="Dernier cycle"
-          value={kpis.lastRun ? kpis.lastRun.period : "—"}
-          sub={kpis.lastRun ? `Net ${maskAmount(perms, Number(kpis.lastRun.net_total))} XOF` : ""}
+          value={kpis.isError ? "—" : kpis.lastRun ? kpis.lastRun.period : "—"}
+          sub={kpis.isError ? "Données indisponibles" : kpis.lastRun ? `Net ${maskAmount(perms, Number(kpis.lastRun.net_total))} ${kpis.lastRun.payroll_currency_code ?? "Devise non enregistrée"}` : ""}
           icon={Wallet}
         />
       </div>
@@ -255,6 +270,7 @@ function CreateRunButton({
   const defaultPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const [period, setPeriod] = useState(defaultPeriod);
   const [payDate, setPayDate] = useState(today.toISOString().slice(0, 10));
+  const inputError = validatePayrollRunInput(period, payDate);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -269,18 +285,18 @@ function CreateRunButton({
         </DialogHeader>
         <div className="space-y-3 text-xs">
           <div>
-            <label className="text-[11px] text-muted-foreground">Période (AAAA-MM)</label>
-            <Input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="2026-06" />
+            <label htmlFor="payroll-run-period" className="text-[11px] text-muted-foreground">Période (AAAA-MM)</label>
+            <Input id="payroll-run-period" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground">Date de paie</label>
-            <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+            <label htmlFor="payroll-run-pay-date" className="text-[11px] text-muted-foreground">Date de paie</label>
+            <Input id="payroll-run-pay-date" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={create.isPending}>Annuler</Button>
           <Button
-            size="sm" disabled={create.isPending || !/^\d{4}-\d{2}$/.test(period)}
+            size="sm" disabled={create.isPending || !!inputError}
             onClick={async () => {
               try {
                 await create.mutateAsync({ period, pay_date: payDate });
@@ -291,6 +307,7 @@ function CreateRunButton({
             {create.isPending ? "Création…" : "Créer"}
           </Button>
         </DialogFooter>
+        {inputError && <p role="alert" className="text-xs text-destructive">{inputError}</p>}
       </DialogContent>
     </Dialog>
   );

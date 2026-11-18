@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { test, expect } from "@playwright/test";
-import { identifiants, surveiller } from "./outils";
+import { identifiants, surveiller, verifierIdentiteE2E, verifierSocieteE2E } from "./outils";
 
 /*
  * Second membre de la société de test : l'approbateur (séparation des tâches, V39 — l'auteur
@@ -13,6 +13,8 @@ const approbateur = identifiants("approbateur");
 
 test("l'approbateur rejoint la société de test par invitation", async ({ browser }, testInfo) => {
   test.skip(!auteur || !approbateur, "identifiants des comptes de test absents");
+  verifierIdentiteE2E(auteur!.email);
+  verifierIdentiteE2E(approbateur!.email);
   mkdirSync("test-results-parcours/.auth", { recursive: true });
 
   const ctx = await browser.newContext({ baseURL: testInfo.project.use.baseURL, locale: "fr-FR" });
@@ -34,6 +36,7 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
     });
     const pa = await admin.newPage();
     await pa.goto("/settings?tab=roles");
+    await verifierSocieteE2E(pa);
     await pa.getByTestId("authz-tab-invitations").click();
     const roles = pa.getByTestId("invitation-role");
     const valeur = await roles.locator("option", { hasText: "Approbateur achats N3" }).getAttribute("value");
@@ -53,7 +56,7 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
 
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });
   await expect(page).not.toHaveURL(/\/(login|onboarding)/);
-  await expect(page.getByText("E2E QUOREICH (société de test)").first(), "même société que l'auteur").toBeVisible();
+  await verifierSocieteE2E(page, 60_000);
   const etat = await ctx.storageState({ path: "test-results-parcours/.auth/approbateur.json" });
 
   // Factures fournisseurs (V41) : le niveau 1 demande ap.approve_l1, porté par le rôle « Comptable ».
@@ -68,6 +71,7 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
   });
   const pa = await admin.newPage();
   await pa.goto("/settings?tab=roles");
+  await verifierSocieteE2E(pa);
   await pa.getByTestId("authz-tab-users").click();
   const rangee = pa.getByTestId(`user-row-${approbateurId}`);
   await expect(rangee).toBeVisible();

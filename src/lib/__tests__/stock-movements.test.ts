@@ -7,6 +7,7 @@ describe("mouvements de stock", () => {
   it("libellés français, écart d'inventaire distingué", () => {
     expect(movementLabel("supplier_return")).toBe("Retour fournisseur");
     expect(movementLabel("adjustment", "inventory_count")).toBe("Écart d'inventaire");
+    expect(movementLabel("adjustment", "inventory_count_campaign")).toBe("Écart d'inventaire");
     expect(movementLabel("inconnu")).toBe("inconnu");
   });
 

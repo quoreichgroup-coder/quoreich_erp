@@ -34,13 +34,16 @@ test("Treasury close — repeated PDF failures keep UI usable and avoid excessiv
 
   await page.addInitScript(() => {
     const OriginalBlob = window.Blob;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).Blob = function PoisonBlob(parts: BlobPart[], opts?: BlobPropertyBag) {
-      const type = opts?.type ?? "";
-      if (type.includes("pdf") || type.includes("octet-stream")) {
-        throw new Error("synthetic Blob failure for PDF export");
+    let failedAttempts = 0;
+    Object.defineProperty(window, "pdfFailureAttempts", { get: () => failedAttempts });
+    window.Blob = class extends OriginalBlob {
+      constructor(parts?: BlobPart[], opts?: BlobPropertyBag) {
+        if (opts?.type === "application/pdf") {
+          failedAttempts++;
+          throw new Error("synthetic Blob failure for PDF export");
+        }
+        super(parts, opts);
       }
-      return new OriginalBlob(parts, opts);
     };
   });
 
@@ -50,19 +53,12 @@ test("Treasury close — repeated PDF failures keep UI usable and avoid excessiv
   const reportBtn = page.getByTestId(`treasury-close-report-${PERIOD}`);
   await expect(reportBtn).toBeVisible();
 
-  // Burst of failures
-  for (let i = 0; i < 5; i++) {
-    await reportBtn.click();
-    await page.waitForTimeout(120);
-  }
-
-  // Toast text remains visible.
-  const toast = page.getByText(/Impossible de générer le rapport PDF/i);
-  await expect(toast.first()).toBeVisible({ timeout: 5000 });
-
-  // Excessive duplication guard: shadcn caps stacked toasts; assert a sane upper bound.
-  const toastCount = await toast.count();
-  expect(toastCount).toBeLessThanOrEqual(5);
+  const toast = page.getByText("Impossible de générer le rapport PDF", { exact: true });
+  // Enchaîner les clics avant que le premier message puisse s'effacer.
+  await reportBtn.click({ clickCount: 5, delay: 12 });
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, "pdfFailureAttempts"))).toBe(5);
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toBeVisible();
 
   // History + button remain operational after the burst.
   await expect(page.getByTestId("treasury-close-history")).toBeVisible();

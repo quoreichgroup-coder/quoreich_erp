@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, FileDown, Lock, ShieldCheck, Eye, CalendarClock, ArrowUp, ArrowDown, X, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { Download, FileDown, Lock, ShieldCheck, Eye, CalendarClock, ArrowUp, ArrowDown, X, AlertTriangle, RefreshCw, Loader2, Package, ChartNoAxesColumnIncreasing, ChartPie } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import {
   useValuationByCategory, useInventoryTurnover, useStockAging, useMyInventoryRoles,
-  useAbcAnalysis, useSlowMovingItems,
+  useSlowMovingItems,
   useInventoryCloseAudit, useInventoryPeriodLocks,
   useInventoryPeriodClosesPaged, fetchAllInventoryCloses,
   logInventoryExportAudit,
@@ -27,8 +28,9 @@ import { actionTooltip, canDo } from "@/lib/inventory-roles";
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
 import InventoryCloseDetailDialog from "@/components/InventoryCloseDetailDialog";
+import { InventoryCycleAnalysisCard } from "@/components/InventoryCycleAnalysisCard";
 import {
-  isValidPeriod,
+  isValidPeriod, URL_PARAM_MAP,
   parseFiltersFromSearchParams, applyFilterChange, toggleSort,
   type HistoryFilters, type SortKey,
 } from "@/lib/inventory-close-history";
@@ -53,12 +55,19 @@ const CLOSE_ACTION_LABEL: Record<string, { label: string; cls: string }> = {
 const fmt = (n: number | null | undefined) => Math.round(Number(n || 0)).toLocaleString("fr-FR");
 
 const AGE_ORDER = ["0-30 jours", "31-60 jours", "61-90 jours", "90+ jours"];
+const REPORT_TABS = [
+  { id: "valorisation", label: "Valorisation", icon: Package },
+  { id: "rotation", label: "Rotation et vieillissement", icon: ChartNoAxesColumnIncreasing },
+  { id: "abc", label: "Analyse ABC", icon: ChartPie },
+  { id: "clotures", label: "Clôtures", icon: CalendarClock },
+  { id: "exports", label: "Historique des exports", icon: FileDown },
+] as const;
+const CLOSE_FILTER_PARAMS = Object.values(URL_PARAM_MAP);
 
 export default function InventoryReporting() {
   const { data: valuation = [], isLoading: vLoading } = useValuationByCategory();
   const { data: turnover = [], isLoading: tLoading } = useInventoryTurnover();
   const { data: aging = [], isLoading: aLoading } = useStockAging();
-  const { data: abc = [], isLoading: abcLoading } = useAbcAnalysis();
   const { data: slow = [], isLoading: slowLoading } = useSlowMovingItems();
   const { data: closeAudit = [], isLoading: auditLoading } = useInventoryCloseAudit();
   const { data: periodLocks = [], isLoading: locksLoading } = useInventoryPeriodLocks();
@@ -70,10 +79,20 @@ export default function InventoryReporting() {
   const [detail, setDetail] = useState<InventoryPeriodClose | null>(null);
   const [exporting, setExporting] = useState<null | "csv" | "pdf">(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingExport = useRef<{ kind: "csv" | "pdf"; search: string; tenantId: string | undefined } | null>(null);
 
   /* ── URL-persisted filters (shared helpers, tested) ────── */
   const [sp, setSp] = useSearchParams();
+  const tab = REPORT_TABS.find(({ id }) => id === sp.get("tab"))?.id ??
+    (CLOSE_FILTER_PARAMS.some((param) => sp.has(param)) ? "clotures" : "valorisation");
   const filters: HistoryFilters = useMemo(() => parseFiltersFromSearchParams(sp), [sp]);
+
+  const changeTab = (id: string) => {
+    pendingExport.current = null;
+    const next = new URLSearchParams(sp);
+    next.set("tab", id);
+    setSp(next, { replace: true });
+  };
 
   const setF = useCallback(<K extends keyof HistoryFilters>(k: K, v: HistoryFilters[K]) => {
     setSp(applyFilterChange(sp, k, v), { replace: true });
@@ -81,7 +100,12 @@ export default function InventoryReporting() {
   const onToggleSort = useCallback((k: SortKey) => {
     setSp(toggleSort(sp, k), { replace: true });
   }, [sp, setSp]);
-  const resetFilters = () => setSp(new URLSearchParams(), { replace: true });
+  const resetFilters = () => {
+    const next = new URLSearchParams(sp);
+    CLOSE_FILTER_PARAMS.forEach((param) => next.delete(param));
+    next.set("tab", "clotures");
+    setSp(next, { replace: true });
+  };
 
   /* ── Server-side paged + sorted closes ─────────────────── */
   const serverQueryParams = {
@@ -96,6 +120,7 @@ export default function InventoryReporting() {
   const {
     data: paged, isLoading: closesLoading, isFetching: closesFetching,
     isError: closesError, error: closesErrObj, refetch: refetchCloses,
+    isPlaceholderData: closesPlaceholder,
   } = useInventoryPeriodClosesPaged(serverQueryParams);
   const serverRows = paged?.rows ?? [];
   const serverTotal = paged?.count ?? 0;
@@ -293,11 +318,24 @@ export default function InventoryReporting() {
   const { data: exportAudit = [], isLoading: exportAuditLoading } = useInventoryExportAudit(25);
   const retryExportFromAudit = useCallback((row: ParsedExportAudit) => {
     if (!row.kind) { toast.error("Type d'export inconnu — impossible de retenter"); return; }
-    const sp = filtersToSearchParams(row.filters);
-    setSp(sp, { replace: true });
-    // Defer so the URL → filters → server query has time to refetch before exporting.
-    setTimeout(() => { void runFullExport(row.kind!); }, 50);
-  }, [setSp, runFullExport]);
+    const next = filtersToSearchParams(row.filters);
+    next.delete(URL_PARAM_MAP.page);
+    next.set("tab", "clotures");
+    pendingExport.current = { kind: row.kind, search: next.toString(), tenantId };
+    setSp(next, { replace: true });
+  }, [setSp, tenantId]);
+
+  useEffect(() => {
+    const pending = pendingExport.current;
+    if (!pending) return;
+    if (pending.search !== sp.toString() || pending.tenantId !== tenantId || closesError) {
+      pendingExport.current = null;
+      return;
+    }
+    if (closesLoading || closesFetching || closesPlaceholder) return;
+    pendingExport.current = null;
+    void runFullExport(pending.kind);
+  }, [sp, tenantId, closesError, closesLoading, closesFetching, closesPlaceholder, runFullExport]);
 
 
 
@@ -378,11 +416,21 @@ export default function InventoryReporting() {
       <Breadcrumb items={[{ label: "Finance" }, { label: "Stock", href: "/inventory" }, { label: "Reporting" }]} />
       <GuidanceBanner
         title="Reporting Stock"
-        description="Valorisation par catégorie (FIFO vs CMP), rotation 12 mois et vieillissement du stock — données live depuis la base."
+        description="Consultez la valorisation, la rotation, le classement ABC et l’historique des clôtures et des exports."
       />
 
       <h1 className="text-lg font-semibold text-foreground">Rapports Stock</h1>
 
+      <Tabs value={tab} onValueChange={changeTab} activationMode="manual" className="flex min-w-0 flex-col gap-2">
+        <TabsList aria-label="Sections des rapports Stock"
+          className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+          {REPORT_TABS.map(({ id, label, icon: Icon }) => <TabsTrigger key={id} value={id}
+            className="shrink-0 gap-1.5 rounded-none border-b-2 border-transparent px-3 py-2 text-xs hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
+            <Icon className="size-3.5" aria-hidden="true" />{label}
+          </TabsTrigger>)}
+        </TabsList>
+
+      <TabsContent value="valorisation">
       {/* Valuation by category */}
       <Card className="border-border">
         <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
@@ -428,6 +476,8 @@ export default function InventoryReporting() {
         </CardContent>
       </Card>
 
+      </TabsContent>
+      <TabsContent value="rotation" className="flex-col gap-4 data-[state=active]:flex">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Turnover */}
         <Card className="border-border">
@@ -514,56 +564,6 @@ export default function InventoryReporting() {
         </Card>
       </div>
 
-      {/* ABC / Pareto */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Analyse ABC (Pareto, 12 mois)</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            {abcLoading ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">Chargement…</div>
-            ) : abc.length === 0 ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">Pas assez de sorties sur 12 mois</div>
-            ) : (
-              <>
-                <div className="grid grid-cols-3 border-b border-border">
-                  {(["A","B","C"] as const).map((cls) => {
-                    const rows = abc.filter((r) => r.abc_class === cls);
-                    const value = rows.reduce((s, r) => s + Number(r.revenue_12m || 0), 0);
-                    const total = abc.reduce((s, r) => s + Number(r.revenue_12m || 0), 0);
-                    const pct = total > 0 ? (value / total) * 100 : 0;
-                    return (
-                      <div key={cls} className="p-3 border-r border-border last:border-r-0">
-                        <div className="text-[10px] uppercase text-muted-foreground">Classe {cls}</div>
-                        <div className="text-base font-semibold tabular-nums">{rows.length} <span className="text-[10px] font-normal text-muted-foreground">articles</span></div>
-                        <div className="text-[11px] text-muted-foreground">{fmt(value)} XOF ({pct.toFixed(0)}%)</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/30">
-                    {["Code", "Article", "Sortie 12m (XOF)", "% cumulé", "Classe"].map((h) =>
-                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
-                  </tr></thead>
-                  <tbody>{abc.slice(0, 15).map((r) => (
-                    <tr key={r.item_id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 font-mono text-primary">{r.code}</td>
-                      <td className="px-3 py-2 font-medium truncate max-w-[200px]">{r.name}</td>
-                      <td className="px-3 py-2 text-right font-mono">{fmt(r.revenue_12m)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-muted-foreground">{Number(r.cum_pct).toFixed(1)}%</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className={`text-[10px] ${r.abc_class === "A" ? "bg-success/15 text-success" : r.abc_class === "B" ? "bg-amber-500/15 text-amber-700" : "bg-muted text-muted-foreground"}`}>
-                          {r.abc_class}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
         <Card className="border-border">
           <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Stock lent / mort / dormant</CardTitle></CardHeader>
           <CardContent className="p-0">
@@ -610,77 +610,13 @@ export default function InventoryReporting() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </TabsContent>
 
-      {/* Audit — clôtures de période & verrouillages */}
-      <Card className="border-border">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-primary" />Audit — Clôtures & Verrouillages
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="grid grid-cols-1 lg:grid-cols-2">
-            <div className="border-r border-border">
-              <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/20">
-                Déclencheurs de clôture
-              </div>
-              {auditLoading ? (
-                <div className="p-4 text-xs text-muted-foreground">Chargement…</div>
-              ) : closeAudit.length === 0 ? (
-                <div className="p-4 text-xs text-muted-foreground">Aucune clôture exécutée</div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/30">
-                    {["Quand", "Action", "Période", "Par"].map((h) =>
-                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
-                  </tr></thead>
-                  <tbody>{closeAudit.map((a) => (
-                    <tr key={a.id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 text-muted-foreground">{new Date(a.created_at).toLocaleString("fr-FR")}</td>
-                      <td className="px-3 py-2">
-                        {(() => {
-                          const meta = CLOSE_ACTION_LABEL[a.action] ?? { label: a.action, cls: "bg-muted text-muted-foreground" };
-                          return <Badge variant="outline" className={`text-[10px] ${meta.cls}`}>{meta.label}</Badge>;
-                        })()}
-                      </td>
+      <TabsContent value="abc">
+        {tenantId && <InventoryCycleAnalysisCard key={tenantId} tenantId={tenantId} canPlan={canDo(perms, "count")} />}
+      </TabsContent>
 
-                      <td className="px-3 py-2 font-mono">{a.comment ?? "—"}</td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{a.performed_by?.slice(0, 8) ?? "—"}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              )}
-            </div>
-            <div>
-              <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/20">
-                Verrouillages de période (module stock)
-              </div>
-              {locksLoading ? (
-                <div className="p-4 text-xs text-muted-foreground">Chargement…</div>
-              ) : periodLocks.length === 0 ? (
-                <div className="p-4 text-xs text-muted-foreground">Aucun verrouillage actif</div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-border bg-muted/30">
-                    {["Période", "Verrouillée le", "Par", "Statut"].map((h) =>
-                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
-                  </tr></thead>
-                  <tbody>{periodLocks.map((l) => (
-                    <tr key={l.id} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 font-mono font-medium">{l.period}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{new Date(l.locked_at).toLocaleString("fr-FR")}</td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{l.locked_by?.slice(0, 8) ?? "—"}</td>
-                      <td className="px-3 py-2"><Badge variant="outline" className="bg-amber-500/15 text-amber-700 text-[10px] gap-1"><Lock className="w-2.5 h-2.5" />Verrouillée</Badge></td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+      <TabsContent value="clotures" className="flex-col gap-4 data-[state=active]:flex">
       {/* Historique des clôtures — exports + détail snapshot */}
       <Card className="border-border">
         <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
@@ -707,7 +643,7 @@ export default function InventoryReporting() {
             <Button
               size="sm" variant="outline" className="h-7 text-[11px] gap-1"
               onClick={exportClosesCsv}
-              disabled={!canExport || serverTotal === 0 || exporting !== null}
+              disabled={!canExport || serverTotal === 0 || closesPlaceholder || exporting !== null}
               aria-label={canExport ? `Exporter en CSV les ${serverTotal} résultats filtrés` : actionTooltip(perms, "export")}
               title={canExport ? `Exporter ${serverTotal} ligne(s) au format CSV` : actionTooltip(perms, "export")}
               data-testid="export-csv"
@@ -720,7 +656,7 @@ export default function InventoryReporting() {
             <Button
               size="sm" variant="outline" className="h-7 text-[11px] gap-1"
               onClick={exportClosesPdf}
-              disabled={!canExport || serverTotal === 0 || exporting !== null}
+              disabled={!canExport || serverTotal === 0 || closesPlaceholder || exporting !== null}
               aria-label={canExport ? `Exporter en PDF les ${serverTotal} résultats filtrés` : actionTooltip(perms, "export")}
               title={canExport ? `Exporter ${serverTotal} ligne(s) au format PDF` : actionTooltip(perms, "export")}
               data-testid="export-pdf"
@@ -922,6 +858,77 @@ export default function InventoryReporting() {
 
       </Card>
 
+      {/* Audit — clôtures de période & verrouillages */}
+      <Card className="border-border">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-primary" />Audit — Clôtures & Verrouillages
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="border-r border-border">
+              <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/20">
+                Déclencheurs de clôture
+              </div>
+              {auditLoading ? (
+                <div className="p-4 text-xs text-muted-foreground">Chargement…</div>
+              ) : closeAudit.length === 0 ? (
+                <div className="p-4 text-xs text-muted-foreground">Aucune clôture exécutée</div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead><tr className="border-b border-border bg-muted/30">
+                    {["Quand", "Action", "Période", "Par"].map((h) =>
+                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
+                  </tr></thead>
+                  <tbody>{closeAudit.map((a) => (
+                    <tr key={a.id} className="border-b border-border hover:bg-muted/20">
+                      <td className="px-3 py-2 text-muted-foreground">{new Date(a.created_at).toLocaleString("fr-FR")}</td>
+                      <td className="px-3 py-2">
+                        {(() => {
+                          const meta = CLOSE_ACTION_LABEL[a.action] ?? { label: a.action, cls: "bg-muted text-muted-foreground" };
+                          return <Badge variant="outline" className={`text-[10px] ${meta.cls}`}>{meta.label}</Badge>;
+                        })()}
+                      </td>
+
+                      <td className="px-3 py-2 font-mono">{a.comment ?? "—"}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{a.performed_by?.slice(0, 8) ?? "—"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+            </div>
+            <div>
+              <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/20">
+                Verrouillages de période (module stock)
+              </div>
+              {locksLoading ? (
+                <div className="p-4 text-xs text-muted-foreground">Chargement…</div>
+              ) : periodLocks.length === 0 ? (
+                <div className="p-4 text-xs text-muted-foreground">Aucun verrouillage actif</div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead><tr className="border-b border-border bg-muted/30">
+                    {["Période", "Verrouillée le", "Par", "Statut"].map((h) =>
+                      <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
+                  </tr></thead>
+                  <tbody>{periodLocks.map((l) => (
+                    <tr key={l.id} className="border-b border-border hover:bg-muted/20">
+                      <td className="px-3 py-2 font-mono font-medium">{l.period}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{new Date(l.locked_at).toLocaleString("fr-FR")}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{l.locked_by?.slice(0, 8) ?? "—"}</td>
+                      <td className="px-3 py-2"><Badge variant="outline" className="bg-amber-500/15 text-amber-700 text-[10px] gap-1"><Lock className="w-2.5 h-2.5" />Verrouillée</Badge></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      </TabsContent>
+      <TabsContent value="exports">
       {/* Historique des exports — CSV/PDF récents avec retry */}
       <Card className="border-border">
         <CardHeader className="p-4 pb-2">
@@ -986,7 +993,8 @@ export default function InventoryReporting() {
           )}
         </CardContent>
       </Card>
-
+      </TabsContent>
+      </Tabs>
 
       <InventoryCloseDetailDialog
         open={!!detail}

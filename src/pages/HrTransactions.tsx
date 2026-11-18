@@ -13,6 +13,7 @@ import { Plus, Lock, PlayCircle } from "lucide-react";
 import { usePayrollRuns, useCreatePayrollRun, useMyHrRoles, type PayrollRun } from "@/hooks/use-hr-data";
 import { canDo, actionTooltip, maskAmount } from "@/lib/hr-roles";
 import { PayrollRunDialog } from "@/components/PayrollRunDialog";
+import { validatePayrollRunInput } from "@/lib/hr-periods";
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   draft:     { label: "Brouillon",   cls: "bg-muted text-muted-foreground" },
@@ -25,7 +26,7 @@ export default function HrTransactions() {
   const canCreate = canDo(perms, "create_payroll_run");
   const createTip = actionTooltip(perms, "create_payroll_run", "Créer un cycle de paie");
 
-  const { data: runs = [], isLoading } = usePayrollRuns();
+  const { data: runs = [], isLoading, isError, error, refetch } = usePayrollRuns();
   const create = useCreatePayrollRun();
 
   const [open, setOpen] = useState(false);
@@ -36,6 +37,7 @@ export default function HrTransactions() {
 
   const drafts = runs.filter((r) => r.status === "draft");
   const approved = runs.filter((r) => r.status === "approved");
+  const runInputError = validatePayrollRunInput(period, payDate);
 
   return (
     <PageShell>
@@ -53,7 +55,7 @@ export default function HrTransactions() {
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" disabled={!canCreate} title={createTip} className="h-8 text-xs gap-1.5">
+              <Button size="sm" disabled={!canCreate || isError} title={createTip} className="h-8 text-xs gap-1.5">
                 {canCreate ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                 Nouveau cycle
               </Button>
@@ -63,18 +65,19 @@ export default function HrTransactions() {
               <div className="space-y-2">
                 <div>
                   <Label className="text-xs">Période (YYYY-MM)</Label>
-                  <Input value={period} onChange={(e) => setPeriod(e.target.value)} className="h-8 text-xs" placeholder="2026-06" />
+                  <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="h-8 text-xs" />
                 </div>
                 <div>
                   <Label className="text-xs">Date de paie</Label>
                   <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
+              {runInputError && <p role="alert" className="text-xs text-destructive">{runInputError}</p>}
               <DialogFooter>
                 <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
                 <Button
                   size="sm"
-                  disabled={create.isPending}
+                  disabled={create.isPending || !!runInputError}
                   onClick={async () => {
                     await create.mutateAsync({ period, pay_date: payDate });
                     setOpen(false);
@@ -85,14 +88,21 @@ export default function HrTransactions() {
           </Dialog>
         </div>
 
+        {isError && <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs">
+          <span className="text-destructive">Les cycles de paie n’ont pas pu être chargés{error instanceof Error ? ` : ${error.message}` : "."}</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void refetch()}>Réessayer</Button>
+        </div>}
+
         <Card>
           <CardHeader className="py-2"><CardTitle className="text-xs">Cycles en cours</CardTitle></CardHeader>
           <CardContent className="space-y-1">
             {isLoading ? (
               <p className="text-xs text-muted-foreground py-4 text-center">Chargement…</p>
+            ) : isError ? (
+              <p className="text-xs text-destructive py-4 text-center">La liste est indisponible. Réessayez avant de saisir un nouveau cycle.</p>
             ) : runs.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">Aucun cycle. Créez-en un.</p>
-            ) : runs.slice(0, 20).map((r) => {
+            ) : runs.map((r) => {
               const meta = STATUS_META[r.status] ?? STATUS_META.draft;
               return (
                 <button

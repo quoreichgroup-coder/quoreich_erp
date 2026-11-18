@@ -94,7 +94,7 @@ Plans de groupe / exports Sage, SAP                             └─ écriture
    normal, nature (regroupement, mouvement, collectif, auxiliaire), autorisations (imputation manuelle,
    automatique seulement, lettrable, analytique obligatoire / interdite / facultative), TVA par défaut,
    devise (monodevise ou toutes devises), attributs personnalisés.
-4. **États financiers par rubriques** : bilan, compte de résultat, SIG, TAFIRE / tableau des flux définis
+4. **États financiers par rubriques** : bilan, compte de résultat, SIG, tableau des flux de trésorerie (TFT)
    comme rubriques du référentiel, alimentées par **affectation des comptes** (règles par intervalle ou
    attribut, éditables) — plus jamais par préfixe codé dans une vue (C-2).
 5. **Correspondances** : table d'appariement compte source → compte cible (1-1, n-1, 1-n avec clé de

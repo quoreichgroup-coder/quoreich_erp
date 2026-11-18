@@ -53,22 +53,25 @@ test.describe("Treasury realtime", () => {
 
     const before = await page.locator("text=Prévision flux nets").textContent();
 
-    const { error } = await sb.from("cashflow_forecasts").insert({
+    const { data: inserted, error } = await sb.from("cashflow_forecasts").insert({
       week_start: iso,
       category: "test_e2e",
       direction: "inflow",
       amount_forecast: 1_234_567,
       source: "manual",
-    });
+    }).select("id").single();
     expect(error).toBeNull();
+    expect(inserted?.id).toBeTruthy();
 
-    // 4. Le widget doit refléter la nouvelle donnée sous 5s (realtime)
-    await expect
-      .poll(async () => (await page.locator("text=Prévision flux nets").textContent()) ?? "", { timeout: 5000 })
-      .not.toBe(before);
-
-    // cleanup
-    await sb.from("cashflow_forecasts").delete().eq("category", "test_e2e");
+    try {
+      // 4. Le widget doit refléter la nouvelle donnée sous 5s (realtime)
+      await expect
+        .poll(async () => (await page.locator("text=Prévision flux nets").textContent()) ?? "", { timeout: 5000 })
+        .not.toBe(before);
+    } finally {
+      // Ne toucher qu'à la ligne créée par cette exécution.
+      if (inserted?.id) await sb.from("cashflow_forecasts").delete().eq("id", inserted.id);
+    }
   });
 
   test("Master Data se met à jour après insert sur bank_statements", async ({ page }) => {

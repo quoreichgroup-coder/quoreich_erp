@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -16,8 +16,14 @@ import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableCo
 import { GLPostingKPIsLive, GLBatchHistoryLive } from "@/hooks/use-gl-batches";
 import { useAllStockMovements, useCreateStockAdjustment, useInventorySettings, useItems, useTransferStock, useWarehouses } from "@/hooks/use-inventory-data";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { movementLabel, movementsOfTab, validateAdjustment, type MovementTab } from "@/lib/stock-movements";
+import { useTenantId } from "@/hooks/use-tenant";
+import { InventoryCampaignPanel } from "@/components/InventoryCampaignPanel";
+import { InventoryCampaignControl } from "@/components/InventoryCampaignControl";
+import { InventoryCampaignCatalog } from "@/components/InventoryCampaignCatalog";
+import { InventoryCyclePlanner } from "@/components/InventoryCyclePlanner";
+import { INVENTORY_CAMPAIGN_REFERENCE, movementLabel, movementsOfTab, validateAdjustment, type MovementTab } from "@/lib/stock-movements";
 import { exportToCSV } from "@/lib/csv-export";
+import { campaignTabTarget } from "@/lib/inventory-campaign";
 import { cn } from "@/lib/utils";
 
 /*
@@ -32,12 +38,12 @@ const num = (s: string) => Number(String(s).replace(",", "."));
 
 type Row = {
   id: string; date: string; type: string; libelle: string; article: string; code: string; depot: string;
-  quantite: number; cout: number; valeur: number; piece: string; motif: string;
+  quantite: number; cout: number; valeur: number; piece: string; motif: string; campaignId: string;
 };
 
-function MovementsTable({ rows, empty }: { rows: Row[]; empty: string }) {
+function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string; canReview: boolean }) {
   const t = useTableFeatures({
-    data: rows, pageSize: 15, searchableKeys: ["article", "code", "depot", "piece", "motif", "libelle"],
+    data: rows, pageSize: 15, searchableKeys: ["article", "code", "depot", "piece", "motif", "libelle", "campaignId"],
     filterConfigs: [{ key: "libelle", label: "Type", options: Array.from(new Set(rows.map((r) => r.libelle))).sort() }],
   });
   return (
@@ -68,7 +74,11 @@ function MovementsTable({ rows, empty }: { rows: Row[]; empty: string }) {
               <TableCell className={cn("text-right tabular-nums", r.quantite < 0 && "text-destructive")}>{fmt(r.quantite)}</TableCell>
               <TableCell className="text-right tabular-nums">{fmt(r.cout)}</TableCell>
               <TableCell className="text-right tabular-nums">{fmt(r.valeur)}</TableCell>
-              <TableCell className="font-mono">{r.piece || "—"}</TableCell>
+              <TableCell>
+                <span className="font-mono">{r.piece || "—"}</span>
+                {r.campaignId && canReview && <Link className="block text-primary underline"
+                  to={`?tab=campaign-control&campaign=${encodeURIComponent(r.campaignId)}`}>Voir la campagne</Link>}
+              </TableCell>
               <TableCell className="truncate max-w-[14rem]">{r.motif || "—"}</TableCell>
             </TableRow>
           ))}
@@ -219,10 +229,20 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
 export default function InventoryTransactions() {
   const { data: movements = [], isLoading } = useAllStockMovements();
   const { data: access } = useMyAccess();
+  const { data: tenantId } = useTenantId();
+  const { data: stockSettings } = useInventorySettings();
+  const defaultWarehouseId = typeof stockSettings?.default_warehouse_id === "string" ? stockSettings.default_warehouse_id : undefined;
   const perms = new Set(access?.permissions ?? []);
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS = ["movements", "transfers", "adjustments", "posting"];
+  const canCount = Boolean(tenantId) && perms.has("inventory.count");
+  const canReview = Boolean(tenantId) && perms.has("inventory.post_count");
+  const canExport = perms.has("inventory.export");
+  const canCatalog = Boolean(tenantId) && (canCount || canReview || canExport);
+  const TABS = ["movements", "transfers", "adjustments", "posting", ...(canCount ? ["campaigns", "inventory-cycle"] : []),
+    ...(canReview ? ["campaign-control"] : []), ...(canCatalog ? ["campaign-catalog"] : [])];
   const tab = TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "movements";
+  const campaignId = searchParams.get("campaign") ?? undefined;
+  const campaignWarehouse = searchParams.get("depot") ?? undefined;
   const [adjOpen, setAdjOpen] = useState(false);
   const [trOpen, setTrOpen] = useState(false);
 
@@ -231,6 +251,7 @@ export default function InventoryTransactions() {
     article: m.item?.name ?? "", code: m.item?.code ?? "", depot: m.warehouse ? `${m.warehouse.code} — ${m.warehouse.name}` : "",
     quantite: Number(m.quantity), cout: Number(m.unit_cost ?? 0), valeur: Number(m.total_value ?? 0) * (Number(m.quantity) < 0 ? -1 : 1),
     piece: m.entry?.piece_number ?? "", motif: m.reason ?? "",
+    campaignId: m.reference_type === INVENTORY_CAMPAIGN_REFERENCE ? m.reference_id ?? "" : "",
   })), [movements]);
   const shown = (t: MovementTab) => movementsOfTab(rows.map((r) => ({ ...r, movement_type: r.type })), t);
 
@@ -241,6 +262,7 @@ export default function InventoryTransactions() {
       { key: "article", header: "Article" }, { key: "depot", header: "Dépôt" }, { key: "quantite", header: "Quantité" },
       { key: "cout", header: "Coût unitaire" }, { key: "valeur", header: "Valeur" }, { key: "piece", header: "Pièce comptable" },
       { key: "motif", header: "Motif" },
+      { key: "campaignId", header: "Référence campagne" },
     ], `mouvements-de-stock-${t}`);
   };
 
@@ -259,15 +281,25 @@ export default function InventoryTransactions() {
           {perms.has("inventory.transfer") && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrOpen(true)}><ArrowLeftRight className="w-3.5 h-3.5" />Transfert</Button>
           )}
-          <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exporter}><Download className="w-3.5 h-3.5" />Exporter</Button>
+          {["movements", "transfers", "adjustments", "posting"].includes(tab) &&
+            <Button size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onClick={exporter}><Download className="w-3.5 h-3.5" />Exporter</Button>}
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
+      <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => {
+        sp.set("tab", v);
+        sp.delete("campaign");
+        sp.delete("depot");
+        return sp;
+      }, { replace: true })}>
         <TabsList className="h-auto flex-wrap justify-start mb-4">
           <TabsTrigger value="movements">Mouvements ({rows.length})</TabsTrigger>
           <TabsTrigger value="transfers">Transferts</TabsTrigger>
           <TabsTrigger value="adjustments">Ajustements et inventaires</TabsTrigger>
+          {canCatalog && <TabsTrigger value="campaign-catalog">Catalogue des campagnes</TabsTrigger>}
+          {canCount && <TabsTrigger value="campaigns">Inventaires physiques</TabsTrigger>}
+          {canCount && <TabsTrigger value="inventory-cycle">Tournant ABC</TabsTrigger>}
+          {canReview && <TabsTrigger value="campaign-control">Contrôle des inventaires</TabsTrigger>}
           <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
         </TabsList>
         {(["movements", "transfers", "adjustments"] as MovementTab[]).map((t) => (
@@ -275,10 +307,25 @@ export default function InventoryTransactions() {
             {isLoading ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
             ) : (
-              <MovementsTable rows={shown(t)} empty={t === "movements" ? "Aucun mouvement de stock." : "Aucun mouvement de ce type."} />
+              <MovementsTable rows={shown(t)} canReview={canReview} empty={t === "movements" ? "Aucun mouvement de stock." : "Aucun mouvement de ce type."} />
             )}
           </TabsContent>
         ))}
+        {canCount && tenantId && <TabsContent value="campaigns">
+          <InventoryCampaignPanel key={`${tenantId}:${campaignId ?? ""}:${campaignWarehouse ?? ""}`} tenantId={tenantId}
+            defaultWarehouseId={defaultWarehouseId} initialWarehouseId={campaignWarehouse} expectedCampaignId={campaignId}
+            catalogueHref={campaignId ? campaignTabTarget(searchParams, "campaign-catalog") : undefined} />
+        </TabsContent>}
+        {canReview && tenantId && <TabsContent value="campaign-control">
+          <InventoryCampaignControl key={`${tenantId}:${campaignId ?? ""}`} tenantId={tenantId} campaignId={campaignId}
+            defaultWarehouseId={defaultWarehouseId} canExport={canExport} />
+        </TabsContent>}
+        {canCatalog && tenantId && <TabsContent value="campaign-catalog">
+          <InventoryCampaignCatalog key={tenantId} tenantId={tenantId} canCount={canCount} canReview={canReview} canExport={canExport} />
+        </TabsContent>}
+        {canCount && tenantId && <TabsContent value="inventory-cycle">
+          <InventoryCyclePlanner key={tenantId} tenantId={tenantId} defaultWarehouseId={defaultWarehouseId} />
+        </TabsContent>}
         <TabsContent value="posting" className="space-y-4">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary" />

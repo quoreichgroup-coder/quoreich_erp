@@ -19,6 +19,13 @@ const permsFromRoles = (roles: HrRole[]): HrPerms => ({
   canManageSettings:    roles.some((r) => REQUIRED_ROLES.manage_settings.includes(r)),
   canExport:            roles.some((r) => REQUIRED_ROLES.export.includes(r)),
   canViewSensitive:     roles.some((r) => REQUIRED_ROLES.view_sensitive.includes(r)),
+  // Keep the fixture aligned with the grants in V81–V83.
+  canManageCompensation: roles.some((r) => ["hr_admin", "payroll_officer"].includes(r)),
+  canManageBankDetails: roles.some((r) => ["hr_admin", "payroll_officer"].includes(r)),
+  canCreateEmployeeMovement: roles.some((r) => ["hr_admin", "hr_clerk"].includes(r)),
+  canApproveEmployeeMovement: roles.some((r) => ["hr_admin", "hr_approver"].includes(r)),
+  canViewEmployeeHistory: roles.some((r) => ALL_HR_ROLES.includes(r)),
+  canManageMovementSettings: roles.some((r) => ["hr_admin"].includes(r)),
 });
 
 const grant = (r: HrRole[], add: HrRole): HrRole[] =>

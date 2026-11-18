@@ -265,9 +265,9 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
 // En-tête (commande, date) puis lignes (quantité reçue par ligne de commande, plafonnée au
 // restant) ; la base crée la réception en attente, ajoute les lignes et la valide (V34).
 
-function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [] }: {
+function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refreshing = false }: {
   returns?: { po_line_id: string; quantity: number; replacement_expected: boolean }[];
-  open: boolean; onOpenChange: (v: boolean) => void; pos: any[]; grs: any[];
+  open: boolean; onOpenChange: (v: boolean) => void; pos: any[]; grs: any[]; refreshing?: boolean;
 }) {
   const { user } = useAuth();
   const createGR = useCreateGoodsReceipt();
@@ -299,6 +299,15 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [] }: {
     setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
     setError(null);
   };
+  // Réceptions rechargées pendant que la fenêtre est ouverte (réception précédente tout juste enregistrée) :
+  // le restant à recevoir est recalculé, jamais proposé sur des données périmées.
+  useEffect(() => {
+    if (!poId) return;
+    const p = receivable.find((x) => x.id === poId);
+    const l = p ? linesToReceive(p.id, p.lines ?? [], grs, returns) : [];
+    setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grs]);
 
   const submit = (complete: boolean) => {
     if (!po || !user) return;
@@ -378,8 +387,8 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [] }: {
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
-          <Button size="sm" variant="outline" onClick={() => submit(false)} disabled={!po || createGR.isPending}>Enregistrer en attente</Button>
-          <Button size="sm" onClick={() => submit(true)} disabled={!po || createGR.isPending}>
+          <Button size="sm" variant="outline" onClick={() => submit(false)} disabled={!po || createGR.isPending || refreshing}>Enregistrer en attente</Button>
+          <Button size="sm" onClick={() => submit(true)} disabled={!po || createGR.isPending || refreshing}>
             {createGR.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Enregistrer et valider
           </Button>
         </DialogFooter>
@@ -445,7 +454,7 @@ export default function ProcurementTransactions() {
   const { user } = useAuth();
   const { data: requisitions, isLoading: loadingPR } = useRequisitions();
   const { data: purchaseOrders, isLoading: loadingPO } = usePurchaseOrders();
-  const { data: goodsReceipts, isLoading: loadingGR } = useGoodsReceipts();
+  const { data: goodsReceipts, isLoading: loadingGR, isFetching: refreshingGR } = useGoodsReceipts();
   const { data: approvals = [] } = useApprovalQueue(undefined, "all");
   const [editPR, setEditPR] = useState<any | null>(null);
   const [editPO, setEditPO] = useState<any | null>(null);
@@ -704,7 +713,7 @@ export default function ProcurementTransactions() {
       <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
       {editPR && <CreateRequisitionDialog open edit={editPR} onOpenChange={(o) => { if (!o) setEditPR(null); }} />}
       {editPO && <CreatePODialog open edit={editPO} onOpenChange={(o) => { if (!o) setEditPO(null); }} />}
-      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} returns={returnLines} />
+      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} returns={returnLines} refreshing={refreshingGR} />
       {returnGR && (
         <SupplierReturnDialog open gr={returnGR} onClose={() => setReturnGR(null)}
           poLines={(pos.find((p: any) => p.id === returnGR.po_id)?.lines ?? []) as any[]} />

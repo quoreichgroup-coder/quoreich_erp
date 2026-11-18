@@ -17,9 +17,12 @@ export const MOVEMENT_LABELS: Record<string, string> = {
 };
 
 export type MovementTab = "movements" | "transfers" | "adjustments";
+export const INVENTORY_CAMPAIGN_REFERENCE = "inventory_count_campaign";
 
 export function movementLabel(type: string, referenceType?: string | null): string {
-  if (type === "adjustment" && referenceType === "inventory_count") return "Écart d'inventaire";
+  if (type === "adjustment" && (referenceType === "inventory_count" || referenceType === INVENTORY_CAMPAIGN_REFERENCE)) {
+    return "Écart d'inventaire";
+  }
   return MOVEMENT_LABELS[type] ?? type;
 }
 

@@ -5,6 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import type { Tables } from "@/integrations/supabase/types";
+
+type DatabaseInventoryItem = Tables<"items">;
 
 /* ============================================================
  * Items
@@ -16,6 +19,32 @@ export function useItems() {
       const { data, error } = await supabase.from("items").select("*").order("code");
       if (error) throw error;
       return data || [];
+    },
+  });
+}
+
+/** The article catalogue must include all records in the active company, including beyond one REST page. */
+export function useInventoryItemCatalog() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["items", "inventory-catalog", tenantId],
+    enabled: Boolean(tenantId),
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const rows: DatabaseInventoryItem[] = [];
+      let cursor: string | undefined;
+      for (;;) {
+        let query = supabase.from("items").select("*").eq("tenant_id", tenantId!).order("id").limit(500);
+        if (cursor) query = query.gt("id", cursor);
+        const { data, error } = await query.abortSignal(signal);
+        if (error) throw error;
+        if (!data?.length) break;
+        const next = data[data.length - 1].id;
+        if (next === cursor) throw new Error("La pagination des articles n’a pas avancé. Rechargez le catalogue.");
+        rows.push(...data);
+        cursor = next;
+      }
+      return rows.sort((a, b) => a.code.localeCompare(b.code, "fr") || a.id.localeCompare(b.id));
     },
   });
 }
@@ -55,12 +84,15 @@ export function useUpdateItem() {
  * Warehouses
  * ============================================================ */
 export function useWarehouses() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase.from("warehouses" as never).select("*").order("code");
+      const { data, error } = await supabase.from("warehouses").select("id,code,name,is_default,status,address")
+        .eq("tenant_id", tenantId!).order("code");
       if (error) throw error;
-      return (data as unknown as Array<{ id: string; code: string; name: string; is_default: boolean; status: string; address: string | null }>) || [];
+      return data ?? [];
     },
   });
 }
@@ -168,7 +200,7 @@ export function useAllStockMovements() {
 }
 
 const STOCK_KEYS = ["stock-movements", "items", "stock-valuation", "inventory-kpis", "inventory-kpis-view", "item-locations",
-  "journal-entries", "gl-batches", "low-stock"];
+  "journal-entries", "gl-batches", "low-stock", "inventory-cycle-analysis", "inventory-cycle-plan"];
 
 /**
  * Ajustement de stock motivé (V53, droit inventory.adjust) : les mouvements ne s'écrivent plus
@@ -306,21 +338,6 @@ export function useInventoryKpisView() {
       const { data, error } = await supabase.from("inventory_kpis_view" as never).select("*").maybeSingle();
       if (error) throw error;
       return data as unknown as { active_items: number; low_stock_items: number; out_of_stock_items: number; total_stock_value: number } | null;
-    },
-  });
-}
-
-export type AbcRow = { item_id: string; code: string; name: string; category: string | null; revenue_12m: number; qty_12m: number; cum_pct: number; abc_class: "A" | "B" | "C" };
-export function useAbcAnalysis() {
-  return useQuery({
-    queryKey: ["inventory-abc"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory_abc_view" as never)
-        .select("*")
-        .order("revenue_12m", { ascending: false });
-      if (error) throw error;
-      return (data as unknown as AbcRow[]) || [];
     },
   });
 }
@@ -644,10 +661,12 @@ export function useStockAging() {
  * Settings & RBAC
  * ============================================================ */
 export function useInventorySettings() {
+  const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["inventory-settings"],
+    queryKey: ["inventory-settings", tenantId],
+    enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase.from("inventory_settings" as never).select("*").maybeSingle();
+      const { data, error } = await supabase.from("inventory_settings").select("*").eq("tenant_id", tenantId!).maybeSingle();
       if (error) throw error;
       return data as unknown as Record<string, unknown> | null;
     },
@@ -664,7 +683,11 @@ export function useUpdateInventorySettings() {
         .upsert({ tenant_id: tenantId!, ...updates } as never, { onConflict: "tenant_id" });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inventory-settings"] }); toast.success("Paramètres mis à jour"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory-settings"] });
+      qc.invalidateQueries({ queryKey: ["inventory-campaign-preview", tenantId] });
+      toast.success("Paramètres mis à jour");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 }

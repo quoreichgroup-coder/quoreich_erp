@@ -149,6 +149,60 @@ class StocksSecurisationIT {
 
   // ─── Outils ───
 
+  @Test
+  @DisplayName("S3 : campagne aveugle, gel du dépôt, soumission et annulation")
+  void campagneInventairePhysique() throws SQLException {
+    String art = article(A, 0, 1000);
+    String wh = depot(A), autre = depot(A), depotB = depot(B);
+    String adjust = "SELECT create_stock_adjustment('" + art + "', '%s', 7, 1000, CURRENT_DATE, 'Entrée S3')::text";
+    asUser(ADMIN, adjust.formatted(wh));
+    assertThatThrownBy(() -> asUser(LECTEUR, "SELECT inventory_campaign('open', '" + wh + "')::text"))
+        .hasMessageContaining("non autorisé");
+    assertThatThrownBy(() -> asUser(MAGASINIER, "SELECT inventory_campaign('open', '" + depotB + "')::text"))
+        .hasMessageContaining("introuvable");
+    String campaign = asUser(MAGASINIER, "SELECT inventory_campaign('open', '" + wh + "')->>'id'");
+    assertThat(asUser(MAGASINIER, "SELECT inventory_campaign('active', '" + wh + "')->>'id'"))
+        .isEqualTo(campaign);
+    assertThat(asUser(MAGASINIER, "SELECT (inventory_campaign('read', '" + campaign
+        + "')->'lines'->0 ? 'expected')::text")).isEqualTo("false");
+    assertThatThrownBy(() -> asUser(MAGASINIER, "SELECT expected::text FROM inventory_campaign_lines"))
+        .hasMessageContaining("permission denied");
+    assertThatThrownBy(() -> asUser(MAGASINIER, "SELECT inventory_campaign('submit', '" + campaign + "')::text"))
+        .hasMessageContaining("impossible");
+    assertThat(asUser(MAGASINIER, "SELECT inventory_campaign('count', '" + campaign + "', '" + art
+        + "', 0)#>>'{lines,0,counted}'")).isEqualTo("0");
+    assertThat(asUser(MAGASINIER, "SELECT inventory_campaign('submit', '" + campaign + "')->>'state'"))
+        .isEqualTo("submitted");
+    assertThatThrownBy(() -> asUser(ADMIN, adjust.formatted(wh))).hasMessageContaining("gelé");
+    assertThatThrownBy(() -> asUser(MAGASINIER, "SELECT transfer_stock('" + art + "', '" + wh + "', '"
+        + autre + "', 1, 'Transfert S3')::text")).hasMessageContaining("gelé");
+    asUser(ADMIN, adjust.formatted(autre));
+    assertThat(asUser(ADMIN, "SELECT inventory_campaign('cancel', '" + campaign + "', _reason => 'Fin de recette S3')->>'state'"))
+        .isEqualTo("cancelled");
+    asUser(ADMIN, adjust.formatted(wh));
+    assertThat(texte("SELECT (expected = 7)::text FROM inventory_campaign_lines WHERE campaign_id = '" + campaign + "'"))
+        .isEqualTo("true");
+  }
+
+  @Test
+  @DisplayName("S3 : validation d'une campagne par un tiers, seuils paramétrés exigés, écart passé en stock au coût d'ouverture")
+  void campagneValidee() throws SQLException {
+    String art = article(A, 0, 1000);
+    String wh = depot(A);
+    asUser(ADMIN, "SELECT create_stock_adjustment('" + art + "', '" + wh + "', 10, 1000, CURRENT_DATE, 'Entrée S3 validation')::text");
+    String campaign = asUser(MAGASINIER, "SELECT inventory_campaign('open', '" + wh + "')->>'id'");
+    asUser(MAGASINIER, "SELECT inventory_campaign('count', '" + campaign + "', '" + art + "', 8)::text");
+    assertThat(asUser(MAGASINIER, "SELECT inventory_campaign('submit', '" + campaign + "')->>'state'")).isEqualTo("submitted");
+    owner("UPDATE inventory_settings SET campaign_tolerance_percent = NULL, campaign_tolerance_value = NULL WHERE tenant_id = '" + A + "'");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT inventory_campaign_control('validate', '" + campaign + "')::text"))
+        .as("seuils de recomptage : paramètre de la société, jamais implicite").hasMessageContaining("seuils de recomptage");
+    asUser(ADMIN, "SELECT inventory_campaign_policy('save', 50, 1000000)::text");
+    assertThat(asUser(ADMIN, "SELECT inventory_campaign_control('validate', '" + campaign + "')->>'state'")).isEqualTo("validated");
+    assertThat(texte("SELECT trim_scale(quantity) || ' ' || trim_scale(unit_cost) FROM stock_movements WHERE reference_id = '" + campaign + "'"))
+        .as("8 comptés − 10 attendus, au coût d'ouverture").isEqualTo("-2 1000");
+    assertThat(texte("SELECT trim_scale(quantity_on_hand)::text FROM items WHERE id = '" + art + "'")).isEqualTo("8");
+  }
+
   private static String asUser(String user, String sql) throws SQLException {
     try (Connection c = DriverManager.getConnection(
             PostgresFixture.urlOf(DATABASE), PostgresFixture.API_USER, PostgresFixture.API_PASSWORD)) {

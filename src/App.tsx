@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { queryClient } from "@/lib/query-client";
@@ -109,7 +109,6 @@ const DataImport = lazy(() => import("./pages/DataImport"));
 const AiHistory = lazy(() => import("./pages/AiHistory"));
 const Employees = lazy(() => import("./pages/Employees"));
 const PayrollRuns = lazy(() => import("./pages/PayrollRuns"));
-const AuditHr = lazy(() => import("./pages/AuditHr"));
 const HrSettings = lazy(() => import("./pages/HrSettings"));
 const HrDashboard = lazy(() => import("./pages/HrDashboard"));
 const HrTransactions = lazy(() => import("./pages/HrTransactions"));
@@ -262,7 +261,7 @@ const App = () => (
               <Route path="/hr/reporting" element={<P><HrReporting /></P>} />
               <Route path="/hr/control" element={<P><HrControl /></P>} />
               <Route path="/payroll" element={<P><PayrollRuns /></P>} />
-              <Route path="/audit/hr" element={<P><AuditHr /></P>} />
+              <Route path="/audit/hr" element={<P><Navigate to="/settings?tab=roles" replace /></P>} />
               <Route path="/hr/settings" element={<P><HrSettings /></P>} />
               {/* CRM */}
               <Route path="/crm" element={<P><CrmDashboard /></P>} />

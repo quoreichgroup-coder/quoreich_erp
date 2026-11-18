@@ -74,7 +74,10 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
   const body: RowInput[] = opts.rows.map((row) =>
     opts.columns.map((c) => {
       const v = c.format ? c.format(row) : (row[c.key as keyof T] as unknown);
-      return v === null || v === undefined ? "" : String(v);
+      if (v === null || v === undefined) return "";
+      return typeof v === "number" && Number.isFinite(v)
+        ? v.toLocaleString("fr-FR", { maximumFractionDigits: 2 })
+        : String(v);
     }),
   );
 
@@ -86,7 +89,19 @@ async function renderPdf<T extends Record<string, unknown>>(opts: PdfExportOptio
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     margin: { left: margin, right: margin },
+    showHead: "everyPage",
+    rowPageBreak: "avoid",
   });
+
+  const pageCount = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    doc.text(`${page} / ${pageCount}`, pageWidth - margin, pageHeight - margin / 2, { align: "right" });
+  }
 
   const name = opts.filename.endsWith(".pdf") ? opts.filename : `${opts.filename}.pdf`;
   doc.save(name);

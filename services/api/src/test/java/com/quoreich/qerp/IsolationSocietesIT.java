@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -97,7 +99,58 @@ class IsolationSocietesIT {
         .hasStackTraceContaining("account_id");
   }
 
+  /** V101 : fonctions SECURITY DEFINER exposées aux utilisateurs avec un paramètre « société », toutes vérifiées. */
+  private static final List<String> EXPOSEES_VERIFIEES = List.of(
+      "assign_crm_role", "assign_project_role", // contrôlent la société de l'appelant (V31)
+      "budget_account_ok", "caller_tenant_matches", "chart_framework", "quality_rule_severity", "replenishment_target_ok", "seed_ap_defaults", // V101
+      "get_consolidated_cfo_kpis", "get_consolidated_cfo_trends", // intersection avec get_accessible_tenants
+      "inventory_campaign_catalog", "inventory_campaign_numbering", "inventory_campaign_policy", "inventory_campaign_preview",
+      "inventory_campaign_timeline", "inventory_cycle_analysis", "inventory_cycle_policy", "inventory_cycle_prepare"); // société déduite côté serveur
+
+  @Test
+  @DisplayName("V101 : aucune fonction SECURITY DEFINER exposée ne prend une société sans contrôle revu")
+  void fonctionsAParametreSocieteRevues() {
+    List<String> exposees = lignes("""
+        SELECT DISTINCT p.proname FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+           AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+           AND pg_get_function_identity_arguments(p.oid) ~ '(_tenant|tenant_id|_company)[a-z_]* uuid' ORDER BY 1""");
+    assertThat(exposees).as("nouvelle fonction à paramètre société : contrôler la société de l'appelant puis l'ajouter ici")
+        .containsExactlyInAnyOrderElementsOf(EXPOSEES_VERIFIEES);
+  }
+
+  @Test
+  @DisplayName("V101 : un membre de A n'obtient ni les totaux, ni les paramètres, ni l'écriture de la société B")
+  void fonctionsInternesFermees() throws SQLException {
+    String compteB = lignes("SELECT id::text FROM gl_accounts WHERE tenant_id = '" + B + "' LIMIT 1").get(0);
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT budget_actual('" + B + "', '', '2000-01-01', '2100-12-31')::text"))
+        .hasMessageContaining("permission denied");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT (budget_setting('" + B + "')).control_mode")).hasMessageContaining("permission denied");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT notify_sales('" + B + "', 'info', 'Intrusion', 'x', NULL)::text")).hasMessageContaining("permission denied");
+    assertThatThrownBy(() -> asUser(ADMIN, "SELECT seed_ap_defaults('" + B + "')::text")).hasMessageContaining("société différente");
+    assertThat(asUser(ADMIN, "SELECT budget_account_ok('" + B + "', '" + compteB + "')::text")).isEqualTo("false");
+    assertThat(asUser(ADMIN, "SELECT chart_framework('" + B + "')")).isNull();
+  }
+
   // ─── Outils ───
+
+  private static String asUser(String user, String sql) throws SQLException {
+    try (Connection c = DriverManager.getConnection(
+            PostgresFixture.urlOf(DATABASE), PostgresFixture.API_USER, PostgresFixture.API_PASSWORD)) {
+      c.setAutoCommit(false);
+      try (PreparedStatement claims = c.prepareStatement("SELECT set_config('request.jwt.claims', ?, true)")) {
+        claims.setString(1, "{\"sub\":\"" + user + "\",\"role\":\"authenticated\"}");
+        claims.execute();
+      }
+      try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+        String r = rs.next() ? rs.getString(1) : null;
+        c.commit();
+        return r;
+      } catch (SQLException e) {
+        c.rollback();
+        throw e;
+      }
+    }
+  }
 
   private static void owner(String sql) {
     PostgresFixture.execute(PostgresFixture.urlOf(DATABASE), sql);

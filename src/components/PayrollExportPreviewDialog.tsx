@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Download, Lock, XCircle } from "lucide-react";
-import { canDo, type HrPerms } from "@/lib/hr-roles";
+import { canDo, maskAmount, type HrPerms } from "@/lib/hr-roles";
 
 export type PreviewColumn = { key: string; header: string };
 export type PreviewRow = Record<string, string | number>;
@@ -14,6 +14,7 @@ export function PayrollExportPreviewDialog({
   open,
   onOpenChange,
   format,
+  currency,
   title,
   perms,
   columns,
@@ -25,7 +26,8 @@ export function PayrollExportPreviewDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  format: "CSV" | "PDF";
+  format: "CSV" | "Excel" | "PDF";
+  currency?: string | null;
   title: string;
   perms: HrPerms;
   columns: PreviewColumn[];
@@ -55,7 +57,7 @@ export function PayrollExportPreviewDialog({
             <Lock className="w-4 h-4" />
             <AlertTitle className="text-xs">Export verrouillé</AlertTitle>
             <AlertDescription className="text-[11px]">
-              Rôle requis : hr_approver, payroll_officer, hr_auditor ou hr_admin.
+              Le droit « Exporter » doit être attribué à votre rôle dans Paramètres → Administration → Rôles et autorisations.
             </AlertDescription>
           </Alert>
         )}
@@ -65,7 +67,7 @@ export function PayrollExportPreviewDialog({
             <XCircle className="w-4 h-4" />
             <AlertTitle className="text-xs">Écriture SYSCOHADA déséquilibrée</AlertTitle>
             <AlertDescription className="text-[11px] font-mono">
-              D {(totalDebit ?? 0).toLocaleString("fr-FR")} / C {(totalCredit ?? 0).toLocaleString("fr-FR")} — l'export reflète l'état actuel ; la comptabilisation sera refusée.
+              D {maskAmount(perms, totalDebit ?? 0)} / C {maskAmount(perms, totalCredit ?? 0)} {currency?.trim() || "Devise non enregistrée"} — l'export reflète l'état actuel ; la comptabilisation sera refusée.
             </AlertDescription>
           </Alert>
         )}
@@ -74,7 +76,7 @@ export function PayrollExportPreviewDialog({
             <CheckCircle2 className="w-4 h-4" />
             <AlertTitle className="text-xs">Écriture équilibrée</AlertTitle>
             <AlertDescription className="text-[11px] font-mono">
-              D {(totalDebit ?? 0).toLocaleString("fr-FR")} = C {(totalCredit ?? 0).toLocaleString("fr-FR")} XOF
+              D {maskAmount(perms, totalDebit ?? 0)} = C {maskAmount(perms, totalCredit ?? 0)} {currency?.trim() || "Devise non enregistrée"}
             </AlertDescription>
           </Alert>
         )}

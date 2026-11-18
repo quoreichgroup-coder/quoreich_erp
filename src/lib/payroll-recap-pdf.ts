@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { PayrollLine, PayrollRun } from "@/hooks/use-hr-data";
 import { canDo, maskAmount, type HrPerms } from "@/lib/hr-roles";
-import { buildJournalPreview, type PayrollComputation } from "@/lib/payroll-engine";
+import { buildJournalPreview, type PayrollComputation, type PayrollPostingAccounts } from "@/lib/payroll-engine";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Brouillon", approved: "Approuvé", posted: "Comptabilisé",
@@ -18,6 +18,7 @@ export function exportPayrollRunRecapPDF(
   run: PayrollRun,
   lines: PayrollLine[],
   perms: HrPerms,
+  accounts?: PayrollPostingAccounts,
 ) {
   if (!canDo(perms, "export")) {
     throw new Error("Export verrouillé : rôle hr_approver / payroll_officer / hr_auditor requis.");
@@ -55,15 +56,18 @@ export function exportPayrollRunRecapPDF(
       ["Période", run.period],
       ["Date de paie", run.pay_date],
       ["Statut", STATUS_LABEL[run.status] ?? run.status],
+      ["Devise", run.payroll_currency_code ?? "Non enregistrée"],
       ["Effectif", String(run.employee_count)],
-      ["Brut total", `${maskAmount(perms, +run.gross_total)} XOF`],
-      ["Net total", `${maskAmount(perms, +run.net_total)} XOF`],
+      ["Brut total", `${maskAmount(perms, +run.gross_total)} ${run.payroll_currency_code ?? "—"}`],
+      ["Net total", `${maskAmount(perms, +run.net_total)} ${run.payroll_currency_code ?? "—"}`],
       ["Approuvé le", run.approved_at?.slice(0, 16).replace("T", " ") ?? "—"],
       ["Comptabilisé le", run.executed_at?.slice(0, 16).replace("T", " ") ?? "—"],
     ],
     styles: { fontSize: 9, cellPadding: 4 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     margin: { left: margin, right: margin },
+    showHead: "everyPage",
+    rowPageBreak: "avoid",
   });
   // @ts-expect-error autoTable mutates doc with lastAutoTable
   y = (doc.lastAutoTable?.finalY ?? y) + 18;
@@ -74,18 +78,21 @@ export function exportPayrollRunRecapPDF(
   y += 8;
   autoTable(doc, {
     startY: y,
-    head: [["Employé", "Brut", "CNPS", "IRPP", "Net"]],
+    head: [["Employé", "Brut", "Cotisations salariales", "Impôt", "Net", "Charges patronales"]],
     body: lines.map((l) => [
-      l.employee_id.slice(0, 8),
+      l.employee ? `${l.employee.first_name} ${l.employee.last_name} (${l.employee.matricule})` : l.employee_id.slice(0, 8),
       maskAmount(perms, +l.gross),
       maskAmount(perms, +l.deductions),
       maskAmount(perms, +l.taxes),
       maskAmount(perms, +l.net),
+      maskAmount(perms, +l.employer_charges),
     ]),
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     margin: { left: margin, right: margin },
+    showHead: "everyPage",
+    rowPageBreak: "avoid",
   });
   // @ts-expect-error autoTable mutates doc with lastAutoTable
   y = (doc.lastAutoTable?.finalY ?? y) + 18;
@@ -93,8 +100,9 @@ export function exportPayrollRunRecapPDF(
   // JE preview
   const comps: PayrollComputation[] = lines.map((l) => ({
     gross: +l.gross, deductions: +l.deductions, taxes: +l.taxes, net: +l.net,
+    employerCharges: +l.employer_charges,
   }));
-  const je = buildJournalPreview(comps);
+  const je = buildJournalPreview(comps, { accounts });
 
   doc.setFontSize(11);
   doc.text("Écriture SYSCOHADA (aperçu)", margin, y);
@@ -123,7 +131,17 @@ export function exportPayrollRunRecapPDF(
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     margin: { left: margin, right: margin },
+    showHead: "everyPage",
+    rowPageBreak: "avoid",
   });
+
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    doc.text(`${page} / ${pageCount}`, doc.internal.pageSize.getWidth() - margin, doc.internal.pageSize.getHeight() - margin / 2, { align: "right" });
+  }
 
   doc.save(`payroll-recap-${run.period}.pdf`);
 }

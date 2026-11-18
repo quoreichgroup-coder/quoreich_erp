@@ -10,9 +10,13 @@ const mk = (over: Partial<PayrollRun>): PayrollRun => ({
   status: "draft",
   gross_total: 0,
   net_total: 0,
+  deductions_total: 0,
+  taxes_total: 0,
+  employer_charges_total: 0,
   employee_count: 0,
   created_by: null, approved_by: null, executed_by: null,
   approved_at: null, executed_at: null, notes: null,
+  payroll_country_code: null, payroll_currency_code: null, payroll_rules_snapshot: null,
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
   ...over,
 });

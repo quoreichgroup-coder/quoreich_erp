@@ -46,6 +46,69 @@ function fakeClose(i: number) {
   };
 }
 
+test("les rapports Stock se consultent par onglet et gardent les filtres des clôtures", async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 900 });
+  await page.goto("/inventory/reporting");
+  const tabs = page.getByRole("tablist", { name: "Sections des rapports Stock" });
+  await expect(tabs.getByRole("tab")).toHaveText([
+    "Valorisation", "Rotation et vieillissement", "Analyse ABC", "Clôtures", "Historique des exports",
+  ]);
+  await expect(page.getByRole("heading", { name: /Valorisation par catégorie/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Analyse ABC par dépôt" })).toBeHidden();
+
+  const valuation = tabs.getByRole("tab", { name: "Valorisation" });
+  const turnover = tabs.getByRole("tab", { name: "Rotation et vieillissement" });
+  await valuation.focus();
+  await valuation.press("ArrowRight");
+  await expect(turnover).toBeFocused();
+  await turnover.press("Enter");
+  await expect(page.getByRole("heading", { name: /Rotation des stocks/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stock lent / mort / dormant" })).toBeVisible();
+  await tabs.getByRole("tab", { name: "Analyse ABC" }).click();
+  await expect(page.getByRole("heading", { name: "Analyse ABC par dépôt" })).toBeVisible();
+  await page.reload();
+  await expect(tabs.getByRole("tab", { name: "Analyse ABC" })).toHaveAttribute("aria-selected", "true");
+
+  await page.goto(URL_WITH_FILTERS);
+  await expect(tabs.getByRole("tab", { name: "Clôtures" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Recherche", { exact: true })).toHaveValue(FILTERS.q);
+  await tabs.getByRole("tab", { name: "Historique des exports" }).click();
+  await expect(page.getByRole("heading", { name: /Historique des exports/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Historique des clôtures de stock/ })).toBeHidden();
+  await tabs.getByRole("tab", { name: "Clôtures" }).click();
+  await expect(page.getByLabel("Recherche", { exact: true })).toHaveValue(FILTERS.q);
+  await page.getByRole("button", { name: "Réinitialiser" }).click();
+  await expect(page.getByLabel("Recherche", { exact: true })).toHaveValue("");
+  await expect(tabs.getByRole("tab", { name: "Clôtures" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("retenter un export rouvre les clôtures avec les filtres de l’audit", async ({ page }) => {
+  await page.route("**/rest/v1/inventory_role_audit?*", (route) => {
+    const actions = new URL(route.request().url()).searchParams.get("action") ?? "";
+    return route.fulfill({ json: actions.includes("export_failed") ? [{
+      id: "echec-1", action: "export_failed", performed_by: null, created_at: "2025-06-01T00:00:00Z",
+      comment: 'historique-clotures — {"kind":"csv","rows":0,"filters":{"search":"2025-06","sortKey":"period","sortDir":"asc"}}',
+    }] : [] });
+  });
+  await page.route("**/rest/v1/inventory_period_closes?*", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const period = params.get("period");
+    const rows = period === "ilike.%2025-06%" ? [fakeClose(5)] : [];
+    await route.fulfill({ status: 206, json: rows, headers: {
+      "access-control-expose-headers": "content-range", "content-range": rows.length ? "0-0/1" : "*/0",
+    } });
+  });
+
+  await page.goto("/inventory/reporting?tab=exports&q=2024");
+  const retry = page.getByTestId("retry-export-echec-1");
+  await expect(retry).toBeEnabled();
+  const downloaded = page.waitForEvent("download");
+  await retry.click();
+  await expect(page.getByRole("tab", { name: "Clôtures" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Recherche", { exact: true })).toHaveValue("2025-06");
+  expect((await downloaded).suggestedFilename()).toBe("historique-clotures-stock.csv");
+});
+
 test("CSV export uses URL filters, shows progress, downloads file", async ({ page, context }) => {
   const restCalls: { url: string; rangeHeader: string | null }[] = [];
 

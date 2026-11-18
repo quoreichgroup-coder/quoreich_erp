@@ -103,6 +103,7 @@ test("Alerts page — filtres, tri, pagination, bulk actions", async ({ page }) 
   });
 
   await page.goto(`${BASE}/alerts`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Alertes & Notifications" })).toBeVisible();
 
   // Table renders 25 rows (page 0)
   await expect(page.getByRole("row").nth(1)).toBeVisible({ timeout: 8000 });

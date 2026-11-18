@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { identifiants, RUN, surveiller, dernierToast } from "./outils";
+import { identifiants, RUN, surveiller, dernierToast, verifierSocieteE2E } from "./outils";
 import { ligne } from "./champs";
 import { creerFournisseur } from "./actions";
 
@@ -24,6 +24,7 @@ test("stocks : article, dépôts, ajustement comptabilisé, transfert, exports",
 
   obs.etape("dépôts");
   await page.goto("/inventory/master-data?tab=warehouses");
+  await verifierSocieteE2E(page);
   for (const d of depots) {
     await page.getByRole("button", { name: "Nouveau dépôt" }).click();
     const w = page.getByRole("dialog");

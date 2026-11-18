@@ -34,6 +34,8 @@ describe("classeur Excel", () => {
     const text = new TextDecoder().decode(bytes);
     expect(text).toContain('state="frozen"');
     expect(text).toContain('<autoFilter ref="A1:C3"/>');
+    expect(text).toContain('<numFmt numFmtId="164" formatCode="#,##0.##"/>');
+    expect(text).toContain('<c r="C2" s="2"><v>33.5</v></c>');
     expect(text).toContain("<v>33.5</v>");
     const back = await readXlsx(bytes.slice().buffer);
     expect(back.headers).toEqual(["Code", "Intitulé", "Clé (%)"]);

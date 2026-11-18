@@ -18,6 +18,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = process.env.E2E_PARCOURS_PORT ?? "8081";
 const BASE = `http://localhost:${PORT}`;
+const captures = process.env.E2E_PARCOURS_CAPTURE === "1";
 
 export default defineConfig({
   testDir: "tests/e2e/parcours",
@@ -33,8 +34,8 @@ export default defineConfig({
     baseURL: BASE,
     locale: "fr-FR",
     timezoneId: "Africa/Ouagadougou",
-    trace: "retain-on-failure",
-    screenshot: "on",
+    trace: captures ? "retain-on-failure" : "off",
+    screenshot: captures ? "on" : "off",
     actionTimeout: 20_000,
     navigationTimeout: 60_000,
   },
@@ -48,9 +49,20 @@ export default defineConfig({
     },
     {
       name: "parcours",
-      testIgnore: /0[01]-(connexion|approbateur)\.spec\.ts/,
+      testIgnore: /(?:0[01]-(?:connexion|approbateur)|71-inventaires-physiques|81-tresorerie-lecture)\.spec\.ts/,
       dependencies: ["approbateur"],
       use: { ...devices["Desktop Chrome"], storageState: "test-results-parcours/.auth/session.json" },
+    },
+    {
+      name: "lecture-stock",
+      testMatch: /71-inventaires-physiques\.spec\.ts/,
+      dependencies: ["connexion"],
+      use: { ...devices["Desktop Chrome"], storageState: "test-results-parcours/.auth/session.json" },
+    },
+    {
+      name: "lecture-tresorerie",
+      testMatch: /81-tresorerie-lecture\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   webServer: {

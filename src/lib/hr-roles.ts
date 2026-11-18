@@ -71,6 +71,12 @@ export type HrPerms = {
   canManageSettings: boolean;
   canExport: boolean;
   canViewSensitive: boolean;
+  canManageCompensation: boolean;
+  canManageBankDetails: boolean;
+  canCreateEmployeeMovement: boolean;
+  canApproveEmployeeMovement: boolean;
+  canViewEmployeeHistory: boolean;
+  canManageMovementSettings?: boolean;
 };
 
 export function canDo(perms: HrPerms | undefined, action: HrAction): boolean {
@@ -88,9 +94,8 @@ export function canDo(perms: HrPerms | undefined, action: HrAction): boolean {
   }
 }
 
-export function missingRoleHint(action: HrAction): string {
-  const roles = REQUIRED_ROLES[action].map((r) => ROLE_LABELS[r]).join(", ");
-  return `Action verrouillée — rôle requis : ${roles}.`;
+export function missingRoleHint(_action: HrAction): string {
+  return "Action verrouillée — le droit correspondant doit être attribué dans Paramètres d’administration > Rôles et autorisations.";
 }
 
 export function actionTooltip(

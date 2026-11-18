@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "79";
+  private static final String DERNIERE_MIGRATION = "103";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -131,6 +131,8 @@ class SchemaMigrationIT {
           "gl_accounts/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
+  /** V80 — référence au validateur qui a confirmé les paramètres de paie. */
+  private static final Set<String> CLES_AUTH_AJOUTEES = Set.of("hr_payroll_settings/hr_payroll_settings_rules_validated_by_fkey");
 
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
@@ -209,6 +211,8 @@ class SchemaMigrationIT {
           "report_line_rules",
           "tenant_report_line_accounts",
           "hr_payroll_settings",
+          // V80 — audit indépendant du cycle de paie.
+          "payroll_run_audit",
           // V64 — référentiels versionnés et règles de qualité.
           "framework_versions",
           "framework_reference_accounts",
@@ -247,7 +251,16 @@ class SchemaMigrationIT {
           "budget_forecasts",
           "budget_forecast_lines",
           // V79 — scénarios de budget.
-          "budget_scenarios");
+          "budget_scenarios",
+          // V82-V91 — mouvements RH, rubriques de paie et campagnes d'inventaire.
+          "employee_movement_audit", "employee_movements", "hr_employee_payroll_components",
+          "hr_movement_references", "hr_payroll_components", "payroll_component_lines",
+          "payroll_run_prechecks", "payroll_run_variables", "inventory_campaign_lines", "inventory_campaigns",
+          // V93/V94/V96 — recomptages, journal des comptages, événements et règles du tournant.
+          "inventory_campaign_count_log", "inventory_campaign_recounts",
+          "inventory_campaign_events", "inventory_cycle_policies",
+          // V95 — configuration de matricules par société.
+          "hr_employee_number_settings");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -275,6 +288,9 @@ class SchemaMigrationIT {
           "audit_authorizations",
           "guard_role_assignments",
           "guard_role_in_use",
+          // V95 — import salariés, numérotation et actions groupées configurables.
+          "create_employee_movements_bulk", "import_hr_employees", "list_hr_employee_number_settings",
+          "next_hr_employee_number", "save_hr_employee_number_settings",
           "my_access",
           // V31 — rôles des modules écrits dans la matrice ; invitations.
           "module_role_tenant",
@@ -524,7 +540,45 @@ class SchemaMigrationIT {
           "budget_account_ok",
           "ensure_budget_scenarios",
           "guard_budget_scenario",
-          "budget_prior_year_monthly");
+          "budget_prior_year_monthly",
+          // V101 — isolation des fonctions à paramètre société.
+          "caller_tenant_matches",
+          // V102 — référentiels RH (contrat, service, poste).
+          "hr_reference_code",
+          "hr_resolve_reference",
+          "hr_reference_label",
+          "guard_employee_references",
+          "guard_employee_movement_values",
+          "payroll_line_department_label",
+          // V103 — séparation des fonctions de paie.
+          "stamp_payroll_run_creator",
+          // V80 — règles de paie par pays.
+          "payroll_rules_valid",
+          "compute_progressive_payroll_tax",
+          "guard_hr_payroll_settings",
+          "confirm_payroll_rules",
+          "audit_payroll_run_change",
+          // V81-V95 — API RH, mouvements, paie détaillée, isolement, inventaire et import RH.
+          "approve_employee_movement", "compute_payroll_line_at", "create_employee_movement",
+          "create_payroll_run", "create_payroll_run_variable", "decide_payroll_run_variable",
+          "guard_campaign_stock_movement", "guard_employee_movement_references", "hr_employee_state_at",
+          "inventory_campaign", "list_employee_movements", "list_hr_employee_payroll_components",
+          "list_hr_employees", "list_hr_movement_references", "list_hr_payroll_components",
+          "precheck_payroll_run", "prevent_payroll_precheck_mutation", "reject_employee_movement",
+          "reject_employee_movement_audit_change", "save_hr_employee", "save_hr_employee_payroll_component",
+          "save_hr_movement_reference", "save_hr_payroll_component",
+          // V91/V93/V94 — périmètre, contrôle et catalogue des inventaires physiques.
+          "inventory_campaign_open_items", "inventory_campaign_capture_cost", "inventory_campaign_log_count",
+          "inventory_campaign_policy", "inventory_campaign_variances", "inventory_campaign_control",
+          "inventory_campaign_numbering", "inventory_campaign_assign_reference", "inventory_campaign_keep_reference",
+          "inventory_campaign_log_transition", "inventory_campaign_timeline", "inventory_campaign_save_counts",
+          "inventory_campaign_catalog", "inventory_campaign_preview",
+          // V96 — classement et planification du tournant ABC.
+          "inventory_cycle_analysis", "inventory_cycle_policy", "inventory_cycle_prepare", "inventory_cycle_ranked_items",
+          // V98 — résolution du compte de comptabilisation d'une rubrique de paie.
+          "hr_component_posting_account",
+          // V100 — les gains de campagne n'ajoutent pas un reliquat global non affecté.
+          "guard_unallocated_campaign_gain");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -685,6 +739,32 @@ class SchemaMigrationIT {
           "budget_scenarios/Lecture société",
           "budget_scenarios/Paramétrage habilité",
           "purchase_order_followup_log/Lecture société",
+          // V80 — historique paie réservé au droit d'audit.
+          "payroll_run_audit/payroll_run_audit_read",
+          // V81-V89 — policies for tenant-scoped HR/payroll tables.
+          "employee_movement_audit/employee_movement_audit_delete",
+          "employee_movement_audit/employee_movement_audit_insert",
+          "employee_movement_audit/employee_movement_audit_select",
+          "employee_movement_audit/employee_movement_audit_update",
+          "employee_movements/employee_movements_delete",
+          "employee_movements/employee_movements_insert",
+          "employee_movements/employee_movements_select",
+          "employee_movements/employee_movements_update",
+          "hr_employee_payroll_components/hr_employee_payroll_components_no_direct_write",
+          "hr_employee_payroll_components/hr_employee_payroll_components_read",
+          "hr_movement_references/hr_movement_references_no_direct_write",
+          "hr_movement_references/hr_movement_references_select",
+          "hr_payroll_components/hr_payroll_components_no_direct_write",
+          "hr_payroll_components/hr_payroll_components_read",
+          "payroll_component_lines/payroll_component_lines_no_direct_write",
+          "payroll_component_lines/payroll_component_lines_read",
+          "payroll_run_prechecks/payroll_run_prechecks_no_direct_write",
+          "payroll_run_prechecks/payroll_run_prechecks_read",
+          "payroll_run_variables/payroll_run_variables_no_direct_write",
+          "payroll_run_variables/payroll_run_variables_read",
+          // V95 — paramétrage des matricules par droit central.
+          "hr_employee_number_settings/hr_employee_number_settings_no_direct_write",
+          "hr_employee_number_settings/hr_employee_number_settings_read",
           // V48 — clients et paramètres AR.
           "customers/Lecture société",
           "customers/Création habilitée",
@@ -759,6 +839,13 @@ class SchemaMigrationIT {
           "budget_forecast_lines/trg_guard_budget_forecast_line",
           // V79.
           "budgets/trg_guard_budget_scenario",
+          // V102.
+          "employees/trg_guard_employee_references",
+          "employee_movements/trg_guard_employee_movement_values",
+          "payroll_lines/trg_payroll_line_department_label",
+          "payroll_runs/trg_stamp_payroll_run_creator",
+          // V80.
+          "payroll_runs/trg_audit_payroll_run_change",
           "depreciation_entries/trg_refresh_asset_depreciation",
           // V73 — contrôle budgétaire.
           "budgets/trg_guard_budget",
@@ -844,7 +931,25 @@ class SchemaMigrationIT {
           "journal_lines/trg_guard_journal_line_account",
           // V62 — valeurs par défaut, attributs personnalisés, historique des comptes.
           "gl_accounts/trg_default_gl_account_fields",
-          "gl_accounts/trg_log_gl_account_changes");
+          "gl_accounts/trg_log_gl_account_changes",
+          // V80 — toute modification des barèmes retire leur confirmation.
+          "hr_payroll_settings/trg_guard_hr_payroll_settings",
+          // V82/V89/V91 — historique RH immuable et garde du comptage inventaire.
+          "employee_movement_audit/employee_movement_audit_immutable",
+          "employee_movements/employee_movement_configured_references",
+          "payroll_run_prechecks/payroll_run_prechecks_immutable",
+          "item_locations/guard_campaign_stock_location",
+          "stock_movements/guard_campaign_stock_movement",
+          // V93 — valorisation à l'ouverture et journal des deux comptages.
+          "inventory_campaign_lines/inventory_campaign_capture_cost",
+          "inventory_campaign_lines/inventory_campaign_log_first",
+          "inventory_campaign_recounts/inventory_campaign_log_second",
+          // V94 — référence stable et historique de la campagne.
+          "inventory_campaigns/inventory_campaign_assign_reference",
+          "inventory_campaigns/inventory_campaign_keep_reference",
+          "inventory_campaigns/inventory_campaign_log_transition",
+          // V100 — garde de comptabilisation sur les gains d'inventaire.
+          "stock_movements/trg_guard_unallocated_campaign_gain");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");
@@ -975,7 +1080,7 @@ class SchemaMigrationIT {
         SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
         """)), "séquences");
 
-    memeEnsemble(sans(MANIFESTE.cles("fk_to_auth_users", 0, 1), CLES_AUTH_RETIREES), new LinkedHashSet<>(noms("""
+    memeEnsemble(avec(sans(MANIFESTE.cles("fk_to_auth_users", 0, 1), CLES_AUTH_RETIREES), CLES_AUTH_AJOUTEES), new LinkedHashSet<>(noms("""
         SELECT c.relname || '/' || con.conname FROM pg_constraint con
         JOIN pg_class c ON c.oid = con.conrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace

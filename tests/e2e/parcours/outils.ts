@@ -1,6 +1,19 @@
 import { readFileSync, existsSync } from "node:fs";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
+export const SOCIETE_E2E = "E2E QUOREICH (société de test)";
+
+export function verifierIdentiteE2E(email: string) {
+  if (!/^e2e[-.a-z0-9]*@[-a-z0-9.]+\.invalid$/i.test(email)) {
+    throw new Error("Ce parcours connecté exige une identité réservée aux tests E2E.");
+  }
+}
+
+export async function verifierSocieteE2E(page: Page, timeout = 20_000) {
+  await expect(page.locator("header").getByText(SOCIETE_E2E, { exact: true }),
+    "Le parcours doit rester dans la société dédiée aux tests E2E.").toBeVisible({ timeout });
+}
+
 /**
  * Identifiants d'un compte de test : variables d'environnement, sinon fichier hors dépôt.
  * « auteur » saisit les pièces (administrateur de la société de test) ; « approbateur » les

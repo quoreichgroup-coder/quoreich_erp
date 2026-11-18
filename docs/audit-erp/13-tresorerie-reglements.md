@@ -71,3 +71,10 @@ Livré :
   est sans contrepartie ou que l'égalité ne tient pas ; rapprochement validé figé (V70) ; relevé annulable tant
   qu'aucune ligne n'est rapprochée.
 * Écran : Trésorerie → Contrôle → « Rapprochement bancaire » (`BankReconciliation.tsx`).
+
+Pour rejouer les contrôles connectés des droits et des exports, lancer
+`npx playwright test --config playwright.treasury-readonly.config.ts`. La suite
+vérifie les comptes réservés à **E2E QUOREICH (société de test)** et écarte les
+scénarios qui insèrent des pièces. Les cas qui demandent un journal d’audit
+alimenté sont vérifiables sur des données simulées avec
+`npm run test:e2e -- tests/e2e/treasury-exports.spec.ts`.

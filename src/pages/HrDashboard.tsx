@@ -10,12 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Wallet, CalendarClock, AlertTriangle, FileText, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useEmployees, usePayrollKpis, useMyHrRoles } from "@/hooks/use-hr-data";
-import { maskAmount } from "@/lib/hr-roles";
+import { canDo, maskAmount } from "@/lib/hr-roles";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
 
 export default function HrDashboard() {
   const perms = useMyHrRoles();
+  const canViewAmounts = canDo(perms, "view_sensitive");
   const kpis = usePayrollKpis();
   const { data: employees = [], isLoading } = useEmployees();
 
@@ -32,10 +33,11 @@ export default function HrDashboard() {
   }, [employees]);
 
   const monthlyMass = byDept.reduce((s, d) => s + d.mass, 0);
+  const hasMixedCurrency = employees.some((e) => e.status === "active" && kpis.currency && e.currency !== kpis.currency);
   const alerts: string[] = [];
-  if (kpis.upcoming.length > 0) alerts.push(`${kpis.upcoming.length} cycle(s) à approuver/exécuter`);
+  if (!kpis.isError && kpis.upcoming.length > 0) alerts.push(`${kpis.upcoming.length} cycle(s) à approuver/exécuter`);
   const draftRuns = kpis.runs.filter((r) => r.status === "draft").length;
-  if (draftRuns > 0) alerts.push(`${draftRuns} cycle(s) brouillon en attente`);
+  if (!kpis.isError && draftRuns > 0) alerts.push(`${draftRuns} cycle(s) brouillon en attente`);
 
   return (
     <PageShell>
@@ -46,11 +48,18 @@ export default function HrDashboard() {
           description="Vue d'ensemble : effectif, masse salariale, cycles à traiter, alertes opérationnelles."
         />
 
+        {kpis.isError && (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs">
+            <span className="text-destructive">Certaines données RH/Paie n’ont pas pu être chargées. Les indicateurs peuvent être incomplets.</span>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void kpis.refetch()}>Réessayer</Button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <KpiCard icon={Users} label="Effectif actif" value={fmt(kpis.activeEmployees)} />
-          <KpiCard icon={Wallet} label="Masse salariale mensuelle" value={maskAmount(perms, monthlyMass)} />
-          <KpiCard icon={Wallet} label="Masse salariale YTD" value={maskAmount(perms, kpis.ytdGross)} />
-          <KpiCard icon={CalendarClock} label="Cycles à venir" value={fmt(kpis.upcoming.length)} />
+          <KpiCard icon={Users} label="Effectif actif" value={kpis.isError ? "—" : fmt(kpis.activeEmployees)} />
+          <KpiCard icon={Wallet} label={`Masse salariale mensuelle${kpis.currency ? ` (${kpis.currency})` : ""}`} value={kpis.isError ? "Indisponible" : hasMixedCurrency || !kpis.currency ? "Devises à vérifier" : maskAmount(perms, monthlyMass)} />
+          <KpiCard icon={Wallet} label={`Masse salariale exercice${kpis.currency ? ` (${kpis.currency})` : ""}`} value={kpis.isError ? "Indisponible" : kpis.ytdGross == null ? "Non comparable" : maskAmount(perms, kpis.ytdGross)} />
+          <KpiCard icon={CalendarClock} label="Cycles à venir" value={kpis.isError ? "—" : fmt(kpis.upcoming.length)} />
         </div>
 
         {alerts.length > 0 && (
@@ -69,7 +78,13 @@ export default function HrDashboard() {
           <Card className="lg:col-span-2">
             <CardHeader className="py-2"><CardTitle className="text-xs">Masse salariale par département</CardTitle></CardHeader>
             <CardContent className="h-64">
-              {isLoading ? <Skeleton className="h-full w-full" /> : (
+              {isLoading || kpis.isLoading ? <Skeleton className="h-full w-full" /> : kpis.isError ? (
+                <p className="h-full flex items-center justify-center text-xs text-destructive">Graphique indisponible tant que toutes les données ne sont pas chargées.</p>
+              ) : !canViewAmounts ? (
+                <p className="h-full flex items-center justify-center text-xs text-muted-foreground">Les montants sont masqués pour votre rôle.</p>
+              ) : hasMixedCurrency ? (
+                <p className="h-full flex items-center justify-center text-xs text-muted-foreground">Les salariés actifs ne partagent pas la devise de paie configurée.</p>
+              ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={byDept}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -86,7 +101,9 @@ export default function HrDashboard() {
           <Card>
             <CardHeader className="py-2"><CardTitle className="text-xs">Prochains cycles</CardTitle></CardHeader>
             <CardContent className="space-y-1.5">
-              {kpis.upcoming.length === 0 ? (
+              {kpis.isError ? (
+                <p className="text-[11px] text-destructive">Échéances indisponibles.</p>
+              ) : kpis.upcoming.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground">Aucun cycle planifié.</p>
               ) : kpis.upcoming.map((r) => (
                 <div key={r.id} className="flex items-center justify-between text-[11px] border-b pb-1">

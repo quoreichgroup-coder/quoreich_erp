@@ -81,8 +81,7 @@ test("cancelling an in-flight export shows the cancel toast and logs export_abor
   // Cancel toast: "Export CSV annulé — N ligne(s) chargée(s)"
   await expect(page.getByText(/Export\s+CSV\s+annul/i)).toBeVisible({ timeout: 5_000 });
 
-  // Give the audit insert a moment to flush.
-  await page.waitForTimeout(300);
+  await expect.poll(() => auditInserts.some((row) => row.action === "export_aborted")).toBe(true);
   expect(downloadOccurred).toBe(false);
 
   const aborted = auditInserts.find((r) => r.action === "export_aborted");

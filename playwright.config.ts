@@ -8,13 +8,18 @@ import { fakeSessionStorageState } from "./tests/e2e/fixtures/session";
  * Port dédié, 8082 par défaut : 8080 est tenu sur ce poste par un conteneur Frappe et 8081 par le
  * serveur de développement, qui est souvent lancé avec VITE_QERP_API_URL. Or la plupart des specs
  * simulent Supabase avec page.route : branché sur l'API Java, le front interrogerait
- * localhost:8090 et les simulations ne verraient rien passer. Playwright démarre donc son propre
- * Vite, sans API, et le réutilise s'il tourne déjà.
+ * localhost:8090 et les simulations ne verraient rien passer. Playwright compile donc sa propre
+ * version, sans API, et la sert avant d'ouvrir Chromium. Les routes chargées à la demande, comme
+ * Alertes, n'attendent plus la transformation des modules par le serveur de développement.
  *
  * Les specs lisent process.env.PORT (et E2E_BASE_URL pour les specs connectées) au chargement :
  * on les fixe ici, avant le chargement des specs, et les workers en héritent.
  */
 const PORT = process.env.E2E_PORT ?? "8082";
+if (!/^[1-9]\d{0,4}$/.test(PORT) || Number(PORT) > 65535) {
+  throw new Error("E2E_PORT doit être un port TCP entre 1 et 65535.");
+}
+const buildDir = `test-results-web-${PORT}`;
 process.env.PORT = PORT;
 process.env.E2E_BASE_URL ??= `http://localhost:${PORT}`;
 
@@ -22,7 +27,7 @@ export default defineConfig({
   testDir: "tests/e2e",
   testMatch: "**/*.spec.ts",
   // Parcours connectés au vrai Supabase : configuration à part (playwright.parcours.config.ts).
-  testIgnore: ["**/parcours/**", "**/sur-site/**"],
+  testIgnore: ["**/parcours/**", "**/sur-site/**", "**/roxgold/**", "**/stock-postgres/**"],
   // Poste chargé (une vingtaine de conteneurs) : peu de workers, délais larges.
   workers: process.env.CI ? 2 : 1,
   timeout: 60_000,
@@ -43,10 +48,10 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `npx vite --port ${PORT} --strictPort`,
+    command: `npm run build -- --mode development --outDir ${buildDir} && npx vite preview --host localhost --port ${PORT} --strictPort --outDir ${buildDir}`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    reuseExistingServer: false,
+    timeout: 180_000,
     // Vide = isApiEnabled() faux : le front parle à Supabase, que les specs simulent.
     env: { VITE_QERP_API_URL: "" },
   },

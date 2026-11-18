@@ -2,7 +2,7 @@
 
 Contraintes respectées par ce plan : pas de réécriture ; fonctionnalités opérationnelles préservées ; réutilisation des composants et du motif V39 / V41 ; aucune donnée de production modifiée pendant l'audit ; **aucune migration destructive** (les gardes refusent, elles ne suppriment rien ; les corrections d'historique passent par des scripts en simulation par défaut) ; aucune nouvelle dépendance ; chaque étape documente son impact ; **rien n'est lancé sans validation du propriétaire**.
 
-## P0 — Sécurité, comptabilité, intégrité (proposé : lot court « Sécurisation », V42–V44)
+## P0 — Sécurité, comptabilité, intégrité (V42–V44 livrés)
 
 | Étape | Écarts | Contenu | Impact sur l'existant | Tests |
 |---|---|---|---|---|
@@ -19,8 +19,8 @@ Ordre proposé, chaque étape avec IT + parcours :
 2. **Règlements reliés à la trésorerie** ✅ V70 (lot T1, [13](13-tresorerie-reglements.md)) : compte de trésorerie par règlement, rôles `CASH` / `MOBILE_MONEY` (G-16) ; **acomptes** (G-14) ; **lettrage** automatique et manuel (G-15) ; rapprochements AR ↔ GL, AP ↔ GL (05 §4).
 3. **Facture fournisseur à lignes** et 3 voies ligne à ligne (G-17) ; **écriture de réception** sur 408 (G-18) ✅ V72 ([14](14-factures-fournisseurs-lignes.md)) ; **stock comptabilisé par rôles** (G-19) ; retour fournisseur.
 4. **Engagement budgétaire** refait : engagé / réalisé / disponible, contrôle avant approbation, levée habilitée (G-08 suite) ✅ V73 ([15](15-controle-budgetaire.md)) ; pré-engagement des demandes, budgets par section, écrans Contrôle et Prévisions ✅ V77 ; sections par ligne, prévisions saisies, import / export, paramètres et droits du module ✅ V78 ; revue complète (sens des produits, scénarios, paramètres, données de base et rapports réels) ✅ V79.
-5. **Immobilisations** réécrites par rôles (G-20) ✅ V75 ([16](16-immobilisations.md)) ; **paie** par rôles et barèmes par pays (G-28 🧮).
-6. **États financiers SYSCOHADA** (G-21 🧮) et **clôture d'exercice** (G-22).
+5. **Immobilisations** réécrites par rôles (G-20) ✅ V75 ([16](16-immobilisations.md)) ; **paie** : rôles V63 ; moteur configurable par pays préparé en V80 local ; tests PostgreSQL et recette métier / fiscale par pays restent à faire.
+6. **États financiers SYSCOHADA** (G-21 🧮) : comparatifs N-1 ajoutés à l’écran local ; compléter tableau des flux de trésorerie (TFT) et notes annexes, tester exercice non civil et continuité à la clôture ; après validation, **clôture d'exercice** (G-22).
 7. **Multi-devise** (G-25) ; échéance depuis les conditions de paiement (G-23) ; blocage de crédit (G-24) ; contraintes `CHECK` de statut.
 8. **Impression de la facture client** avancée depuis le Lot 6 (G-26).
 9. Données fictives retirées des écrans (UX-1).
@@ -58,9 +58,9 @@ Méthode (appliquée à V57 pour les achats) : chaque règle = paramètre par so
 
 | # | Décision | Recommandation |
 |---|---|---|
-| D1 | Lancer le lot de sécurisation P0 (V42–V44) **avant** de poursuivre le Lot 3 | Oui : ce sont des failles exploitables par n'importe quel salarié connecté, et une écriture entre sociétés |
+| D1 | Lancer le lot de sécurisation P0 (V42–V44) **avant** de poursuivre le Lot 3 | ✅ Réalisé par V42–V44 ; conserver la recette comme preuve |
 | D2 | Facture issue de livraison : brouillon à compléter, ou émission automatique avec la TVA de la commande | Brouillon (le comptable valide), comme SAP VF01 en facturation collective contrôlée |
-| D3 | Budget : désactiver l'imputation fausse dès V44 en attendant le module d'engagement | Oui (chiffres faux pires qu'absents) |
+| D3 | Budget : désactiver l'imputation fausse dès V44 en attendant le module d'engagement | ✅ Réalisé ; engagement remplacé et contrôlé par V73–V79 |
 | D4 | ROXGOLD SANGO : reclassement 4000 → 70x et 4310 → 443x | À trancher par l'expert-comptable, puis OD de reclassement |
 | D5 | Paie : comptes et taux à confirmer par pays | Expert-comptable / fiscaliste local |
 

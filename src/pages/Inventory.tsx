@@ -22,10 +22,8 @@ import {
 } from "@/hooks/use-inventory-data";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
-const COLORS = [
-  "hsl(220, 50%, 40%)", "hsl(150, 50%, 40%)", "hsl(35, 80%, 50%)",
-  "hsl(0, 60%, 50%)", "hsl(280, 50%, 50%)", "hsl(190, 55%, 40%)",
-];
+// Palette du thème (tokens --chart-*), clair et sombre.
+const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--primary))"];
 
 export default function Inventory() {
   const [warehouseId, setWarehouseId] = useState<string>("");

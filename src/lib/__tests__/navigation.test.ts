@@ -33,7 +33,7 @@ describe("navigation principale", () => {
     const anciennes = [
       "/", "/cockpit", "/receivables/aging", "/customers", "/payables/payment-planning", "/suppliers",
       "/journal/settings", "/assets", "/treasury/control", "/budget", "/projects", "/procurement", "/inventory",
-      "/sales", "/expenses", "/compliance", "/risk", "/hr/payroll", "/hr/employees", "/audit/hr", "/crm/reminders",
+      "/sales", "/expenses", "/compliance", "/risk", "/hr/payroll", "/hr/employees", "/crm/reminders",
       "/reports", "/admin/modules", "/admin/import", "/audit/projects", "/settings?tab=audit", "/settings",
       "/settings?tab=roles", "/docs",
     ];
@@ -50,6 +50,12 @@ describe("navigation principale", () => {
 
   it("aucun lien en double", () => {
     expect(allUrls.length).toBe(new Set(allUrls).size);
+  });
+
+  it("centralise les droits RH dans les paramètres d'administration", () => {
+    const hr = NAV_SECTIONS.find((section) => section.id === "rh")?.modules?.[0];
+    expect(hr?.items.some((item) => item.url === "/audit/hr")).toBe(false);
+    expect(allUrls).toContain("/settings?tab=roles");
   });
 
   it("modules visibles : tous sans configuration ; sinon les modules activés, plus ceux sans clé", () => {

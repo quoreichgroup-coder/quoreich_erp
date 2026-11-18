@@ -19,6 +19,11 @@ function permsFor(roles: HrRole[]): HrPerms {
     canManageSettings:    has("manage_settings"),
     canExport:            has("export"),
     canViewSensitive:     has("view_sensitive"),
+    canManageCompensation: false,
+    canManageBankDetails: false,
+    canCreateEmployeeMovement: false,
+    canApproveEmployeeMovement: false,
+    canViewEmployeeHistory: false,
   };
 }
 

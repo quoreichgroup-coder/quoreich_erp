@@ -124,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         title: "RH et paie", icon: "UsersRound", basePath: "/hr",
         // Transactions = onglets Saisie de paie, Cycles de paie ; Données de base = employés.
-        items: standard("/hr", [{ title: "Historique des rôles", url: "/audit/hr" }], { masterData: "/hr/employees" }),
+        items: standard("/hr", [], { masterData: "/hr/employees" }),
       },
     ],
   },
