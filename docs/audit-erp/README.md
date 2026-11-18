@@ -43,6 +43,7 @@ Légende utilisée dans tous les livrables :
 | 15 | [15-controle-budgetaire.md](15-controle-budgetaire.md) | Contrôle budgétaire : engagé / réalisé / disponible, cycle de vie du budget (lot B1, V73) ; pré-engagement des demandes, budgets par section, Contrôle et Prévisions (lot B2, V77) ; sections par ligne, prévisions saisies, import / export, droits (V78) ; revue complète, scénarios, rapports (V79) |
 | 16 | [16-immobilisations.md](16-immobilisations.md) | Immobilisations : amortissements, cessions SYSCOHADA (lot F1, V75) |
 | 19 | [19-impressions-actions-groupees-mvp.md](19-impressions-actions-groupees-mvp.md) | Impression des pièces (PDF / Excel), exports de listes, actions groupées dans le cœur ; écarts restants pour le MVP |
+| 20 | [20-comptabilisation-parametrable-par-module.md](20-comptabilisation-parametrable-par-module.md) | Comptabilisation paramétrable par module : jeux de comptes client / fournisseur / article (SAP OBYC, Sage 300, X3), plan du lot V105 |
 
 ## Synthèse pour la direction
 
