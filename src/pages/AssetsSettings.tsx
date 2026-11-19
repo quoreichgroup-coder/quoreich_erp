@@ -4,7 +4,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Settings, BookOpen, Calculator, Link, Wrench, Shield } from "lucide-react";
+import { ArrowRight, Settings, BookOpen, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import { FixedAssetsRolesPanel } from "@/components/FixedAssetsRolesPanel";
@@ -12,40 +12,16 @@ import { AssetCategoriesPanel, AssetSettingsCard } from "@/components/AssetAccou
 
 const tabs = [
   { id: "general", label: "Catégories et amortissements", icon: Settings },
-  { id: "roles", label: "Rôles & Audit", icon: Shield },
+  { id: "roles", label: "Rôles et audit", icon: Shield },
   { id: "glposting", label: "Comptabilisation", icon: BookOpen },
-  { id: "depreciation", label: "Depreciation", icon: Calculator },
-  { id: "maintenance", label: "Maintenance", icon: Wrench },
 ];
 
-const depreciationMethods = [
-  { method: "Linear (Straight-Line)", formula: "(Cost - Residual) / Useful Life", default: true },
-  { method: "Declining Balance", formula: "NBV × Rate%", default: false },
-  { method: "Exceptional (Impairment)", formula: "Manual entry — requires L3 approval", default: false },
-];
-
-const glMapping = [
-  { label: "IT Equipment", asset: "1600-IT", dep: "6810-IT", accDep: "1600-IT-AD" },
-  { label: "Vehicles", asset: "1500-VEH", dep: "6815-VEH", accDep: "1500-VEH-AD" },
-  { label: "Furniture", asset: "1400-FUR", dep: "6812-FUR", accDep: "1400-FUR-AD" },
-  { label: "Building Equip.", asset: "1300-BLD", dep: "6811-BLD", accDep: "1300-BLD-AD" },
-  { label: "Right-of-Use (Lease)", asset: "1700-ROU", dep: "6820-ROU", accDep: "1700-ROU-AD" },
-];
-
-const postingRules = [
-  "Acquisition: Debit Asset, Credit Bank/Vendor",
-  "Depreciation: Debit Expense, Credit Acc. Dep.",
-  "Disposal: Debit Acc. Dep. + Bank, Credit Asset ± Gain/Loss",
-  "Revaluation: Debit Asset, Credit Revaluation Reserve",
-  "Finance Lease: Debit ROU Asset, Credit Lease Liability",
-  "Exceptional Dep.: Debit Exceptional Expense, Credit Acc. Dep.",
-];
-
-const maintenanceCycles = [
-  { cycle: "Monthly", assets: 2 }, { cycle: "Quarterly", assets: 1 },
-  { cycle: "Semi-Annual", assets: 1 }, { cycle: "Annual", assets: 0 },
-];
-
+/*
+ * Paramètres des immobilisations (V75) : catégories avec leurs comptes, méthode (linéaire / dégressif) et
+ * coefficients dégressifs, prorata du premier mois — tout est réel et modifiable dans le premier onglet.
+ * Les onglets de démonstration (méthodes, correspondances, cycles de maintenance) ont disparu : la
+ * maintenance n'est pas gérée aujourd'hui.
+ */
 export default function AssetsSettings() {
   const [activeTab, setActiveTab] = useState("general");
 
@@ -73,37 +49,6 @@ export default function AssetsSettings() {
       {activeTab === "glposting" && <ModulePostingSettings modules={["FA"]} extra={
         <p className="text-xs text-muted-foreground">Comptes d'immobilisation, d'amortissement et de dotation : par catégorie, onglet « Catégories et amortissements » (comme la classe d'immobilisation SAP).</p>} />}
 
-      {activeTab === "depreciation" && (
-        <Card className="border-border max-w-2xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Depreciation Methods</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {depreciationMethods.map(m => (
-              <div key={m.method} className="flex items-center gap-3 p-3 rounded-lg border border-border text-xs">
-                <div className="flex-1">
-                  <div className="font-medium text-foreground">{m.method}</div>
-                  <div className="text-muted-foreground font-mono mt-0.5">{m.formula}</div>
-                </div>
-                {m.default && <Badge variant="default" className="text-[10px]">Default</Badge>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-
-      {activeTab === "maintenance" && (
-        <Card className="border-border max-w-md">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Maintenance Cycles</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {maintenanceCycles.map(c => (
-              <div key={c.cycle} className="flex items-center justify-between p-2 border border-border rounded text-xs">
-                <span className="font-medium">{c.cycle}</span>
-                <Badge variant="outline" className="text-[10px]">{c.assets} assets</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </PageShell>
   );
 }

@@ -1,5 +1,9 @@
 import { BankReconciliation } from "@/components/BankReconciliation";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantId } from "@/hooks/use-tenant";
+import { ExportButtons } from "@/components/ExportButtons";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -20,26 +24,8 @@ import { toast } from "sonner";
 const tabs = [
   { id: "reconciliation", label: "Rapprochement bancaire", icon: CheckCircle },
   { id: "close", label: "Clôture de période", icon: Lock },
-  { id: "limits", label: "Limit Monitoring", icon: AlertTriangle },
-  { id: "audit", label: "Audit Trail", icon: Eye },
-];
-
-const reconciliationItems = [
-  { bank: "SGBS — Operating", bookBalance: 145000000, bankStatement: 144800000, diff: 200000, items: 3, status: "in_progress" },
-  { bank: "BOA — Reserve", bookBalance: 88000000, bankStatement: 88000000, diff: 0, items: 0, status: "reconciled" },
-  { bank: "SGBS — Payroll", bookBalance: 12000000, bankStatement: 12000000, diff: 0, items: 0, status: "reconciled" },
-];
-
-const limitMonitoring = [
-  { entity: "SGBS Overdraft", type: "Credit Facility", limit: 30000000, used: 0, available: 30000000, utilization: 0 },
-  { entity: "SGBS Operating", type: "Min Balance", limit: 5000000, used: 145000000, available: 140000000, utilization: 0 },
-  { entity: "FX Exposure — EUR", type: "FX Limit", limit: 100000, used: 45000, available: 55000, utilization: 45 },
-];
-
-const auditTrail = [
-  { ts: "2025-02-15 16:00", user: "Treasury Mgr", action: "Reconciliation", detail: "BOA Reserve — fully reconciled" },
-  { ts: "2025-02-15 14:30", user: "Treasury Mgr", action: "Transfer", detail: "INT-TRF-0015 — 20M XOF SGBS→BOA" },
-  { ts: "2025-02-14 11:00", user: "CFO", action: "FX Approval", detail: "FX-002 Forward USD/XOF 50K approved" },
+  { id: "limits", label: "Limites des comptes", icon: AlertTriangle },
+  { id: "audit", label: "Piste d'audit", icon: Eye },
 ];
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
@@ -243,35 +229,7 @@ export default function TreasuryControl() {
         </div>
       )}
 
-      {activeTab === "limits" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Limit Monitoring</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Entity", "Type", "Limit", "Used", "Available", "Utilization"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {limitMonitoring.map(l => (
-                <tr key={l.entity} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{l.entity}</td>
-                  <td className="px-3 py-2">{l.type}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(l.limit)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(l.used)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-success">{fmt(l.available)}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full"><div className={cn("h-1.5 rounded-full", l.utilization > 80 ? "bg-destructive" : l.utilization > 50 ? "bg-amber-500" : "bg-success")} style={{ width: `${l.utilization}%` }} /></div>
-                      <span className="text-[10px] text-muted-foreground w-8 text-right">{l.utilization}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {activeTab === "limits" && <TreasuryLimitsTab />}
 
       {activeTab === "audit" && (
         <TreasuryAuditTab history={history} />
@@ -287,26 +245,7 @@ function TreasuryAuditTab({ history }: { history: TreasuryCloseHistoryRow[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="bg-card border border-border rounded-lg">
-        <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Treasury Audit Trail</h3></div>
-        <table className="w-full text-xs">
-          <thead><tr className="border-b border-border bg-muted/30">
-            {["Timestamp", "User", "Action", "Detail"].map(h => (
-              <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {auditTrail.map((a, i) => (
-              <tr key={i} className="border-b border-border hover:bg-muted/20">
-                <td className="px-3 py-2 font-mono text-muted-foreground">{a.ts}</td>
-                <td className="px-3 py-2 font-medium">{a.user}</td>
-                <td className="px-3 py-2"><StatusBadge status="info" label={a.action} /></td>
-                <td className="px-3 py-2 text-muted-foreground">{a.detail}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TreasuryAuditTrail />
 
       <div className="bg-card border border-border rounded-lg" data-testid="treasury-idempotent-panel">
         <div className="p-3 border-b border-border flex items-center justify-between">
@@ -351,6 +290,119 @@ function TreasuryAuditTab({ history }: { history: TreasuryCloseHistoryRow[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+const LIMIT_STATUS: Record<string, [string, string]> = {
+  overdraft_exceeded: ["error", "Découvert dépassé"], overdraft_used: ["warning", "En découvert"], below_min: ["warning", "Sous le minimum"],
+  above_max: ["info", "Excédent à placer"], ok: ["success", "Dans les limites"], not_monitored: ["neutral", "Non suivi"],
+};
+
+/** Limites par compte de trésorerie (V107) : seuils saisis sur le compte, comparés au solde réel. */
+function TreasuryLimitsTab() {
+  const { data: tenantId } = useTenantId();
+  const q = useQuery({
+    queryKey: ["treasury-limit-status", tenantId],
+    enabled: Boolean(tenantId),
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("treasury_limit_status").select("*").eq("tenant_id", tenantId).order("name");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const m = (v: unknown) => (v == null ? "—" : fmt(Number(v)));
+  return (
+    <div className="bg-card border border-border rounded-lg" data-testid="treasury-limits">
+      <div className="p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-foreground">Limites des comptes de trésorerie</h3>
+        <span className="text-[11px] text-muted-foreground">Seuils réglés sur chaque compte (Trésorerie → Données de base) : solde minimal, solde maximal, découvert autorisé.</span>
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <p className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message}</p> : (
+        <table className="w-full text-xs">
+          <thead><tr className="border-b border-border bg-muted/30 text-muted-foreground">
+            {["Compte", "Solde", "Minimum", "Maximum", "Découvert autorisé", "Disponible", "Découvert utilisé", "État"].map((h) => <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {(q.data ?? []).length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Aucun compte de trésorerie actif.</td></tr>}
+            {(q.data ?? []).map((l) => (
+              <tr key={l.bank_account_id} data-testid="treasury-limit-row" className="border-b border-border/50">
+                <td className="px-3 py-2 font-medium">{l.name} <span className="text-muted-foreground">({l.currency})</span></td>
+                <td className="px-3 py-2 text-right tabular-nums">{m(l.balance)}</td><td className="px-3 py-2 text-right tabular-nums">{m(l.min_balance)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{m(l.max_balance)}</td><td className="px-3 py-2 text-right tabular-nums">{m(l.overdraft_limit)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{m(l.available)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{l.overdraft_used_pct == null ? "—" : `${fmt(Number(l.overdraft_used_pct))} %`}</td>
+                <td className="px-3 py-2"><StatusBadge status={LIMIT_STATUS[l.status]?.[0] ?? "info"} label={LIMIT_STATUS[l.status]?.[1] ?? l.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const AUDIT_KIND: Record<string, string> = { movement: "Mouvement", statement: "Relevé", reconciliation: "Rapprochement", close: "Clôture" };
+
+/** Piste d'audit de la trésorerie (V107) : mouvements, relevés importés, rapprochements, clôtures. */
+function TreasuryAuditTrail() {
+  const { data: tenantId } = useTenantId();
+  const [kind, setKind] = useState("");
+  const q = useQuery({
+    queryKey: ["treasury-audit-trail", tenantId],
+    enabled: Boolean(tenantId),
+    retry: false,
+    queryFn: async () => {
+      const all: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await (supabase as any).from("treasury_audit_trail").select("*").eq("tenant_id", tenantId)
+          .order("occurred_at", { ascending: false }).range(from, from + 999);
+        if (error) throw error;
+        all.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      const ids = [...new Set(all.map((r) => r.actor_id).filter(Boolean))];
+      const names = new Map<string, string>();
+      if (ids.length) {
+        const { data } = await (supabase as any).from("profiles").select("id, full_name").in("id", ids);
+        for (const p of data ?? []) names.set(p.id, p.full_name ?? "");
+      }
+      return all.map((r) => ({ ...r, actor: r.actor_id ? names.get(r.actor_id) || "—" : "Système" }));
+    },
+  });
+  const rows = (q.data ?? []).filter((r) => !kind || r.kind === kind);
+  return (
+    <div className="bg-card border border-border rounded-lg" data-testid="treasury-audit-trail">
+      <div className="p-3 border-b border-border flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-foreground mr-auto">Piste d'audit de la trésorerie</h3>
+        <select aria-label="Type d'événement" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={kind} onChange={(e) => setKind(e.target.value)}>
+          <option value="">Tous les événements</option>{Object.entries(AUDIT_KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <ExportButtons label="Exporter la piste d'audit" rows={rows.map((r) => ({ date: new Date(r.occurred_at).toLocaleString("fr-FR"), type: AUDIT_KIND[r.kind] ?? r.kind,
+          action: r.action, compte: r.account_name ?? "", montant: r.amount == null ? "" : Number(r.amount), utilisateur: r.actor, detail: r.detail ?? "" }))}
+          columns={[{ key: "date", header: "Date" }, { key: "type", header: "Type" }, { key: "action", header: "Action" }, { key: "compte", header: "Compte" },
+            { key: "montant", header: "Montant" }, { key: "utilisateur", header: "Utilisateur" }, { key: "detail", header: "Détail" }]} filename="piste-audit-tresorerie" />
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <p className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message}</p> : (
+        <div className="overflow-x-auto max-h-[60vh]">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-muted"><tr className="text-muted-foreground">{["Date", "Type", "Action", "Compte", "Montant", "Utilisateur", "Détail"].map((h) => <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Aucun événement.</td></tr>}
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t border-border/50" data-testid="treasury-audit-row">
+                  <td className="px-3 py-1.5 whitespace-nowrap">{new Date(r.occurred_at).toLocaleString("fr-FR")}</td><td>{AUDIT_KIND[r.kind] ?? r.kind}</td>
+                  <td>{r.action}</td><td>{r.account_name ?? "—"}</td><td className="text-right tabular-nums pr-2">{r.amount == null ? "" : fmt(Number(r.amount))}</td>
+                  <td>{r.actor}</td><td className="text-muted-foreground">{r.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

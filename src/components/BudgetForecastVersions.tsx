@@ -36,7 +36,8 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
   const [picked, setPicked] = useState<string | null>(null);
   const current = versions.find((v) => v.id === picked) ?? versions[0] ?? null;
   const { data: lines = [] } = useBudgetForecastLines(current?.id ?? null);
-  const { data: gl = [] } = useGLAccounts();
+  const glQuery = useGLAccounts();
+  const gl = glQuery.data ?? [];
   const { data: setup } = useAnalyticsSetup();
   const accById = useMemo(() => new Map((gl as any[]).map((g) => [g.id, g])), [gl]);
   const accByCode = useMemo(() => new Map((gl as any[]).map((g) => [g.code, g])), [gl]);
@@ -96,7 +97,9 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
             <select id="fv-version" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={current?.id ?? ""} onChange={(e) => setPicked(e.target.value)}>
               {versions.map((v) => <option key={v.id} value={v.id}>{v.name} — {v.status === "published" ? "publiée" : "brouillon"}</option>)}
             </select></div>}
-          {canForecast && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setCreating(true)}>Nouvelle version</Button>}
+          {/* L'initialisation lit le plan comptable : sans lui chargé, la version naîtrait vide sans le dire. */}
+          {canForecast && <Button size="sm" variant="outline" className="h-8 text-xs" disabled={!glQuery.isSuccess} title={glQuery.isSuccess ? undefined : "Chargement du plan comptable…"}
+            onClick={() => setCreating(true)}>Nouvelle version</Button>}
           {canExport && current && <ExportButtons label="Exporter la version" filename={`prevision-${year}-${current.name}`} sheetName="Prévision"
             rows={lines.map((l) => ({ compte: accById.get(l.gl_account_id)?.code ?? "", intitule: accById.get(l.gl_account_id)?.name ?? "",
               section: l.analytic_value_id ? sectionCode.get(l.analytic_value_id) ?? "" : "", montant: l.amount,
@@ -176,6 +179,7 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
       {creating && <NewVersionDialog year={year} versions={versions.map((v) => ({ id: v.id, name: v.name }))} pending={create.isPending} onClose={() => setCreating(false)}
         onCreate={async (name, init) => {
           let seed: { gl_account_id: string; analytic_value_id: string | null; amount: number }[] = [];
+          if (init === "calculated" && forecast.length > 0 && accByCode.size === 0) { toast.error("Plan comptable non chargé : réessayez dans un instant."); return; }
           if (init === "calculated") seed = forecast.flatMap((f) => {
             const acc = accByCode.get(f.account_code); if (!acc) return [];
             return [{ gl_account_id: acc.id, analytic_value_id: f.key.split("|")[1] || null, amount: f.landing }];

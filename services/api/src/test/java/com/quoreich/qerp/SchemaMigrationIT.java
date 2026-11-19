@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "105";
+  private static final String DERNIERE_MIGRATION = "108";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -128,7 +128,15 @@ class SchemaMigrationIT {
           "ar_numbering_series/Tenant isolation",
           "ar_notification_log/Tenant isolation",
           // V60 — plan comptable : écriture réservée.
-          "gl_accounts/Tenant isolation");
+          "gl_accounts/Tenant isolation",
+          // V106 — piste d'audit effaçable par tout membre (audit S6).
+          "gl_audit_logs/Tenant isolation",
+          // V108 — écritures directes ouvertes à tout membre.
+          "ap_approval_thresholds/Tenant isolation", "ap_general_settings/Tenant isolation", "ap_notification_rules/Tenant isolation",
+          "ap_numbering_series/Tenant isolation", "ap_payment_methods/Tenant isolation", "ap_withholding_rates/Tenant isolation",
+          "procurement_approval_thresholds/tenant_isolation_proc_thresholds", "procurement_approvals/tenant_isolation_proc_approvals",
+          "procurement_match_decisions/tenant_isolation_match_dec", "ap_approval_queue/Tenant isolation", "erp_alerts/Tenant isolation",
+          "tenant_modules/Tenant isolation", "licenses/Tenant isolation");
 
   private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
   /** V80 — référence au validateur qui a confirmé les paramètres de paie. */
@@ -262,7 +270,9 @@ class SchemaMigrationIT {
           // V95 — configuration de matricules par société.
           "hr_employee_number_settings",
           // V105 — jeux de comptes par client, fournisseur et article.
-          "posting_role_set_kinds", "posting_account_sets", "posting_account_set_lines", "posting_settings");
+          "posting_role_set_kinds", "posting_account_sets", "posting_account_set_lines", "posting_settings",
+          // V106 — contrôles du grand livre.
+          "gl_control_settings", "gl_control_reviews");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -588,7 +598,9 @@ class SchemaMigrationIT {
           // V105 — résolution par jeu de comptes, postes ouverts, garde-fous des comptes de bilan.
           "posting_account_for", "customer_account_set", "supplier_account_set", "item_account_set",
           "posting_member_has_open_items", "posting_role_open_members", "posting_lock_on",
-          "guard_member_account_set", "guard_posting_account_set_line", "guard_posting_account_set", "guard_tenant_posting_account");
+          "guard_member_account_set", "guard_posting_account_set_line", "guard_posting_account_set", "guard_tenant_posting_account",
+          // V106 — anomalies, intégrité, concordance des livres auxiliaires.
+          "gl_control_setting", "gl_control_findings", "gl_integrity_checks", "posting_role_accounts", "gl_subledger_reconciliation");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -830,7 +842,22 @@ class SchemaMigrationIT {
           "posting_role_set_kinds/Lecture du référentiel",
           "posting_account_sets/Lecture société", "posting_account_sets/Écriture habilitée",
           "posting_account_set_lines/Lecture société", "posting_account_set_lines/Écriture habilitée",
-          "posting_settings/Lecture société", "posting_settings/Écriture habilitée");
+          "posting_settings/Lecture société", "posting_settings/Écriture habilitée",
+          // V106 — piste d'audit en lecture seule, compteurs lisibles, contrôles.
+          "gl_audit_logs/Lecture société", "journal_piece_counters/Lecture société",
+          "gl_control_settings/Lecture société", "gl_control_settings/Écriture habilitée",
+          "gl_control_reviews/Lecture société", "gl_control_reviews/Examen habilité",
+          // V108 — paramètres et circuits d'approbation protégés.
+          "ap_approval_thresholds/Lecture société", "ap_approval_thresholds/Paramétrage habilité",
+          "ap_general_settings/Lecture société", "ap_general_settings/Paramétrage habilité",
+          "ap_notification_rules/Lecture société", "ap_notification_rules/Paramétrage habilité",
+          "ap_numbering_series/Lecture société", "ap_numbering_series/Paramétrage habilité",
+          "ap_payment_methods/Lecture société", "ap_payment_methods/Paramétrage habilité",
+          "ap_withholding_rates/Lecture société", "ap_withholding_rates/Paramétrage habilité",
+          "procurement_approval_thresholds/Lecture société", "procurement_approval_thresholds/Paramétrage habilité",
+          "procurement_approvals/Lecture société", "procurement_match_decisions/Lecture société",
+          "ap_approval_queue/Lecture société", "erp_alerts/Lecture société",
+          "tenant_modules/Lecture société", "tenant_modules/Administrateur de la société", "licenses/Lecture société");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -974,7 +1001,9 @@ class SchemaMigrationIT {
           "tenant_posting_accounts/trg_guard_tenant_posting_account");
 
   /** V38 — synthèse des lots du grand livre. */
-  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");
+  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view",
+      // V107 — limites et piste d'audit de la trésorerie.
+      "treasury_limit_status", "treasury_audit_trail");
 
   /** Référence moins les retraits déclarés, chacun devant exister dans la référence. */
   private static Set<String> sans(Set<String> reference, Set<String> retraits) {

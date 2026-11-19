@@ -1,4 +1,6 @@
 import { exportToCSV } from "@/lib/csv-export";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
 import { useState } from "react";
@@ -23,7 +25,7 @@ import {
 } from "@/hooks/use-procurement-data";
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 const PIE_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--muted-foreground))"];
@@ -36,12 +38,6 @@ const statusBadge = (s: string) => {
   }
 };
 
-const approvalWorkflow = [
-  { level: "L1", label: "Manager Direct", threshold: "< 10M XOF", sla: "24h" },
-  { level: "L2", label: "Head of Department", threshold: "10M – 50M XOF", sla: "48h" },
-  { level: "L3", label: "CFO / Finance Director", threshold: "50M – 200M XOF", sla: "72h" },
-  { level: "L4", label: "CEO / Board", threshold: "> 200M XOF", sla: "5 jours" },
-];
 
 export default function Procurement() {
   const { user } = useAuth();
@@ -53,6 +49,15 @@ export default function Procurement() {
   // Cycle de vie (V39) : soumission, approbation par niveau, rejet, annulation ; la modification
   // d'une pièce se fait dans l'écran des transactions, qui porte le formulaire complet.
   const { data: approvals = [] } = useApprovalQueue(undefined, "all");
+  const { data: thresholds } = useQuery({
+    queryKey: ["approval-thresholds", "procurement-dashboard"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("procurement_approval_thresholds").select("id, doc_type, level, max_amount, approver, sla_hours")
+        .order("doc_type").order("max_amount", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const editer = () => navigate("/procurement/transactions");
 
   const [selectedPR, setSelectedPR] = useState<any | null>(null);
@@ -210,19 +215,19 @@ export default function Procurement() {
               <Card className="border-border">
                 <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Niveaux d'Approbation</CardTitle></CardHeader>
                 <CardContent className="p-4 pt-0 space-y-3">
-                  {approvalWorkflow.map((w, i) => (
-                    <div key={w.level} className="flex items-center gap-4 p-3 rounded-lg border border-border bg-muted/20">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">{w.level}</div>
+                  {/* Niveaux réellement paramétrés (Paramètres → Niveaux d'approbation), par plafond croissant. */}
+                  {(thresholds ?? []).length === 0 && <p className="text-xs text-muted-foreground">Aucun seuil paramétré : chaque pièce passe par un seul niveau L1.</p>}
+                  {(thresholds ?? []).map((w: any) => (
+                    <div key={w.id} className="flex items-center gap-4 p-3 rounded-lg border border-border bg-muted/20" data-testid="workflow-level">
+                      <div className="w-12 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[11px]">{w.doc_type === "PR" ? "DA" : "BC"}</div>
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground">{w.label}</div>
-                        <div className="text-xs text-muted-foreground">{w.threshold}</div>
+                        <div className="text-sm font-medium text-foreground">{w.level}</div>
+                        <div className="text-xs text-muted-foreground">{w.approver} · {w.max_amount == null ? "sans plafond" : `jusqu'à ${fmt(Number(w.max_amount))} XOF`}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs font-medium text-foreground">SLA: {w.sla}</div>
-                        {i < approvalWorkflow.length - 1 && <div className="text-[10px] text-muted-foreground">Escalade → {approvalWorkflow[i + 1].level}</div>}
-                      </div>
+                      <div className="text-xs font-medium text-foreground">Délai cible : {w.sla_hours} h</div>
                     </div>
                   ))}
+                  <Link to="/procurement/settings" className="text-xs text-primary underline">Modifier les niveaux dans les paramètres</Link>
                 </CardContent>
               </Card>
 

@@ -1,174 +1,164 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Settings, BookOpen, Calendar, FileText, Globe, Landmark } from "lucide-react";
-import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { BookOpen, Calendar, FileText, Globe, Landmark, Loader2, ShieldCheck } from "lucide-react";
 import { ModulePostingSettings } from "@/components/AccountSets";
+import { FiscalCalendarPanel } from "@/components/FiscalCalendarPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantId } from "@/hooks/use-tenant";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { DISABLEABLE_CHECKS, useGlControlSettings, useSaveGlControlSettings, type GlControlSettings } from "@/hooks/use-gl-controls";
 import { cn } from "@/lib/utils";
 
+/*
+ * Paramètres du grand livre : comptabilisation (rôles et jeux de comptes), contrôles (V106), journaux et
+ * numérotation des pièces (V38, lecture : la base numérote sans trou par journal et par année),
+ * calendrier fiscal (V33) et devise fonctionnelle de la société. Aucune valeur de démonstration.
+ */
 const tabs = [
-  { id: "posting", label: "Paramétrage comptable", icon: Landmark },
-  { id: "general", label: "General", icon: Settings },
-  { id: "journals", label: "Journal Types", icon: BookOpen },
-  { id: "fiscal", label: "Fiscal Calendar", icon: Calendar },
-  { id: "numbering", label: "Numbering", icon: FileText },
-  { id: "currency", label: "Currency", icon: Globe },
-];
+  { id: "posting", label: "Comptabilisation", icon: Landmark },
+  { id: "controls", label: "Contrôles", icon: ShieldCheck },
+  { id: "journals", label: "Journaux et numérotation", icon: BookOpen },
+  { id: "fiscal", label: "Calendrier fiscal", icon: Calendar },
+  { id: "currency", label: "Devise", icon: Globe },
+] as const;
+type Tab = (typeof tabs)[number]["id"];
+const db = supabase as any;
 
-const journalTypes = [
-  { code: "VT", name: "Sales Journal", autoPost: true, reversible: false, active: true },
-  { code: "AC", name: "Purchases Journal", autoPost: true, reversible: false, active: true },
-  { code: "BQ", name: "Bank Journal", autoPost: false, reversible: false, active: true },
-  { code: "OD", name: "Miscellaneous", autoPost: false, reversible: true, active: true },
-  { code: "AN", name: "Opening Entries", autoPost: false, reversible: false, active: true },
-  { code: "CL", name: "Closing Entries", autoPost: false, reversible: false, active: true },
-];
+function ControlsSettings() {
+  const q = useGlControlSettings();
+  const save = useSaveGlControlSettings();
+  const { data: access } = useMyAccess();
+  const can = (access?.permissions ?? []).includes("accounting.controls");
+  const [f, setF] = useState<GlControlSettings | null>(null);
+  useEffect(() => { if (q.data && !f) setF(q.data); }, [q.data, f]);
+  if (q.isLoading || !f) return <div className="p-6"><Loader2 className="w-4 h-4 animate-spin" /></div>;
+  const n = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
+  const toggle = (code: string) => setF({ ...f, disabled_checks: f.disabled_checks.includes(code) ? f.disabled_checks.filter((c) => c !== code) : [...f.disabled_checks, code] });
+  return (
+    <section className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-3xl" data-testid="gl-control-settings">
+      <h3 className="text-sm font-semibold">Contrôles du grand livre</h3>
+      <p className="text-xs text-muted-foreground">Aucun seuil n'est imposé : un champ vide désactive le contrôle correspondant. Les écritures déséquilibrées ou sans ligne sont toujours signalées.</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-1"><label htmlFor="ctl-large" className="text-xs font-medium">Signaler les écritures à partir de (montant)</label>
+          <Input id="ctl-large" inputMode="decimal" className="h-8 text-xs" disabled={!can} value={f.large_entry_threshold ?? ""} placeholder="vide = désactivé"
+            onChange={(e) => setF({ ...f, large_entry_threshold: n(e.target.value) })} /></div>
+        <div className="space-y-1"><label htmlFor="ctl-dup" className="text-xs font-medium">Fenêtre de recherche des doublons (jours)</label>
+          <Input id="ctl-dup" type="number" min={0} max={60} className="h-8 text-xs" disabled={!can} value={f.duplicate_window_days}
+            onChange={(e) => setF({ ...f, duplicate_window_days: Number(e.target.value || 0) })} /></div>
+        <div className="space-y-1"><label htmlFor="ctl-back" className="text-xs font-medium">Écart maximal date de pièce → comptabilisation (jours)</label>
+          <Input id="ctl-back" type="number" min={1} max={366} className="h-8 text-xs" disabled={!can} value={f.backdating_days ?? ""} placeholder="vide = désactivé"
+            onChange={(e) => setF({ ...f, backdating_days: n(e.target.value) })} /></div>
+        <div className="space-y-1"><label htmlFor="ctl-tol" className="text-xs font-medium">Tolérance de concordance des livres (montant)</label>
+          <Input id="ctl-tol" inputMode="decimal" className="h-8 text-xs" disabled={!can} value={f.subledger_tolerance}
+            onChange={(e) => setF({ ...f, subledger_tolerance: n(e.target.value) ?? 0 })} /></div>
+      </div>
+      <fieldset className="space-y-1">
+        <legend className="text-xs font-medium mb-1">Contrôles actifs</legend>
+        <div className="grid sm:grid-cols-2 gap-1">
+          {DISABLEABLE_CHECKS.map(([code, label]) => (
+            <label key={code} className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!can} checked={!f.disabled_checks.includes(code)} onChange={() => toggle(code)} /> {label}</label>
+          ))}
+        </div>
+      </fieldset>
+      {can ? <Button size="sm" className="text-xs" disabled={save.isPending} onClick={() => save.mutate(f)}>Enregistrer</Button>
+        : <p className="text-[11px] text-muted-foreground">Modification réservée au droit « accounting.controls ».</p>}
+    </section>
+  );
+}
 
-const fiscalPeriods = [
-  { month: "January", start: "2025-01-01", end: "2025-01-31", status: "closed" },
-  { month: "February", start: "2025-02-01", end: "2025-02-28", status: "open" },
-  { month: "March", start: "2025-03-01", end: "2025-03-31", status: "future" },
-  { month: "April", start: "2025-04-01", end: "2025-04-30", status: "future" },
-];
+function JournalsAndNumbering() {
+  const { data: tenantId } = useTenantId();
+  const q = useQuery({
+    queryKey: ["gl-journals-numbering", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const [j, c] = await Promise.all([
+        db.from("accounting_journals").select("code, label, sort_order").order("sort_order"),
+        db.from("journal_piece_counters").select("journal_code, year, last_value").eq("tenant_id", tenantId).order("year", { ascending: false }),
+      ]);
+      if (j.error) throw j.error;
+      if (c.error) throw c.error;
+      return { journals: (j.data ?? []) as { code: string; label: string }[], counters: (c.data ?? []) as { journal_code: string; year: number; last_value: number }[] };
+    },
+  });
+  if (q.isLoading) return <div className="p-6"><Loader2 className="w-4 h-4 animate-spin" /></div>;
+  if (q.isError) return <p className="text-xs text-destructive" role="alert">{(q.error as Error).message}</p>;
+  const year = new Date().getFullYear();
+  return (
+    <section className="bg-card border border-border rounded-lg max-w-3xl" data-testid="gl-journals">
+      <div className="p-3 border-b border-border">
+        <h3 className="text-sm font-semibold">Journaux et numérotation des pièces</h3>
+        <p className="text-xs text-muted-foreground">Journaux auxiliaires SYSCOHADA. Chaque écriture reçoit son journal d'après son origine et un numéro de pièce continu par journal et par année (format JOURNAL-AAAA-NNNNNN), attribué par la base : il ne se saisit pas.</p>
+      </div>
+      <table className="w-full text-xs">
+        <thead><tr className="bg-muted/30 text-muted-foreground"><th className="px-3 py-2 text-left">Code</th><th className="text-left">Journal</th><th className="text-right">Dernière pièce {year}</th><th className="text-left pl-3">Prochaine pièce</th></tr></thead>
+        <tbody>
+          {q.data!.journals.map((j) => {
+            const c = q.data!.counters.find((x) => x.journal_code === j.code && x.year === year);
+            const next = (c?.last_value ?? 0) + 1;
+            return (
+              <tr key={j.code} className="border-t border-border/50"><td className="px-3 py-2 font-mono">{j.code}</td><td>{j.label}</td>
+                <td className="text-right tabular-nums">{c ? `${j.code}-${year}-${String(c.last_value).padStart(6, "0")}` : "—"}</td>
+                <td className="pl-3 font-mono">{`${j.code}-${year}-${String(next).padStart(6, "0")}`}</td></tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function Currency() {
+  const { data: tenantId } = useTenantId();
+  const q = useQuery({
+    queryKey: ["tenant-currency", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async () => {
+      const { data, error } = await db.from("tenants").select("currency").eq("id", tenantId).single();
+      if (error) throw error;
+      return (data?.currency as string) ?? null;
+    },
+  });
+  return (
+    <section className="bg-card border border-border rounded-lg p-5 space-y-2 max-w-2xl" data-testid="gl-currency">
+      <h3 className="text-sm font-semibold">Devise fonctionnelle</h3>
+      <p className="text-sm"><span className="font-mono font-semibold">{q.data ?? "—"}</span> : devise de tenue de la comptabilité de la société.</p>
+      <p className="text-xs text-muted-foreground">Les pièces en devise étrangère et les cours (BCEAO) arrivent avec le lot des achats internationaux ; aucun cours n'est fixé aujourd'hui.</p>
+    </section>
+  );
+}
 
 export default function GLSettings() {
-  const [activeTab, setActiveTab] = useState("posting");
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("tab") as Tab | null;
+  const activeTab: Tab = asked && tabs.some((t) => t.id === asked) ? asked : "posting";
+  const setTab = (t: Tab) => setParams((p) => { p.set("tab", t); return p; }, { replace: true });
 
   return (
     <PageShell>
-      <Breadcrumb items={[
-        { label: "Finance" },
-        { label: "General Ledger", href: "/journal" },
-        { label: "Settings" },
-      ]} />
-
-      <GuidanceBanner title="GL Settings" description="Configure journal types, fiscal calendar, numbering series and currency for the General Ledger module." />
-
-      <div className="flex gap-1 border-b border-border">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={cn("flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors",
+      <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Grand livre", href: "/journal" }, { label: "Paramètres" }]} />
+      <GuidanceBanner title="Paramètres du grand livre" description="Comptabilisation par rôle et par jeu de comptes, contrôles, journaux et numérotation, calendrier fiscal et devise de la société." />
+      <div className="flex gap-1 border-b border-border overflow-x-auto" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={activeTab === t.id} onClick={() => setTab(t.id)}
+            className={cn("flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 whitespace-nowrap",
               activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
             <t.icon className="w-3.5 h-3.5" />{t.label}
           </button>
         ))}
       </div>
-
       {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}
-
-      {activeTab === "general" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">General GL Settings</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label className="text-xs">Default Journal</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                {journalTypes.map(j => <option key={j.code}>{j.code} — {j.name}</option>)}
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Posting Mode</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Real-time</option><option>Batch</option>
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Require Balanced Entries</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Yes — Strict</option><option>Warning only</option>
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Auto-reverse Accruals</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Enabled</option><option>Disabled</option>
-              </select></div>
-          </div>
-          <Button size="sm" className="text-xs">Save Changes</Button>
-        </div>
-      )}
-
-      {activeTab === "journals" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Journal Types</h3>
-            <Button size="sm" variant="outline" className="h-7 text-xs">+ Add Journal</Button>
-          </div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Code", "Name", "Auto-post", "Reversible", "Active"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {journalTypes.map(j => (
-                <tr key={j.code} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-mono font-medium">{j.code}</td>
-                  <td className="px-3 py-2">{j.name}</td>
-                  <td className="px-3 py-2">{j.autoPost ? "✓" : "—"}</td>
-                  <td className="px-3 py-2">{j.reversible ? "✓" : "—"}</td>
-                  <td className="px-3 py-2">{j.active ? <span className="text-success">●</span> : <span className="text-muted-foreground">●</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === "fiscal" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Fiscal Calendar — FY 2025</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Month", "Start", "End", "Status"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {fiscalPeriods.map(p => (
-                <tr key={p.month} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{p.month}</td>
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{p.start}</td>
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{p.end}</td>
-                  <td className="px-3 py-2"><span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded",
-                    p.status === "closed" ? "bg-success/15 text-success" : p.status === "open" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
-                  )}>{p.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === "numbering" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">Journal Entry Numbering</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label className="text-xs">Format</Label>
-              <Input defaultValue="JE-YYYY-######" className="h-9 text-xs font-mono" readOnly /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Next Number</Label>
-              <Input defaultValue="JE-2025-000043" className="h-9 text-xs font-mono" readOnly /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Reset</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"><option>Yearly</option><option>Never</option></select></div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "currency" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">Functional Currency</h3>
-          {[
-            { code: "XOF", name: "CFA Franc BCEAO", rate: "1.0000", base: true },
-            { code: "EUR", name: "Euro", rate: "655.957", base: false },
-            { code: "USD", name: "US Dollar", rate: "615.000", base: false },
-          ].map(c => (
-            <div key={c.code} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <div>
-                <div className="text-xs font-medium text-foreground">{c.code} — {c.name}</div>
-                <div className="text-[10px] text-muted-foreground">Rate: {c.rate} {c.base && "(Functional)"}</div>
-              </div>
-              {!c.base && <Button size="sm" variant="ghost" className="h-6 text-[10px]">Edit</Button>}
-            </div>
-          ))}
-        </div>
-      )}
+      {activeTab === "controls" && <ControlsSettings />}
+      {activeTab === "journals" && <JournalsAndNumbering />}
+      {activeTab === "fiscal" && <div className="max-w-5xl"><FiscalCalendarPanel /></div>}
+      {activeTab === "currency" && <Currency />}
+      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><FileText className="w-3 h-3" /> Ces réglages valent pour toute la société.</p>
     </PageShell>
   );
 }

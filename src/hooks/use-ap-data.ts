@@ -385,33 +385,6 @@ export function useAPApprovalThresholds() {
   });
 }
 
-// Approval queue
-export function useAPApprovalQueue() {
-  return useQuery({
-    queryKey: ["ap-approval-queue"],
-    queryFn: async () => {
-      const { data, error } = await sb.from("ap_approval_queue").select("*").order("request_date", { ascending: false });
-      if (error) throw error;
-      return (data || []).map((q: any) => {
-        const elapsed_hours = Math.round((Date.now() - new Date(q.created_at).getTime()) / 3_600_000);
-        return { ...q, elapsed_hours };
-      });
-    },
-  });
-}
-export function useResolveAPApproval() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, decision }: { id: string; decision: "approved" | "rejected" }) => {
-      const { error } = await sb.from("ap_approval_queue").update({ status: decision, resolved_at: new Date().toISOString() }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ap-approval-queue"] }); toast.success("Décision enregistrée"); },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
-
-// AP Audit (reuses gl_audit_logs filtered)
 export function useAPAuditTrail(limit = 100) {
   return useQuery({
     queryKey: ["ap-audit-trail", limit],

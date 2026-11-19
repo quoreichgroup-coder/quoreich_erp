@@ -29,6 +29,7 @@ export function useTreasuryAccounts() {
 export type TreasuryAccountInput = {
   id?: string; name: string; bank_name: string; account_number: string; currency: string; account_type: TreasuryKind;
   gl_account_id: string; opening_balance: number; opening_date: string | null; is_active: boolean;
+  min_balance: number | null; max_balance: number | null; overdraft_limit: number | null;
 };
 
 export function useSaveTreasuryAccount() {

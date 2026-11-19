@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { ApprovalThresholdsEditor } from "@/components/ApprovalThresholdsEditor";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, CreditCard, FileText, Bell, Globe, Percent, BookOpen } from "lucide-react";
+import { Settings, CreditCard, FileText, Bell, Globe, Percent, BookOpen, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import {
@@ -23,6 +24,7 @@ import {
 const tabs = [
   { id: "general", label: "Général", icon: Settings },
   { id: "glposting", label: "Comptabilisation", icon: BookOpen },
+  { id: "approval", label: "Approbation", icon: Users },
   { id: "payment", label: "Modes de paiement", icon: CreditCard },
   { id: "numbering", label: "Numérotation", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -108,6 +110,8 @@ export default function APSettings() {
       )}
 
       {activeTab === "glposting" && <ModulePostingSettings modules={["AP", "TRE"]} kinds={["supplier"]} />}
+
+      {activeTab === "approval" && <ApprovalThresholdsEditor kind="ap" />}
 
       {activeTab === "payment" && (
         <div className="bg-card border border-border rounded-lg">

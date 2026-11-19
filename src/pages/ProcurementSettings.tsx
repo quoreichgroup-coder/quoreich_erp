@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ApprovalThresholdsEditor } from "@/components/ApprovalThresholdsEditor";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -20,25 +21,16 @@ import {
 } from "@/hooks/use-procurement-data";
 
 const tabs = [
-  { id: "general", label: "General", icon: Settings },
+  { id: "general", label: "Général", icon: Settings },
   { id: "controls", label: "Contrôles et suivi", icon: ShieldCheck },
-  { id: "threeway", label: "3-Way Match", icon: Scale },
-  { id: "sla", label: "SLA", icon: Timer },
-  { id: "approval", label: "Approval Levels", icon: Users },
+  { id: "threeway", label: "Rapprochement à trois", icon: Scale },
+  { id: "sla", label: "Délais cibles", icon: Timer },
+  { id: "approval", label: "Niveaux d'approbation", icon: Users },
   { id: "glposting", label: "Comptabilisation", icon: BookOpen },
-  { id: "categories", label: "Spend Categories", icon: Tag },
 ];
 
 
 
-
-const categories = ["IT Hardware", "IT Network", "Telecom", "Utilities", "Banking", "Facilities", "Logistics", "HR", "Other"];
-
-const glMapping = [
-  { category: "CAPEX", debit: "2100-CAPEX", credit: "2200-AP" },
-  { category: "OPEX", debit: "6100-OPEX", credit: "2200-AP" },
-  { category: "HR Expenses", debit: "6200-HR", credit: "2200-AP" },
-];
 
 export default function ProcurementSettings() {
   const [activeTab, setActiveTab] = useState("general");
@@ -244,50 +236,10 @@ export default function ProcurementSettings() {
         </Card>
       )}
 
-      {activeTab === "approval" && (
-
-        <Card className="border-border max-w-3xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Seuils d'approbation PR / PO</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Niveau</TableHead>
-                  <TableHead className="text-right">Plafond (XOF)</TableHead>
-                  <TableHead>Approbateur</TableHead>
-                  <TableHead className="text-right">SLA (h)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(thresholds ?? []).map((t: any) => (
-                  <TableRow key={t.id}>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{t.doc_type}</Badge></TableCell>
-                    <TableCell className="text-xs font-medium">{t.level}</TableCell>
-                    <TableCell className="text-right text-xs font-mono">{t.max_amount ? new Intl.NumberFormat("fr-FR").format(Number(t.max_amount)) : "∞"}</TableCell>
-                    <TableCell className="text-xs">{t.approver}</TableCell>
-                    <TableCell className="text-right text-xs">{t.sla_hours}h</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
+      {activeTab === "approval" && <ApprovalThresholdsEditor kind="procurement" />}
 
       {activeTab === "glposting" && <ModulePostingSettings modules={["AP", "STK"]} kinds={["supplier", "item"]} />}
 
-      {activeTab === "categories" && (
-        <Card className="border-border max-w-md">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Spend Categories</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="flex flex-wrap gap-2">
-              {categories.map(c => <Badge key={c} variant="outline" className="text-xs">{c}</Badge>)}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
     </PageShell>
   );

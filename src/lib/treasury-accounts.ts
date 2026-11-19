@@ -7,6 +7,8 @@ export type TreasuryAccount = {
   id: string; name: string; bank_name: string | null; account_number: string | null; currency: string; account_type: TreasuryKind;
   gl_account_id: string | null; opening_balance: number; opening_date: string | null; balance: number; is_default: boolean; is_active: boolean;
   last_reconciled_at: string | null;
+  /** V107 : seuils suivis (NULL = non suivi). */
+  min_balance?: number | null; max_balance?: number | null; overdraft_limit?: number | null;
 };
 
 export const KIND_LABEL: Record<TreasuryKind, string> = { bank: "Banque", cash: "Caisse", mobile_money: "Mobile money" };

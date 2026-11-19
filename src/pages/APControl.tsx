@@ -1,4 +1,9 @@
 import { useState, useMemo } from "react";
+import { useTenantId } from "@/hooks/use-tenant";
+import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { ApprovalThresholdsEditor } from "@/components/ApprovalThresholdsEditor";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -9,8 +14,6 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle, Eye, ShieldCheck, CheckCircle, Search, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  useAPApprovalQueue,
-  useResolveAPApproval,
   useAPApprovalThresholds,
   useAPAuditTrail,
 } from "@/hooks/use-ap-data";
@@ -30,8 +33,7 @@ export default function APControl() {
   const [activeTab, setActiveTab] = useState("validation");
   const [search, setSearch] = useState("");
 
-  const { data: queue = [] } = useAPApprovalQueue();
-  const resolve = useResolveAPApproval();
+  const { data: queue = [] } = useAPPendingApprovals();
   const { data: thresholds = [] } = useAPApprovalThresholds();
   const { data: audit = [] } = useAPAuditTrail(100);
   // Budget de contrôle de l'exercice en cours (charges) : consommé = pré-engagé + engagé + réalisé ; seuil d'alerte
@@ -47,9 +49,9 @@ export default function APControl() {
     });
   }, [budgetRows, alertPct]);
 
-  const slaBreaches = queue.filter((v: any) => v.elapsed_hours > v.sla_hours).length;
+  const slaBreaches = queue.filter((v) => v.sla_hours != null && v.elapsed_hours > v.sla_hours).length;
   const criticalBudgets = budgetAlerts.filter((b) => b.severity === "critical").length;
-  const pendingCount = queue.filter((v: any) => v.status === "pending" || v.status === "escalated").length;
+  const pendingCount = queue.length;
 
   return (
     <PageShell>
@@ -84,56 +86,49 @@ export default function APControl() {
       </div>
 
       {activeTab === "validation" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex justify-between">
-            <h3 className="text-sm font-semibold text-foreground">File d'approbation multi-niveaux</h3>
-            <div className="relative w-52">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-              <Input placeholder="Rechercher…" className="pl-8 h-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="bg-card border border-border rounded-lg" data-testid="ap-validation-queue">
+          <div className="p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-foreground">Factures en attente d'approbation</h3>
+            <div className="flex items-center gap-2">
+              <div className="relative w-52">
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <Input placeholder="N° de facture, fournisseur…" aria-label="Rechercher une facture" className="pl-8 h-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+              <Button asChild size="sm" variant="outline" className="h-8 text-xs"><Link to="/payables/transactions?tab=approvals">Approuver ou rejeter</Link></Button>
             </div>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">
-              {["Document", "Type", "Montant (XOF)", "Niveau", "Demandeur", "Date", "SLA", "Statut", "Actions"].map(h => (
+              {["Facture", "Fournisseur", "Montant", "Niveau en cours", "Approbateur", "Soumise le", "Délai", "État"].map(h => (
                 <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {queue
-                .filter((v: any) => v.doc_number.toLowerCase().includes(search.toLowerCase()))
-                .map((v: any) => {
-                  const slaPct = Math.round((v.elapsed_hours / v.sla_hours) * 100);
-                  const breached = v.elapsed_hours > v.sla_hours;
-                  return (
-                    <tr key={v.id} className={cn("border-b border-border hover:bg-muted/20", breached && "bg-destructive/5")}>
-                      <td className="px-3 py-2 font-medium text-primary">{v.doc_number}</td>
-                      <td className="px-3 py-2">{v.doc_type}</td>
-                      <td className="px-3 py-2 text-right font-mono">{fmt(v.amount)}</td>
-                      <td className="px-3 py-2"><StatusBadge status={v.level?.startsWith("L4") ? "error" : v.level?.startsWith("L3") ? "warning" : "info"} label={v.level} /></td>
-                      <td className="px-3 py-2">{v.requester}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{v.request_date}</td>
-                      <td className="px-3 py-2 w-28">
+              {queue.filter((v) => `${v.invoice_number} ${v.supplier}`.toLowerCase().includes(search.toLowerCase())).map((v) => {
+                const pct = v.sla_hours ? Math.round((v.elapsed_hours / v.sla_hours) * 100) : null;
+                const breached = pct != null && pct > 100;
+                return (
+                  <tr key={v.id} data-testid="ap-validation-row" className={cn("border-b border-border hover:bg-muted/20", breached && "bg-destructive/5")}>
+                    <td className="px-3 py-2 font-medium text-primary">{v.invoice_number}</td>
+                    <td className="px-3 py-2">{v.supplier}</td>
+                    <td className="px-3 py-2 text-right font-mono">{fmt(v.amount)}</td>
+                    <td className="px-3 py-2"><StatusBadge status="info" label={v.level_label} /></td>
+                    <td className="px-3 py-2">{v.approver_label}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{new Date(v.created_at).toLocaleString("fr-FR")}</td>
+                    <td className="px-3 py-2 w-32">
+                      {pct == null ? <span className="text-muted-foreground">{v.elapsed_hours} h (pas de délai cible)</span> : (
                         <div className="flex items-center gap-1.5">
-                          <Progress value={Math.min(slaPct, 100)} className={cn("h-1.5", breached ? "[&>div]:bg-destructive" : slaPct >= 75 ? "[&>div]:bg-amber-500" : "")} />
+                          <Progress value={Math.min(pct, 100)} className={cn("h-1.5", breached ? "[&>div]:bg-destructive" : pct >= 75 ? "[&>div]:bg-warning" : "")} />
                           <span className={cn("text-[10px] tabular-nums", breached ? "text-destructive font-semibold" : "text-muted-foreground")}>{v.elapsed_hours}h/{v.sla_hours}h</span>
                         </div>
-                      </td>
-                      <td className="px-3 py-2"><StatusBadge status={v.status === "approved" ? "success" : v.status === "rejected" ? "error" : breached ? "error" : "info"} label={v.status} /></td>
-                      <td className="px-3 py-2 flex gap-1">
-                        {v.status === "pending" && (
-                          <>
-                            <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={resolve.isPending}
-                              onClick={() => resolve.mutate({ id: v.id, decision: "approved" })}>Approuver</Button>
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" disabled={resolve.isPending}
-                              onClick={() => resolve.mutate({ id: v.id, decision: "rejected" })}>Rejeter</Button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                    <td className="px-3 py-2"><StatusBadge status={breached ? "error" : "warning"} label={breached ? "Délai dépassé" : "En attente"} /></td>
+                  </tr>
+                );
+              })}
               {queue.length === 0 && (
-                <tr><td colSpan={9} className="text-center text-muted-foreground py-6">Aucune validation en attente</td></tr>
+                <tr><td colSpan={8} className="text-center text-muted-foreground py-6">Aucune facture en attente d'approbation</td></tr>
               )}
             </tbody>
           </table>
@@ -204,29 +199,35 @@ export default function APControl() {
         </div>
       )}
 
-      {activeTab === "thresholds" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Seuils d'approbation</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Niveau", "Montant max (XOF)", "Approbateur", "SLA", "Types de documents"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {thresholds.map((t: any) => (
-                <tr key={t.id} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{t.level}</td>
-                  <td className="px-3 py-2 font-mono">{t.max_amount ? fmt(t.max_amount) : "Illimité"}</td>
-                  <td className="px-3 py-2">{t.approver}</td>
-                  <td className="px-3 py-2">{t.sla_hours}h</td>
-                  <td className="px-3 py-2 text-muted-foreground">{t.doc_types}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {activeTab === "thresholds" && <ApprovalThresholdsEditor kind="ap" />}
     </PageShell>
   );
+}
+
+/** File réelle (V41) : niveau en cours de chaque facture soumise, délai écoulé contre le délai cible du seuil. */
+function useAPPendingApprovals() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["ap-pending-approvals", tenantId],
+    enabled: Boolean(tenantId),
+    retry: false,
+    queryFn: async () => {
+      const db = supabase as any;
+      const [a, t] = await Promise.all([
+        db.from("ap_invoice_approvals").select("id, invoice_id, level_order, level_label, approver_label, amount, created_at, status,"
+          + " invoice:ap_invoices(invoice_number, approval_status, supplier:suppliers(name))").eq("tenant_id", tenantId).eq("status", "pending").order("level_order"),
+        db.from("ap_approval_thresholds").select("level, sla_hours").eq("tenant_id", tenantId),
+      ]);
+      if (a.error) throw a.error;
+      if (t.error) throw t.error;
+      const sla = new Map<string, number>((t.data ?? []).map((r: any) => [r.level, Number(r.sla_hours)]));
+      const seen = new Set<string>();
+      return (a.data ?? []).filter((r: any) => r.invoice?.approval_status === "submitted" && !seen.has(r.invoice_id) && seen.add(r.invoice_id)).map((r: any) => ({
+        id: r.id as string, invoice_number: r.invoice?.invoice_number ?? "", supplier: r.invoice?.supplier?.name ?? "", amount: Number(r.amount),
+        level_label: r.level_label as string, approver_label: r.approver_label as string, created_at: r.created_at as string,
+        elapsed_hours: Math.max(0, Math.round((Date.now() - new Date(r.created_at).getTime()) / 3600000)),
+        sla_hours: sla.get(r.level_label) ?? null,
+      }));
+    },
+  });
 }

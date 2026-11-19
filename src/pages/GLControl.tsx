@@ -1,400 +1,357 @@
-import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ExportButtons } from "@/components/ExportButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Clock, Eye, ShieldCheck, CheckCircle, AlertTriangle,
-  Zap, Calculator, Search, Loader2,
-} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle, Calculator, CheckCircle, Clock, Eye, Loader2, Plus, Scale, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useGLPeriods, useCloseGLPeriod, useReopenGLPeriod } from "@/hooks/use-gl-data";
+import { useGLPeriods } from "@/hooks/use-gl-data";
+import { useGlAccountOptions } from "@/hooks/use-accounting-setup";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { isApiEnabled } from "@/api/client";
+import {
+  CHECK_LABELS, useGlAuditTrail, useGlFindings, useGlIntegrity, useGlReconciliation, useReviewFinding, type GlFinding,
+} from "@/hooks/use-gl-controls";
+
+/*
+ * Grand livre → Contrôle (V106) : anomalies par écriture (seuils et contrôles paramétrés par la société),
+ * concordance des livres auxiliaires avec leurs comptes collectifs, intégrité de la comptabilité,
+ * piste d'audit, périodes et simulateur d'écriture. Plus aucune donnée de démonstration.
+ */
+const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+const today = () => new Date().toISOString().slice(0, 10);
+const yearStart = () => `${new Date().getFullYear()}-01-01`;
+const SEVERITY: Record<string, [string, string]> = { critical: ["error", "Critique"], warning: ["warning", "À examiner"], info: ["info", "Information"] };
 
 const tabs = [
-  { id: "periods", label: "Period Management", icon: Clock },
-  { id: "anomalies", label: "Anomaly Detection", icon: AlertTriangle },
-  { id: "simulation", label: "Journal Simulator", icon: Calculator },
-  { id: "reconciliation", label: "Reconciliation", icon: CheckCircle },
-  { id: "audit", label: "Audit Trail", icon: Eye },
-  { id: "integrity", label: "Data Integrity", icon: ShieldCheck },
-];
+  { id: "anomalies", label: "Anomalies", icon: AlertTriangle },
+  { id: "reconciliation", label: "Concordance des livres", icon: Scale },
+  { id: "integrity", label: "Intégrité", icon: ShieldCheck },
+  { id: "audit", label: "Piste d'audit", icon: Eye },
+  { id: "periods", label: "Périodes", icon: Clock },
+  { id: "simulation", label: "Simulateur d'écriture", icon: Calculator },
+] as const;
 
-// Periods now sourced live from useGLPeriods() — no mock data
+function Periode({ from, to, onFrom, onTo }: { from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <label className="text-muted-foreground" htmlFor="ctl-from">Du</label>
+      <Input id="ctl-from" type="date" className="h-8 w-36 text-xs" value={from} onChange={(e) => onFrom(e.target.value)} />
+      <label className="text-muted-foreground" htmlFor="ctl-to">au</label>
+      <Input id="ctl-to" type="date" className="h-8 w-36 text-xs" value={to} onChange={(e) => onTo(e.target.value)} />
+    </div>
+  );
+}
 
-const anomalies = [
-  { id: "AN-001", type: "Threshold Breach", journal: "JE-2026-0048", description: "Single entry exceeds 10M XOF threshold", amount: 12500000, severity: "critical", date: "2026-03-05", status: "unresolved", detail: "Journal entry for consulting fee – requires L3 approval" },
-  { id: "AN-002", type: "Duplicate Suspicion", journal: "JE-2026-0046 / JE-2026-0047", description: "Two entries with same amount, date, and account", amount: 3400000, severity: "warning", date: "2026-03-04", status: "investigating", detail: "Both entries reference Bolloré Logistics – possible double posting" },
-  { id: "AN-003", type: "Unusual Pattern", journal: "JE-2026-0044", description: "Account 6200 has 3x normal monthly volume", amount: 4200000, severity: "warning", date: "2026-03-03", status: "investigating", detail: "Utilities expense spike — verify with Facilities department" },
-  { id: "AN-004", type: "Imbalance Detected", journal: "JE-2026-0045", description: "Debit ≠ Credit — draft entry unbalanced", amount: 580000, severity: "critical", date: "2026-03-02", status: "unresolved", detail: "Entry saved as draft with Debit=580,000 Credit=560,000 — difference 20,000 XOF" },
-  { id: "AN-005", type: "Cross-Period", journal: "JE-2026-0043", description: "Entry dated in closed period (Jan 2026)", amount: 920000, severity: "warning", date: "2026-03-01", status: "resolved", detail: "Entry was backdated to January — moved to February by admin" },
-  { id: "AN-006", type: "Segregation Alert", journal: "JE-2026-0042", description: "Same user created and posted entry", amount: 4250000, severity: "info", date: "2026-02-28", status: "mitigated", detail: "User A. Koné both created and posted — allowed due to delegation" },
-];
+function ReviewDialog({ finding, onClose }: { finding: GlFinding; onClose: () => void }) {
+  const review = useReviewFinding();
+  const [comment, setComment] = useState("");
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle className="text-sm">Examiner : {CHECK_LABELS[finding.check_code] ?? finding.check_code} — {finding.piece_number}</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">{finding.detail}</p>
+        <label htmlFor="review-comment" className="text-xs font-medium">Justification (obligatoire)</label>
+        <Textarea id="review-comment" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={1000} />
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
+          <Button size="sm" disabled={!comment.trim() || review.isPending}
+            onClick={() => review.mutate({ check: finding.check_code, entryId: finding.entry_id, comment: comment.trim() }, { onSuccess: onClose })}>Enregistrer l'examen</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-const reconciliationItems = [
-  { account: "1000", name: "Cash & Cash Equivalents", glBalance: 45000000, subBalance: 45000000, diff: 0, status: "reconciled" },
-  { account: "1100", name: "Accounts Receivable", glBalance: 78500000, subBalance: 78200000, diff: 300000, status: "unreconciled" },
-  { account: "2000", name: "Accounts Payable", glBalance: 56000000, subBalance: 56000000, diff: 0, status: "reconciled" },
-  { account: "1500", name: "Fixed Assets", glBalance: 120000000, subBalance: 120000000, diff: 0, status: "reconciled" },
-  { account: "3000", name: "Owner's Equity", glBalance: 150000000, subBalance: 150000000, diff: 0, status: "reconciled" },
-];
+function Anomalies({ canReview }: { canReview: boolean }) {
+  const [from, setFrom] = useState(yearStart());
+  const [to, setTo] = useState(today());
+  const [showReviewed, setShowReviewed] = useState(false);
+  const [open, setOpen] = useState<GlFinding | null>(null);
+  const q = useGlFindings(from, to);
+  const rows = (q.data ?? []).filter((f) => showReviewed || !f.reviewed);
+  return (
+    <section className="bg-card border border-border rounded-lg" aria-label="Anomalies">
+      <div className="p-3 border-b border-border flex flex-wrap items-center gap-3">
+        <Periode from={from} to={to} onFrom={setFrom} onTo={setTo} />
+        <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={showReviewed} onChange={(e) => setShowReviewed(e.target.checked)} /> Afficher les anomalies examinées</label>
+        <div className="ml-auto">
+          <ExportButtons label="Exporter les anomalies" rows={rows.map((f) => ({ controle: CHECK_LABELS[f.check_code] ?? f.check_code, gravite: SEVERITY[f.severity]?.[1] ?? f.severity,
+            piece: f.piece_number ?? "", date: f.entry_date, montant: f.amount, detail: f.detail, examen: f.reviewed ? f.review_comment ?? "examinée" : "" }))}
+            columns={[{ key: "controle", header: "Contrôle" }, { key: "gravite", header: "Gravité" }, { key: "piece", header: "Pièce" }, { key: "date", header: "Date" },
+              { key: "montant", header: "Montant" }, { key: "detail", header: "Détail" }, { key: "examen", header: "Examen" }]} filename={`anomalies-grand-livre-${to}`} />
+        </div>
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <div className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message} <Button size="sm" variant="outline" className="h-6 ml-2 text-xs" onClick={() => q.refetch()}>Réessayer</Button></div>
+        : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" data-testid="gl-findings">
+              <thead><tr className="border-b border-border bg-muted/30 text-muted-foreground">
+                <th className="px-3 py-2 text-left">Contrôle</th><th className="text-left">Gravité</th><th className="text-left">Pièce</th><th className="text-left">Date</th>
+                <th className="text-right">Montant</th><th className="text-left pl-3">Détail</th><th className="text-left">Examen</th>
+              </tr></thead>
+              <tbody>
+                {rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Aucune anomalie sur la période.</td></tr>}
+                {rows.map((f) => (
+                  <tr key={`${f.check_code}-${f.entry_id}`} data-testid="gl-finding" className="border-b border-border/50">
+                    <td className="px-3 py-2">{CHECK_LABELS[f.check_code] ?? f.check_code}</td>
+                    <td><StatusBadge status={SEVERITY[f.severity]?.[0] ?? "info"} label={SEVERITY[f.severity]?.[1] ?? f.severity} /></td>
+                    <td className="font-mono">{f.piece_number}</td><td className="tabular-nums">{f.entry_date}</td>
+                    <td className="text-right tabular-nums">{fmt(f.amount)}</td><td className="pl-3 max-w-[28rem]">{f.detail}</td>
+                    <td>{f.reviewed ? <span className="text-success" title={f.review_comment ?? ""}>Examinée</span>
+                      : canReview ? <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setOpen(f)}>Examiner</Button> : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      {open && <ReviewDialog finding={open} onClose={() => setOpen(null)} />}
+    </section>
+  );
+}
 
-const integrityChecks = [
-  { check: "Trial Balance", status: "pass", detail: "Debit = Credit — Balanced", lastRun: "2026-03-06 14:00" },
-  { check: "Sub-ledger Reconciliation", status: "warning", detail: "AR sub-ledger difference: 300,000 XOF", lastRun: "2026-03-06 14:00" },
-  { check: "Orphan Entries", status: "pass", detail: "No orphan journal entries found", lastRun: "2026-03-06 14:00" },
-  { check: "Duplicate Detection", status: "warning", detail: "1 potential duplicate flagged (AN-002)", lastRun: "2026-03-06 14:00" },
-  { check: "Period Integrity", status: "pass", detail: "No entries in closed periods", lastRun: "2026-03-06 14:00" },
-  { check: "Threshold Compliance", status: "warning", detail: "1 entry exceeds posting threshold without approval", lastRun: "2026-03-06 14:00" },
-  { check: "SoD Compliance", status: "pass", detail: "All entries comply with segregation of duties", lastRun: "2026-03-06 14:00" },
-];
+function Concordance() {
+  const [asOf, setAsOf] = useState(today());
+  const q = useGlReconciliation(asOf);
+  return (
+    <section className="bg-card border border-border rounded-lg" aria-label="Concordance des livres">
+      <div className="p-3 border-b border-border flex flex-wrap items-center gap-3">
+        <label className="text-xs text-muted-foreground" htmlFor="recon-date">Arrêté au</label>
+        <Input id="recon-date" type="date" className="h-8 w-40 text-xs" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+        <p className="text-[11px] text-muted-foreground">Chaque livre auxiliaire doit égaler le solde de ses comptes collectifs (AUDCIF : concordance des livres). Tolérance et contrôles : paramètres du grand livre.</p>
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <div className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message}</div>
+        : (
+          <table className="w-full text-xs" data-testid="gl-reconciliation">
+            <thead><tr className="border-b border-border bg-muted/30 text-muted-foreground">
+              <th className="px-3 py-2 text-left">Livre</th><th className="text-right">Livre auxiliaire</th><th className="text-right">Grand livre</th>
+              <th className="text-right">Écart</th><th className="text-left pl-3">État</th><th className="text-left">Explication</th>
+            </tr></thead>
+            <tbody>
+              {(q.data ?? []).map((r, i) => (
+                <tr key={`${r.area}-${i}`} data-testid="gl-recon-row" className="border-b border-border/50">
+                  <td className="px-3 py-2">{r.label}</td>
+                  <td className="text-right tabular-nums">{fmt(r.subledger)}</td><td className="text-right tabular-nums">{fmt(r.ledger)}</td>
+                  <td className={cn("text-right tabular-nums", r.difference !== 0 && "text-destructive font-medium")}>{fmt(r.difference)}</td>
+                  <td className="pl-3">{r.status === "pass" ? <StatusBadge status="success" label="Concordant" /> : <StatusBadge status="warning" label="Écart à justifier" />}</td>
+                  <td className="text-muted-foreground max-w-[24rem]">{r.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+    </section>
+  );
+}
 
-const auditTrail = [
-  { ts: "2026-03-06 14:32", user: "A. Koné", action: "Posted", doc: "JE-2026-0048", detail: "Consulting fee – 12,500,000 XOF (pending L3 approval)" },
-  { ts: "2026-03-06 11:15", user: "System", action: "Anomaly Detected", doc: "AN-001", detail: "Threshold breach flagged – JE-2026-0048 exceeds 10M" },
-  { ts: "2026-03-05 16:20", user: "M. Touré", action: "Draft Saved", doc: "JE-2026-0045", detail: "Entry saved as draft – imbalance of 20,000 XOF detected" },
-  { ts: "2026-03-05 09:00", user: "System", action: "Integrity Check", doc: "—", detail: "7 checks completed — 3 warnings, 4 passed" },
-  { ts: "2026-03-04 15:30", user: "Admin", action: "Period Closed", doc: "January 2026", detail: "Fiscal period closed — 142 entries finalized" },
-];
+function Integrite() {
+  const q = useGlIntegrity();
+  return (
+    <section className="bg-card border border-border rounded-lg" aria-label="Intégrité">
+      <div className="p-3 border-b border-border flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Intégrité de la comptabilité (toute la société)</h3>
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => q.refetch()} disabled={q.isFetching}>Relancer les contrôles</Button>
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <div className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message}</div>
+        : (
+          <ul className="divide-y divide-border" data-testid="gl-integrity">
+            {(q.data ?? []).map((c) => (
+              <li key={c.check_code} className="p-3 flex items-start gap-3 text-xs" data-testid="gl-integrity-check">
+                <StatusBadge status={c.status === "pass" ? "success" : c.status === "fail" ? "error" : "warning"}
+                  label={c.status === "pass" ? "Réussi" : c.status === "fail" ? `Échec (${c.issues})` : `À examiner (${c.issues})`} />
+                <div><p className="font-medium">{c.label}</p><p className="text-muted-foreground">{c.detail}</p></div>
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
+  );
+}
 
-const fmt = (n: number) => n.toLocaleString("fr-FR");
+function PisteAudit() {
+  const [from, setFrom] = useState(yearStart());
+  const [to, setTo] = useState(today());
+  const [search, setSearch] = useState("");
+  const q = useGlAuditTrail(from, to);
+  const rows = (q.data ?? []).filter((r) => `${r.action} ${r.user_name ?? ""} ${r.details ?? ""} ${r.piece_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const ACTIONS: Record<string, string> = { Created: "Créée", Posted: "Comptabilisée", Reversed: "Contre-passée", Cancelled: "Annulée", Updated: "Modifiée", Approved: "Validée", Rejected: "Rejetée" };
+  return (
+    <section className="bg-card border border-border rounded-lg" aria-label="Piste d'audit">
+      <div className="p-3 border-b border-border flex flex-wrap items-center gap-3">
+        <Periode from={from} to={to} onFrom={setFrom} onTo={setTo} />
+        <Input aria-label="Rechercher dans la piste d'audit" placeholder="Pièce, utilisateur, action…" className="h-8 w-56 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <span className="text-[11px] text-muted-foreground">Lecture seule : écrite par la base à chaque création, comptabilisation ou contre-passation.</span>
+        <div className="ml-auto">
+          <ExportButtons label="Exporter la piste d'audit" rows={rows.map((r) => ({ date: new Date(r.created_at).toLocaleString("fr-FR"), action: ACTIONS[r.action] ?? r.action,
+            piece: r.piece_number ?? "", utilisateur: r.user_name ?? "", detail: r.details ?? "" }))}
+            columns={[{ key: "date", header: "Date" }, { key: "action", header: "Action" }, { key: "piece", header: "Pièce" }, { key: "utilisateur", header: "Utilisateur" }, { key: "detail", header: "Détail" }]}
+            filename={`piste-audit-${from}-${to}`} />
+        </div>
+      </div>
+      {q.isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        : q.isError ? <div className="p-4 text-xs text-destructive" role="alert">{(q.error as Error).message}</div>
+        : (
+          <div className="overflow-x-auto max-h-[60vh]">
+            <table className="w-full text-xs" data-testid="gl-audit-trail">
+              <thead className="sticky top-0 bg-muted"><tr className="text-muted-foreground"><th className="px-3 py-2 text-left">Date</th><th className="text-left">Action</th><th className="text-left">Pièce</th><th className="text-left">Utilisateur</th><th className="text-left">Détail</th></tr></thead>
+              <tbody>
+                {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Aucun événement sur la période.</td></tr>}
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-t border-border/50"><td className="px-3 py-1.5 whitespace-nowrap">{new Date(r.created_at).toLocaleString("fr-FR")}</td>
+                    <td>{ACTIONS[r.action] ?? r.action}</td><td className="font-mono">{r.piece_number ?? "—"}</td><td>{r.user_name ?? "—"}</td><td className="text-muted-foreground">{r.details}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+    </section>
+  );
+}
 
-/* ─── Simulation ─── */
-interface SimLine { account: string; debit: number; credit: number; }
+function Periodes() {
+  const { data: periods = [], isLoading } = useGLPeriods();
+  return (
+    <section className="bg-card border border-border rounded-lg" aria-label="Périodes">
+      <div className="p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Écritures par période</h3>
+        <Button asChild size="sm" variant="outline" className="h-7 text-xs"><Link to="/settings?tab=fiscal">Clôturer ou rouvrir dans le calendrier fiscal</Link></Button>
+      </div>
+      {isLoading ? <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin" /></div> : (
+        <table className="w-full text-xs">
+          <thead><tr className="border-b border-border bg-muted/30 text-muted-foreground">
+            {["Période", "Statut", "Comptabilisées", "Brouillons", "Débit", "Crédit", "Équilibrée"].map((h) => <th key={h} className="px-3 py-2 text-left">{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {periods.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Aucune écriture comptable enregistrée.</td></tr>}
+            {periods.map((p: any) => (
+              <tr key={p.period} className="border-b border-border/50">
+                <td className="px-3 py-2 font-mono">{p.period}</td>
+                <td><StatusBadge status={p.status === "closed" ? "success" : "info"} label={p.status === "closed" ? "Clôturée" : "Ouverte"} /></td>
+                <td className="tabular-nums">{p.posted_count}</td><td className={cn("tabular-nums", p.draft_count > 0 && "text-warning font-medium")}>{p.draft_count}</td>
+                <td className="tabular-nums">{fmt(Number(p.total_debit))}</td><td className="tabular-nums">{fmt(Number(p.total_credit))}</td>
+                <td>{Number(p.total_debit) === Number(p.total_credit) ? <span className="text-success">Oui</span> : <span className="text-destructive">Non</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+interface SimLine { account: string; debit: string; credit: string }
+const num = (s: string) => Number(String(s).replace(/\s/g, "").replace(",", ".")) || 0;
+
+function Simulateur() {
+  const accounts = useGlAccountOptions();
+  const options = (accounts.data ?? []).filter((a) => a.active);
+  const [lines, setLines] = useState<SimLine[]>([{ account: "", debit: "", credit: "" }, { account: "", debit: "", credit: "" }]);
+  const debit = lines.reduce((s, l) => s + num(l.debit), 0);
+  const credit = lines.reduce((s, l) => s + num(l.credit), 0);
+  const issues = useMemo(() => {
+    const out: string[] = [];
+    if (lines.some((l) => (num(l.debit) || num(l.credit)) && !l.account)) out.push("Une ligne chiffrée n'a pas de compte.");
+    if (lines.some((l) => num(l.debit) && num(l.credit))) out.push("Une ligne ne porte pas à la fois un débit et un crédit.");
+    if (debit !== credit) out.push(`Écart débit − crédit : ${fmt(debit - credit)}.`);
+    if (debit === 0) out.push("Écriture sans montant.");
+    return out;
+  }, [lines, debit, credit]);
+  const set = (i: number, k: keyof SimLine, v: string) => setLines(lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
+  return (
+    <section className="bg-card border border-border rounded-lg p-4 space-y-3 max-w-3xl" aria-label="Simulateur d'écriture">
+      <p className="text-xs text-muted-foreground">Tester une écriture avant de la saisir : comptes actifs du plan de la société, équilibre débit / crédit. Rien n'est enregistré.</p>
+      <table className="w-full text-xs">
+        <thead><tr className="text-muted-foreground"><th className="text-left">Compte</th><th className="text-right">Débit</th><th className="text-right">Crédit</th><th /></tr></thead>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={i}>
+              <td className="py-1 pr-2"><select aria-label={`Compte ligne ${i + 1}`} className="h-8 w-full rounded border border-input bg-background px-1 text-xs" value={l.account} onChange={(e) => set(i, "account", e.target.value)}>
+                <option value="">— compte —</option>{options.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}</select></td>
+              <td className="pr-2"><Input aria-label={`Débit ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.debit} onChange={(e) => set(i, "debit", e.target.value)} /></td>
+              <td className="pr-2"><Input aria-label={`Crédit ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right" value={l.credit} onChange={(e) => set(i, "credit", e.target.value)} /></td>
+              <td><Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`Retirer la ligne ${i + 1}`} disabled={lines.length <= 2} onClick={() => setLines(lines.filter((_, j) => j !== i))}><Trash2 className="w-3.5 h-3.5" /></Button></td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr className="font-medium"><td className="pt-2">Total</td><td className="text-right tabular-nums pt-2">{fmt(debit)}</td><td className="text-right tabular-nums pt-2">{fmt(credit)}</td><td /></tr></tfoot>
+      </table>
+      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setLines([...lines, { account: "", debit: "", credit: "" }])}><Plus className="w-3.5 h-3.5" /> Ajouter une ligne</Button>
+      <div data-testid="simulation-result" className={cn("text-xs rounded-md p-2", issues.length ? "bg-warning/10 text-warning" : "bg-success/10 text-success")}>
+        {issues.length ? issues.map((m) => <p key={m}>{m}</p>) : "Écriture équilibrée : elle peut être saisie dans Écritures (le contrôle analytique et la période ouverte sont vérifiés à la comptabilisation)."}
+      </div>
+    </section>
+  );
+}
 
 export default function GLControl() {
-  const [activeTab, setActiveTab] = useState("anomalies");
-  const [search, setSearch] = useState("");
-  const [simLines, setSimLines] = useState<SimLine[]>([
-    { account: "6000 – Salaries Expense", debit: 5000000, credit: 0 },
-    { account: "1100 – Bank", debit: 0, credit: 5000000 },
-  ]);
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>("anomalies");
+  const { data: access } = useMyAccess();
+  const canReview = (access?.permissions ?? []).includes("accounting.controls");
+  const findings = useGlFindings(yearStart(), today());
+  const integrity = useGlIntegrity();
+  const recon = useGlReconciliation(today());
+  const { data: periods = [] } = useGLPeriods();
 
-  const simDebit = simLines.reduce((s, l) => s + l.debit, 0);
-  const simCredit = simLines.reduce((s, l) => s + l.credit, 0);
-  const simBalanced = simDebit > 0 && simDebit === simCredit;
-
-  const { data: periods = [], isLoading: loadingPeriods } = useGLPeriods();
-  const closePeriod = useCloseGLPeriod();
-  const reopenPeriod = useReopenGLPeriod();
-  const [reopenReason, setReopenReason] = useState("");
-  const openPeriodsCount = periods.filter((p: any) => p.status === "open").length;
-
-  const criticalAnomalies = anomalies.filter(a => a.severity === "critical" && a.status === "unresolved").length;
-  const warningCount = integrityChecks.filter(c => c.status === "warning").length;
+  if (isApiEnabled()) {
+    return (
+      <PageShell>
+        <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Grand livre", href: "/journal" }, { label: "Contrôle" }]} />
+        <p className="text-sm text-muted-foreground mt-4">Sur site, les contrôles du grand livre arrivent avec la tranche comptable de l'API.</p>
+      </PageShell>
+    );
+  }
+  const open = (findings.data ?? []).filter((f) => !f.reviewed);
+  const kpis = [
+    { label: "Anomalies critiques", value: open.filter((f) => f.severity === "critical").length, icon: AlertTriangle, bad: true },
+    { label: "Anomalies à examiner", value: open.filter((f) => f.severity !== "critical").length, icon: Eye, bad: false },
+    { label: "Contrôles d'intégrité en défaut", value: (integrity.data ?? []).filter((c) => c.status !== "pass").length, icon: ShieldCheck, bad: true },
+    { label: "Livres non concordants", value: (recon.data ?? []).filter((r) => r.status !== "pass").length, icon: Scale, bad: true },
+    { label: "Périodes ouvertes", value: periods.filter((p: any) => p.status === "open").length, icon: Clock, bad: false },
+  ];
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "General Ledger", href: "/journal" }, { label: "Control" }]} />
-      <GuidanceBanner title="GL Control & Validation" description="Anomaly detection, journal simulation, period management, reconciliation and data integrity monitoring." />
-
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        {[
-          { label: "Open Periods", value: String(openPeriodsCount), icon: Clock, color: "text-primary" },
-          { label: "Critical Anomalies", value: String(criticalAnomalies), icon: AlertTriangle, color: criticalAnomalies > 0 ? "text-destructive" : "text-success" },
-          { label: "Integrity Warnings", value: String(warningCount), icon: ShieldCheck, color: warningCount > 0 ? "text-amber-600" : "text-success" },
-          { label: "Unreconciled", value: "1", icon: Zap, color: "text-amber-600" },
-          { label: "Period Entries", value: "89", icon: CheckCircle, color: "text-primary" },
-          { label: "Checks Passed", value: `${integrityChecks.filter(c => c.status === "pass").length}/${integrityChecks.length}`, icon: ShieldCheck, color: "text-success" },
-        ].map(kpi => (
-          <div key={kpi.label} className="bg-card border border-border rounded-lg p-3 flex items-center gap-2.5">
-            <kpi.icon className={cn("w-4 h-4", kpi.color)} />
-            <div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{kpi.label}</div>
-              <div className="text-lg font-semibold text-foreground">{kpi.value}</div>
-            </div>
+      <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Grand livre", href: "/journal" }, { label: "Contrôle" }]} />
+      <GuidanceBanner title="Contrôle du grand livre"
+        description="Anomalies détectées sur les écritures, concordance des livres auxiliaires avec les comptes collectifs, intégrité, piste d'audit et périodes. Les seuils se règlent dans les paramètres du grand livre." />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h1 className="text-lg font-semibold">Grand livre — Contrôle</h1>
+        <Button asChild size="sm" variant="outline" className="h-8 text-xs gap-1"><Link to="/journal/settings?tab=controls"><Settings2 className="w-3.5 h-3.5" /> Paramètres des contrôles</Link></Button>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" data-testid="gl-control-kpis">
+        {kpis.map((k) => (
+          <div key={k.label} className="bg-card border border-border rounded-lg p-3 flex items-center gap-2.5">
+            <k.icon className={cn("w-4 h-4", k.value > 0 && k.bad ? "text-destructive" : "text-primary")} />
+            <div><div className="text-[10px] text-muted-foreground uppercase tracking-wider">{k.label}</div><div className="text-lg font-semibold">{k.value}</div></div>
           </div>
         ))}
       </div>
-
-      <div className="flex gap-1 border-b border-border overflow-x-auto">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={cn("flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
+      <div className="flex gap-1 border-b border-border overflow-x-auto" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={activeTab === t.id} onClick={() => setActiveTab(t.id)}
+            className={cn("flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 whitespace-nowrap",
               activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
             <t.icon className="w-3.5 h-3.5" />{t.label}
           </button>
         ))}
       </div>
-
-      {/* ═══ ANOMALY DETECTION ═══ */}
-      {activeTab === "anomalies" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-foreground">Detected Anomalies</h3>
-            <div className="relative w-52">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-              <Input placeholder="Search…" className="pl-8 h-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead><tr className="border-b border-border bg-muted/30">
-                {["ID", "Type", "Journal(s)", "Description", "Amount (XOF)", "Severity", "Date", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {anomalies.filter(a => !search || a.description.toLowerCase().includes(search.toLowerCase()) || a.journal.toLowerCase().includes(search.toLowerCase())).map(a => (
-                  <tr key={a.id} className={cn("border-b border-border hover:bg-muted/20", a.severity === "critical" && a.status === "unresolved" && "bg-destructive/5")}>
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{a.id}</td>
-                    <td className="px-3 py-2 font-medium">{a.type}</td>
-                    <td className="px-3 py-2 font-mono text-primary">{a.journal}</td>
-                    <td className="px-3 py-2 max-w-xs">
-                      <p>{a.description}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{a.detail}</p>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">{fmt(a.amount)}</td>
-                    <td className="px-3 py-2"><StatusBadge status={a.severity === "critical" ? "error" : a.severity === "warning" ? "warning" : "info"} label={a.severity} /></td>
-                    <td className="px-3 py-2 text-muted-foreground">{a.date}</td>
-                    <td className="px-3 py-2"><StatusBadge status={a.status === "unresolved" ? "error" : a.status === "investigating" ? "warning" : "success"} label={a.status} /></td>
-                    <td className="px-3 py-2">
-                      {a.status !== "resolved" && a.status !== "mitigated" && (
-                        <Button size="sm" variant="outline" className="h-6 text-[10px]">Resolve</Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ JOURNAL SIMULATOR ═══ */}
-      {activeTab === "simulation" && (
-        <div className="space-y-4">
-          <div className="bg-card border border-border rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Journal Entry Simulator (Dry Run)</h3>
-            <p className="text-xs text-muted-foreground mb-4">Simulate a journal entry to verify balancing, threshold compliance, and anomaly checks before posting.</p>
-            <table className="w-full text-xs">
-              <thead><tr className="border-b border-border bg-muted/30">
-                {["Account", "Debit (XOF)", "Credit (XOF)"].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {simLines.map((l, i) => (
-                  <tr key={i} className="border-b border-border">
-                    <td className="px-3 py-2 font-medium">{l.account}</td>
-                    <td className="px-3 py-2 font-mono text-right">{l.debit ? fmt(l.debit) : "—"}</td>
-                    <td className="px-3 py-2 font-mono text-right">{l.credit ? fmt(l.credit) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-muted/30 font-semibold">
-                  <td className="px-3 py-2">Total</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(simDebit)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(simCredit)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Simulation Results</h3>
-            <div className="space-y-2">
-              {[
-                { check: "Balance Check", result: simBalanced, detail: simBalanced ? `Debit = Credit = ${fmt(simDebit)} XOF` : `Difference: ${fmt(Math.abs(simDebit - simCredit))} XOF` },
-                { check: "Threshold Compliance", result: simDebit <= 10000000, detail: simDebit > 10000000 ? `Amount exceeds 10M threshold — requires L3 approval` : "Within standard posting limits" },
-                { check: "Period Check", result: true, detail: "February 2026 period is open" },
-                { check: "Duplicate Check", result: true, detail: "No matching entries found" },
-                { check: "Account Validity", result: true, detail: "All accounts are active and posting-enabled" },
-                { check: "SoD Check", result: true, detail: "No segregation of duties conflict detected" },
-              ].map(c => (
-                <div key={c.check} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg border",
-                  c.result ? "bg-success/5 border-success/20" : "bg-destructive/5 border-destructive/20")}>
-                  {c.result ? <CheckCircle className="w-4 h-4 text-success shrink-0" /> : <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
-                  <div>
-                    <span className="text-xs font-medium text-foreground">{c.check}</span>
-                    <span className="text-[10px] text-muted-foreground ml-2">{c.detail}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button size="sm" className="text-xs" disabled={!simBalanced}>Post Entry</Button>
-              <Button size="sm" variant="outline" className="text-xs">Save as Draft</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ PERIODS ═══ */}
-      {activeTab === "periods" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Gestion des Périodes Fiscales (GL)</h3>
-            <span className="text-[10px] text-muted-foreground">{openPeriodsCount} ouverte(s) · {periods.length} au total</span>
-          </div>
-          {loadingPeriods ? (
-            <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
-          ) : (
-            <table className="w-full text-xs">
-              <thead><tr className="border-b border-border bg-muted/30">
-                {["Période", "Statut", "Postées", "Brouillons", "Total Débit", "Total Crédit", "Équilibrée", "Clôturée le", "Actions"].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {periods.map((p) => {
-                  const balanced = Number(p.total_debit) === Number(p.total_credit);
-                  const busy = closePeriod.isPending || reopenPeriod.isPending;
-                  return (
-                    <tr key={p.period} className="border-b border-border hover:bg-muted/20">
-                      <td className="px-3 py-2 font-medium font-mono">{p.period}</td>
-                      <td className="px-3 py-2"><StatusBadge status={p.status === "closed" ? "success" : "info"} label={p.status === "closed" ? "Fermée" : "Ouverte"} /></td>
-                      <td className="px-3 py-2 text-center">{p.posted_count}</td>
-                      <td className="px-3 py-2 text-center">{p.draft_count > 0 ? <span className="text-amber-600 font-semibold">{p.draft_count}</span> : 0}</td>
-                      <td className="px-3 py-2 text-right font-mono">{fmt(Number(p.total_debit))}</td>
-                      <td className="px-3 py-2 text-right font-mono">{fmt(Number(p.total_credit))}</td>
-                      <td className="px-3 py-2">{balanced ? <span className="text-success">✓</span> : <span className="text-destructive">✗</span>}</td>
-                      <td className="px-3 py-2 text-muted-foreground text-[11px]">{p.closed_at ? new Date(p.closed_at).toLocaleDateString("fr-FR") : "—"}</td>
-                      <td className="px-3 py-2">
-                        {p.status === "open" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline" className="h-6 text-[10px]" disabled={busy || p.draft_count > 0}>
-                                Clôturer
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Clôturer la période {p.period} ?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Aucune écriture postée ne pourra plus être créée ou modifiée pour cette période.
-                                  Les brouillons doivent être validés ou supprimés au préalable.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => closePeriod.mutate(p.period)}>Clôturer</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                        {p.status === "closed" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="ghost" className="h-6 text-[10px]" disabled={busy}>Ré-ouvrir</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Ré-ouvrir la période {p.period} ?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  La période redeviendra modifiable. À utiliser uniquement pour corrections exceptionnelles ;
-                                  le motif est enregistré au journal des clôtures.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <Textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} maxLength={500}
-                                placeholder="Motif de la réouverture (obligatoire)" aria-label="Motif de la réouverture" />
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setReopenReason("")}>Annuler</AlertDialogCancel>
-                                <AlertDialogAction disabled={!reopenReason.trim()}
-                                  onClick={() => { reopenPeriod.mutate({ period: p.period, reason: reopenReason.trim() }); setReopenReason(""); }}>
-                                  Ré-ouvrir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {periods.length === 0 && (
-                  <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Aucune écriture comptable enregistrée</td></tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* ═══ RECONCILIATION ═══ */}
-      {activeTab === "reconciliation" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">GL vs Sub-ledger Reconciliation</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Account", "Name", "GL Balance", "Sub-ledger", "Difference", "Status"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {reconciliationItems.map(r => (
-                <tr key={r.account} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-mono font-medium">{r.account}</td>
-                  <td className="px-3 py-2">{r.name}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(r.glBalance)}</td>
-                  <td className="px-3 py-2 text-right font-mono">{fmt(r.subBalance)}</td>
-                  <td className={cn("px-3 py-2 text-right font-mono", r.diff > 0 ? "text-destructive" : "")}>{fmt(r.diff)}</td>
-                  <td className="px-3 py-2"><StatusBadge status={r.status === "reconciled" ? "success" : "error"} label={r.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ═══ AUDIT ═══ */}
-      {activeTab === "audit" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">GL Audit Trail</h3></div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Timestamp", "User", "Action", "Document", "Detail"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {auditTrail.map((a, i) => (
-                <tr key={i} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{a.ts}</td>
-                  <td className="px-3 py-2 font-medium">{a.user}</td>
-                  <td className="px-3 py-2"><StatusBadge status={a.action.includes("Anomaly") || a.action.includes("Integrity") ? "warning" : a.action === "Posted" ? "success" : "info"} label={a.action} /></td>
-                  <td className="px-3 py-2 font-mono">{a.doc}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{a.detail}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ═══ INTEGRITY ═══ */}
-      {activeTab === "integrity" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Data Integrity Checks</h3>
-            <Button size="sm" variant="outline" className="h-7 text-xs">Run All Checks</Button>
-          </div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Check", "Status", "Detail", "Last Run"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {integrityChecks.map(c => (
-                <tr key={c.check} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{c.check}</td>
-                  <td className="px-3 py-2"><StatusBadge status={c.status === "pass" ? "success" : "warning"} label={c.status} /></td>
-                  <td className="px-3 py-2 text-muted-foreground">{c.detail}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{c.lastRun}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {activeTab === "anomalies" && <Anomalies canReview={canReview} />}
+      {activeTab === "reconciliation" && <Concordance />}
+      {activeTab === "integrity" && <Integrite />}
+      {activeTab === "audit" && <PisteAudit />}
+      {activeTab === "periods" && <Periodes />}
+      {activeTab === "simulation" && <Simulateur />}
+      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Contrôles calculés par la base sur les données de la société ; un écart se justifie, il ne se corrige pas en silence.</p>
     </PageShell>
   );
 }

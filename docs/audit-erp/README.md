@@ -44,6 +44,7 @@ Légende utilisée dans tous les livrables :
 | 16 | [16-immobilisations.md](16-immobilisations.md) | Immobilisations : amortissements, cessions SYSCOHADA (lot F1, V75) |
 | 19 | [19-impressions-actions-groupees-mvp.md](19-impressions-actions-groupees-mvp.md) | Impression des pièces (PDF / Excel), exports de listes, actions groupées dans le cœur ; écarts restants pour le MVP |
 | 20 | [20-comptabilisation-parametrable-par-module.md](20-comptabilisation-parametrable-par-module.md) | Comptabilisation paramétrable par module : jeux de comptes client / fournisseur / article (SAP OBYC, Sage 300, X3), plan du lot V105 |
+| 21 | [21-ecrans-de-controle-et-parametres-reels.md](21-ecrans-de-controle-et-parametres-reels.md) | Lot 3 : contrôle du grand livre, limites et audit de trésorerie, rapports et seuils d'approbation réels ; écritures directes fermées (V106–V108) |
 
 ## Synthèse pour la direction
 

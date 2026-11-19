@@ -95,7 +95,8 @@ function AccountDialog({ account, gl, onClose }: { account: TreasuryAccount | nu
   const [f, setF] = useState<TreasuryAccountInput>(() => account ? {
     id: account.id, name: account.name, bank_name: account.bank_name ?? "", account_number: account.account_number ?? "", currency: account.currency,
     account_type: account.account_type, gl_account_id: account.gl_account_id ?? "", opening_balance: account.opening_balance, opening_date: account.opening_date, is_active: account.is_active,
-  } : { name: "", bank_name: "", account_number: "", currency: "XOF", account_type: "bank", gl_account_id: "", opening_balance: 0, opening_date: new Date().toISOString().slice(0, 10), is_active: true });
+    min_balance: account.min_balance ?? null, max_balance: account.max_balance ?? null, overdraft_limit: account.overdraft_limit ?? null,
+  } : { name: "", bank_name: "", account_number: "", currency: "XOF", account_type: "bank", gl_account_id: "", opening_balance: 0, opening_date: new Date().toISOString().slice(0, 10), is_active: true, min_balance: null, max_balance: null, overdraft_limit: null });
   const set = <K extends keyof TreasuryAccountInput>(k: K, v: TreasuryAccountInput[K]) => setF((p) => ({ ...p, [k]: v }));
   const prefix = f.account_type === "cash" ? "57" : f.account_type === "mobile_money" ? "55" : "5";
   const choices = gl.filter((g) => g.is_active && !g.is_header && g.code.startsWith(prefix) && (f.account_type !== "bank" || /^5[237]/.test(g.code)));
@@ -131,6 +132,14 @@ function AccountDialog({ account, gl, onClose }: { account: TreasuryAccount | nu
             <Input id="ta-opening" type="number" step="0.01" className="h-8 text-xs" value={f.opening_balance} disabled={used} onChange={(e) => set("opening_balance", Number(e.target.value))} /></div>
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="ta-opening-date">Au</Label>
             <Input id="ta-opening-date" type="date" className="h-8 text-xs" value={f.opening_date ?? ""} disabled={used} onChange={(e) => set("opening_date", e.target.value || null)} /></div>
+          <fieldset className="col-span-2 grid grid-cols-3 gap-3 border-t border-border pt-2">
+            <legend className="text-[11px] text-muted-foreground">Limites suivies (vide = non suivi)</legend>
+            {([["min_balance", "Solde minimal"], ["max_balance", "Solde maximal"], ["overdraft_limit", "Découvert autorisé"]] as const).map(([k, l]) => (
+              <div key={k} className="space-y-1.5"><Label className="text-xs" htmlFor={`ta-${k}`}>{l}</Label>
+                <Input id={`ta-${k}`} inputMode="decimal" className="h-8 text-xs text-right" value={f[k] ?? ""}
+                  onChange={(e) => set(k, e.target.value.trim() === "" ? null : Number(e.target.value.replace(/\s/g, "").replace(",", ".")))} /></div>
+            ))}
+          </fieldset>
           <label className="flex items-end gap-2 text-xs pb-1.5"><Switch aria-label="Compte actif" checked={f.is_active} onCheckedChange={(v) => set("is_active", v)} />Actif</label>
         </div>
         {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
