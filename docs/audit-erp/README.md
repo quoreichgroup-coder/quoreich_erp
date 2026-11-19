@@ -51,6 +51,7 @@ Légende utilisée dans tous les livrables :
 | 25 | [25-jumeau-sur-site.md](25-jumeau-sur-site.md) | Jumeau sur site : API Java pour tous les modules (socle commun, méthode, avancement module par module) |
 | 26 | [26-identite-sur-site.md](26-identite-sur-site.md) | Identité sur site : connexion par l'API Java (protocole supabase-js), comptes repris avec leur mot de passe (V114, DEC-07) |
 | 27 | [27-balayage-360.md](27-balayage-360.md) | Balayage 360 : données de démonstration, valeurs codées en dur, commandes sans effet ; corrections et restes (V119) |
+| 28 | [28-bilan-lots-et-ecarts.md](28-bilan-lots-et-ecarts.md) | Bilan vérifié : lots du plan, écarts G-01 à G-51, standard des modules ; ordre de la suite |
 
 ## Synthèse pour la direction
 
