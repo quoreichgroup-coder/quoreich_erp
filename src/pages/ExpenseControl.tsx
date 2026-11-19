@@ -1,111 +1,72 @@
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
+import { StatusBadge } from "@/components/StatusBadge";
+import { ExportButtons } from "@/components/ExportButtons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Copy, TrendingUp, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useMyExpenseRoles } from "@/hooks/use-expense-data";
-import { canDo, actionTooltip, maskAmount } from "@/lib/expense-roles";
+import { Loader2 } from "lucide-react";
+import { useExpenseReports } from "@/hooks/use-expenses";
+import { EXPENSE_STATUS } from "@/lib/expenses";
 
-const policyViolations = [
-  { id: "EXP-2025-008", employee: "A. Koné", category: "Travel", amount: 375000, violation: "Per diem exceeds destination rate (Dakar: max 75K/day × 5 = 375K but no receipts)", severity: "Critical", date: "2025-03-08" },
-  { id: "EXP-2025-004", employee: "A. Koné", category: "Transport", amount: 35000, violation: "Taxi expense > 25K without pre-approval", severity: "Warning", date: "2025-03-04" },
-  { id: "EXP-2025-009", employee: "C. Bamba", category: "Meals", amount: 92000, violation: "5th meal expense this week (policy max: 4)", severity: "Warning", date: "2025-03-07" },
-];
-
-const duplicateSuspects = [
-  { expense1: "EXP-2025-001", expense2: "EXP-2025-010", employee: "A. Koné", amount: 850000, description: "Flight ABJ→DKR", similarity: 95, date: "2025-03-01" },
-  { expense1: "EXP-2025-007", expense2: "EXP-2025-011", employee: "D. Ouattara", amount: 180000, description: "Team lunch", similarity: 88, date: "2025-03-07" },
-];
-
-const budgetOverruns = [
-  { department: "IT", budgetAlloc: 15000000, spent: 14250000, utilization: 95, remaining: 750000, status: "Warning" },
-  { department: "Sales", budgetAlloc: 12000000, spent: 11800000, utilization: 98, remaining: 200000, status: "Critical" },
-  { department: "HR", budgetAlloc: 8000000, spent: 5100000, utilization: 64, remaining: 2900000, status: "OK" },
-];
-
-const fmt = (n: number) => n.toLocaleString("fr-FR");
+/*
+ * Notes de frais → Contrôle : approbations en retard sur leur délai cible, notes approuvées non encore
+ * comptabilisées, comptabilisées non remboursées, rejets et annulations motivés, journal des décisions.
+ */
+const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+const hours = (d: string) => Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 3600000));
+const days = (d: string | null) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 86400000)) : 0);
 
 export default function ExpenseControl() {
-  const perms = useMyExpenseRoles();
-  const canApprove = canDo(perms, "approve_report");
+  const { data: reports = [], isLoading } = useExpenseReports();
+  const who = (r: (typeof reports)[number]) => (r.employee ? `${r.employee.first_name} ${r.employee.last_name}` : "—");
+  const late = reports.filter((r) => r.status === "submitted").map((r) => ({ r, a: r.approvals.find((x) => x.status === "pending")! }))
+    .filter(({ a }) => a && a.sla_hours != null && hours(a.created_at) > a.sla_hours);
+  const notPosted = reports.filter((r) => r.status === "approved");
+  const notPaid = reports.filter((r) => r.status === "posted");
+  const decisions = reports.flatMap((r) => r.approvals.filter((a) => a.decided_at).map((a) => ({ r, a }))).sort((x, y) => (y.a.decided_at! > x.a.decided_at! ? 1 : -1));
+  const motives = reports.filter((r) => r.rejection_reason || r.cancel_reason);
+  const block = (title: string, testId: string, body: React.ReactNode) => (
+    <Card className="border-border" data-testid={testId}><CardHeader className="p-4 pb-2"><CardTitle className="text-sm">{title}</CardTitle></CardHeader><CardContent className="p-0">{body}</CardContent></Card>
+  );
+  const simple = (list: typeof reports, since: (r: (typeof reports)[number]) => string | null, sinceLabel: string) => (
+    <table className="w-full text-xs"><thead><tr className="bg-muted/30 text-muted-foreground"><th className="px-3 py-2 text-left">Note</th><th className="text-left">Salarié</th><th className="text-right">TTC</th><th className="text-right pr-3">{sinceLabel}</th></tr></thead>
+      <tbody>{list.length === 0 ? <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Rien à signaler.</td></tr>
+        : list.map((r) => <tr key={r.id} className="border-t border-border/50"><td className="px-3 py-1.5 font-mono">{r.report_number}</td><td>{who(r)}</td><td className="text-right tabular-nums">{fmt(r.total)}</td><td className="text-right tabular-nums pr-3">{days(since(r))} j</td></tr>)}</tbody></table>
+  );
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Expenses", href: "/expenses" }, { label: "Control" }]} />
-      <GuidanceBanner title="Expense Control" description="Policy violation detection, duplicate expense alerts, and department budget overrun monitoring." />
-
-      <h1 className="text-lg font-semibold text-foreground">Expense Control</h1>
-
-      {/* Policy Violations */}
-      <Card className="border-border">
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" />Policy Violations</CardTitle></CardHeader>
-        <CardContent className="p-4 pt-2 space-y-2.5">
-          {policyViolations.map(v => (
-            <div key={v.id} className={`p-3 rounded-lg border ${v.severity === "Critical" ? "border-destructive/30 bg-destructive/5" : "border-amber-500/30 bg-amber-50/5"}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-primary">{v.id}</span>
-                  <span className="text-xs font-medium">{v.employee}</span>
-                  <Badge variant="outline" className="text-[10px]">{v.category}</Badge>
-                </div>
-                <Badge variant={v.severity === "Critical" ? "destructive" : "secondary"} className="text-[10px]">{v.severity}</Badge>
-              </div>
-              <div className="text-[11px] text-muted-foreground">{v.violation}</div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs font-mono">{maskAmount(perms, v.amount)} XOF</span>
-                <Button size="sm" variant="ghost" className="h-6 text-[10px]" disabled={!canApprove}
-                  aria-label={actionTooltip(perms, "approve_report", "Revoir")}
-                  title={actionTooltip(perms, "approve_report", "Revoir")}>
-                  {canApprove ? "Review" : <><Lock className="w-3 h-3 mr-1" />Review</>}
-                </Button>
-              </div>
-            </div>
+      <Breadcrumb items={[{ label: "Achats et fournisseurs" }, { label: "Notes de frais", href: "/expenses" }, { label: "Contrôle" }]} />
+      <GuidanceBanner title="Contrôle des notes de frais" description="Retards d'approbation, notes en attente de comptabilisation ou de remboursement, motifs de rejet et d'annulation, journal des décisions." />
+      <h1 className="text-lg font-semibold">Notes de frais — Contrôle</h1>
+      {isLoading ? <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin" /></div> : (
+        <div className="grid lg:grid-cols-2 gap-4">
+          {block("Approbations au-delà du délai cible", "expense-late-approvals", (
+            <table className="w-full text-xs"><thead><tr className="bg-muted/30 text-muted-foreground"><th className="px-3 py-2 text-left">Note</th><th className="text-left">Niveau</th><th className="text-right">Attente</th><th className="text-right pr-3">Délai cible</th></tr></thead>
+              <tbody>{late.length === 0 ? <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Aucun retard.</td></tr>
+                : late.map(({ r, a }) => <tr key={r.id} className="border-t border-border/50"><td className="px-3 py-1.5 font-mono">{r.report_number}</td><td>{a.level_label}</td><td className="text-right tabular-nums text-destructive">{hours(a.created_at)} h</td><td className="text-right tabular-nums pr-3">{a.sla_hours} h</td></tr>)}</tbody></table>
           ))}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Duplicate Detection */}
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><Copy className="w-4 h-4 text-amber-600" />Duplicate Detection</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-2 space-y-2.5">
-            {duplicateSuspects.map((d, i) => (
-              <div key={i} className="p-3 rounded-lg border border-amber-500/30 bg-amber-50/5 text-xs">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium">{d.employee}</span>
-                  <Badge variant="secondary" className="text-[10px]">{d.similarity}% match</Badge>
-                </div>
-                <div className="text-muted-foreground">{d.description} — {fmt(d.amount)} XOF</div>
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  <span className="font-mono">{d.expense1}</span> ↔ <span className="font-mono">{d.expense2}</span>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Budget Overruns */}
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" />Department Budget Utilization</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-2 space-y-3">
-            {budgetOverruns.map(b => (
-              <div key={b.department} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{b.department}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono">{fmt(b.spent)} / {fmt(b.budgetAlloc)}</span>
-                    <Badge variant={b.status === "Critical" ? "destructive" : b.status === "Warning" ? "secondary" : "outline"} className="text-[10px]">{b.utilization}%</Badge>
-                  </div>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${b.status === "Critical" ? "bg-destructive" : b.status === "Warning" ? "bg-amber-500" : "bg-success"}`} style={{ width: `${Math.min(b.utilization, 100)}%` }} />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+          {block("Approuvées, non comptabilisées", "expense-not-posted", simple(notPosted, (r) => r.approved_at, "Depuis"))}
+          {block("Comptabilisées, non remboursées", "expense-not-paid", simple(notPaid, (r) => r.posted_at, "Depuis"))}
+          {block("Rejets et annulations", "expense-motives", (
+            <table className="w-full text-xs"><thead><tr className="bg-muted/30 text-muted-foreground"><th className="px-3 py-2 text-left">Note</th><th className="text-left">Statut</th><th className="text-left pr-3">Motif</th></tr></thead>
+              <tbody>{motives.length === 0 ? <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">Aucun.</td></tr>
+                : motives.map((r) => <tr key={r.id} className="border-t border-border/50"><td className="px-3 py-1.5 font-mono">{r.report_number}</td>
+                  <td><StatusBadge status={EXPENSE_STATUS[r.status][0]} label={EXPENSE_STATUS[r.status][1]} /></td><td className="pr-3">{r.cancel_reason ?? r.rejection_reason}</td></tr>)}</tbody></table>
+          ))}
+          <div className="lg:col-span-2">{block("Journal des décisions d'approbation", "expense-decisions", (
+            <>
+              <div className="p-2 flex justify-end"><ExportButtons label="Exporter le journal" rows={decisions.map(({ r, a }) => ({ date: new Date(a.decided_at!).toLocaleString("fr-FR"), note: r.report_number,
+                niveau: a.level_label, decision: a.status === "approved" ? "Approuvé" : "Rejeté", commentaire: a.comment ?? "" }))}
+                columns={[{ key: "date", header: "Date" }, { key: "note", header: "Note" }, { key: "niveau", header: "Niveau" }, { key: "decision", header: "Décision" }, { key: "commentaire", header: "Commentaire" }]}
+                filename="decisions-notes-de-frais" /></div>
+              <table className="w-full text-xs"><thead><tr className="bg-muted/30 text-muted-foreground"><th className="px-3 py-2 text-left">Date</th><th className="text-left">Note</th><th className="text-left">Niveau</th><th className="text-left">Décision</th><th className="text-left pr-3">Commentaire</th></tr></thead>
+                <tbody>{decisions.length === 0 ? <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">Aucune décision.</td></tr>
+                  : decisions.map(({ r, a }) => <tr key={a.id} className="border-t border-border/50"><td className="px-3 py-1.5">{new Date(a.decided_at!).toLocaleString("fr-FR")}</td><td className="font-mono">{r.report_number}</td>
+                    <td>{a.level_label}</td><td>{a.status === "approved" ? "Approuvé" : "Rejeté"}</td><td className="pr-3">{a.comment}</td></tr>)}</tbody></table>
+            </>
+          ))}</div>
+        </div>
+      )}
     </PageShell>
   );
 }

@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "108";
+  private static final String DERNIERE_MIGRATION = "110";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -136,9 +136,13 @@ class SchemaMigrationIT {
           "ap_numbering_series/Tenant isolation", "ap_payment_methods/Tenant isolation", "ap_withholding_rates/Tenant isolation",
           "procurement_approval_thresholds/tenant_isolation_proc_thresholds", "procurement_approvals/tenant_isolation_proc_approvals",
           "procurement_match_decisions/tenant_isolation_match_dec", "ap_approval_queue/Tenant isolation", "erp_alerts/Tenant isolation",
-          "tenant_modules/Tenant isolation", "licenses/Tenant isolation");
+          "tenant_modules/Tenant isolation", "licenses/Tenant isolation",
+          // V109 — notes de frais ouvertes à tout membre.
+          "expense_reports/Tenant isolation", "expense_lines/Access via report");
 
-  private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey");
+  private static final Set<String> CLES_AUTH_RETIREES = Set.of("user_roles/user_roles_user_id_fkey",
+      // V109 — le salarié d'une note de frais est une fiche du personnel, plus un compte utilisateur.
+      "expense_reports/expense_reports_employee_id_fkey");
   /** V80 — référence au validateur qui a confirmé les paramètres de paie. */
   private static final Set<String> CLES_AUTH_AJOUTEES = Set.of("hr_payroll_settings/hr_payroll_settings_rules_validated_by_fkey");
 
@@ -272,7 +276,9 @@ class SchemaMigrationIT {
           // V105 — jeux de comptes par client, fournisseur et article.
           "posting_role_set_kinds", "posting_account_sets", "posting_account_set_lines", "posting_settings",
           // V106 — contrôles du grand livre.
-          "gl_control_settings", "gl_control_reviews");
+          "gl_control_settings", "gl_control_reviews",
+          // V109 — notes de frais.
+          "expense_categories", "expense_settings", "expense_approval_thresholds", "expense_report_approvals");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -600,7 +606,12 @@ class SchemaMigrationIT {
           "posting_member_has_open_items", "posting_role_open_members", "posting_lock_on",
           "guard_member_account_set", "guard_posting_account_set_line", "guard_posting_account_set", "guard_tenant_posting_account",
           // V106 — anomalies, intégrité, concordance des livres auxiliaires.
-          "gl_control_setting", "gl_control_findings", "gl_integrity_checks", "posting_role_accounts", "gl_subledger_reconciliation");
+          "gl_control_setting", "gl_control_findings", "gl_integrity_checks", "posting_role_accounts", "gl_subledger_reconciliation",
+          // V109 — notes de frais.
+          "compute_expense_line", "sync_expense_report_totals", "default_expense_report_number", "guard_expense_report", "guard_expense_line",
+          "expense_report_submit", "expense_report_decide", "expense_report_post", "expense_report_pay", "expense_report_cancel",
+          // V110
+          "guard_expense_category");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -857,7 +868,13 @@ class SchemaMigrationIT {
           "procurement_approval_thresholds/Lecture société", "procurement_approval_thresholds/Paramétrage habilité",
           "procurement_approvals/Lecture société", "procurement_match_decisions/Lecture société",
           "ap_approval_queue/Lecture société", "erp_alerts/Lecture société",
-          "tenant_modules/Lecture société", "tenant_modules/Administrateur de la société", "licenses/Lecture société");
+          "tenant_modules/Lecture société", "tenant_modules/Administrateur de la société", "licenses/Lecture société",
+          // V109 — notes de frais : confidentialité et paramètres.
+          "expense_reports/Lecture : auteur ou droit de consultation", "expense_reports/Saisie",
+          "expense_reports/Modification par l'auteur ou le gestionnaire", "expense_reports/Suppression par l'auteur ou le gestionnaire",
+          "expense_lines/Lecture avec la note", "expense_lines/Écriture avec la note", "expense_report_approvals/Lecture avec la note",
+          "expense_categories/Lecture société", "expense_categories/Paramétrage habilité", "expense_settings/Lecture société",
+          "expense_settings/Paramétrage habilité", "expense_approval_thresholds/Lecture société", "expense_approval_thresholds/Paramétrage habilité");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -998,7 +1015,11 @@ class SchemaMigrationIT {
           // V105
           "customers/trg_guard_customer_account_set", "suppliers/trg_guard_supplier_account_set", "items/trg_guard_item_account_set",
           "posting_account_set_lines/trg_guard_posting_account_set_line", "posting_account_sets/trg_guard_posting_account_set",
-          "tenant_posting_accounts/trg_guard_tenant_posting_account");
+          "tenant_posting_accounts/trg_guard_tenant_posting_account",
+          // V109
+          "expense_lines/trg_compute_expense_line", "expense_lines/trg_sync_expense_report_totals", "expense_lines/trg_guard_expense_line",
+          "expense_reports/trg_guard_expense_report", "expense_reports/trg_default_expense_report_number",
+          "expense_categories/trg_guard_expense_category");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view",

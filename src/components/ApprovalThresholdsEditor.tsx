@@ -14,12 +14,13 @@ import { useMyAccess } from "@/hooks/use-my-access";
  * construit sa file à partir de ces lignes, du plus petit plafond au plus grand, jusqu'au niveau qui
  * couvre le montant. Les droits d'approuver chaque niveau sont ceux du catalogue (approve_l1…l4).
  */
-type Kind = "procurement" | "ap";
+type Kind = "procurement" | "ap" | "expense";
 const CONF: Record<Kind, { table: string; right: string; docTypes: string[] }> = {
   procurement: { table: "procurement_approval_thresholds", right: "procurement.settings", docTypes: ["PR", "PO"] },
   ap: { table: "ap_approval_thresholds", right: "ap.settings", docTypes: ["Factures"] },
+  expense: { table: "expense_approval_thresholds", right: "expenses.settings", docTypes: ["Notes"] },
 };
-const DOC_LABEL: Record<string, string> = { PR: "Demandes d'achat", PO: "Commandes", Factures: "Factures fournisseurs" };
+const DOC_LABEL: Record<string, string> = { PR: "Demandes d'achat", PO: "Commandes", Factures: "Factures fournisseurs", Notes: "Notes de frais" };
 const db = supabase as any;
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -45,7 +46,7 @@ export function ApprovalThresholdsEditor({ kind }: { kind: Kind }) {
     mutationFn: async (r: Partial<Row> & { id?: string }) => {
       const tenant_id = await fetchTenantId();
       const row: Record<string, unknown> = { level: r.level?.trim(), approver: r.approver?.trim(), max_amount: r.max_amount, sla_hours: r.sla_hours };
-      if (kind === "procurement") row.doc_type = r.doc_type; else row.doc_types = "factures";
+      if (kind === "procurement") row.doc_type = r.doc_type; else if (kind === "ap") row.doc_types = "factures";
       const { data, error } = r.id
         ? await db.from(c.table).update(row).eq("id", r.id).select("id")
         : await db.from(c.table).insert({ ...row, tenant_id }).select("id");
@@ -71,13 +72,13 @@ export function ApprovalThresholdsEditor({ kind }: { kind: Kind }) {
   if (q.isLoading) return <div className="p-6"><Loader2 className="w-4 h-4 animate-spin" /></div>;
   if (q.isError) return <p className="text-xs text-destructive" role="alert">{(q.error as Error).message}</p>;
   const rows = q.data ?? [];
-  const groups = kind === "procurement" ? c.docTypes : ["Factures"];
+  const groups = kind === "procurement" ? c.docTypes : [c.docTypes[0]];
   return (
     <section className="bg-card border border-border rounded-lg p-4 space-y-4 max-w-4xl" data-testid={`approval-thresholds-${kind}`}>
       <div>
         <h3 className="text-sm font-semibold">Seuils d'approbation</h3>
         <p className="text-xs text-muted-foreground">À la soumission, la pièce parcourt les niveaux du plus petit plafond au plus grand, jusqu'à celui qui couvre son montant (plafond vide = dernier niveau). Sans aucun seuil, un seul niveau L1 s'applique.
-          Qui peut approuver un niveau : droits du catalogue « approve_l1 » à « approve_l{kind === "ap" ? 4 : 3} ».</p>
+          Qui peut approuver un niveau : droits du catalogue « approve_l1 » à « approve_l{kind === "ap" ? 4 : 3} »{kind === "expense" ? " ; l'auteur d'une note ne l'approuve jamais" : ""}.</p>
       </div>
       {groups.map((g) => {
         const list = rows.filter((r) => (kind === "procurement" ? r.doc_type === g : true));
