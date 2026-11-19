@@ -176,7 +176,7 @@ test("budget préparé par fichier, révision validée par un tiers, sections pa
   const montant = page.getByTestId("forecast-version-line").filter({ hasText: "Toutes" }).getByRole("textbox");
   await montant.fill("125000");
   await Promise.all([
-    page.waitForResponse((r) => r.url().includes("budget_forecast_lines") && r.request().method() === "PATCH" && r.ok()),
+    page.waitForResponse((r) => /budget_forecast_lines|budget\/forecast-lines/.test(r.url()) && r.request().method() === "PATCH" && r.ok()),
     montant.press("Tab"),
   ]);
   await expect(page.getByTestId("forecast-version-status")).toContainText("brouillon");

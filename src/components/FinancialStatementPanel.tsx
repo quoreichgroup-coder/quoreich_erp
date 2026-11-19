@@ -10,6 +10,7 @@ import { exportToPDF } from "@/lib/pdf-export";
 import { cn } from "@/lib/utils";
 import { useTenantId } from "@/hooks/use-tenant";
 import { combineStatementComparison, fiscalYearStartDate, shiftStatementDate } from "@/lib/financial-statement-period";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /*
  * États financiers par rubriques (V63, lot PC-2) : compte de résultat (TA … XI) et bilan (AD … DZ)
@@ -33,7 +34,8 @@ export function FinancialStatementPanel() {
     queryKey: ["financial-statement-tenant", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("tenants").select("currency, fiscal_year_start").eq("id", tenantId!).single();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/gl/company"), error: null }
+        : await supabase.from("tenants").select("currency, fiscal_year_start").eq("id", tenantId!).single();
       if (error) throw error;
       return data as TenantInfo;
     },
@@ -55,7 +57,13 @@ export function FinancialStatementPanel() {
         .eq("tenant_id", tenantId!).in("status", ["posted", "reversed"]);
       if (isBalance) journalQuery.lte("entry_date", priorTo);
       else journalQuery.gte("entry_date", priorFrom!).lte("entry_date", priorTo);
-      const [current, prior, history] = await Promise.all([
+      const viaApi = async () => {
+        const st = (f: string | null, t: string) => apiGet<any[]>(`/api/v1/gl/financial-statement?layout=${layout}${f ? `&from=${f}` : ""}&to=${t}`);
+        const [c, p, n] = await Promise.all([st(isBalance ? null : from, to), st(priorFrom, priorTo),
+          apiGet<number>(`/api/v1/gl/journal-entries/count?${isBalance ? "" : `from=${priorFrom}&`}to=${priorTo}`)]);
+        return [{ data: c, error: null }, { data: p, error: null }, { count: n, error: null }] as const;
+      };
+      const [current, prior, history] = isApiEnabled() ? await viaApi() : await Promise.all([
         (supabase as any).rpc("financial_statement", { _layout: layout, _from: isBalance ? null : from, _to: to }),
         (supabase as any).rpc("financial_statement", { _layout: layout, _from: priorFrom, _to: priorTo }),
         journalQuery,

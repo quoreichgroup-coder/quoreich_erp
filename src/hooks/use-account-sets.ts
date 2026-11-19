@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import type { AccountSetKind } from "@/lib/account-sets";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Jeux de comptes (V105) : par client, fournisseur ou article, le compte de certains rôles de
@@ -31,6 +32,7 @@ export function useRoleKinds() {
     queryKey: ["posting-role-set-kinds"],
     staleTime: Infinity,
     queryFn: async (): Promise<RoleKind[]> => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/gl/charts/account-sets/roles");
       const { data, error } = await db.from("posting_role_set_kinds").select("kind, role_code, control").order("role_code");
       if (error) throw error;
       return data ?? [];
@@ -45,6 +47,7 @@ export function useAccountSets(kind?: AccountSetKind) {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async (): Promise<AccountSet[]> => {
+      if (isApiEnabled()) return (await apiGet<AccountSet[]>(`/api/v1/gl/charts/account-sets${kind ? `?kind=${kind}` : ""}`)).map((s) => ({ ...s, members: Number(s.members) }));
       let q = db.from("posting_account_sets").select("id, kind, code, name, is_active, lines:posting_account_set_lines(role_code, gl_account_id)")
         .eq("tenant_id", tenantId).order("code");
       if (kind) q = q.eq("kind", kind);
@@ -72,6 +75,7 @@ export function useCreateAccountSet() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (input: { kind: AccountSetKind; code: string; name: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/gl/charts/account-sets", input); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await db.from("posting_account_sets").insert({ tenant_id, ...input });
       if (error) throw error;
@@ -85,6 +89,7 @@ export function useUpdateAccountSet() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async ({ id, ...patch }: { id: string; name?: string; is_active?: boolean }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/gl/charts/account-sets/${id}`, patch); return; }
       const { data, error } = await db.from("posting_account_sets").update(patch).eq("id", id).select("id");
       if (error) throw error;
       touched(data, "Modification du jeu");
@@ -98,6 +103,7 @@ export function useDeleteAccountSet() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/gl/charts/account-sets/${id}`); return; }
       const { data, error } = await db.from("posting_account_sets").delete().eq("id", id).select("id");
       if (error) throw new Error(/foreign key|violates/i.test(error.message) ? "Jeu utilisé par des fiches : le désactiver, ou retirer d'abord ses fiches." : error.message);
       touched(data, "Suppression du jeu");
@@ -113,6 +119,7 @@ export function useSetAccountSetLine() {
   return useMutation({
     mutationFn: async ({ set, role, glAccountId }: { set: AccountSet; role: string; glAccountId: string | null }) => {
       const exists = set.lines.some((l) => l.role_code === role);
+      if (isApiEnabled()) { if (glAccountId || exists) await apiPut(`/api/v1/gl/charts/account-sets/${set.id}/roles/${role}`, { gl_account_id: glAccountId || null }); return; }
       if (!glAccountId) {
         if (!exists) return;
         const { data, error } = await db.from("posting_account_set_lines").delete().eq("set_id", set.id).eq("role_code", role).select("role_code");
@@ -142,6 +149,7 @@ export function usePostingLock() {
     queryKey: ["posting-settings", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<boolean> => {
+      if (isApiEnabled()) return (await apiGet<{ lock_control_accounts: boolean } | null>("/api/v1/gl/charts/posting-settings"))?.lock_control_accounts ?? true;
       const { data, error } = await db.from("posting_settings").select("lock_control_accounts").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return data?.lock_control_accounts ?? true;
@@ -153,6 +161,7 @@ export function useSetPostingLock() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (on: boolean) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/gl/charts/posting-settings", { lock_control_accounts: on }); return; }
       const tenant_id = await fetchTenantId();
       const { data, error } = await db.from("posting_settings").upsert({ tenant_id, lock_control_accounts: on }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;

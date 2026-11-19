@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { GLBatchHistory, GLPostingKPIs, GLAuditHistory, type GLBatch } from "@/components/GLPostingConfig";
 import { useGLAuditLogs } from "@/hooks/use-gl-audit";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 // Lots réels du grand livre (V38) : un lot par société, journal et mois, alimenté à l'insertion de
 // chaque écriture des livres auxiliaires. Avant V38, ces écrans regroupaient dans le navigateur les
@@ -28,10 +29,10 @@ export function useGLBatches(moduleFilter?: string) {
   return useQuery({
     queryKey: ["gl-batches", moduleFilter ?? "all"],
     queryFn: async (): Promise<GLBatch[]> => {
-      let q = (supabase as any).from("journal_batch_summary").select("*").order("period", { ascending: false });
       const journals = moduleFilter ? MODULE_JOURNALS[moduleFilter] : undefined;
+      let q = (supabase as any).from("journal_batch_summary").select("*").order("period", { ascending: false });
       if (journals) q = q.in("journal_code", journals);
-      const { data, error } = await q;
+      const { data, error } = isApiEnabled() ? { data: await apiGet<BatchRow[]>(`/api/v1/gl/batches${journals ? `?journals=${journals.join(",")}` : ""}`), error: null } : await q;
       if (error) throw error;
       return ((data ?? []) as BatchRow[]).map((b) => ({
         id: b.batch_number,

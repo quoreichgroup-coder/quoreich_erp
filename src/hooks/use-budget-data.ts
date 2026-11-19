@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import type { BudgetRole, BudgetPerms } from "@/lib/budget-roles";
 import { REQUIRED_ROLES, ALL_BUDGET_ROLES } from "@/lib/budget-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 
 // =====================================================================
@@ -38,6 +39,7 @@ export function useBudgetRoleAudit() {
   return useQuery({
     queryKey: ["budget-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/budget/role-audit");
       const { data, error } = await supabase
         .from("budget_role_audit" as never)
         .select("*")
@@ -56,6 +58,7 @@ export function useAssignBudgetRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: BudgetRole; action: "assign" | "revoke"; comment?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/budget/actions/assign_budget_role", { p_target_user: input.target_user, p_role: input.role, p_action: input.action, p_comment: input.comment ?? null }); return; }
       const { error } = await supabase.rpc("assign_budget_role" as never, {
         p_target_user: input.target_user,
         p_role: input.role,

@@ -22,6 +22,12 @@ const PORT = process.env.E2E_SUR_SITE_PORT ?? "8083";
 const BASE = `http://localhost:${PORT}`;
 const API = process.env.E2E_API_URL ?? "http://127.0.0.1:8090";
 process.env.E2E_API_URL = API;
+// Parcours métier du nuage rejoués sur site (projet « parcours-sur-site ») : société locale, sessions
+// locales, tout accès aux données de Supabase compté comme incident (tests/e2e/parcours/outils.ts).
+process.env.E2E_SUR_SITE = "1";
+process.env.E2E_AUTH_DIR = "test-results-sur-site/.auth";
+/** Parcours du nuage dont tous les modules sont portés sur l'API (étendu module par module). */
+const PARCOURS_PORTES = process.env.E2E_PARCOURS_SUR_SITE ? new RegExp(process.env.E2E_PARCOURS_SUR_SITE) : /(10-tiers|20-achats|30-fournisseurs|50-comptabilite|80-tresorerie|90-budget|92-budget|93-budget|94-budget)/;
 
 export default defineConfig({
   testDir: "tests/e2e/sur-site",
@@ -45,6 +51,13 @@ export default defineConfig({
   projects: [
     { name: "connexion-sur-site", testMatch: /00-connexion\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     { name: "approbateur-sur-site", testMatch: /01-approbateur\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "parcours-sur-site",
+      testDir: "tests/e2e/parcours",
+      testMatch: PARCOURS_PORTES,
+      dependencies: ["connexion-sur-site", "approbateur-sur-site"],
+      use: { ...devices["Desktop Chrome"], storageState: "test-results-sur-site/.auth/session.json" },
+    },
     {
       name: "sur-site",
       testIgnore: /0[01]-(connexion|approbateur)\.spec\.ts/,

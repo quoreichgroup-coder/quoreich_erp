@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
 import type { ColumnMap, ImportRow } from "@/lib/chart-import";
+import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /* Import guidé du plan comptable (V65) : profils, exécutions, lignes contrôlées par la base. */
 export type ImportProfile = { id: string; tenant_id: string | null; code: string; name: string; source: string; delimiter: string; column_map: ColumnMap; notes: string | null };
@@ -24,6 +25,7 @@ export function useImportProfiles() {
   return useQuery({
     queryKey: ["import-profiles"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<ImportProfile[]>("/api/v1/gl/charts/import/profiles");
       const { data, error } = await db.from("import_profiles").select("*").order("tenant_id", { nullsFirst: true }).order("name");
       if (error) throw error;
       return (data ?? []) as ImportProfile[];
@@ -37,6 +39,7 @@ export function useImportRuns() {
     queryKey: ["chart-import-runs", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<ImportRun[]>("/api/v1/gl/charts/import/runs");
       const { data, error } = await db.from("chart_import_runs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50);
       if (error) throw error;
       return (data ?? []) as ImportRun[];
@@ -51,6 +54,7 @@ export function useImportRows(runId: string | null) {
     queryFn: async () => {
       const all: ImportRunRow[] = [];
       for (let from = 0; ; from += 1000) {
+        if (isApiEnabled()) { all.push(...await apiGet<any[]>(`/api/v1/gl/charts/import/runs/${runId}/rows`)); break; }
         const { data, error } = await db.from("chart_import_rows").select("*").eq("run_id", runId).order("line_no").range(from, from + 999);
         if (error) throw error;
         all.push(...(data ?? []));
@@ -67,6 +71,8 @@ export function useImportSettings() {
     queryKey: ["chart-import-settings", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return ((await apiGet<ImportSettings | null>("/api/v1/gl/charts/import/settings"))
+        ?? { require_second_person: true, allow_label_updates: true, mapping_second_person: true, migration_second_person: true }) as ImportSettings;
       const { data, error } = await db.from("chart_import_settings").select("require_second_person, allow_label_updates, mapping_second_person, migration_second_person").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return (data ?? { require_second_person: true, allow_label_updates: true, mapping_second_person: true, migration_second_person: true }) as ImportSettings;
@@ -83,6 +89,7 @@ function useRpc<V>(fn: (v: V) => Promise<unknown>, ok: string | ((d: any) => str
   });
 }
 const call = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/gl/charts/actions/${name}`, args);
   const { data, error } = await db.rpc(name, args);
   if (error) throw error;
   return data;
@@ -101,6 +108,7 @@ export function useSaveImportSettings() {
   return useMutation({
     mutationFn: async (s: ImportSettings) => {
       const tenantId = await fetchTenantId();
+      if (isApiEnabled()) { await apiPut("/api/v1/gl/charts/import/settings", s); return; }
       const { data, error } = await db.from("chart_import_settings").upsert({ tenant_id: tenantId, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;
       if (!data?.length) throw new Error("Refusé : droit « Administrer les plans comptables et les attributs de compte » requis.");

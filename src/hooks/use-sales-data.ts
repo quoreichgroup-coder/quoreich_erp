@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 // ===== Types =====
 export interface Quotation {
@@ -52,6 +53,20 @@ export interface DeliveryNote {
   sales_order?: { so_number: string };
 }
 
+/**
+ * Fonctions de la base des ventes : par l'API Java sur site (/api/v1/sales/actions), sinon par Supabase.
+ * Même contrat { data, error } dans les deux cas : un refus de l'API devient `error` (les actions groupées
+ * collectent les refus au lieu de s'arrêter).
+ */
+async function salesRpc(name: string, args: Record<string, unknown>): Promise<{ data: any; error: { message: string } | null }> {
+  if (!isApiEnabled()) return (supabase as any).rpc(name, args);
+  try {
+    return { data: await apiPost<any>(`/api/v1/sales/actions/${name}`, args), error: null };
+  } catch (e) {
+    return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+  }
+}
+
 export const SALES_ROLES = ["sales_rep", "sales_manager", "sales_controller"] as const;
 export type SalesRole = (typeof SALES_ROLES)[number];
 
@@ -62,7 +77,7 @@ export function useQuotations() {
     queryKey: ["quotations", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/quotations"), error: null } : await supabase
         .from("quotations")
         .select("*, customer:customers(name)")
         .eq("tenant_id", tenantId!)
@@ -79,7 +94,7 @@ export function useSalesOrders() {
     queryKey: ["sales-orders", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/orders"), error: null } : await supabase
         .from("sales_orders")
         .select("*, customer:customers(name), quotation:quotations(quote_number)")
         .eq("tenant_id", tenantId!)
@@ -95,7 +110,7 @@ export function useSoLines(soId?: string) {
     queryKey: ["so-lines", soId],
     enabled: !!soId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("so_lines").select(LINE_SELECT).eq("so_id", soId!).order("created_at");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/sales/orders/${soId}/lines`), error: null } : await (supabase as any).from("so_lines").select(LINE_SELECT).eq("so_id", soId!).order("created_at");
       if (error) throw error;
       return data || [];
     },
@@ -125,7 +140,7 @@ export function useQuoteLines(quoteId?: string) {
     queryKey: ["quote-lines", quoteId],
     enabled: !!quoteId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("quote_lines").select(LINE_SELECT)
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/sales/quotations/${quoteId}/lines`), error: null } : await (supabase as any).from("quote_lines").select(LINE_SELECT)
         .eq("quotation_id", quoteId!).order("created_at");
       if (error) throw error;
       return (data || []) as SalesLine[];
@@ -138,7 +153,7 @@ export function useDnLines(dnId?: string) {
     queryKey: ["dn-lines", dnId],
     enabled: !!dnId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("dn_lines").select(LINE_SELECT)
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/sales/deliveries/${dnId}/lines`), error: null } : await (supabase as any).from("dn_lines").select(LINE_SELECT)
         .eq("dn_id", dnId!).order("created_at");
       if (error) throw error;
       return (data || []) as SalesLine[];
@@ -152,7 +167,7 @@ export function useCustomerExposure(customerId?: string) {
     queryKey: ["customer-exposure", customerId],
     enabled: !!customerId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("ar_invoices").select("total, amount_paid, status, due_date")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/sales/customers/${customerId}/exposure`), error: null } : await supabase.from("ar_invoices").select("total, amount_paid, status, due_date")
         .eq("customer_id", customerId!).not("status", "in", "(draft,paid,cancelled)");
       if (error) throw error;
       const rows = data || [];
@@ -172,7 +187,7 @@ export function useDeliveryNotes() {
     queryKey: ["delivery-notes", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/deliveries"), error: null } : await supabase
         .from("delivery_notes")
         .select("*, customer:customers(name), sales_order:sales_orders(so_number)")
         .eq("tenant_id", tenantId!)
@@ -187,7 +202,7 @@ export function useSalesPipeline() {
   return useQuery({
     queryKey: ["sales-pipeline"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_pipeline_view").select("*");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/views/pipeline"), error: null } : await supabase.from("sales_pipeline_view").select("*");
       if (error) throw error;
       return data || [];
     },
@@ -198,7 +213,7 @@ export function useSalesSLA() {
   return useQuery({
     queryKey: ["sales-sla"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_sla_view").select("*");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/views/sla"), error: null } : await supabase.from("sales_sla_view").select("*");
       if (error) throw error;
       return data || [];
     },
@@ -209,7 +224,7 @@ export function useSalesKPIs() {
   return useQuery({
     queryKey: ["sales-kpis"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_kpis_view").select("*").maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/sales/views/kpis"), error: null } : await supabase.from("sales_kpis_view").select("*").maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -220,7 +235,7 @@ export function useSalesAudit() {
   return useQuery({
     queryKey: ["sales-audit"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/views/audit"), error: null } : await supabase
         .from("sales_audit_view")
         .select("*")
         .order("created_at", { ascending: false })
@@ -237,7 +252,7 @@ export function useSalesSettings() {
     queryKey: ["sales-settings", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/sales/settings"), error: null } : await supabase
         .from("sales_settings")
         .select("*")
         .eq("tenant_id", tenantId!)
@@ -253,6 +268,7 @@ export function useUpdateSalesSettings() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/sales/settings", updates); return; }
       const { data, error } = await supabase
         .from("sales_settings")
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -285,7 +301,7 @@ export function useSalesNumberingSeries() {
     queryKey: ["sales-numbering-series", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_numbering_series" as never)
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/numbering"), error: null } : await supabase.from("sales_numbering_series" as never)
         .select("tenant_id, doc_type, prefix, format, next_number, reset_frequency")
         .eq("tenant_id", tenantId)
         .order("doc_type");
@@ -300,6 +316,7 @@ export function useUpdateSalesNumberingSeries() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (series: Pick<SalesNumberingSeries, "doc_type" | "prefix" | "format" | "reset_frequency">) => {
+      if (isApiEnabled()) { await apiPut(`/api/v1/sales/numbering/${series.doc_type}`, { prefix: series.prefix.trim(), format: series.format.trim(), reset_frequency: series.reset_frequency }); return; }
       const { error } = await supabase.from("sales_numbering_series" as never)
         .update({ prefix: series.prefix.trim(), format: series.format.trim(), reset_frequency: series.reset_frequency, updated_at: new Date().toISOString() } as never)
         .eq("tenant_id", tenantId)
@@ -344,7 +361,7 @@ export function useCreateQuotation() {
       valid_until: string;
       lines: Array<{ description: string; quantity: number; unit_price: number; discount_pct?: number; tax_code_id?: string | null }>;
     }) => {
-      const { error } = await supabase.rpc("create_sales_quotation" as never, {
+      const { error } = await salesRpc("create_sales_quotation", {
         _customer_id: input.customer_id,
         _quote_date: input.quote_date,
         _valid_until: input.valid_until,
@@ -368,7 +385,7 @@ export function useCreateSalesOrder() {
       order_date: string;
       lines: Array<{ description: string; quantity: number; unit_price: number; discount_pct?: number; tax_code_id?: string | null }>;
     }) => {
-      const { error } = await supabase.rpc("create_sales_order" as never, {
+      const { error } = await salesRpc("create_sales_order", {
         _customer_id: input.customer_id,
         _order_date: input.order_date,
         _lines: input.lines,
@@ -388,7 +405,7 @@ export function useCreateOrderFromQuote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { quoteId: string; orderDate: string; lines: { quote_line_id: string; quantity: number }[] }) => {
-      const { data, error } = await (supabase as any).rpc("create_sales_order_from_quote", {
+      const { data, error } = await salesRpc("create_sales_order_from_quote", {
         _quote_id: input.quoteId, _lines: input.lines, _order_date: input.orderDate,
       });
       if (error) throw error;
@@ -422,7 +439,7 @@ function salesMutation<T>(fn: (input: T) => Promise<void>, success: string, keys
 }
 
 const rpc = async (name: string, args: Record<string, unknown>) => {
-  const { error } = await (supabase as any).rpc(name, args);
+  const { error } = await salesRpc(name, args);
   if (error) throw error;
 };
 
@@ -458,7 +475,7 @@ export function useBulkSales() {
       const echecs: string[] = [];
       let ok = 0;
       for (const id of ids) {
-        const { error } = await (supabase as any).rpc(b.rpc, { [b.arg]: id });
+        const { error } = await salesRpc(b.rpc, { [b.arg]: id });
         if (error) echecs.push(error.message); else ok++;
       }
       return { ok, echecs };
@@ -493,7 +510,7 @@ export function useCustomerReturns() {
     queryKey: ["customer-returns", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("customer_returns")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/returns"), error: null } : await (supabase as any).from("customer_returns")
         .select("*, customer:customers(name), delivery:delivery_notes(dn_number, ar_invoice_id), credit_note:ar_credit_notes(credit_note_number),"
           + " lines:customer_return_lines(description, quantity, unit_price, unit_cost)")
         .eq("tenant_id", tenantId).order("created_at", { ascending: false });
@@ -509,7 +526,7 @@ export function useCreateCustomerReturn() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (i: { dnId: string; reason: string; date: string; lines: { dn_line_id: string; quantity: number }[]; withCreditNote: boolean }) => {
-      const { data, error } = await (supabase as any).rpc("create_customer_return", {
+      const { data, error } = await salesRpc("create_customer_return", {
         _dn_id: i.dnId, _reason: i.reason, _return_date: i.date, _lines: i.lines, _with_credit_note: i.withCreditNote,
       });
       if (error) throw error;
@@ -527,7 +544,7 @@ export function useCreditCustomerReturn() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (returnId: string) => {
-      const { error } = await (supabase as any).rpc("credit_customer_return", { _return_id: returnId });
+      const { error } = await salesRpc("credit_customer_return", { _return_id: returnId });
       if (error) throw error;
     },
     onSuccess: () => { for (const k of RETURN_KEYS) qc.invalidateQueries({ queryKey: [k] }); toast.success("Avoir du retour émis"); },
@@ -540,7 +557,7 @@ export function useConvertQuoteToSO() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (quoteId: string) => {
-      const { data, error } = await supabase.rpc("confirm_quote_to_so", { _quote_id: quoteId });
+      const { data, error } = await salesRpc("confirm_quote_to_so", { _quote_id: quoteId });
       if (error) throw error;
       return data;
     },
@@ -558,7 +575,7 @@ export function useConfirmSO() {
   return useMutation({
     // V43 : au-delà de la limite de crédit, refus QG010 ; un motif lève le blocage (droit requis).
     mutationFn: async ({ soId, reason }: { soId: string; reason?: string }) => {
-      const { error } = await (supabase as any).rpc("confirm_so", { _so_id: soId, _override_reason: reason ?? null });
+      const { error } = await salesRpc("confirm_so", { _so_id: soId, _override_reason: reason ?? null });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -576,7 +593,7 @@ export function usePostDelivery() {
       so_id: string;
       lines: Array<{ so_line_id: string; quantity: number }>;
     }) => {
-      const { data, error } = await supabase.rpc("post_delivery", {
+      const { data, error } = await salesRpc("post_delivery", {
         _so_id: input.so_id,
         _lines: input.lines as unknown as never,
       });
@@ -598,7 +615,7 @@ export function useInvoiceFromDelivery() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (dnId: string) => {
-      const { data, error } = await supabase.rpc("invoice_from_delivery", { _dn_id: dnId });
+      const { data, error } = await salesRpc("invoice_from_delivery", { _dn_id: dnId });
       if (error) throw error;
       return data;
     },
@@ -625,7 +642,7 @@ export function useSalesRoleAudit() {
   return useQuery({
     queryKey: ["sales-role-audit"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/role-audit"), error: null } : await supabase
         .from("sales_role_audit")
         .select("*")
         .order("created_at", { ascending: false })
@@ -645,7 +662,7 @@ export function useAssignSalesRole() {
       action: "assign" | "revoke";
       comment?: string;
     }) => {
-      const { error } = await supabase.rpc("assign_sales_role", {
+      const { error } = await salesRpc("assign_sales_role", {
         _target_user: input.target_user,
         _role: input.role,
         _action: input.action,
@@ -674,7 +691,7 @@ export function useSalesReportingData(opts?: { from?: string; to?: string }) {
   const { data: arInvoices = [], isLoading: loadingI } = useQuery({
     queryKey: ["ar-invoices-for-sales"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: (await apiGet<any>(`/api/v1/sales/reporting`)).invoices, error: null } : await supabase
         .from("ar_invoices")
         .select("total, amount_paid, status, invoice_date, customer:customers(name)")
         .order("invoice_date", { ascending: false });
@@ -685,7 +702,7 @@ export function useSalesReportingData(opts?: { from?: string; to?: string }) {
   const { data: cogsMovements = [], isLoading: loadingC } = useQuery({
     queryKey: ["sales-cogs-movements"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: (await apiGet<any>(`/api/v1/sales/reporting`)).cogs, error: null } : await supabase
         .from("stock_movements")
         .select("movement_date, total_value, movement_type, reference_type")
         .or("movement_type.in.(delivery,sale,issue),reference_type.eq.delivery_note");

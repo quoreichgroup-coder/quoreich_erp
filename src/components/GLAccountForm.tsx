@@ -12,6 +12,7 @@ import { useMyAccess } from "@/hooks/use-my-access";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useCodePattern } from "@/hooks/use-chart-frameworks";
 import { ACCOUNT_TYPES, POSTING_MODES, ANALYTIC_POLICIES, defaultNormalBalance, validateCustomAttributes, type AttributeDefinition } from "@/lib/gl-account";
+import { apiGet, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Fiche compte du plan comptable (V62, lot PC-1) : tous les attributs sont paramétrables ; la base
@@ -24,6 +25,7 @@ export function useAttributeDefinitions() {
   return useQuery({
     queryKey: ["gl-attribute-definitions"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<AttributeDefinition[]>("/api/v1/gl/attribute-definitions");
       const { data, error } = await (supabase as any).from("gl_account_attribute_definitions").select("*").order("sort_order").order("label");
       if (error) throw error;
       return (data ?? []) as AttributeDefinition[];
@@ -35,6 +37,7 @@ function AccountHistory({ accountId }: { accountId: string }) {
   const { data: rows = [] } = useQuery({
     queryKey: ["gl-account-history", accountId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/gl/accounts/${accountId}/history`);
       const { data, error } = await (supabase as any).from("gl_account_history").select("*").eq("account_id", accountId).order("id", { ascending: false }).limit(30);
       if (error) throw error;
       return (data ?? []) as { id: number; action: string; changes: Record<string, unknown>; changed_at: string }[];
@@ -177,6 +180,7 @@ export function AttributeDefinitionsDialog({ open, onClose }: { open: boolean; o
   const [n, setN] = useState({ key: "", label: "", data_type: "text", options: "", required: false });
   const save = useMutation({
     mutationFn: async (row: Record<string, unknown>) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/gl/attribute-definitions", row); return; }
       const { data, error } = await (supabase as any).from("gl_account_attribute_definitions").upsert(row, { onConflict: "tenant_id,key" }).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Refusé : droit « Administrer les plans comptables et les attributs de compte » requis.");

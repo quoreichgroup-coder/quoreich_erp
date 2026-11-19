@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
 import type { BudgetImportRow } from "@/lib/budget-import";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Prévisions saisies (V78) : versions par exercice (brouillon → publiée, figée), une ligne par compte × section,
@@ -24,7 +25,7 @@ export function useBudgetForecasts(year: string) {
     queryKey: ["budget-forecasts", tenantId, year],
     enabled: !!tenantId && /^\d{4}$/.test(year),
     queryFn: async () => {
-      const { data, error } = await db.from("budget_forecasts").select("id, fiscal_year, name, status, notes, created_at, published_at")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/budget/forecasts?year=${year}`), error: null } : await db.from("budget_forecasts").select("id, fiscal_year, name, status, notes, created_at, published_at")
         .eq("tenant_id", tenantId).eq("fiscal_year", year).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as BudgetForecast[];
@@ -37,7 +38,7 @@ export function useBudgetForecastLines(forecastId: string | null) {
     queryKey: ["budget-forecast-lines", forecastId],
     enabled: !!forecastId,
     queryFn: async () => {
-      const { data, error } = await db.from("budget_forecast_lines").select("id, forecast_id, gl_account_id, analytic_value_id, amount, comment").eq("forecast_id", forecastId);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/budget/forecasts/${forecastId}/lines`), error: null } : await db.from("budget_forecast_lines").select("id, forecast_id, gl_account_id, analytic_value_id, amount, comment").eq("forecast_id", forecastId);
       if (error) throw error;
       return (data ?? []).map((l: any) => ({ ...l, amount: Number(l.amount) })) as BudgetForecastLine[];
     },
@@ -48,7 +49,7 @@ const refused = "Refusé : droit « Saisir et publier les prévisions budgétair
 
 /** Lignes d'une version avec code de compte et de section (rapports de comparaison). */
 export async function fetchForecastAmounts(forecastId: string) {
-  const { data, error } = await db.from("budget_forecast_lines").select("amount, account:gl_accounts(code), section:analytic_values(code)").eq("forecast_id", forecastId).range(0, 9999);
+  const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/budget/forecasts/${forecastId}/amounts`), error: null } : await db.from("budget_forecast_lines").select("amount, account:gl_accounts(code), section:analytic_values(code)").eq("forecast_id", forecastId).range(0, 9999);
   if (error) throw error;
   return (data ?? []).map((l: any) => ({ account: l.account?.code ?? "", section: l.section?.code ?? "", amount: Number(l.amount) }));
 }
@@ -58,6 +59,7 @@ export function useCreateBudgetForecast() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { year: string; name: string; lines: { gl_account_id: string; analytic_value_id: string | null; amount: number }[] }) => {
+      if (isApiEnabled()) return (await apiPost<{ id: string }>("/api/v1/budget/forecasts", { year: v.year, name: v.name, lines: v.lines })).id;
       const tenantId = await fetchTenantId();
       const { data, error } = await db.from("budget_forecasts").insert({ tenant_id: tenantId, fiscal_year: v.year, name: v.name.trim() }).select("id").single();
       if (error) throw new Error(/budget_forecasts_tenant_id_fiscal_year_name_key/.test(error.message) ? "Une version de ce nom existe déjà pour l'exercice" : /row-level security/.test(error.message) ? refused : error.message);
@@ -76,6 +78,11 @@ export function useSaveBudgetForecastLine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { id?: string; forecast_id: string; gl_account_id: string; analytic_value_id: string | null; amount: number; comment?: string | null }) => {
+      if (isApiEnabled()) {
+        const f = { gl_account_id: v.gl_account_id, analytic_value_id: v.analytic_value_id, amount: v.amount, comment: v.comment ?? null };
+        await (v.id ? apiPatch(`/api/v1/budget/forecast-lines/${v.id}`, f) : apiPost("/api/v1/budget/forecast-lines", { forecast_id: v.forecast_id, ...f }));
+        return;
+      }
       const tenantId = await fetchTenantId();
       const fields = { gl_account_id: v.gl_account_id, analytic_value_id: v.analytic_value_id, amount: v.amount, comment: v.comment ?? null };
       const q = v.id ? db.from("budget_forecast_lines").update(fields).eq("id", v.id) : db.from("budget_forecast_lines").insert({ tenant_id: tenantId, forecast_id: v.forecast_id, ...fields });
@@ -92,6 +99,7 @@ export function useDeleteBudgetForecastLine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/budget/forecast-lines/${id}`); return; }
       const { data, error } = await db.from("budget_forecast_lines").delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error(refused);
@@ -105,6 +113,7 @@ export function useImportBudgetForecast() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { forecast: string; rows: BudgetImportRow[] }) => {
+      if (isApiEnabled()) return Number(await apiPost("/api/v1/budget/actions/import_budget_forecast_lines", { _forecast: v.forecast, _rows: v.rows }));
       const { data, error } = await db.rpc("import_budget_forecast_lines", { _forecast: v.forecast, _rows: v.rows });
       if (error) throw error;
       return Number(data);
@@ -118,6 +127,7 @@ export function usePublishBudgetForecast() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/budget/actions/budget_forecast_publish", { _forecast: id }); return; }
       const { error } = await db.rpc("budget_forecast_publish", { _forecast: id });
       if (error) throw error;
     },
@@ -130,6 +140,7 @@ export function useDeleteBudgetForecast() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/budget/forecasts/${id}`); return; }
       const { data, error } = await db.from("budget_forecasts").delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error(refused);

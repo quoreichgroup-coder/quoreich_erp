@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { GLAuditEntry } from "@/components/GLPostingConfig";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export function useGLAuditLogs(batchFilter?: string) {
   return useQuery({
     queryKey: ["gl-audit-logs", batchFilter],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/gl/audit-logs${batchFilter ? `?batch=${encodeURIComponent(batchFilter)}` : ""}`);
       let query = supabase
         .from("gl_audit_logs")
         .select("id, batch_id, entry_id, action, user_name, details, hash, prev_hash, created_at")

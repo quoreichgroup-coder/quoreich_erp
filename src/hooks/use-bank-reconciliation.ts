@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { StatementLine } from "@/lib/bank-statement";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /* Relevés et rapprochement bancaire (V71) : écritures par fonctions, rapprochement manuel par la table. */
 const db = supabase as any;
@@ -20,6 +21,7 @@ export function useStatements(account: string | null) {
     queryKey: ["bank-statements-v71", account],
     enabled: !!account,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Statement[]>(`/api/v1/treasury/statements?accountId=${account}&status=imported`);
       const { data, error } = await db.from("bank_statements").select("*").eq("bank_account_id", account).eq("status", "imported").order("period_end", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Statement[];
@@ -34,6 +36,7 @@ export function useStatementRows(statement: string | null) {
     queryFn: async () => {
       const all: StatementRow[] = [];
       for (let from = 0; ; from += 1000) {
+        if (isApiEnabled()) { all.push(...await apiGet<any[]>(`/api/v1/treasury/statements/${statement}/lines`)); break; }
         const { data, error } = await db.from("bank_statement_lines").select("id, line_no, line_date, description, amount, reference, matched_transaction_id")
           .eq("statement_id", statement).order("line_date").order("line_no").range(from, from + 999);
         if (error) throw error;
@@ -50,6 +53,7 @@ export function useReconciliationsFor(account: string | null) {
     queryKey: ["bank-reconciliations-v71", account],
     enabled: !!account,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Reconciliation[]>(`/api/v1/treasury/reconciliations?accountId=${account}`);
       const { data, error } = await db.from("bank_reconciliations").select("*").eq("bank_account_id", account).order("period_end", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Reconciliation[];
@@ -58,6 +62,7 @@ export function useReconciliationsFor(account: string | null) {
 }
 
 const rpc = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/treasury/actions/${name}`, args);
   const { data, error } = await db.rpc(name, args);
   if (error) throw error;
   return data;
@@ -81,6 +86,7 @@ export function useSetMatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { line: string; transaction: string | null }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/treasury/statement-lines/${v.line}/match`, { transaction_id: v.transaction }); return; }
       const { data, error } = await db.from("bank_statement_lines").update({ matched_transaction_id: v.transaction }).eq("id", v.line).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Refusé : droit « Rapprocher les relevés » requis.");

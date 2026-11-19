@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 export interface GLAccount {
   id: string;
@@ -26,6 +27,7 @@ export function useGLAccounts() {
   return useQuery({
     queryKey: ["gl-accounts-full"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<GLAccount[]>("/api/v1/gl/accounts");
       const { data, error } = await supabase
         .from("gl_accounts")
         .select("*")
@@ -42,6 +44,10 @@ export function useAccountBalances() {
     queryKey: ["account-balances"],
     queryFn: async () => {
       // Get all journal lines from posted entries
+      if (isApiEnabled()) {
+        const rows = await apiGet<{ account_id: string; debit: number; credit: number }[]>("/api/v1/gl/account-balances");
+        return Object.fromEntries(rows.map((r) => [r.account_id, { debit: Number(r.debit) || 0, credit: Number(r.credit) || 0 }])) as Record<string, { debit: number; credit: number }>;
+      }
       const { data, error } = await supabase
         .from("journal_lines")
         .select("account_id, debit, credit, entry_id, entry:journal_entries!inner(status)");
@@ -126,6 +132,7 @@ export function useCreateGLAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (account: { code: string; name: string; account_type: string; parent_id?: string | null; is_active?: boolean }) => {
+      if (isApiEnabled()) return apiPost<any>("/api/v1/gl/accounts", account);
       const tenant_id = await fetchTenantId();
       const { data, error } = await supabase
         .from("gl_accounts")
@@ -149,6 +156,7 @@ export function useUpdateGLAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; code?: string; name?: string; account_type?: string; is_active?: boolean; parent_id?: string | null }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/gl/accounts/${id}`, updates); return; }
       const { data, error } = await (supabase as any)
         .from("gl_accounts")
         .update(updates)
@@ -182,6 +190,7 @@ export function useTrialBalance() {
   return useQuery({
     queryKey: ["gl-trial-balance"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<TrialBalanceRow[]>("/api/v1/gl/trial-balance");
       const { data, error } = await (supabase as any)
         .from("gl_trial_balance")
         .select("*")
@@ -213,6 +222,7 @@ export function useLedgerDetail(accountId?: string) {
   return useQuery({
     queryKey: ["gl-ledger-detail", accountId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<LedgerDetailRow[]>(`/api/v1/gl/ledger${accountId ? `?accountId=${accountId}` : ""}`);
       let q = (supabase as any).from("gl_ledger_detail").select("*");
       if (accountId) q = q.eq("account_id", accountId);
       const { data, error } = await q.order("entry_date").order("entry_number");
@@ -241,6 +251,7 @@ export function useGLPeriods() {
   return useQuery({
     queryKey: ["gl-periods"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<GLPeriodRow[]>("/api/v1/gl/periods");
       const { data, error } = await (supabase as any)
         .from("gl_periods_view")
         .select("*")
@@ -255,6 +266,7 @@ export function useCloseGLPeriod() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (period: string) => {
+      if (isApiEnabled()) return apiPost<any>(`/api/v1/gl/periods/${period}/close`, {});
       const { data, error } = await (supabase as any).rpc("close_gl_period", { _period: period });
       if (error) throw error;
       return data;
@@ -273,6 +285,7 @@ export function useReopenGLPeriod() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ period, reason }: { period: string; reason: string }) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/gl/periods/${period}/reopen`, { reason }); return; }
       const { error } = await (supabase as any).rpc("set_period_status", {
         _period: period, _module: "GL", _status: "open", _reason: reason,
       });
@@ -292,6 +305,8 @@ export function useReverseJournalEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ entryId, reverseDate, reason }: { entryId: string; reverseDate?: string; reason?: string }) => {
+      if (isApiEnabled()) return apiPost<string>(`/api/v1/gl/journal-entries/${entryId}/reverse`, {
+        reverse_date: reverseDate ?? new Date().toISOString().slice(0, 10), reason: reason ?? "Contre-passation" });
       const { data, error } = await (supabase as any).rpc("reverse_journal_entry", {
         _entry_id: entryId,
         _reverse_date: reverseDate ?? new Date().toISOString().slice(0, 10),
@@ -334,6 +349,10 @@ export function useGLSig(fromPeriod?: string, toPeriod?: string) {
   return useQuery({
     queryKey: ["gl-sig", fromPeriod, toPeriod],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const qs = new URLSearchParams({ ...(fromPeriod ? { from: fromPeriod } : {}), ...(toPeriod ? { to: toPeriod } : {}) });
+        return apiGet<GLSigRow[]>(`/api/v1/gl/sig?${qs}`);
+      }
       let q = (supabase as any).from("gl_sig_view").select("*");
       if (fromPeriod) q = q.gte("period", fromPeriod);
       if (toPeriod) q = q.lte("period", toPeriod);

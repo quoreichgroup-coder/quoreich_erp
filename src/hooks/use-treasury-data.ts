@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { computeTreasuryPerms, permsCacheKey, type TreasuryPerms, type TreasuryRole } from "@/lib/treasury-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 export function useBankAccounts() {
   const { data: tenantId } = useTenantId();
@@ -16,6 +17,7 @@ export function useBankAccounts() {
     enabled: !!tenantId,
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/accounts");
       if (!tenantId) throw new Error("Aucune société sélectionnée");
       const { data, error } = await supabase.from("bank_accounts").select("*").eq("tenant_id", tenantId).order("name");
       if (error) throw error;
@@ -31,6 +33,7 @@ export function useBankTransactions(accountId?: string) {
     enabled: !!tenantId,
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/treasury/transactions${accountId ? `?accountId=${accountId}` : ""}`);
       if (!tenantId) throw new Error("Aucune société sélectionnée");
       const fetchPage = async (offset: number) => {
         let q = supabase.from("bank_transactions").select("*, bank_account:bank_accounts(name)").eq("tenant_id", tenantId);
@@ -56,6 +59,7 @@ export function useCreateBankAccount() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: { name: string; bank_name: string; account_number?: string; currency?: string; balance?: number; account_type?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/treasury/accounts", input); return; }
       const { error } = await supabase.from("bank_accounts").insert({ ...input, tenant_id: tenantId! });
       if (error) throw error;
     },
@@ -83,6 +87,7 @@ export function useCashPosition() {
   return useQuery({
     queryKey: ["treasury-cash-position"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/views/cash-position");
       const { data, error } = await supabase
         .from("treasury_cash_position_view" as never)
         .select("*");
@@ -99,6 +104,7 @@ export function useReconciliationStatus() {
   return useQuery({
     queryKey: ["treasury-recon-status"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/views/reconciliation-status");
       const { data, error } = await supabase
         .from("treasury_reconciliation_status_view" as never)
         .select("*");
@@ -115,6 +121,7 @@ export function useCashflowForecast13w() {
   return useQuery({
     queryKey: ["treasury-13w-forecast"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/views/forecast-13w");
       const { data, error } = await supabase
         .from("treasury_13w_forecast_view" as never)
         .select("*")
@@ -132,6 +139,7 @@ export function useBankStatements(accountId?: string) {
   return useQuery({
     queryKey: ["bank-statements", accountId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/treasury/statements${accountId ? `?accountId=${accountId}` : ""}`);
       let q = supabase.from("bank_statements" as never).select("*");
       if (accountId) q = (q as any).eq("bank_account_id", accountId);
       const { data, error } = await (q as any).order("statement_date", { ascending: false });
@@ -149,6 +157,7 @@ export function useStatementLines(statementId: string | null) {
     queryKey: ["statement-lines", statementId],
     enabled: !!statementId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/treasury/statements/${statementId}/lines`);
       const { data, error } = await supabase
         .from("bank_statement_lines" as never)
         .select("*")
@@ -167,6 +176,7 @@ export function useMatchLine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ lineId, transactionId }: { lineId: string; transactionId: string | null }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/treasury/statement-lines/${lineId}/match`, { transaction_id: transactionId }); return; }
       const { error } = await (supabase
         .from("bank_statement_lines" as never) as any)
         .update({ matched_transaction_id: transactionId })
@@ -188,6 +198,7 @@ export function useSuggestMatches(lineId: string | null) {
     queryKey: ["suggest-matches", lineId],
     enabled: !!lineId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiPost<any>(`/api/v1/treasury/actions/suggest_bank_matches`, { p_line_id: lineId });
       const { data, error } = await supabase.rpc("suggest_bank_matches" as never, { p_line_id: lineId } as never);
       if (error) throw error;
       return (data ?? []) as Array<{
@@ -201,6 +212,7 @@ export function useReconciliations() {
   return useQuery({
     queryKey: ["bank-reconciliations"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/reconciliations");
       const { data, error } = await supabase
         .from("bank_reconciliations" as never)
         .select("*")
@@ -219,6 +231,7 @@ export function useCashflowForecastRows() {
   return useQuery({
     queryKey: ["cashflow-forecasts"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/forecasts");
       const { data, error } = await supabase
         .from("cashflow_forecasts" as never)
         .select("*")
@@ -240,6 +253,7 @@ export function useUpsertCashflowForecast() {
       id?: string; week_start: string; category: string; direction: "inflow" | "outflow";
       amount_forecast: number; bank_account_id?: string | null; source?: string; notes?: string | null;
     }) => {
+      if (isApiEnabled()) { const { id, ...row } = input; await (id ? apiPatch(`/api/v1/treasury/forecasts/${id}`, row) : apiPost("/api/v1/treasury/forecasts", row)); return; }
       const payload = { ...input, tenant_id: tenantId! };
       const table = supabase.from("cashflow_forecasts" as never) as any;
       if (input.id) {
@@ -280,6 +294,7 @@ export function useAssignTreasuryRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: TreasuryRole; action: "assign" | "revoke"; comment?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/treasury/actions/assign_treasury_role", { p_target_user: input.target_user, p_role: input.role, p_action: input.action, p_comment: input.comment ?? null }); return; }
       const { error } = await supabase.rpc("assign_treasury_role" as never, {
         p_target_user: input.target_user,
         p_role: input.role,
@@ -304,6 +319,7 @@ export function useTreasuryRoleAudit() {
   return useQuery({
     queryKey: ["treasury-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/role-audit");
       const { data, error } = await supabase
         .from("treasury_role_audit" as never)
         .select("*")

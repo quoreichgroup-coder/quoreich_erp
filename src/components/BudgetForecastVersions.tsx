@@ -19,6 +19,7 @@ import { exportToXLSX } from "@/lib/xlsx";
 import { readTableFile, TABLE_FILE_ACCEPT } from "@/lib/table-file";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /*
  * Prévisions saisies (V78) : versions par exercice, établies à partir de l'atterrissage calculé, du budget de
@@ -191,7 +192,8 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
             for (const r of status) { const k = keyOf(r.account_id, r.analytic_value_id); const e = m.get(k); m.set(k, { gl_account_id: r.account_id, analytic_value_id: r.analytic_value_id, amount: (e?.amount ?? 0) + r.planned }); }
             seed = [...m.values()];
           } else if (init !== "empty") {
-            const { data, error } = await (supabase as any).from("budget_forecast_lines").select("gl_account_id, analytic_value_id, amount").eq("forecast_id", init);
+            const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/budget/forecasts/${init}/lines`), error: null }
+              : await (supabase as any).from("budget_forecast_lines").select("gl_account_id, analytic_value_id, amount").eq("forecast_id", init);
             if (error) { toast.error(error.message); return; }
             seed = ((data ?? []) as any[]).map((l) => ({ gl_account_id: l.gl_account_id, analytic_value_id: l.analytic_value_id, amount: Number(l.amount) }));
           }

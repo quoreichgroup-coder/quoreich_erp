@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Contrôles du grand livre (V106) : fonctions SECURITY INVOKER de la base (la RLS limite à la société),
@@ -45,7 +46,8 @@ export function useGlFindings(from: string, to: string) {
     enabled: Boolean(tenantId && from && to),
     retry: false,
     queryFn: async (): Promise<GlFinding[]> => {
-      const { data, error } = await db.rpc("gl_control_findings", { _from: from, _to: to });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/gl/controls/findings?from=${from}&to=${to}`), error: null }
+        : await db.rpc("gl_control_findings", { _from: from, _to: to });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, amount: Number(r.amount) }));
     },
@@ -59,7 +61,7 @@ export function useGlIntegrity() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async (): Promise<GlIntegrityCheck[]> => {
-      const { data, error } = await db.rpc("gl_integrity_checks");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/gl/controls/integrity"), error: null } : await db.rpc("gl_integrity_checks");
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, issues: Number(r.issues) }));
     },
@@ -73,7 +75,8 @@ export function useGlReconciliation(asOf: string) {
     enabled: Boolean(tenantId && asOf),
     retry: false,
     queryFn: async (): Promise<GlReconciliation[]> => {
-      const { data, error } = await db.rpc("gl_subledger_reconciliation", { _as_of: asOf });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/gl/controls/reconciliation?asOf=${asOf}`), error: null }
+        : await db.rpc("gl_subledger_reconciliation", { _as_of: asOf });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, subledger: Number(r.subledger), ledger: Number(r.ledger), difference: Number(r.difference) }));
     },
@@ -86,7 +89,8 @@ export function useGlControlSettings() {
     queryKey: ["gl-control-settings", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<GlControlSettings> => {
-      const { data, error } = await db.from("gl_control_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/gl/controls/settings"), error: null }
+        : await db.from("gl_control_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return {
         large_entry_threshold: data?.large_entry_threshold == null ? null : Number(data.large_entry_threshold),
@@ -111,6 +115,7 @@ export function useSaveGlControlSettings() {
   return useMutation({
     mutationFn: async (s: GlControlSettings) => {
       const tenant_id = await fetchTenantId();
+      if (isApiEnabled()) { await apiPut("/api/v1/gl/controls/settings", s); return; }
       const { data, error } = await db.from("gl_control_settings").upsert({ tenant_id, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;
       if (!data?.length) throw new Error("Droit « accounting.controls » requis pour modifier les contrôles.");
@@ -125,7 +130,8 @@ export function useReviewFinding() {
   return useMutation({
     mutationFn: async ({ check, entryId, comment }: { check: string; entryId: string; comment: string }) => {
       const tenant_id = await fetchTenantId();
-      const { error } = await db.from("gl_control_reviews").insert({ tenant_id, check_code: check, entry_id: entryId, comment });
+      const { error } = isApiEnabled() ? (await apiPost("/api/v1/gl/controls/reviews", { check_code: check, entry_id: entryId, comment }), { error: null })
+        : await db.from("gl_control_reviews").insert({ tenant_id, check_code: check, entry_id: entryId, comment });
       if (error) throw new Error(/row-level security/i.test(error.message) ? "Droit « accounting.controls » requis pour examiner une anomalie." : error.message);
     },
     onSuccess: () => { invalidate(); toast.success("Examen enregistré"); },
@@ -145,6 +151,7 @@ export function useGlAuditTrail(from: string, to: string) {
     queryFn: async (): Promise<GlAuditRow[]> => {
       const all: GlAuditRow[] = [];
       for (let start = 0; ; start += 1000) {
+        if (isApiEnabled()) { all.push(...await apiGet<any[]>(`/api/v1/gl/audit-logs?from=${from}&to=${to}`)); break; }
         const { data, error } = await db.from("gl_audit_logs")
           .select("id, created_at, action, user_name, details, entry_id, entry:journal_entries(piece_number)")
           .eq("tenant_id", tenantId).gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59.999`)

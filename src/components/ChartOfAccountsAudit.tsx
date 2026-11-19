@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { exportToCSV } from "@/lib/csv-export";
 import { effectiveFramework, useCodePattern, useFrameworks, useOperationalChart } from "@/hooks/use-chart-frameworks";
+import { apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Contrôle du plan comptable (V60, générique depuis V64) : anomalies calculées par la base contre le
@@ -41,13 +42,15 @@ export function ChartOfAccountsAudit() {
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ["chart-issues"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("chart_of_accounts_issues");
+      const { data, error } = isApiEnabled() ? { data: await apiPost<any[]>("/api/v1/gl/charts/actions/chart_of_accounts_issues", {}), error: null }
+        : await (supabase as any).rpc("chart_of_accounts_issues");
       if (error) throw error;
       return (data ?? []) as Issue[];
     },
   });
   const run = useMutation({
     mutationFn: async ({ fn, args }: { fn: string; args?: Record<string, unknown>; ok: string }) => {
+      if (isApiEnabled()) return apiPost<any>(`/api/v1/gl/charts/actions/${fn}`, args ?? {});
       const { data, error } = await (supabase as any).rpc(fn, args ?? {});
       if (error) throw error;
       return data;

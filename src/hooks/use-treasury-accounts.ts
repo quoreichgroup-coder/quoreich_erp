@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
 import type { TreasuryAccount, TreasuryKind } from "@/lib/treasury-accounts";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Comptes de trésorerie et mouvements (V70) : comptes écrits sous droit treasury.manage_accounts
@@ -19,6 +20,7 @@ export function useTreasuryAccounts() {
     enabled: !!tenantId,
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return (await apiGet<any[]>("/api/v1/treasury/accounts")).map((a) => ({ ...a, balance: Number(a.balance ?? 0), opening_balance: Number(a.opening_balance ?? 0) })) as TreasuryAccount[];
       const { data, error } = await db.from("bank_accounts").select("*").eq("tenant_id", tenantId).order("account_type").order("name");
       if (error) throw error;
       return (data ?? []).map((a: any) => ({ ...a, balance: Number(a.balance ?? 0), opening_balance: Number(a.opening_balance ?? 0) })) as TreasuryAccount[];
@@ -36,6 +38,7 @@ export function useSaveTreasuryAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: TreasuryAccountInput) => {
+      if (isApiEnabled()) { const { id, ...row } = v; await (id ? apiPatch(`/api/v1/treasury/accounts/${id}`, row) : apiPost("/api/v1/treasury/accounts", row)); return; }
       const tenantId = await fetchTenantId();
       const { id, ...row } = v;
       const q = id ? db.from("bank_accounts").update(row).eq("id", id) : db.from("bank_accounts").insert({ ...row, tenant_id: tenantId });
@@ -49,6 +52,7 @@ export function useSaveTreasuryAccount() {
 }
 
 const rpc = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/treasury/actions/${name}`, args);
   const { data, error } = await db.rpc(name, args);
   if (error) throw error;
   return data;
@@ -73,6 +77,7 @@ export function useTreasuryMovements() {
     enabled: !!tenantId,
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/transactions");
       const all: any[] = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await db.from("bank_transactions")
@@ -95,6 +100,7 @@ export function useTreasuryRequireAccount() {
     queryKey: ["treasury-settings-v70", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return !!(await apiGet<any>("/api/v1/treasury/settings"))?.require_treasury_account;
       const { data, error } = await db.from("treasury_settings").select("require_treasury_account").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return !!data?.require_treasury_account;
@@ -102,6 +108,7 @@ export function useTreasuryRequireAccount() {
   });
   const save = useMutation({
     mutationFn: async (v: boolean) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/treasury/settings", { require_treasury_account: v }); return; }
       const { data, error } = await db.from("treasury_settings")
         .upsert({ tenant_id: tenantId, require_treasury_account: v, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;

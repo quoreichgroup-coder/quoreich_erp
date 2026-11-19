@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
+import { apiDelete, apiGet, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Référentiels comptables versionnés et règles de qualité (V64, lot PC-3). Les référentiels, versions
@@ -24,7 +25,9 @@ export function useFrameworks() {
   return useQuery({
     queryKey: ["accounting-frameworks"],
     queryFn: async () => {
-      const [f, v, n] = await Promise.all([
+      const [f, v, n] = isApiEnabled()
+        ? await apiGet<any>("/api/v1/gl/charts/frameworks").then((r) => [{ data: r.frameworks, error: null }, { data: r.versions, error: null }, { data: r.references, error: null }])
+        : await Promise.all([
         db.from("accounting_frameworks").select("*").order("code"),
         db.from("framework_versions").select("*").order("effective_from", { ascending: false }),
         db.from("framework_reference_accounts").select("framework_code"),
@@ -43,6 +46,7 @@ export function useOperationalChart() {
     queryKey: ["operational-chart", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<OperationalChart | null>("/api/v1/gl/charts/operational");
       const { data, error } = await db.from("charts").select("id, name, framework_code, framework_version")
         .eq("tenant_id", tenantId).eq("kind", "operational").eq("status", "active").maybeSingle();
       if (error) throw error;
@@ -60,6 +64,10 @@ export function useQualityRules(framework: string | undefined) {
     queryKey: ["quality-rules", tenantId, framework],
     enabled: !!tenantId && !!framework,
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const q = await apiGet<any>(`/api/v1/gl/charts/quality-rules?framework=${framework}`);
+        return { rules: q.rules as QualityRule[], overrides: q.tenant as TenantRule[] };
+      }
       const [r, t] = await Promise.all([
         db.from("framework_quality_rules").select("*").eq("framework_code", framework).order("rule_code"),
         db.from("tenant_quality_rules").select("rule_code, enabled, severity").eq("tenant_id", tenantId),
@@ -93,6 +101,11 @@ export function useSetQualityRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { rule_code: string; enabled: boolean; severity: Severity | null } | { rule_code: string; reset: true }) => {
+      if (isApiEnabled()) {
+        if ("reset" in v) await apiDelete(`/api/v1/gl/charts/quality-rules/${v.rule_code}`);
+        else await apiPut(`/api/v1/gl/charts/quality-rules/${v.rule_code}`, { enabled: v.enabled, severity: v.severity });
+        return;
+      }
       const tenantId = await fetchTenantId();
       if ("reset" in v) {
         const { error } = await db.from("tenant_quality_rules").delete().eq("tenant_id", tenantId).eq("rule_code", v.rule_code);

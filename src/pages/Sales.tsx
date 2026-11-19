@@ -11,6 +11,7 @@ import { useQuotations, useSalesOrders } from "@/hooks/use-sales-data";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -22,7 +23,7 @@ export default function Sales() {
     queryKey: ["ar-invoices-for-sales-dash", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("ar_invoices").select("total, amount_paid, status, invoice_date, customer:customers(name)").eq("tenant_id", tenantId!).order("invoice_date", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/ar-invoices-summary"), error: null } : await supabase.from("ar_invoices").select("total, amount_paid, status, invoice_date, customer:customers(name)").eq("tenant_id", tenantId!).order("invoice_date", { ascending: false });
       if (error) throw error;
       return data || [];
     },

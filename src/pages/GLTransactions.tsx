@@ -17,6 +17,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
+import { apiGet, apiPost } from "@/api/client";
 
 /*
  * Grand livre → Transactions : les écritures RÉELLES, telles que comptabilisées (V38 : journal,
@@ -52,8 +53,9 @@ function useGLEntries() {
   const { data: tenantId } = useTenantId();
   return useQuery({
     queryKey: ["gl-transactions", tenantId],
-    enabled: !!tenantId && !isApiEnabled(),
+    enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Entry[]>("/api/v1/gl/transactions");
       const all: Entry[] = [];
       // Toutes les pages : aucune écriture tronquée (la liste sert aussi à l'export).
       for (let from = 0; ; from += 1000) {
@@ -103,7 +105,8 @@ function GLBulkBar({ sel }: { sel: Selection<Entry> }) {
           const r = window.prompt(`Motif de la contre-passation de ${reversibles.length} écriture(s) manuelle(s)`);
           if (r && r.trim()) bulk.mutate({ ids: reversibles, done: "écriture(s) contre-passée(s)",
             invalidate: ["gl-transactions", "journal-entries", "gl-trial-balance", "account-balances"],
-            run: async (id) => check(await (supabase as any).rpc("reverse_journal_entry", { _entry_id: id, _reverse_date: new Date().toISOString().slice(0, 10), _reason: r.trim() })) },
+            run: async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/gl/journal-entries/${id}/reverse`, { reverse_date: new Date().toISOString().slice(0, 10), reason: r.trim() }); return; }
+              check(await (supabase as any).rpc("reverse_journal_entry", { _entry_id: id, _reverse_date: new Date().toISOString().slice(0, 10), _reason: r.trim() })); } },
             { onSuccess: sel.clear });
         }} />
     </BulkBar>
@@ -169,9 +172,7 @@ export default function GLTransactions() {
       <GuidanceBanner title="Transactions du grand livre"
         description="Écritures comptabilisées depuis les livres auxiliaires (ventes, achats, banque, paie, stock), écritures manuelles et contre-passations, avec leur journal, leur numéro de pièce et leur lot. Cliquez une écriture pour voir ses lignes." />
 
-      {isApiEnabled() ? (
-        <p className="text-sm text-muted-foreground mt-4">Sur site, la consultation du grand livre par l'API arrive avec le Lot 3 (tranche GL).</p>
-      ) : (
+      {(
         <>
           <div className="flex gap-1 border-b border-border mt-4">
             {tabs.map((t) => (

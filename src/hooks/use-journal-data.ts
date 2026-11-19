@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 export interface JournalEntry {
   id: string;
@@ -39,6 +40,7 @@ export function useJournalEntries() {
   return useQuery({
     queryKey: ["journal-entries"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<JournalEntry[]>("/api/v1/gl/journal-entries");
       const { data, error } = await supabase
         .from("journal_entries")
         .select("*, lines:journal_lines(*, account:gl_accounts(id, code, name))")
@@ -53,6 +55,7 @@ export function useGLAccounts() {
   return useQuery({
     queryKey: ["gl-accounts"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/gl/accounts?activeOnly=true");
       const { data, error } = await supabase
         .from("gl_accounts")
         .select("id, code, name, account_type, is_active")
@@ -77,6 +80,8 @@ export function useCreateJournalEntry() {
       /** analytics : section par axe ({ axisId: valueId }), contrôlée à la comptabilisation (QG002). */
       lines: { account_id: string; description: string; debit: number; credit: number; analytics?: Record<string, string> }[];
     }) => {
+      // Sur site : brouillon, lignes, sections et comptabilisation en une transaction (un refus n'en laisse rien).
+      if (isApiEnabled()) return apiPost<any>("/api/v1/gl/journal-entries", entry);
       const tenant_id = await fetchTenantId();
       const { lines, status, ...header } = entry;
 

@@ -51,7 +51,12 @@ public class DatabaseRefusalAdvice {
       return ResponseEntity.status(status == 500 ? 500 : status)
           .body(Map.of("error", "Le serveur a rencontré une erreur : réessayez, ou contactez l'administrateur"));
     }
-    return ResponseEntity.status(status).body(Map.of("error", message));
+    // Le code SQLSTATE accompagne le message (comme dans la réponse de Supabase) : les écrans et les
+    // parcours reconnaissent un refus métier attendu (QG007, QG008…) sans dépendre de la formulation.
+    Map<String, String> body = new java.util.LinkedHashMap<>();
+    body.put("code", s);
+    body.put("error", message);
+    return ResponseEntity.status(status).body(body);
   }
 
   /** Message du serveur sans le préfixe de gravité ni les lignes de contexte (Where, Detail…). */

@@ -14,6 +14,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { DISABLEABLE_CHECKS, useGlControlSettings, useSaveGlControlSettings, type GlControlSettings } from "@/hooks/use-gl-controls";
 import { cn } from "@/lib/utils";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /*
  * Paramètres du grand livre : comptabilisation (rôles et jeux de comptes), contrôles (V106), journaux et
@@ -79,8 +80,8 @@ function JournalsAndNumbering() {
     enabled: Boolean(tenantId),
     queryFn: async () => {
       const [j, c] = await Promise.all([
-        db.from("accounting_journals").select("code, label, sort_order").order("sort_order"),
-        db.from("journal_piece_counters").select("journal_code, year, last_value").eq("tenant_id", tenantId).order("year", { ascending: false }),
+        isApiEnabled() ? apiGet<any>("/api/v1/gl/journals").then((r) => ({ data: r.journals, error: null })) : db.from("accounting_journals").select("code, label, sort_order").order("sort_order"),
+        isApiEnabled() ? apiGet<any>("/api/v1/gl/journals").then((r) => ({ data: r.counters, error: null })) : db.from("journal_piece_counters").select("journal_code, year, last_value").eq("tenant_id", tenantId).order("year", { ascending: false }),
       ]);
       if (j.error) throw j.error;
       if (c.error) throw c.error;
@@ -120,7 +121,7 @@ function Currency() {
     queryKey: ["tenant-currency", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await db.from("tenants").select("currency").eq("id", tenantId).single();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/tenant"), error: null } : await db.from("tenants").select("currency").eq("id", tenantId).single();
       if (error) throw error;
       return (data?.currency as string) ?? null;
     },

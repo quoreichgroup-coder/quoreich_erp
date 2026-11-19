@@ -14,6 +14,7 @@ import { useChartMappings } from "@/hooks/use-chart-mappings";
 import { useImportSettings, useSaveImportSettings } from "@/hooks/use-chart-import";
 import { ExportButtons } from "@/components/ExportButtons";
 import { cn } from "@/lib/utils";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Migration du plan opérationnel (V67, lot PC-6) : à partir d'une correspondance validée, simulation
@@ -40,6 +41,7 @@ function useMigrations() {
     queryKey: ["chart-migrations", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Migration[]>("/api/v1/gl/charts/migrations");
       const { data, error } = await db.from("chart_migrations").select("*").eq("tenant_id", tenantId).order("simulated_at", { ascending: false }).limit(30);
       if (error) throw error;
       return (data ?? []) as Migration[];
@@ -49,7 +51,10 @@ function useMigrations() {
 function useRpc<V>(name: string, args: (v: V) => Record<string, unknown>, ok: (d: any) => string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: V) => { const { data, error } = await db.rpc(name, args(v)); if (error) throw error; return data; },
+    mutationFn: async (v: V) => {
+      if (isApiEnabled()) return apiPost<any>(`/api/v1/gl/charts/actions/${name}`, args(v));
+      const { data, error } = await db.rpc(name, args(v)); if (error) throw error; return data;
+    },
     onSuccess: (d) => { for (const k of KEYS) qc.invalidateQueries({ queryKey: [k] }); toast.success(ok(d)); },
     onError: (e: Error) => toast.error(e.message),
   });

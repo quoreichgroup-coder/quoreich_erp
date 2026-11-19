@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /* Correspondances entre plans et plans secondaires (V66, lot PC-5). Écritures par RPC uniquement. */
 export type SecondaryChart = { id: string; code: string; name: string; framework_code: string | null; framework_version: string | null; status: string };
@@ -19,6 +20,7 @@ export type MappedBalance = { target_code: string; target_name: string; target_t
 const db = supabase as any;
 const KEYS = ["secondary-charts", "chart-mappings", "chart-mapping-compare", "mapped-trial-balance", "chart-mapping-lines"];
 const call = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/gl/charts/actions/${name}`, args);
   const { data, error } = await db.rpc(name, args);
   if (error) throw error;
   return data;
@@ -38,6 +40,7 @@ export function useSecondaryCharts() {
     queryKey: ["secondary-charts", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<SecondaryChart[]>("/api/v1/gl/charts/secondary");
       const { data, error } = await db.from("charts").select("id, code, name, framework_code, framework_version, status").eq("tenant_id", tenantId).eq("kind", "secondary").order("code");
       if (error) throw error;
       return (data ?? []) as SecondaryChart[];
@@ -51,6 +54,7 @@ export function useChartMappings() {
     queryKey: ["chart-mappings", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<ChartMapping[]>("/api/v1/gl/charts/mappings");
       const { data, error } = await db.from("chart_mappings").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ChartMapping[];
@@ -65,6 +69,7 @@ export function useMappingLineAuthors(mappingId: string | null) {
     queryFn: async () => {
       const all: { id: string; proposed_by: string | null; comment: string | null }[] = [];
       for (let from = 0; ; from += 1000) {
+        if (isApiEnabled()) { all.push(...await apiGet<any[]>(`/api/v1/gl/charts/mappings/${mappingId}/proposers`)); break; }
         const { data, error } = await db.from("chart_mapping_lines").select("id, proposed_by, comment").eq("mapping_id", mappingId).range(from, from + 999);
         if (error) throw error;
         all.push(...(data ?? []));

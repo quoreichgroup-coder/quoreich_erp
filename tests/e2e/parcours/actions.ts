@@ -51,7 +51,7 @@ export async function demandeObligatoire(page: Page, actif: boolean) {
 
 /** Page de l'approbateur (second membre de la société de test, session enregistrée par 01-approbateur). */
 export async function pageApprobateur(browser: import("@playwright/test").Browser, baseURL: string | undefined) {
-  const ctx = await browser.newContext({ baseURL, locale: "fr-FR", storageState: "test-results-parcours/.auth/approbateur.json" });
+  const ctx = await browser.newContext({ baseURL, locale: "fr-FR", storageState: `${process.env.E2E_AUTH_DIR ?? "test-results-parcours/.auth"}/approbateur.json` });
   return { ctx, page: await ctx.newPage() };
 }
 

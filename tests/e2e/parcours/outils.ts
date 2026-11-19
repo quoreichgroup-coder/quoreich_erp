@@ -1,7 +1,9 @@
 import { readFileSync, existsSync } from "node:fs";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-export const SOCIETE_E2E = "E2E QUOREICH (société de test)";
+/** Parcours rejoués sur site (playwright.sur-site.config.ts, projet « parcours-sur-site ») : E2E_SUR_SITE=1. */
+export const SUR_SITE = process.env.E2E_SUR_SITE === "1";
+export const SOCIETE_E2E = SUR_SITE ? "E2E QUOREICH (sur site)" : "E2E QUOREICH (société de test)";
 
 export function verifierIdentiteE2E(email: string) {
   if (!/^e2e[-.a-z0-9]*@[-a-z0-9.]+\.invalid$/i.test(email)) {
@@ -39,7 +41,7 @@ export function identifiants(qui: "auteur" | "approbateur" = "auteur"): { email:
 /** Préfixe unique par exécution : les données d'un passage se reconnaissent et ne se mélangent pas. */
 export const RUN = process.env.E2E_RUN_ID ?? `E2E-${Date.now().toString(36).toUpperCase()}`;
 
-export type Incident = { quand: string; type: "refus-serveur" | "erreur-console" | "erreur-page"; detail: string };
+export type Incident = { quand: string; type: "refus-serveur" | "erreur-console" | "erreur-page" | "acces-nuage"; detail: string };
 
 /**
  * Observe la page : refus du serveur (réponses ≥ 400 de Supabase, avec le message renvoyé),
@@ -55,6 +57,15 @@ export function surveiller(page: Page) {
     const u = new URL(r.url());
     incidents.push({ quand: etape, type: "refus-serveur", detail: `${r.request().method()} ${u.pathname}${u.search.slice(0, 120)} → ${r.status()} ${corps}` });
   });
+  // Sur site, toute donnée doit venir de l'API Java : un accès aux données de Supabase (hors connexion)
+  // est un incident, lecture comprise — c'est la preuve qu'un module est entièrement porté.
+  if (SUR_SITE) page.on("request", (r) => {
+    const u = r.url();
+    if (r.method() !== "OPTIONS" && /supabase\.co\/(rest|functions|storage)\//.test(u)) {
+      const x = new URL(u);
+      incidents.push({ quand: etape, type: "acces-nuage", detail: `${r.method()} ${x.pathname}${x.search.slice(0, 80)}` });
+    }
+  });
   page.on("console", (m) => {
     if (m.type() === "error") incidents.push({ quand: etape, type: "erreur-console", detail: m.text().slice(0, 400) });
   });
@@ -66,7 +77,7 @@ export function surveiller(page: Page) {
     /**
      * Refus métier ANNONCÉ dans l'étape courante (ex. un paramètre de la société qui interdit
      * l'action) : le refus du serveur qui porte ce motif, et la ligne de console que le navigateur
-     * écrit pour toute réponse 400 ou 403, ne comptent pas comme incidents. Tout autre refus, oui.
+     * écrit pour toute réponse 400, 403, 409 ou 422 (Supabase ou API sur site), ne comptent pas comme incidents. Tout autre refus, oui.
      */
     refusAttendu(motif: RegExp) { attendus.push({ etape, motif }); },
     /** Incidents hors refus annoncés : c'est ce qu'un parcours exige vide. */
@@ -76,7 +87,7 @@ export function surveiller(page: Page) {
           .map((i) => i.quand));
       return incidents.filter((i) => {
         if (i.type === "refus-serveur") return !attendus.some((a) => a.etape === i.quand && a.motif.test(i.detail));
-        if (i.type === "erreur-console" && etapesTolerees.has(i.quand) && /status of 40[03]/.test(i.detail)) return false;
+        if (i.type === "erreur-console" && etapesTolerees.has(i.quand) && /status of 4(00|03|09|22)/.test(i.detail)) return false;
         return true;
       });
     },

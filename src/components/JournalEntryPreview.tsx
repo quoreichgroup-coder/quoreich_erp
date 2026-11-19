@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isApiEnabled } from "@/api/client";
+import { apiGet } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
@@ -13,8 +14,9 @@ export function JournalEntryPreview({ entryId }: { entryId: string | null | unde
   const api = isApiEnabled();
   const { data, isLoading, error } = useQuery({
     queryKey: ["journal-entry-preview", entryId],
-    enabled: !!entryId && !api,
+    enabled: !!entryId,
     queryFn: async () => {
+      if (api) return apiGet<any>(`/api/v1/gl/journal-entries/${entryId}`);
       const { data, error } = await (supabase as any)
         .from("journal_entries")
         .select("entry_number, entry_date, status, lines:journal_lines(debit, credit, description, account:gl_accounts(code, name))")
@@ -26,8 +28,7 @@ export function JournalEntryPreview({ entryId }: { entryId: string | null | unde
   });
 
   let body;
-  if (api) body = <p className="text-xs text-muted-foreground">Consultation de l'écriture sur site : avec le grand livre de l'API (Lot 3).</p>;
-  else if (!entryId) body = <p className="text-xs text-destructive">Aucune écriture comptable rattachée à cette pièce.</p>;
+  if (!entryId) body = <p className="text-xs text-destructive">Aucune écriture comptable rattachée à cette pièce.</p>;
   else if (isLoading) body = <p className="text-xs text-muted-foreground">Chargement…</p>;
   else if (error || !data) body = <p className="text-xs text-destructive">Écriture illisible.</p>;
   else {

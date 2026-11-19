@@ -16,6 +16,7 @@ import { DollarSign, Users, Package, Loader2 } from "lucide-react";
 import { useCustomers, useARPaymentTerms } from "@/hooks/use-ar-data";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR");
 
@@ -23,7 +24,7 @@ function useSellableItems() {
   return useQuery({
     queryKey: ["sellable-items"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/sellable-items"), error: null } : await supabase
         .from("items")
         .select("id, code, name, category, selling_price, unit, status")
         .eq("status", "active")
@@ -38,7 +39,7 @@ function useCustomerOutstanding() {
   return useQuery({
     queryKey: ["customer-outstanding"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/sales/ar-invoices-summary?excludeCancelled=true"), error: null } : await supabase
         .from("ar_invoices")
         .select("customer_id, total, amount_paid, status")
         .neq("status", "cancelled");

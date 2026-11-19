@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { periodBounds } from "@/lib/treasury-close";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export type TreasuryIdempotentAuditRow = {
   id: string;
@@ -31,7 +32,7 @@ export function useTreasuryIdempotentAudit(limit = 50) {
     queryKey: ["treasury-idempotent-audit", limit],
     queryFn: async (): Promise<TreasuryIdempotentAuditRow[]> => {
       type Raw = Omit<TreasuryIdempotentAuditRow, "period" | "period_start" | "period_end">;
-      const { data, error } = await (supabase as unknown as {
+      const { data, error } = isApiEnabled() ? { data: (await apiGet<Raw[]>("/api/v1/treasury/role-audit?action=period_close_idempotent")).slice(0, limit), error: null } : await (supabase as unknown as {
         from: (t: string) => {
           select: (s: string) => {
             eq: (

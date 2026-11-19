@@ -116,12 +116,19 @@ public class Sql {
   /** Met à jour les lignes répondant à une condition écrite par le module (jamais par le client). */
   @Transactional
   public JsonNode updateWhere(String table, Map<String, Object> body, Set<String> allowed, String where, Object... whereArgs) {
+    return updateWith(table, body, allowed, Map.of(), where, whereArgs);
+  }
+
+  /** Mise à jour avec des colonnes posées par le serveur (expressions constantes du module, ex. {@code posted_by -> auth.uid()}). */
+  @Transactional
+  public JsonNode updateWith(String table, Map<String, Object> body, Set<String> allowed, Map<String, String> server, String where, Object... whereArgs) {
     Map<String, Column> cols = columns(table);
     List<String> sets = new ArrayList<>();
     List<Object> args = new ArrayList<>();
+    for (Map.Entry<String, String> e : server.entrySet()) sets.add(ident(e.getKey()) + " = " + e.getValue());
     for (Map.Entry<String, Object> e : body.entrySet()) {
       String c = e.getKey();
-      if (!allowed.contains(c) || !cols.containsKey(c) || c.equals("tenant_id")) continue;
+      if (!writable(c, allowed, cols, server)) continue;
       sets.add(c + " = " + cast(cols.get(c), e.getValue()));
       args.add(bind(e.getValue()));
     }

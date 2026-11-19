@@ -20,6 +20,7 @@ import { useCloseTreasuryPeriod, useTreasuryCloseHistory, type TreasuryCloseHist
 import { useTreasuryIdempotentAudit } from "@/hooks/use-treasury-idempotent-audit";
 import { safeExportTreasuryCloseReport } from "@/lib/treasury-close-report";
 import { toast } from "sonner";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const tabs = [
   { id: "reconciliation", label: "Rapprochement bancaire", icon: CheckCircle },
@@ -307,6 +308,7 @@ function TreasuryLimitsTab() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/views/limits");
       const { data, error } = await (supabase as any).from("treasury_limit_status").select("*").eq("tenant_id", tenantId).order("name");
       if (error) throw error;
       return (data ?? []) as any[];
@@ -355,6 +357,7 @@ function TreasuryAuditTrail() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/audit-trail");
       const all: any[] = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await (supabase as any).from("treasury_audit_trail").select("*").eq("tenant_id", tenantId)

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isValidTreasuryPeriod, treasuryCloseMessage } from "@/lib/treasury-close";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 export type TreasuryCloseHistoryRow = {
   id: string;
@@ -21,7 +22,7 @@ export function useTreasuryCloseHistory(limit = 24) {
   return useQuery({
     queryKey: ["treasury-close-history", limit],
     queryFn: async (): Promise<TreasuryCloseHistoryRow[]> => {
-      const { data, error } = await (supabase as unknown as {
+      const { data, error } = isApiEnabled() ? { data: (await apiGet<TreasuryCloseHistoryRow[]>("/api/v1/treasury/views/close-history")).slice(0, limit), error: null } : await (supabase as unknown as {
         from: (t: string) => {
           select: (s: string) => {
             order: (
@@ -47,6 +48,7 @@ export function useCloseTreasuryPeriod() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (period: string) => {
+      if (isApiEnabled() && isValidTreasuryPeriod(period)) return apiPost<TreasuryCloseHistoryRow | null>("/api/v1/treasury/actions/close_treasury_period", { _period: period });
       if (!isValidTreasuryPeriod(period)) {
         throw new Error(treasuryCloseMessage("invalid_period", period));
       }
