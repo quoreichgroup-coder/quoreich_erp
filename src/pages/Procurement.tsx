@@ -26,6 +26,7 @@ import {
 import { useSuppliers } from "@/hooks/use-ap-data";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 const PIE_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--muted-foreground))"];
@@ -52,6 +53,7 @@ export default function Procurement() {
   const { data: thresholds } = useQuery({
     queryKey: ["approval-thresholds", "procurement-dashboard"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/procurement/thresholds");
       const { data, error } = await (supabase as any).from("procurement_approval_thresholds").select("id, doc_type, level, max_amount, approver, sla_hours")
         .order("doc_type").order("max_amount", { ascending: true, nullsFirst: false });
       if (error) throw error;
@@ -79,7 +81,7 @@ export default function Procurement() {
     acc[name] = (acc[name] || 0) + po.total;
     return acc;
   }, {});
-  const spendPieData = Object.entries(spendBySupplier).map(([name, amount]) => ({ name, amount }));
+  const spendPieData = Object.entries(spendBySupplier).map(([name, amount]) => ({ name, amount: Number(amount) }));
 
   const isLoading = loadingPR || loadingPO || loadingGR;
 

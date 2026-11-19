@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 export interface ERPAlertRow {
   id: string;
@@ -46,6 +47,10 @@ export function useERPAlerts(
   return useQuery({
     queryKey: ["erp-alerts", "list", { includeResolved, modules, severities }],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const qs = new URLSearchParams(Object.fromEntries(Object.entries({includeResolved: String(includeResolved), modules: modules.join(","), severities: severities.join(",")}).filter(([, v]) => v !== undefined && v !== "")) as Record<string, string>);
+        return apiGet<ERPAlertRow[]>(`/api/v1/alerts?${qs}`);
+      }
       let q = supabase
         .from("erp_alerts")
         .select("*")
@@ -81,6 +86,10 @@ export function useERPAlertsPaginated(params: AlertsQueryParams = {}) {
       includeResolved, module, severity, modules, severities, search, sortBy, sortDir, page, pageSize,
     }],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const qs = new URLSearchParams(Object.fromEntries(Object.entries({includeResolved: String(includeResolved), module, severity, modules: modules.join(","), severities: severities.join(","), search: search.trim(), sortBy, sortDir, page: String(page), pageSize: String(pageSize)}).filter(([, v]) => v !== undefined && v !== "")) as Record<string, string>);
+        return apiGet<{ rows: ERPAlertRow[]; total: number }>(`/api/v1/alerts/page?${qs}`);
+      }
       let q = supabase
         .from("erp_alerts")
         .select("*", { count: "exact" })
@@ -114,6 +123,10 @@ export function useUnreadAlertsCount(opts?: { modules?: string[]; severities?: s
   return useQuery({
     queryKey: ["erp-alerts-unread-count", { modules, severities }],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const qs = new URLSearchParams(Object.fromEntries(Object.entries({modules: modules.join(","), severities: severities.join(",")}).filter(([, v]) => v !== undefined && v !== "")) as Record<string, string>);
+        return apiGet<number>(`/api/v1/alerts/unread-count?${qs}`);
+      }
       let q = supabase
         .from("erp_alerts")
         .select("id", { count: "exact", head: true })
@@ -139,7 +152,7 @@ export function useRealtimeAlerts() {
   const instance = useId();
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || isApiEnabled()) return;
     const channel = supabase
       .channel(`erp-alerts-${tenantId}-${instance}`)
       .on(
@@ -175,6 +188,7 @@ export function useResolveAlert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/alerts/${id}/resolve`, {}); return; }
       const { error } = await (supabase as any).rpc("resolve_erp_alert", { _alert_id: id });
       if (error) throw error;
     },
@@ -190,6 +204,7 @@ export function useMarkAllAlertsRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
+      if (isApiEnabled()) return apiPost<number>("/api/v1/alerts/mark-all-read", {});
       const { data, error } = await (supabase as any).rpc("mark_all_erp_alerts_read");
       if (error) throw error;
       return data as number;
@@ -206,6 +221,8 @@ export function useResolveAllAlerts() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { module?: string; severity?: string } = {}) => {
+      if (isApiEnabled()) return apiPost<number>("/api/v1/alerts/resolve-all", {
+        module: args.module && args.module !== "all" ? args.module : null, severity: args.severity && args.severity !== "all" ? args.severity : null });
       const { data, error } = await (supabase as any).rpc("resolve_all_erp_alerts", {
         _module: args.module && args.module !== "all" ? args.module : null,
         _severity: args.severity && args.severity !== "all" ? args.severity : null,

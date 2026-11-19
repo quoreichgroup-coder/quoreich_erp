@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isApiEnabled } from "@/api/client";
 
 /**
  * Subscribes to Supabase Realtime changes on key financial tables
@@ -10,6 +11,8 @@ export function useRealtimeInvalidation() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Sur site, pas de temps réel Supabase : les écrans se rafraîchissent par React Query.
+    if (isApiEnabled()) return;
     const channel = supabase
       .channel("cfo-dashboard-realtime")
       .on(

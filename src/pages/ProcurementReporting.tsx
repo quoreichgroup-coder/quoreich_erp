@@ -11,6 +11,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { deliveryPerformance, engagedOrders, ordersByMonth, spendBy, type ReportGR, type ReportPO } from "@/lib/procurement-reporting";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /*
  * Approvisionnement → Rapports : dépenses engagées (commandes approuvées et suivantes), par fournisseur et
@@ -40,7 +41,7 @@ function useProcurementReportData() {
     retry: false,
     queryFn: async () => {
       const db = supabase as any;
-      const [pos, grs] = await Promise.all([
+      const [pos, grs] = isApiEnabled() ? await apiGet<{ pos: any[]; grs: ReportGR[] }>("/api/v1/procurement/report").then((r) => [r.pos, r.grs] as const) : await Promise.all([
         allPages<any>((f) => db.from("purchase_orders").select("id, po_number, order_date, expected_date, total, status, supplier:suppliers(name, category)")
           .eq("tenant_id", tenantId).order("order_date").range(f, f + 999)),
         allPages<ReportGR>((f) => db.from("goods_receipts").select("po_id, receipt_date, status").eq("tenant_id", tenantId).range(f, f + 999)),

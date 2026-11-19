@@ -73,6 +73,13 @@ Pour chaque module :
 4. **Parcours sur site du module** : il échoue si un seul accès de son périmètre, **lecture
    comprise**, part vers Supabase.
 
+Second membre sur site : `scripts/e2e/approbateur-sur-site.sql` (même identifiant que dans le nuage),
+session enregistrée par `tests/e2e/sur-site/01-approbateur.spec.ts`.
+
+Constat en cours de route : dès que la société vient de la base locale (`/me`), tout écran qui lit
+encore Supabase avec cet identifiant échoue visiblement (406, 0 ligne). Les parcours le détectent ;
+c'est ce qui a imposé de porter la coquille avec les premiers modules.
+
 Fin du chantier :
 - tous les parcours métier rejoués sur site ;
 - connexion locale (fournisseur d'identité sur site) ;
@@ -86,7 +93,7 @@ Fin du chantier :
 | Socle (`Sql`, refus, analytique des pièces, seuils d'approbation) | ✅ | ✅ | `PayableApiIT` | — |
 | Comptes fournisseurs (fournisseurs, factures à lignes, approbations, paiements, règlements, avoirs, retours, paramètres AP) | ✅ | ✅ | `PayableApiIT` | ✅ `20-fournisseurs-sur-site` |
 | Clients, facturation client, avoirs clients (lot 2) | ✅ | ✅ | existants | ✅ `10-clients-sur-site` |
-| Approvisionnement (demandes, commandes, réceptions, suivi, réapprovisionnement) | à faire | | | |
+| Approvisionnement (demandes, commandes, réceptions en une transaction, approbations, conversion, suivi des livraisons, rapprochement, réapprovisionnement, rapports, paramètres) | ✅ | ✅ | `ProcurementApiIT` | ✅ `30-achats-sur-site` (avec le second membre) |
 | Grand livre, journaux, plan comptable, référentiels, contrôles | à faire | | | |
 | Ventes (devis, commandes, livraisons, retours) | à faire | | | |
 | Stocks (articles, entrepôts, mouvements, inventaires, campagnes) | à faire | | | |
@@ -97,6 +104,7 @@ Fin du chantier :
 | CRM | à faire | | | |
 | RH et paie (reste) | partiel | | | |
 | Conformité, risques | à faire | | | |
-| Pilotage (tableaux de bord, CFO, alertes, IA), administration (calendrier, sociétés, modules, invitations, import) | à faire | | | |
+| Coquille : profil et société (`/me`), société courante, modules actifs, alertes, préférences de notification, calendrier fiscal | ✅ | ✅ | `ProcurementApiIT` (`/me`) | via tous les parcours sur site |
+| Pilotage (tableaux de bord, CFO, IA), administration (sociétés, modules, invitations, import) | à faire | | | |
 | Identité sur site (connexion sans Supabase Auth) | à faire | | | |
 | Fichiers (justificatifs) et temps réel | à faire | | | |

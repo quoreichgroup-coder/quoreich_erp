@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -9,6 +10,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<{ tenant_id: string | null } | null>("/api/v1/me");
       const { data } = await supabase.from("profiles").select("tenant_id").eq("id", user!.id).single();
       return data;
     },

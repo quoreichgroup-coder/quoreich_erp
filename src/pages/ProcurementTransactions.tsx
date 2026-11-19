@@ -52,6 +52,7 @@ import { INCOTERMS } from "@/lib/supplier";
 import { useSupplierReturns } from "@/hooks/use-supplier-returns";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocLine } from "@/lib/document-lines";
+import { apiDelete, apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -78,6 +79,7 @@ function useMyTenantId() {
   const { data } = useQuery({
     queryKey: ["my-profile", user?.id],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<{ tenant_id: string } | null>("/api/v1/me");
       const { data } = await supabase.from("profiles").select("tenant_id").eq("id", user!.id).single();
       return data;
     },
@@ -433,18 +435,21 @@ function ProcurementBulkBar({ docType, sel, approvals }: { docType: "PR" | "PO";
       <ExportMenu size="sm" variant="outline" className="h-7 text-xs" onPick={(f) => exportTable(f, rows as any[], cols as any, docType === "PR" ? "demandes-achat-selection" : "commandes-selection", docType === "PR" ? "Demandes d'achat" : "Commandes d'achat")}>Exporter</ExportMenu>
       <BulkButton count={editables.length} label="Soumettre" disabled={bulk.isPending}
         onClick={() => go(editables, `Soumettre ${editables.length} ${nom} à l'approbation ?`, `${nom} soumise(s)`,
-          async (id) => check(await db.rpc("procurement_submit", { _doc_type: docType, _doc_id: id })))} />
+          async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/procurement/documents/${docType}/${id}/submit`, {}); return; } check(await db.rpc("procurement_submit", { _doc_type: docType, _doc_id: id })); })} />
       <BulkButton count={enApprobation.length} label="Approuver le niveau en cours" disabled={bulk.isPending}
         onClick={() => go(enApprobation, `Approuver le niveau en cours de ${enApprobation.length} ${nom} ? (refusé pour vos propres pièces et sans le droit du niveau)`, "étape(s) approuvée(s)",
-          async (id) => check(await db.rpc("approve_procurement_step", { _approval_id: pendingOf(id).id, _comment: "Approbation groupée" })))} />
+          async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/procurement/approvals/${pendingOf(id).id}/approve`, { comment: "Approbation groupée" }); return; }
+            check(await db.rpc("approve_procurement_step", { _approval_id: pendingOf(id).id, _comment: "Approbation groupée" })); })} />
       <BulkButton count={annulables.length} label="Annuler" disabled={bulk.isPending}
         onClick={() => {
           const r = window.prompt(`Motif de l'annulation de ${annulables.length} ${nom}`);
           if (r && r.trim()) bulk.mutate({ ids: annulables, done: `${nom} annulée(s)`, invalidate,
-            run: async (id) => check(await db.rpc("procurement_cancel", { _doc_type: docType, _doc_id: id, _reason: r.trim() })) }, { onSuccess: sel.clear });
+            run: async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/procurement/documents/${docType}/${id}/cancel`, { reason: r.trim() }); return; }
+              check(await db.rpc("procurement_cancel", { _doc_type: docType, _doc_id: id, _reason: r.trim() })); } }, { onSuccess: sel.clear });
         }} />
       <BulkButton count={editables.length} label="Supprimer" danger disabled={bulk.isPending}
         onClick={() => go(editables, `Supprimer ${editables.length} ${nom} (brouillons ou rejetées) ?`, `${nom} supprimée(s)`, async (id) => {
+          if (isApiEnabled()) { await apiDelete(`/api/v1/procurement/documents/${docType}/${id}`); return; }
           const { data, error } = await db.from(docType === "PR" ? "purchase_requisitions" : "purchase_orders").delete().eq("id", id).select("id");
           if (error) throw new Error(error.message);
           if (!data?.length) throw new Error("Pièce introuvable ou non supprimable.");

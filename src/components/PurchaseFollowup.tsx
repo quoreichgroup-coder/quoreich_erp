@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { exportToCSV } from "@/lib/csv-export";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Suivi des livraisons fournisseurs (V56 ; SAP confirmations de commande et relances, Sage suivi des
@@ -30,6 +31,7 @@ function useFollowup() {
     queryKey: ["purchase-followup", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/procurement/followup");
       const { data, error } = await (supabase as any).from("purchase_order_followup_view").select("*")
         .eq("tenant_id", tenantId).order("promised_date", { ascending: true });
       if (error) throw error;
@@ -42,6 +44,11 @@ function useFollowupAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (a: { kind: "ack" | "reschedule"; poId: string; date: string; text: string }) => {
+      if (isApiEnabled()) {
+        await (a.kind === "ack" ? apiPost(`/api/v1/procurement/purchase-orders/${a.poId}/acknowledge`, { supplier_reference: a.text || null, confirmed_date: a.date })
+          : apiPost(`/api/v1/procurement/purchase-orders/${a.poId}/reschedule`, { new_date: a.date, reason: a.text }));
+        return;
+      }
       const { error } = a.kind === "ack"
         ? await (supabase as any).rpc("acknowledge_purchase_order", { _po_id: a.poId, _supplier_reference: a.text || null, _confirmed_date: a.date })
         : await (supabase as any).rpc("reschedule_purchase_order", { _po_id: a.poId, _new_date: a.date, _reason: a.text });

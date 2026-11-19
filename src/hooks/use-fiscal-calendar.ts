@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import type { FiscalModule, FiscalPeriod, FiscalYear, PeriodLock } from "@/lib/fiscal-calendar";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Calendrier fiscal central (V33). Lecture : fiscal_years, fiscal_periods, fiscal_modules et le
@@ -32,6 +33,7 @@ export function useFiscalCalendar() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async (): Promise<FiscalCalendar> => {
+      if (isApiEnabled()) return apiGet<FiscalCalendar>("/api/v1/fiscal-calendar");
       const [years, periods, modules, locks] = await Promise.all([
         check<FiscalYear[]>(db.from("fiscal_years").select("id, code, start_date, end_date, status").order("start_date")),
         check<FiscalPeriod[]>(db.from("fiscal_periods").select("id, fiscal_year_id, period_no, code, start_date, end_date")
@@ -55,7 +57,7 @@ export function useFiscalCalendarAudit(enabled: boolean) {
     queryKey: ["fiscal-calendar-audit", tenantId],
     enabled: Boolean(tenantId) && enabled,
     retry: false,
-    queryFn: async () => check<FiscalAuditRow[]>(db.from("fiscal_calendar_audit")
+    queryFn: async () => isApiEnabled() ? apiGet<FiscalAuditRow[]>("/api/v1/fiscal-calendar/audit") : check<FiscalAuditRow[]>(db.from("fiscal_calendar_audit")
       .select("seq, created_at, action, fiscal_year_code, period, module, reason, actor_id")
       .order("seq", { ascending: false }).limit(100)),
   });
@@ -81,21 +83,22 @@ function useCalendarMutation<I>(run: (i: I) => Promise<unknown>, success: string
 
 export function useCreateFiscalYear() {
   return useCalendarMutation(
-    (i: { start: string; end: string }) => check(db.rpc("create_fiscal_year", { _start: i.start, _end: i.end })),
+    (i: { start: string; end: string }) => isApiEnabled() ? apiPost("/api/v1/fiscal-calendar/years", i) : check(db.rpc("create_fiscal_year", { _start: i.start, _end: i.end })),
     "Exercice créé (non ouvert)");
 }
 
 export function useOpenFiscalYear() {
-  return useCalendarMutation((id: string) => check(db.rpc("open_fiscal_year", { _id: id })), "Exercice ouvert");
+  return useCalendarMutation((id: string) => isApiEnabled() ? apiPost(`/api/v1/fiscal-calendar/years/${id}/open`, {}) : check(db.rpc("open_fiscal_year", { _id: id })), "Exercice ouvert");
 }
 
 export function useCloseFiscalYear() {
-  return useCalendarMutation((id: string) => check(db.rpc("close_fiscal_year", { _id: id })), "Exercice clôturé définitivement");
+  return useCalendarMutation((id: string) => isApiEnabled() ? apiPost(`/api/v1/fiscal-calendar/years/${id}/close`, {}) : check(db.rpc("close_fiscal_year", { _id: id })), "Exercice clôturé définitivement");
 }
 
 export function useSetPeriodStatus() {
   return useCalendarMutation(
     (i: { period: string; module: string; status: "open" | "closed"; reason?: string }) =>
-      check(db.rpc("set_period_status", { _period: i.period, _module: i.module, _status: i.status, _reason: i.reason ?? null })),
+      isApiEnabled() ? apiPost("/api/v1/fiscal-calendar/period-status", { period: i.period, module: i.module, status: i.status, reason: i.reason ?? null })
+        : check(db.rpc("set_period_status", { _period: i.period, _module: i.module, _status: i.status, _reason: i.reason ?? null })),
     (i) => (i.status === "closed" ? "Période clôturée" : "Période rouverte"));
 }

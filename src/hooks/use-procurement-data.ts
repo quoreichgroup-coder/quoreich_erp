@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { saveDocumentAnalytics, saveLineAnalytics, type LineAnalytics } from "@/hooks/use-document-analytics";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
+
+const P = "/api/v1/procurement";
 
 // ── Requisitions ──────────────────────────────────────────────────────────
 
@@ -11,6 +14,7 @@ export function useRequisitions() {
   return useQuery({
     queryKey: ["purchase-requisitions"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/requisitions`);
       const { data, error } = await supabase
         .from("purchase_requisitions")
         .select("*, lines:requisition_lines(*)")
@@ -35,6 +39,8 @@ export function useCreateRequisition() {
       analytics?: Record<string, string>;
     }) => {
       const { lines, analytics, ...header } = input;
+      if (isApiEnabled()) return apiPost<any>(`${P}/documents/PR`, { ...header, analytics: analytics ?? null, lines: lines.map((l) => ({
+        description: l.description, quantity: l.quantity, estimated_unit_cost: l.estimated_unit_cost, item_id: l.item_id || null, analytics: l.analytics ?? null })) });
       const { data, error } = await supabase
         .from("purchase_requisitions")
         .insert(header)
@@ -83,6 +89,7 @@ export function usePurchaseOrders() {
   return useQuery({
     queryKey: ["purchase-orders"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/purchase-orders`);
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("*, supplier:suppliers(name), lines:po_lines(*)")
@@ -110,6 +117,8 @@ export function useCreatePurchaseOrder() {
     }) => {
       // En-tête puis lignes ; le total d'en-tête est recalculé par la base (recompute_po_total).
       const { lines, analytics, ...header } = input;
+      if (isApiEnabled()) return apiPost<any>(`${P}/documents/PO`, { ...header, analytics: analytics ?? null, lines: lines.map((l) => ({
+        description: l.description, quantity: l.quantity, unit_cost: l.unit_cost, item_id: l.item_id || null, analytics: l.analytics ?? null })) });
       const { data, error } = await (supabase as any)
         .from("purchase_orders")
         .insert(header)
@@ -162,6 +171,7 @@ export function useGoodsReceipts() {
   return useQuery({
     queryKey: ["goods-receipts"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/goods-receipts`);
       const { data, error } = await supabase
         .from("goods_receipts")
         .select("*, po:purchase_orders(po_number, supplier:suppliers(name)), lines:gr_lines(*)")
@@ -188,6 +198,7 @@ export function useCreateGoodsReceipt() {
     }) => {
       const { lines, complete, ...header } = input;
       if (lines.length === 0) throw new Error("Une réception comporte au moins une ligne.");
+      if (isApiEnabled()) return apiPost<any>(`${P}/goods-receipts`, { ...header, complete: !!complete, lines });
       const { data, error } = await supabase
         .from("goods_receipts")
         .insert({ ...header, status: "pending" })
@@ -233,6 +244,7 @@ export function useCompleteGoodsReceipt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost(`${P}/goods-receipts/${id}/complete`, {}); return; }
       const { data, error } = await supabase
         .from("goods_receipts")
         .update({ status: "completed" })
@@ -275,6 +287,7 @@ export function useThreeWayMatch(filter?: "all" | "discrepancy" | "matched" | "p
   return useQuery({
     queryKey: ["three-way-match", filter ?? "all"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<ThreeWayMatchRow[]>(`${P}/three-way-match?status=${filter ?? "all"}`);
       let q = supabase.from("three_way_match_view" as any).select("*").order("order_date", { ascending: false });
       if (filter && filter !== "all") q = q.eq("match_status", filter);
       const { data, error } = await q;
@@ -288,7 +301,8 @@ export function useProcurementKpis() {
   return useQuery({
     queryKey: ["procurement-kpis"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("procurement_kpis_view" as any).select("*").maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>(`${P}/kpis`), error: null }
+        : await supabase.from("procurement_kpis_view" as any).select("*").maybeSingle();
       if (error) throw error;
       return data as unknown as {
         pr_open: number; po_pending: number; gr_today: number;
@@ -304,6 +318,7 @@ export function useProcurementSettings() {
   return useQuery({
     queryKey: ["procurement-settings"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any>(`${P}/settings`);
       const { data, error } = await supabase.from("procurement_settings" as any).select("*").maybeSingle();
       if (error) throw error;
       return data as any;
@@ -316,6 +331,7 @@ export function useUpdateProcurementSettings() {
   return useMutation({
     mutationFn: async (patch: Record<string, any> & { id: string }) => {
       const { id, ...rest } = patch;
+      if (isApiEnabled()) { await apiPatch(`${P}/settings/${id}`, rest); return; }
       const { data, error } = await (supabase as any).from("procurement_settings").update(rest).eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Modification refusée : droit « Modifier les paramètres des achats » requis.");
@@ -333,6 +349,7 @@ export function useProcurementThresholds(docType?: "PR" | "PO") {
   return useQuery({
     queryKey: ["procurement-thresholds", docType ?? "all"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/thresholds${docType ? `?docType=${docType}` : ""}`);
       let q = supabase.from("procurement_approval_thresholds" as any).select("*").order("max_amount", { ascending: true, nullsFirst: false });
       if (docType) q = q.eq("doc_type", docType);
       const { data, error } = await q;
@@ -348,6 +365,7 @@ export function useApprovalQueue(docType?: "PR" | "PO", status: string = "pendin
   return useQuery({
     queryKey: ["procurement-approvals", docType ?? "all", status],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/approvals?status=${status}${docType ? `&docType=${docType}` : ""}`);
       let q = supabase.from("procurement_approvals" as any).select("*").order("created_at", { ascending: false });
       if (docType) q = q.eq("doc_type", docType);
       if (status !== "all") q = q.eq("status", status);
@@ -362,6 +380,7 @@ export function useApproveStep() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, comment }: { id: string; comment?: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/approvals/${id}/approve`, { comment: comment ?? null }); return; }
       const { error } = await supabase.rpc("approve_procurement_step" as any, { _approval_id: id, _comment: comment ?? null });
       if (error) throw error;
     },
@@ -379,6 +398,7 @@ export function useRejectStep() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, comment }: { id: string; comment: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/approvals/${id}/reject`, { comment }); return; }
       const { error } = await supabase.rpc("reject_procurement_step" as any, { _approval_id: id, _comment: comment });
       if (error) throw error;
     },
@@ -398,6 +418,7 @@ export function useConvertPRToPO() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ pr_id, supplier_id }: { pr_id: string; supplier_id: string }) => {
+      if (isApiEnabled()) return apiPost<string>(`${P}/requisitions/${pr_id}/convert`, { supplier_id });
       const { data, error } = await supabase.rpc("convert_pr_to_po" as any, { _pr_id: pr_id, _supplier_id: supplier_id });
       if (error) throw error;
       return data as string;
@@ -417,6 +438,7 @@ export function useRecordMatchDecision() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ po_id, decision, reason }: { po_id: string; decision: "accepted" | "revision_requested"; reason: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/purchase-orders/${po_id}/match-decision`, { decision, reason }); return; }
       const { error } = await supabase.rpc("record_match_decision" as any, { _po_id: po_id, _decision: decision, _reason: reason });
       if (error) throw error;
     },
@@ -433,6 +455,7 @@ export function useMatchDecisions(poId?: string) {
   return useQuery({
     queryKey: ["match-decisions", poId ?? "all"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/match-decisions${poId ? `?poId=${poId}` : ""}`);
       let q = supabase.from("procurement_match_decisions" as any).select("*").order("created_at", { ascending: false });
       if (poId) q = q.eq("po_id", poId);
       const { data, error } = await q;
@@ -448,6 +471,7 @@ export function useProcurementSLA() {
   return useQuery({
     queryKey: ["procurement-sla"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/sla`);
       const { data, error } = await supabase.from("procurement_sla_view" as any).select("*").order("po_date", { ascending: false }).limit(200);
       if (error) throw error;
       return (data ?? []) as any[];
@@ -461,6 +485,10 @@ export function useProcurementAudit(filters?: { dateFrom?: string; dateTo?: stri
   return useQuery({
     queryKey: ["procurement-audit", filters],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const qs = new URLSearchParams({ eventType: filters?.eventType ?? "all", ...(filters?.dateFrom ? { dateFrom: filters.dateFrom } : {}), ...(filters?.dateTo ? { dateTo: filters.dateTo } : {}) });
+        return apiGet<any[]>(`${P}/audit?${qs}`);
+      }
       let q = supabase.from("procurement_audit_view" as any).select("*").order("event_at", { ascending: false }).limit(500);
       if (filters?.dateFrom) q = q.gte("event_at", filters.dateFrom);
       if (filters?.dateTo) q = q.lte("event_at", filters.dateTo);
@@ -509,6 +537,7 @@ export function useAssignProcurementRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: string; action: "assign" | "revoke"; comment?: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/roles`, { target_user: input.target_user, role: input.role, action: input.action, comment: input.comment ?? null }); return; }
       const { error } = await supabase.rpc("assign_procurement_role" as any, {
         _target_user: input.target_user,
         _role: input.role,
@@ -533,6 +562,7 @@ export function useProcurementRoleAudit() {
   return useQuery({
     queryKey: ["procurement-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/role-audit`);
       const { data, error } = await supabase
         .from("procurement_role_audit" as any)
         .select("*")
@@ -565,6 +595,7 @@ export function useSubmitProcurement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ docType, id }: { docType: ProcurementDocType; id: string }) => {
+      if (isApiEnabled()) return apiPost<number>(`${P}/documents/${docType}/${id}/submit`, {});
       const { data, error } = await supabase.rpc("procurement_submit" as any, { _doc_type: docType, _doc_id: id });
       if (error) throw error;
       return data as number;
@@ -581,6 +612,7 @@ export function useCancelProcurement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ docType, id, reason }: { docType: ProcurementDocType; id: string; reason: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/documents/${docType}/${id}/cancel`, { reason }); return; }
       const { error } = await supabase.rpc("procurement_cancel" as any, { _doc_type: docType, _doc_id: id, _reason: reason });
       if (error) throw error;
     },
@@ -594,6 +626,7 @@ export function useDeleteProcurementDraft() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ docType, id }: { docType: ProcurementDocType; id: string }) => {
+      if (isApiEnabled()) { await apiDelete(`${P}/documents/${docType}/${id}`); return; }
       const { data, error } = await (supabase as any).from(TABLE[docType]).delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("Pièce introuvable ou non supprimable.");
@@ -613,6 +646,12 @@ export function useUpdateProcurementDraft() {
       analytics?: Record<string, string>;
     }) => {
       const db = supabase as any;
+      if (isApiEnabled()) {
+        await apiPut(`${P}/documents/${input.docType}/${input.id}`, { ...input.header, analytics: input.analytics ?? null, lines: input.lines.map((l) => input.docType === "PR"
+          ? { description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics ?? null }
+          : { description: l.description, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics ?? null }) });
+        return;
+      }
       const { data, error } = await db.from(TABLE[input.docType]).update(input.header).eq("id", input.id).select("id");
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("Pièce introuvable ou non modifiable.");

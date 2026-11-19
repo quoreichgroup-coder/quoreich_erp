@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPut, isApiEnabled } from "@/api/client";
 
 export interface NotificationPreferences {
   user_id: string;
@@ -21,6 +22,7 @@ export function useNotificationPreferences() {
   return useQuery({
     queryKey: ["notification-preferences"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<NotificationPreferences | null>("/api/v1/notification-preferences");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
@@ -39,6 +41,7 @@ export function useSaveNotificationPreferences() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (prefs: Omit<NotificationPreferences, "user_id" | "tenant_id">) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/notification-preferences", prefs); return; }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       if (!tenantId) throw new Error("No tenant");

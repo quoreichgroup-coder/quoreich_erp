@@ -44,10 +44,11 @@ export default defineConfig({
   },
   projects: [
     { name: "connexion-sur-site", testMatch: /00-connexion\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "approbateur-sur-site", testMatch: /01-approbateur\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     {
       name: "sur-site",
-      testIgnore: /00-connexion\.spec\.ts/,
-      dependencies: ["connexion-sur-site"],
+      testIgnore: /0[01]-(connexion|approbateur)\.spec\.ts/,
+      dependencies: ["connexion-sur-site", "approbateur-sur-site"],
       use: { ...devices["Desktop Chrome"], storageState: "test-results-sur-site/.auth/session.json" },
     },
   ],

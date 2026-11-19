@@ -13,6 +13,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /** Exercice en cours, lu dans le calendrier fiscal (remplace le libellé figé « AF 2025–2026 »). */
 function TopNavFiscalYear() {
@@ -35,6 +36,7 @@ export function TopNav() {
     queryKey: ["tenant-info", tenantId],
     queryFn: async () => {
       if (!tenantId) return null;
+      if (isApiEnabled()) return apiGet<{ name: string; currency: string } | null>("/api/v1/tenant");
       const { data } = await supabase
         .from("tenants")
         .select("name, currency")

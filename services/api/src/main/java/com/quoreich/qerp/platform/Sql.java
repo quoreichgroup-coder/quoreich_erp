@@ -93,6 +93,12 @@ public class Sql {
     return json(jdbc.queryForObject(insertSql(table, body, allowed, conflict, Map.of()), String.class, values(table, body, allowed, Map.of())));
   }
 
+  /** Upsert avec colonnes posées par le serveur (ex. {@code user_id -> auth.uid()} pour une ligne propre à l'utilisateur). */
+  @Transactional
+  public JsonNode upsertWith(String table, Map<String, Object> body, Set<String> allowed, List<String> conflict, Map<String, String> server) {
+    return json(jdbc.queryForObject(insertSql(table, body, allowed, conflict, server), String.class, values(table, body, allowed, server)));
+  }
+
   /** Insère plusieurs lignes dans la même transaction. */
   @Transactional
   public JsonNode insertAll(String table, Collection<Map<String, Object>> rows, Set<String> allowed) {

@@ -169,6 +169,17 @@ public final class PostgresFixture {
     }
   }
 
+  /** Première valeur texte d'une requête d'observation, en propriétaire (hors RLS). */
+  public static String textAsAdmin(String databaseName, String sql) {
+    try (Connection connection = DriverManager.getConnection(urlOf(databaseName), ADMIN_USER, ADMIN_PASSWORD);
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(sql)) {
+      return resultSet.next() ? resultSet.getString(1) : null;
+    } catch (SQLException e) {
+      throw new IllegalStateException("Requête d'observation échouée : " + sql, e);
+    }
+  }
+
   /**
    * Applique le référentiel SYSCOHADA révisé à une société, en propriétaire, comme le fait
    * l'administrateur via {@code apply_accounting_framework()}. Idempotent.

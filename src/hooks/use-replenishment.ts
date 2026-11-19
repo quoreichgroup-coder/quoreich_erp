@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiDelete, apiGet, apiPatch, apiPost, isApiEnabled } from "@/api/client";
+
+const P = "/api/v1/procurement";
 
 /*
  * Réapprovisionnement (V54) : catalogue fournisseur et règles (écriture directe, droit
@@ -21,6 +24,7 @@ export function useSupplierItems() {
     queryKey: ["supplier-items", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/supplier-items`);
       const { data, error } = await db.from("supplier_items")
         .select("*, supplier:suppliers(name), item:items(code, name, unit)").eq("tenant_id", tenantId).order("created_at");
       if (error) throw error;
@@ -34,6 +38,7 @@ export function useSaveSupplierItem() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async ({ id, ...row }: { id?: string; [k: string]: unknown }) => {
+      if (isApiEnabled()) { await (id ? apiPatch(`${P}/supplier-items/${id}`, row) : apiPost(`${P}/supplier-items`, row)); return; }
       const q = id ? db.from("supplier_items").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id)
         : db.from("supplier_items").insert({ ...row, tenant_id: tenantId });
       const { data, error } = await q.select("id");
@@ -49,6 +54,7 @@ export function useDeleteSupplierItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`${P}/supplier-items/${id}`); return; }
       const { data, error } = await db.from("supplier_items").delete().eq("id", id).select("id");
       if (error) throw error;
       touched(data);
@@ -64,6 +70,7 @@ export function useReplenishmentRules() {
     queryKey: ["replenishment-rules", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/replenishment-rules`);
       const { data, error } = await db.from("item_replenishment_rules")
         .select("*, item:items(code, name, unit), warehouse:warehouses(code, name)").eq("tenant_id", tenantId).order("created_at");
       if (error) throw error;
@@ -77,6 +84,7 @@ export function useSaveReplenishmentRule() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async ({ id, ...row }: { id?: string; [k: string]: unknown }) => {
+      if (isApiEnabled()) { await (id ? apiPatch(`${P}/replenishment-rules/${id}`, row) : apiPost(`${P}/replenishment-rules`, row)); return; }
       const q = id ? db.from("item_replenishment_rules").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id)
         : db.from("item_replenishment_rules").insert({ ...row, tenant_id: tenantId });
       const { data, error } = await q.select("id");
@@ -92,6 +100,7 @@ export function useDeleteReplenishmentRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`${P}/replenishment-rules/${id}`); return; }
       const { data, error } = await db.from("item_replenishment_rules").delete().eq("id", id).select("id");
       if (error) throw error;
       touched(data);
@@ -107,6 +116,7 @@ export function useStockProjection() {
     queryKey: ["stock-projection", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<{ item_id: string; on_hand: number; on_order: number; reserved: number; projected: number }[]>(`${P}/stock-projection`);
       const { data, error } = await db.from("stock_projection_view").select("*").eq("tenant_id", tenantId);
       if (error) throw error;
       return (data ?? []) as { item_id: string; on_hand: number; on_order: number; reserved: number; projected: number }[];
@@ -120,6 +130,7 @@ export function useReplenishmentProposals() {
     queryKey: ["replenishment-proposals", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${P}/replenishment-proposals`);
       const { data, error } = await db.from("replenishment_proposals")
         .select("*, item:items(code, name, unit), warehouse:warehouses(code, name), supplier:suppliers(name), requisition:purchase_requisitions(pr_number)")
         .eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
@@ -133,7 +144,8 @@ export function useGenerateReplenishment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { data, error } = await db.rpc("generate_replenishment_proposals");
+      const { data, error } = isApiEnabled() ? { data: await apiPost<number>(`${P}/replenishment-proposals/generate`, {}), error: null }
+        : await db.rpc("generate_replenishment_proposals");
       if (error) throw error;
       return Number(data ?? 0);
     },
@@ -146,7 +158,8 @@ export function useConvertReplenishment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const { data, error } = await db.rpc("convert_replenishment_proposals", { _ids: ids });
+      const { data, error } = isApiEnabled() ? { data: await apiPost<any>(`${P}/replenishment-proposals/convert`, { ids }), error: null }
+        : await db.rpc("convert_replenishment_proposals", { _ids: ids });
       if (error) throw error;
       return Number(data ?? 0);
     },
@@ -159,6 +172,7 @@ export function useDismissReplenishment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      if (isApiEnabled()) { await apiPost(`${P}/replenishment-proposals/${id}/dismiss`, { reason }); return; }
       const { error } = await db.rpc("dismiss_replenishment_proposal", { _id: id, _reason: reason });
       if (error) throw error;
     },
