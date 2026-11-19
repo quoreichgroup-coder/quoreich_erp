@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "104";
+  private static final String DERNIERE_MIGRATION = "105";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -260,7 +260,9 @@ class SchemaMigrationIT {
           "inventory_campaign_count_log", "inventory_campaign_recounts",
           "inventory_campaign_events", "inventory_cycle_policies",
           // V95 — configuration de matricules par société.
-          "hr_employee_number_settings");
+          "hr_employee_number_settings",
+          // V105 — jeux de comptes par client, fournisseur et article.
+          "posting_role_set_kinds", "posting_account_sets", "posting_account_set_lines", "posting_settings");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -582,7 +584,11 @@ class SchemaMigrationIT {
           // V98 — résolution du compte de comptabilisation d'une rubrique de paie.
           "hr_component_posting_account",
           // V100 — les gains de campagne n'ajoutent pas un reliquat global non affecté.
-          "guard_unallocated_campaign_gain");
+          "guard_unallocated_campaign_gain",
+          // V105 — résolution par jeu de comptes, postes ouverts, garde-fous des comptes de bilan.
+          "posting_account_for", "customer_account_set", "supplier_account_set", "item_account_set",
+          "posting_member_has_open_items", "posting_role_open_members", "posting_lock_on",
+          "guard_member_account_set", "guard_posting_account_set_line", "guard_posting_account_set", "guard_tenant_posting_account");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -819,7 +825,12 @@ class SchemaMigrationIT {
           "erp_role_permissions/Tenant isolation",
           "erp_role_permissions/Administrateur de la société",
           "erp_roles/Administrateur de la société",
-          "erp_authorization_audit/Administrateur de la société");
+          "erp_authorization_audit/Administrateur de la société",
+          // V105
+          "posting_role_set_kinds/Lecture du référentiel",
+          "posting_account_sets/Lecture société", "posting_account_sets/Écriture habilitée",
+          "posting_account_set_lines/Lecture société", "posting_account_set_lines/Écriture habilitée",
+          "posting_settings/Lecture société", "posting_settings/Écriture habilitée");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -956,7 +967,11 @@ class SchemaMigrationIT {
           "inventory_campaigns/inventory_campaign_keep_reference",
           "inventory_campaigns/inventory_campaign_log_transition",
           // V100 — garde de comptabilisation sur les gains d'inventaire.
-          "stock_movements/trg_guard_unallocated_campaign_gain");
+          "stock_movements/trg_guard_unallocated_campaign_gain",
+          // V105
+          "customers/trg_guard_customer_account_set", "suppliers/trg_guard_supplier_account_set", "items/trg_guard_item_account_set",
+          "posting_account_set_lines/trg_guard_posting_account_set_line", "posting_account_sets/trg_guard_posting_account_set",
+          "tenant_posting_accounts/trg_guard_tenant_posting_account");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view");

@@ -399,6 +399,8 @@ export interface Customer {
   payment_terms: number;
   status: string;
   created_at: string;
+  /** V105 : jeu de comptes (vide = comptes par défaut). */
+  account_set_id?: string | null;
 }
 
 export interface Payment {
@@ -846,7 +848,7 @@ export function useCreateCustomer() {
     mutationFn: async (c: Omit<Customer, "id" | "tenant_id" | "created_at">) => {
       if (isApiEnabled()) return apiPost("/api/v1/customers", customerToApi(c));
       const tenant_id = await fetchTenantId();
-      const { data, error } = await supabase.from("customers").insert({
+      const { data, error } = await (supabase as any).from("customers").insert({
         ...c,
         tenant_id,
       }).select().single();
@@ -866,7 +868,7 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Customer> & { id: string }) => {
       if (isApiEnabled()) { await apiPut(`/api/v1/customers/${id}`, customerToApi(updates)); return; }
-      const { data, error } = await supabase.from("customers").update(updates).eq("id", id).select("id");
+      const { data, error } = await (supabase as any).from("customers").update(updates).eq("id", id).select("id");
       if (error) throw error;
       // RLS (V48) : une modification sans droit ne touche aucune ligne, sans erreur.
       if (!data || data.length === 0) throw new Error("Droit insuffisant : modification de la fiche client refusée.");

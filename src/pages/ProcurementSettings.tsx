@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Settings, BookOpen, Users, Tag, Link, Scale, Timer, ShieldCheck } from "lucide-react";
 import { ProcurementControlSettings } from "@/components/ProcurementControlSettings";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import {
   useProcurementSettings,
   useUpdateProcurementSettings,
@@ -25,9 +25,8 @@ const tabs = [
   { id: "threeway", label: "3-Way Match", icon: Scale },
   { id: "sla", label: "SLA", icon: Timer },
   { id: "approval", label: "Approval Levels", icon: Users },
-  { id: "glposting", label: "GL Posting", icon: BookOpen },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "categories", label: "Spend Categories", icon: Tag },
-  { id: "glmapping", label: "GL Mapping", icon: Link },
 ];
 
 
@@ -277,6 +276,8 @@ export default function ProcurementSettings() {
       )}
 
 
+      {activeTab === "glposting" && <ModulePostingSettings modules={["AP", "STK"]} kinds={["supplier", "item"]} />}
+
       {activeTab === "categories" && (
         <Card className="border-border max-w-md">
           <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Spend Categories</CardTitle></CardHeader>
@@ -288,20 +289,6 @@ export default function ProcurementSettings() {
         </Card>
       )}
 
-      {activeTab === "glmapping" && (
-        <Card className="border-border max-w-2xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">GL Account Mapping</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {glMapping.map(m => (
-              <div key={m.category} className="flex items-center gap-3 p-3 border border-border rounded text-xs">
-                <div className="font-medium w-32">{m.category}</div>
-                <div className="text-muted-foreground">Debit: <span className="font-mono text-foreground">{m.debit}</span></div>
-                <div className="text-muted-foreground">Credit: <span className="font-mono text-foreground">{m.credit}</span></div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </PageShell>
   );
 }

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, CreditCard, FileText, Bell, Globe, Percent, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import {
   useAPGeneralSettings,
   useUpdateAPGeneralSettings,
@@ -22,7 +22,7 @@ import {
 
 const tabs = [
   { id: "general", label: "Général", icon: Settings },
-  { id: "glposting", label: "Imputation GL", icon: BookOpen },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "payment", label: "Modes de paiement", icon: CreditCard },
   { id: "numbering", label: "Numérotation", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -107,11 +107,7 @@ export default function APSettings() {
         </div>
       )}
 
-      {activeTab === "glposting" && (
-        <div className="max-w-3xl">
-          <GLPostingConfigPanel config={defaultGLPostingSettings.AP} />
-        </div>
-      )}
+      {activeTab === "glposting" && <ModulePostingSettings modules={["AP", "TRE"]} kinds={["supplier"]} />}
 
       {activeTab === "payment" && (
         <div className="bg-card border border-border rounded-lg">

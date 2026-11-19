@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AccountSetSelect } from "@/components/AccountSets";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -16,7 +17,7 @@ import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, 
 import { exportToCSV } from "@/lib/csv-export";
 import { CustomerAnalyticDefaults } from "@/components/AnalyticSelectors";
 
-const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30 };
+const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number; account_set_id: string | null } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30, account_set_id: null };
 
 const Customers = () => {
   const { data: customers = [], isLoading } = useCustomers();
@@ -57,25 +58,34 @@ const Customers = () => {
       status: customer.status as "active" | "inactive",
       credit_limit: customer.credit_limit,
       payment_terms: customer.payment_terms,
+      account_set_id: customer.account_set_id ?? null,
     });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
-    if (editingCustomer) {
-      await updateCustomer.mutateAsync({ id: editingCustomer.id, ...form });
-    } else {
-      await createCustomer.mutateAsync(form as any);
+    // Un refus (droit, verrou d'un compte de bilan…) est déjà signalé par le toast de la mutation :
+    // la fiche reste ouverte, sans rejet non géré.
+    try {
+      if (editingCustomer) {
+        await updateCustomer.mutateAsync({ id: editingCustomer.id, ...form });
+      } else {
+        await createCustomer.mutateAsync(form as any);
+      }
+      setDialogOpen(false);
+    } catch {
+      /* déjà affiché */
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = async () => {
     if (deletingCustomer) {
-      await deleteCustomer.mutateAsync(deletingCustomer.id);
-      setDeleteDialogOpen(false);
-      setDeletingCustomer(null);
+      try {
+        await deleteCustomer.mutateAsync(deletingCustomer.id);
+        setDeleteDialogOpen(false);
+        setDeletingCustomer(null);
+      } catch { /* refus déjà affiché (client référencé : le désactiver) */ }
     }
   };
 
@@ -254,6 +264,7 @@ const Customers = () => {
                 <Input type="number" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: Number(e.target.value) }))} />
               </div>
             </div>
+            <AccountSetSelect kind="customer" value={form.account_set_id} onChange={(v) => setForm(f => ({ ...f, account_set_id: v }))} />
             {/* Une section par défaut se rattache à un client existant : visible en modification seulement. */}
             {editingCustomer && <CustomerAnalyticDefaults customerId={editingCustomer.id} />}
           </div>

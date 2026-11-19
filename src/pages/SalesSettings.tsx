@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -222,66 +222,7 @@ export default function SalesSettings() {
         </TabsContent>
 
         <TabsContent value="gl">
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-primary" />
-                GL Account Mapping
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-2 space-y-2.5">
-              {[
-                { label: "Sales Revenue", account: "4000", desc: "Revenue from sales" },
-                { label: "Accounts Receivable", account: "4110", desc: "Customer receivables" },
-                { label: "COGS", account: "6010", desc: "Cost of Goods Sold" },
-                { label: "Sales Tax (Output VAT)", account: "4310", desc: "VAT collected" },
-              ].map((m) => (
-                <div
-                  key={m.account}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/20 text-xs"
-                >
-                  <div>
-                    <div className="font-medium">{m.label}</div>
-                    <div className="text-[10px] text-muted-foreground">{m.desc}</div>
-                  </div>
-                  <span className="font-mono text-primary font-medium">{m.account}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <div className="mt-4">
-            <GLPostingConfigPanel
-              config={
-                defaultGLPostingSettings.Sales || {
-                  module: "Sales",
-                  batchMode: "individual",
-                  frequency: "immediate",
-                  targetJournal: "VJ",
-                  approvalWorkflow: true,
-                  autoPost: true,
-                  approvalLevels: [
-                    { level: "L1", role: "Sales Manager", threshold: "All orders" },
-                    { level: "L2", role: "Finance Controller", threshold: "> 50M XOF" },
-                  ],
-                  alertThresholds: [
-                    {
-                      rule: "Margin below threshold",
-                      threshold: "20%",
-                      action: "Alert sales manager",
-                      severity: "Warning",
-                    },
-                    {
-                      rule: "Credit limit exceeded",
-                      threshold: "100%",
-                      action: "Block order",
-                      severity: "Critical",
-                    },
-                  ],
-                }
-              }
-            />
-          </div>
+          <ModulePostingSettings modules={["AR"]} kinds={["customer"]} />
         </TabsContent>
       </Tabs>
     </PageShell>

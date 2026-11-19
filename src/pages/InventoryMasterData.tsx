@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AccountSetSelect } from "@/components/AccountSets";
 import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -30,10 +31,10 @@ const num = (s: string) => Number(String(s).replace(",", "."));
 
 type ItemForm = {
   code: string; name: string; category: string; unit: string; unit_cost: string; selling_price: string;
-  reorder_level: string; safety_stock: string; default_warehouse_id: string; status: string;
+  reorder_level: string; safety_stock: string; default_warehouse_id: string; status: string; account_set_id: string;
 };
 const EMPTY: ItemForm = { code: "", name: "", category: "", unit: "unité", unit_cost: "", selling_price: "", reorder_level: "",
-  safety_stock: "", default_warehouse_id: "", status: "active" };
+  safety_stock: "", default_warehouse_id: "", status: "active", account_set_id: "" };
 
 function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; onClose: () => void }) {
   const { data: warehouses = [] } = useWarehouses();
@@ -47,7 +48,7 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
     setF(item ? {
       code: item.code ?? "", name: item.name ?? "", category: item.category ?? "", unit: item.unit ?? "", unit_cost: String(item.unit_cost ?? ""),
       selling_price: String(item.selling_price ?? ""), reorder_level: String(item.reorder_level ?? ""), safety_stock: String(item.safety_stock ?? ""),
-      default_warehouse_id: item.default_warehouse_id ?? "", status: item.status ?? "active",
+      default_warehouse_id: item.default_warehouse_id ?? "", status: item.status ?? "active", account_set_id: item.account_set_id ?? "",
     } : EMPTY);
   }
   const close = () => { setLoadedFor(null); onClose(); };
@@ -58,9 +59,10 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
     unit_cost: f.unit_cost ? num(f.unit_cost) : undefined, selling_price: f.selling_price ? num(f.selling_price) : undefined,
     reorder_level: f.reorder_level ? num(f.reorder_level) : undefined, safety_stock: f.safety_stock ? num(f.safety_stock) : undefined,
     default_warehouse_id: f.default_warehouse_id || undefined,
+    account_set_id: f.account_set_id || undefined,
   };
   const save = () => item
-    ? update.mutate({ id: item.id, ...payload, default_warehouse_id: f.default_warehouse_id || null, status: f.status }, { onSuccess: close })
+    ? update.mutate({ id: item.id, ...payload, default_warehouse_id: f.default_warehouse_id || null, account_set_id: f.account_set_id || null, status: f.status }, { onSuccess: close })
     : create.mutate(payload, { onSuccess: close });
   const field = (k: keyof ItemForm, label: string, extra: Record<string, unknown> = {}) => (
     <div className="space-y-1.5">
@@ -93,6 +95,7 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
             </select>
           </div>
+          <AccountSetSelect kind="item" value={f.account_set_id || null} onChange={(v) => setF({ ...f, account_set_id: v ?? "" })} />
           {item && (
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="item-status">Statut</Label>

@@ -79,6 +79,7 @@ export function missingRoles(setup: AccountingSetup): PostingAccount[] {
 
 export const MODULE_LABELS: Record<string, string> = {
   AR: "Clients",
+  FA: "Immobilisations",
   AP: "Fournisseurs",
   TRE: "Trésorerie",
   STK: "Stocks",

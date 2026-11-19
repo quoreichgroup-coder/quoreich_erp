@@ -1,7 +1,7 @@
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -51,41 +51,9 @@ export default function ExpenseSettings() {
           </CardContent>
         </Card>
 
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><Calculator className="w-4 h-4 text-primary" />GL Account Mapping</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-2 space-y-2.5">
-            {[
-              { label: "Travel Expenses", account: "6100", desc: "Flights, hotels, transport" },
-              { label: "Meals & Entertainment", account: "6150", desc: "Client and team meals" },
-              { label: "Office Supplies", account: "6200", desc: "Stationery, equipment" },
-              { label: "Training", account: "6300", desc: "Certifications, courses" },
-              { label: "Accounts Payable (Reimbursement)", account: "2010", desc: "AP for reimbursements" },
-            ].map(m => (
-              <div key={m.account} className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/20 text-xs">
-                <div><div className="font-medium">{m.label}</div><div className="text-[10px] text-muted-foreground">{m.desc}</div></div>
-                <span className="font-mono text-primary font-medium">{m.account}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       </div>
 
-      <GLPostingConfigPanel config={defaultGLPostingSettings.Expenses || {
-        module: "Expenses",
-        batchMode: "consolidated",
-        frequency: "weekly",
-        targetJournal: "GJ",
-        approvalWorkflow: true,
-        autoPost: true,
-        approvalLevels: [
-          { level: "L1", role: "Manager", threshold: "< 500K XOF" },
-          { level: "L2", role: "Finance Controller", threshold: "> 500K XOF" },
-        ],
-        alertThresholds: [
-          { rule: "Missing receipt", threshold: "> 10K XOF", action: "Block submission", severity: "Critical" },
-          { rule: "Budget overrun > 90%", threshold: "90%", action: "Alert department head", severity: "Warning" },
-        ],
-      }} />
+      <PostingPendingNotice module="notes de frais" />
 
       <Card className="border-border">
         <CardHeader className="p-4 pb-2">

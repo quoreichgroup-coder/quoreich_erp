@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, BookOpen, Calendar, FileText, Globe, Landmark } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { ModulePostingSettings } from "@/components/AccountSets";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -57,7 +58,7 @@ export default function GLSettings() {
         ))}
       </div>
 
-      {activeTab === "posting" && <div className="max-w-4xl"><PostingAccountsPanel /></div>}
+      {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}
 
       {activeTab === "general" && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">

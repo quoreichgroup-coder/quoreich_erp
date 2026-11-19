@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ModulePostingSettings } from "@/components/AccountSets";
 import { Link } from "react-router-dom";
 import { ArrowRight, BadgeCheck, Coins, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { PayrollSettingsCard } from "@/components/PayrollSettingsCard";
@@ -19,6 +20,7 @@ export default function HrSettings() {
   const tabs = [
     { id: "payroll", label: "Règles de paie", icon: Settings2 },
     { id: "components", label: "Rubriques", icon: Coins },
+    { id: "posting", label: "Comptabilisation", icon: Coins },
     { id: "numbering", label: "Matricules", icon: BadgeCheck },
     { id: "movements", label: "Référentiels et mouvements", icon: UsersRound },
     { id: "rights", label: "Droits et rôles", icon: ShieldCheck },
@@ -48,6 +50,8 @@ export default function HrSettings() {
       <div role="tabpanel" className="mt-4 space-y-4">
         {activeTab === "payroll" && <PayrollSettingsCard />}
         {activeTab === "components" && <HrPayrollComponentsCard />}
+        {activeTab === "posting" && <ModulePostingSettings modules={["PAY"]} extra={
+          <p className="text-xs text-muted-foreground">Un compte propre à une rubrique (prime, retenue…) se règle sur la rubrique, onglet « Rubriques » ; sinon le rôle ci-dessus s'applique.</p>} />}
         {activeTab === "numbering" && <HrEmployeeNumberSettingsCard canManage={(access?.permissions ?? []).includes("hr.manage_employee_number_settings")} />}
         {activeTab === "movements" && <HrMovementSettingsCard canManage={!!perms.canManageMovementSettings} />}
         {activeTab === "rights" && <section className="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center justify-between gap-3">

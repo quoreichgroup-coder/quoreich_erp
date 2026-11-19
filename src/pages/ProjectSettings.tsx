@@ -6,14 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Settings, BookOpen, Calculator, Link, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import { ProjectRolesPanel } from "@/components/ProjectRolesPanel";
 
 const tabs = [
   { id: "general", label: "General", icon: Settings },
-  { id: "glposting", label: "GL Posting", icon: BookOpen },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "costs", label: "Cost Categories", icon: Calculator },
-  { id: "glrules", label: "GL Rules", icon: Link },
   { id: "roles", label: "Rôles & RBAC", icon: Shield },
 ];
 
@@ -85,11 +84,7 @@ export default function ProjectSettings() {
         </div>
       )}
 
-      {activeTab === "glposting" && (
-        <div className="max-w-3xl">
-          <GLPostingConfigPanel config={defaultGLPostingSettings.Projects} />
-        </div>
-      )}
+      {activeTab === "glposting" && <PostingPendingNotice module="projets" />}
 
       {activeTab === "costs" && (
         <Card className="border-border max-w-2xl">
@@ -108,22 +103,6 @@ export default function ProjectSettings() {
         </Card>
       )}
 
-      {activeTab === "glrules" && (
-        <Card className="border-border max-w-2xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">GL Posting Rules</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {glPostingRules.map((r, i) => (
-              <div key={i} className="p-3 border border-border rounded text-xs">
-                <div className="font-medium mb-1">{r.event}</div>
-                <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-                  <span>Debit: <span className="font-mono text-foreground">{r.debit}</span></span>
-                  <span>Credit: <span className="font-mono text-foreground">{r.credit}</span></span>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {activeTab === "roles" && (
         <div className="max-w-6xl">

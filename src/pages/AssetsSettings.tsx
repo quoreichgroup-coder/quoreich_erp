@@ -6,16 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Settings, BookOpen, Calculator, Link, Wrench, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GLPostingConfigPanel, defaultGLPostingSettings } from "@/components/GLPostingConfig";
+import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
 import { FixedAssetsRolesPanel } from "@/components/FixedAssetsRolesPanel";
 import { AssetCategoriesPanel, AssetSettingsCard } from "@/components/AssetAccountingPanels";
 
 const tabs = [
   { id: "general", label: "Catégories et amortissements", icon: Settings },
   { id: "roles", label: "Rôles & Audit", icon: Shield },
-  { id: "glposting", label: "GL Posting", icon: BookOpen },
+  { id: "glposting", label: "Comptabilisation", icon: BookOpen },
   { id: "depreciation", label: "Depreciation", icon: Calculator },
-  { id: "glmapping", label: "GL Mapping", icon: Link },
   { id: "maintenance", label: "Maintenance", icon: Wrench },
 ];
 
@@ -71,11 +70,8 @@ export default function AssetsSettings() {
 
       {activeTab === "roles" && <FixedAssetsRolesPanel />}
 
-      {activeTab === "glposting" && (
-        <div className="max-w-3xl">
-          <GLPostingConfigPanel config={defaultGLPostingSettings.Assets} />
-        </div>
-      )}
+      {activeTab === "glposting" && <ModulePostingSettings modules={["FA"]} extra={
+        <p className="text-xs text-muted-foreground">Comptes d'immobilisation, d'amortissement et de dotation : par catégorie, onglet « Catégories et amortissements » (comme la classe d'immobilisation SAP).</p>} />}
 
       {activeTab === "depreciation" && (
         <Card className="border-border max-w-2xl">
@@ -94,23 +90,6 @@ export default function AssetsSettings() {
         </Card>
       )}
 
-      {activeTab === "glmapping" && (
-        <Card className="border-border max-w-2xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">GL Account Mapping</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {glMapping.map(m => (
-              <div key={m.label} className="p-2.5 bg-muted/20 border border-border rounded space-y-1.5">
-                <div className="text-xs font-medium">{m.label}</div>
-                <div className="grid grid-cols-2 gap-1 text-[11px]">
-                  <span className="text-muted-foreground">Asset</span><span className="font-mono">{m.asset}</span>
-                  <span className="text-muted-foreground">Dep. Exp.</span><span className="font-mono">{m.dep}</span>
-                  <span className="text-muted-foreground">Acc. Dep.</span><span className="font-mono">{m.accDep}</span>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {activeTab === "maintenance" && (
         <Card className="border-border max-w-md">

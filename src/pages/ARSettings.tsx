@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings, CreditCard, FileText, Bell, Calculator, Globe, BookOpen, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { ModulePostingSettings } from "@/components/AccountSets";
 import {
   useARPaymentTerms, useUpsertARPaymentTerm,
   useARNumberingSeries, useUpdateARNumberingSeries,
@@ -287,7 +287,7 @@ export default function ARSettings() {
         ))}
       </div>
       {activeTab === "general" && <GeneralTab />}
-      {activeTab === "glposting" && <div className="max-w-4xl"><PostingAccountsPanel modules={["AR", "TRE"]} /></div>}
+      {activeTab === "glposting" && <ModulePostingSettings modules={["AR", "TRE"]} kinds={["customer"]} />}
       {activeTab === "payment" && <PaymentTermsTab />}
       {activeTab === "numbering" && <NumberingTab />}
       {activeTab === "notifications" && <NotificationsTab />}

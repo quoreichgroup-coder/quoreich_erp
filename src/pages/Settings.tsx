@@ -14,6 +14,7 @@ import {
   Clock, AlertTriangle, ArrowUp, Eye, FileText, Download, Play, UserMinus, RefreshCw,
   Zap, Shield, Hash, Bot, Landmark, Layers, Building2 } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { ModulePostingSettings } from "@/components/AccountSets";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
 import { TaxCodesPanel } from "@/components/TaxCodesPanel";
 import { AuthorizationsPanel } from "@/components/AuthorizationsPanel";
@@ -290,7 +291,7 @@ const Settings = () => {
           {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
 
           {/* ── Chart of Accounts ── */}
-          {activeTab === "posting" && <div className="max-w-4xl"><PostingAccountsPanel /></div>}
+          {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}
 
           {activeTab === "analytics" && <div className="max-w-5xl"><AnalyticAxesPanel /></div>}
 

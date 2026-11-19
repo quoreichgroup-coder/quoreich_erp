@@ -1,6 +1,6 @@
 # 20 — Comptabilisation paramétrable par module (audit et plan, lot V105)
 
-État au 18 novembre 2026. Audit fait ; **migration non encore écrite**.
+Audit du 18 novembre 2026 ; **livré le 19 novembre 2026 (V105)**, voir §5.
 
 ## 1. Constat
 
@@ -108,3 +108,46 @@ suit le droit de modification de la fiche concernée (client, fournisseur, artic
 Changer le compte **par défaut** d'un rôle de bilan dans `tenant_posting_accounts` n'est pas
 protégé non plus : une facture comptabilisée sur l'ancien 411 serait encaissée sur le nouveau.
 Le même garde-fou s'applique, tant que des tiers sans jeu ont des postes ouverts.
+
+## 5. Livraison (V105, 19 novembre 2026)
+
+Réalisé comme conçu ci-dessus, avec les précisions suivantes.
+
+- **Base** :
+  - 17 fonctions réécrites à partir de leur définition en service (remplacements exacts, vérifiés un à
+    un).
+  - Aucun appel « par défaut » ne reste pour un rôle porté par un jeu.
+  - Les remplacements de compte et les migrations du plan redirigent aussi les lignes de jeux.
+  - Le verrou se règle par société : `posting_settings.lock_control_accounts`, actif par défaut.
+  - Le nouveau droit `accounting.account_sets` porte le catalogue à 105 codes.
+- **Écrans** : chaque module a désormais un onglet « Comptabilisation » réel
+  (`ModulePostingSettings`). Les panneaux statiques et les onglets « GL Mapping » / « GL Rules »
+  factices sont supprimés.
+
+| Module | Rôles | Jeux de comptes |
+|---|---|---|
+| Ventes | AR | client |
+| Comptes clients | AR, TRE | client |
+| Comptes fournisseurs | AP, TRE | fournisseur |
+| Approvisionnement | AP, STK | fournisseur, article |
+| Stocks | STK | article |
+| Immobilisations | FA (+ comptes par catégorie) | — |
+| Paie (RH → Paramètres) | PAY (+ comptes par rubrique) | — |
+| Paramétrage central et grand livre | tous | tous + verrou |
+| Notes de frais, projets | message clair : module à construire (lot 4), aucun compte utilisé | — |
+
+- **Fiches** : le champ « Jeu de comptes » figure sur les fiches client, fournisseur et article.
+- **Défaut corrigé en route** : la fiche client et la fiche fournisseur laissaient filer un refus
+  d'enregistrement (droit, verrou…) en rejet non géré. Le refus reste affiché et la fiche reste
+  ouverte.
+- **Tests** :
+  - `JeuxDeComptesIT` (4 tests) : client du groupe sur 4111 avec encaissement et lettrage sur le même
+    compte ; fournisseur étranger 4012 / 604 ; matières en 321 ; verrou ; type de jeu ; compte
+    inactif ; droit ; autre société.
+  - Parcours **97** dans le nuage.
+  - Java, Vitest, parcours nuage et sur site : tous verts.
+- **Reste à faire** :
+  - Endpoints API sur site pour les jeux. Sur site, les comptes par défaut s'appliquent et l'écran le
+    dit.
+  - Contrôle de classe des comptes de jeu dans `chart_of_accounts_issues`.
+  - Jeux pour les catégories d'immobilisations : inutiles, la catégorie porte déjà ses comptes.

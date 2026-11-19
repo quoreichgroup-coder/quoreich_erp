@@ -8,7 +8,7 @@ import { InventoryRolesPanel } from "@/components/InventoryRolesPanel";
 import { InventoryCampaignPolicyCard } from "@/components/InventoryCampaignPolicyCard";
 import { InventoryCampaignNumberingCard } from "@/components/InventoryCampaignNumberingCard";
 import { InventoryCyclePolicyCard } from "@/components/InventoryCyclePolicyCard";
-import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
+import { ModulePostingSettings } from "@/components/AccountSets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -147,7 +147,7 @@ function InventorySettingsSections({ tenantId }: { tenantId?: string }) {
           </Button>
         </CardContent>
       </Card>
-      <PostingAccountsPanel modules={["STK"]} />
+      <ModulePostingSettings modules={["STK"]} kinds={["item"]} />
     </TabsContent>
 
     <TabsContent value="droits"><InventoryRolesPanel /></TabsContent>
