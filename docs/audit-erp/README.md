@@ -45,7 +45,8 @@ Légende utilisée dans tous les livrables :
 | 19 | [19-impressions-actions-groupees-mvp.md](19-impressions-actions-groupees-mvp.md) | Impression des pièces (PDF / Excel), exports de listes, actions groupées dans le cœur ; écarts restants pour le MVP |
 | 20 | [20-comptabilisation-parametrable-par-module.md](20-comptabilisation-parametrable-par-module.md) | Comptabilisation paramétrable par module : jeux de comptes client / fournisseur / article (SAP OBYC, Sage 300, X3), plan du lot V105 |
 | 21 | [21-ecrans-de-controle-et-parametres-reels.md](21-ecrans-de-controle-et-parametres-reels.md) | Lot 3 : contrôle du grand livre, limites et audit de trésorerie, rapports et seuils d'approbation réels ; écritures directes fermées (V106–V108) |
-| 22 | [22-notes-de-frais.md](22-notes-de-frais.md) | Lot 4 — notes de frais : catégories, règles, approbation par niveaux, comptabilisation, remboursement (V109–V110) |
+| 22 | [22-notes-de-frais.md](22-notes-de-frais.md) | Lot 4 — notes de frais : catégories, règles, approbation, comptabilisation, remboursement ; avances, barèmes, devises, justificatifs (V109–V112) |
+| 23 | [23-projets.md](23-projets.md) | Lot 4 — projets : projet = section analytique, budget par compte, réalisé et engagé lus dans la comptabilité (V111) |
 
 ## Synthèse pour la direction
 

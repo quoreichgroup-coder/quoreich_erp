@@ -8,68 +8,8 @@ import type { ProjectPerms, ProjectRole } from "@/lib/project-roles";
 import { ALL_PROJECT_ROLES } from "@/lib/project-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
-export function useProjects() {
-  return useQuery({
-    queryKey: ["projects"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-}
+// Projets, budget et chiffres : voir use-projects.ts (V111). Ce module ne garde que les rôles.
 
-export function useProjectCosts(projectId?: string) {
-  return useQuery({
-    queryKey: ["project-costs", projectId],
-    queryFn: async () => {
-      let q = supabase.from("project_costs").select("*, project:projects(name, project_code)");
-      if (projectId) q = q.eq("project_id", projectId);
-      const { data, error } = await q.order("cost_date", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-}
-
-export function useCreateProject() {
-  const qc = useQueryClient();
-  const { data: tenantId } = useTenantId();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async (input: { project_code: string; name: string; client?: string; budget?: number; start_date?: string; end_date?: string; department?: string; project_manager?: string }) => {
-      const { error } = await supabase.from("projects").insert({ ...input, tenant_id: tenantId!, created_by: user!.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); toast.success("Projet créé"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function useCreateProjectCost() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async (input: { project_id: string; category: string; description?: string; amount: number; cost_date?: string }) => {
-      const { error } = await supabase.from("project_costs").insert({ ...input, created_by: user!.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["project-costs"] }); toast.success("Coût enregistré"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function useProjectKpis() {
-  const { data: projects = [] } = useProjects();
-  const { data: costs = [] } = useProjectCosts();
-  const active = projects.filter(p => p.status === "active");
-  const totalBudget = active.reduce((s, p) => s + Number(p.budget), 0);
-  const totalCosts = active.reduce((s, p) => s + Number(p.total_costs), 0);
-
-  return { projects, costs, active, totalBudget, totalCosts };
-}
-
-// ---------- RBAC ----------
 
 export function useMyProjectRoles(): ProjectPerms {
   const { user } = useAuth();

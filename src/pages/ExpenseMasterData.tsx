@@ -12,7 +12,7 @@ import { useMyAccess } from "@/hooks/use-my-access";
 import { useGlAccountOptions } from "@/hooks/use-accounting-setup";
 import { useTaxCodes } from "@/hooks/use-tax-codes";
 import { useGLAccounts } from "@/hooks/use-gl-data";
-import { useExpenseCategories, useSaveExpenseCategory, type ExpenseCategory } from "@/hooks/use-expenses";
+import { RATE_UNIT, useExpenseCategories, useExpenseRates, useSaveExpenseCategory, useSaveExpenseRate, type ExpenseCategory, type ExpenseRate } from "@/hooks/use-expenses";
 import { normalizeSetCode } from "@/lib/account-sets";
 
 /*
@@ -72,6 +72,64 @@ function CategoryDialog({ category, onClose }: { category: ExpenseCategory | nul
   );
 }
 
+/** Barèmes de la société (indemnités kilométriques, per diem) : taux par unité, catégorie (compte), validité. Aucun barème légal pré-rempli. */
+function RatesPanel({ can }: { can: boolean }) {
+  const { data: rates = [] } = useExpenseRates();
+  const { data: categories = [] } = useExpenseCategories();
+  const save = useSaveExpenseRate();
+  const [f, setF] = useState({ kind: "mileage" as ExpenseRate["kind"], code: "", name: "", unit: "km" as ExpenseRate["unit"], rate: "", category_id: "", valid_from: "", valid_to: "" });
+  const code = normalizeSetCode(f.code);
+  const cat = new Map(categories.map((c) => [c.id, c]));
+  return (
+    <section className="bg-card border border-border rounded-lg p-4 space-y-3" data-testid="expense-rates">
+      <div><h2 className="text-sm font-semibold">Barèmes</h2>
+        <p className="text-xs text-muted-foreground">Indemnité kilométrique ou per diem : la ligne de note vaut quantité × taux, sans TVA ni justificatif de montant. Les taux sont ceux de la société (aucun barème légal n'est pré-rempli).</p></div>
+      <table className="w-full text-xs">
+        <thead><tr className="text-muted-foreground"><th className="text-left">Code</th><th className="text-left">Libellé</th><th className="text-left">Type</th><th className="text-right">Taux</th>
+          <th className="text-left pl-3">Catégorie</th><th className="text-left">Validité</th><th className="text-left">État</th><th /></tr></thead>
+        <tbody>
+          {rates.length === 0 && <tr><td colSpan={8} className="py-2 text-muted-foreground">Aucun barème.</td></tr>}
+          {rates.map((r) => (
+            <tr key={r.id} className="border-t border-border/50" data-testid="expense-rate-row">
+              <td className="py-1 font-mono">{r.code}</td><td>{r.name}</td><td>{r.kind === "mileage" ? "Kilométrique" : "Per diem"}</td>
+              <td className="text-right tabular-nums">{r.rate.toLocaleString("fr-FR")} / {RATE_UNIT[r.unit]}</td><td className="pl-3">{cat.get(r.category_id)?.name ?? "—"}</td>
+              <td>{r.valid_from ?? "—"} → {r.valid_to ?? "—"}</td>
+              <td><StatusBadge status={r.is_active ? "success" : "neutral"} label={r.is_active ? "Actif" : "Inactif"} /></td>
+              <td className="text-right">{can && <Button size="sm" variant="ghost" className="h-6 text-[10px]" disabled={save.isPending}
+                onClick={() => save.mutate({ ...r, is_active: !r.is_active })}>{r.is_active ? "Désactiver" : "Activer"}</Button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {can && (
+        <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+          <div className="space-y-1"><label htmlFor="rate-kind" className="text-[11px] text-muted-foreground">Type</label>
+            <select id="rate-kind" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.kind}
+              onChange={(e) => setF({ ...f, kind: e.target.value as ExpenseRate["kind"], unit: e.target.value === "mileage" ? "km" : "day" })}>
+              <option value="mileage">Kilométrique</option><option value="per_diem">Per diem</option></select></div>
+          <div className="space-y-1"><label htmlFor="rate-code" className="text-[11px] text-muted-foreground">Code</label>
+            <Input id="rate-code" className="h-8 w-28 text-xs" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="KM-VP" /></div>
+          <div className="space-y-1"><label htmlFor="rate-name" className="text-[11px] text-muted-foreground">Libellé</label>
+            <Input id="rate-name" className="h-8 w-48 text-xs" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+          <div className="space-y-1"><label htmlFor="rate-unit" className="text-[11px] text-muted-foreground">Unité</label>
+            <select id="rate-unit" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value as ExpenseRate["unit"] })}>
+              {(f.kind === "mileage" ? ["km"] : ["day", "night", "meal"]).map((u) => <option key={u} value={u}>{RATE_UNIT[u as ExpenseRate["unit"]]}</option>)}</select></div>
+          <div className="space-y-1"><label htmlFor="rate-value" className="text-[11px] text-muted-foreground">Taux par unité</label>
+            <Input id="rate-value" inputMode="decimal" className="h-8 w-24 text-xs text-right" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} /></div>
+          <div className="space-y-1"><label htmlFor="rate-cat" className="text-[11px] text-muted-foreground">Catégorie (compte)</label>
+            <select id="rate-cat" className="h-8 rounded-md border border-input bg-background px-2 text-xs w-44" value={f.category_id} onChange={(e) => setF({ ...f, category_id: e.target.value })}>
+              <option value="">—</option>{categories.filter((c) => c.is_active).map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}</select></div>
+          <div className="space-y-1"><label htmlFor="rate-from" className="text-[11px] text-muted-foreground">Valable du</label>
+            <Input id="rate-from" type="date" className="h-8 w-36 text-xs" value={f.valid_from} onChange={(e) => setF({ ...f, valid_from: e.target.value })} /></div>
+          <Button size="sm" className="h-8 text-xs gap-1" disabled={!code || !f.name.trim() || !(Number(f.rate.replace(",", ".")) > 0) || !f.category_id || save.isPending}
+            onClick={() => save.mutate({ kind: f.kind, code: code!, name: f.name.trim(), unit: f.unit, rate: Number(f.rate.replace(/\s/g, "").replace(",", ".")), category_id: f.category_id,
+              valid_from: f.valid_from || null, valid_to: f.valid_to || null }, { onSuccess: () => setF({ ...f, code: "", name: "", rate: "" }) })}><Plus className="w-3.5 h-3.5" /> Ajouter le barème</Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function ExpenseMasterData() {
   const { data: categories = [], isLoading } = useExpenseCategories();
   const accounts = useGlAccountOptions();
@@ -115,6 +173,7 @@ export default function ExpenseMasterData() {
           </table>
         )}
       </div>
+      <RatesPanel can={can} />
       {open && <CategoryDialog category={open === "new" ? null : open} onClose={() => setOpen(null)} />}
     </PageShell>
   );

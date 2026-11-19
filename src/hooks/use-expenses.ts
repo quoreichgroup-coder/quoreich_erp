@@ -14,6 +14,9 @@ const db = supabase as any;
 export interface ExpenseLine {
   id?: string; line_no: number; expense_date: string; category_id: string | null; description: string; merchant: string | null;
   receipt_ref: string | null; amount: number; tax_code_id: string | null; net_amount?: number; tax_amount?: number; category?: string;
+  /** V111 : projet imputé ; V112 : barème × quantité, devise d'origine et cours, justificatif joint. */
+  project_id?: string | null; rate_id?: string | null; quantity?: number | null; original_currency?: string | null;
+  original_amount?: number | null; exchange_rate?: number | null; receipt_path?: string | null;
 }
 export interface ExpenseApproval { id: string; level_order: number; level_label: string; approver_label: string; sla_hours: number | null;
   status: string; decided_by: string | null; decided_at: string | null; comment: string | null; created_at: string }
@@ -21,7 +24,7 @@ export interface ExpenseReport {
   id: string; report_number: string; employee_id: string | null; purpose: string | null; period_start: string | null; period_end: string | null;
   currency: string; total: number; subtotal: number; tax_amount: number; status: ExpenseStatus; created_by: string | null; created_at: string;
   submitted_at: string | null; approved_at: string | null; posted_at: string | null; paid_at: string | null; rejection_reason: string | null;
-  cancel_reason: string | null; notes: string | null; journal_entry_id: string | null; payment_journal_entry_id: string | null;
+  cancel_reason: string | null; notes: string | null; journal_entry_id: string | null; payment_journal_entry_id: string | null; advance_applied: number;
   employee?: { first_name: string; last_name: string; matricule: string } | null;
   lines: ExpenseLine[]; approvals: ExpenseApproval[];
   entry?: { piece_number: string } | null; payment_entry?: { piece_number: string } | null;
@@ -52,7 +55,7 @@ export function useExpenseReports() {
         if (!data || data.length < 1000) break;
       }
       return all.map((r) => ({
-        ...r, total: Number(r.total), subtotal: Number(r.subtotal), tax_amount: Number(r.tax_amount),
+        ...r, total: Number(r.total), subtotal: Number(r.subtotal), tax_amount: Number(r.tax_amount), advance_applied: Number(r.advance_applied ?? 0),
         lines: (r.lines ?? []).map((l: any) => ({ ...l, amount: Number(l.amount), net_amount: Number(l.net_amount), tax_amount: Number(l.tax_amount) }))
           .sort((a: ExpenseLine, b: ExpenseLine) => a.line_no - b.line_no),
         approvals: (r.approvals ?? []).sort((a: ExpenseApproval, b: ExpenseApproval) => a.level_order - b.level_order),
@@ -173,8 +176,8 @@ export const useSubmitExpense = rpcMutation<string>("expense_report_submit", (id
 export const useDecideExpense = rpcMutation<{ approval: string; approve: boolean; comment?: string }>("expense_report_decide",
   (v) => ({ _approval: v.approval, _approve: v.approve, _comment: v.comment ?? null }), "Décision enregistrée");
 export const usePostExpense = rpcMutation<{ id: string; date: string }>("expense_report_post", (v) => ({ _id: v.id, _date: v.date }), "Note comptabilisée");
-export const usePayExpense = rpcMutation<{ id: string; date: string; method: string; bankAccountId: string | null; reference: string | null }>("expense_report_pay",
-  (v) => ({ _id: v.id, _date: v.date, _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: v.reference }), "Note remboursée");
+export const usePayExpense = rpcMutation<{ id: string; date: string; method: string; bankAccountId: string | null; reference: string | null; applyAdvances?: boolean }>("expense_report_pay",
+  (v) => ({ _id: v.id, _date: v.date, _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: v.reference, _apply_advances: v.applyAdvances ?? true }), "Note remboursée");
 export const useCancelExpense = rpcMutation<{ id: string; reason: string }>("expense_report_cancel", (v) => ({ _id: v.id, _reason: v.reason }), "Note annulée");
 
 export function useSaveExpenseCategory() {
@@ -207,4 +210,108 @@ export function useSaveExpenseSettings() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense-settings"] }); toast.success("Paramètres enregistrés"); },
     onError: (e: Error) => toast.error(e.message),
   });
+}
+
+// ─── V112 : barèmes, avances, justificatifs ───
+export interface ExpenseRate { id: string; kind: "mileage" | "per_diem"; code: string; name: string; unit: "km" | "day" | "night" | "meal"; rate: number;
+  category_id: string; valid_from: string | null; valid_to: string | null; is_active: boolean }
+export const RATE_UNIT: Record<ExpenseRate["unit"], string> = { km: "km", day: "jour", night: "nuit", meal: "repas" };
+
+export function useExpenseRates() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["expense-rates", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async (): Promise<ExpenseRate[]> => {
+      const { data, error } = await db.from("expense_rates").select("*").eq("tenant_id", tenantId).order("code");
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({ ...r, rate: Number(r.rate) }));
+    },
+  });
+}
+
+export function useSaveExpenseRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (r: Partial<ExpenseRate> & { kind: ExpenseRate["kind"]; code: string; name: string; unit: ExpenseRate["unit"]; rate: number; category_id: string }) => {
+      const tenant_id = await fetchTenantId();
+      const row = { kind: r.kind, code: r.code, name: r.name, unit: r.unit, rate: r.rate, category_id: r.category_id, valid_from: r.valid_from || null, valid_to: r.valid_to || null, is_active: r.is_active ?? true };
+      const { data, error } = r.id ? await db.from("expense_rates").update(row).eq("id", r.id).select("id") : await db.from("expense_rates").insert({ tenant_id, ...row }).select("id");
+      if (error) throw new Error(/duplicate key|unique/i.test(error.message) ? "Ce code de barème existe déjà." : error.message);
+      if (!data?.length) throw new Error("Droit « expenses.settings » requis.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense-rates"] }); toast.success("Barème enregistré"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export interface ExpenseAdvance { id: string; advance_number: string; employee_id: string; advance_date: string; amount: number; amount_applied: number; amount_refunded: number;
+  purpose: string | null; payment_method: string; employee?: { first_name: string; last_name: string } | null }
+
+export function useExpenseAdvances() {
+  const { data: tenantId } = useTenantId();
+  return useQuery({
+    queryKey: ["expense-advances", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async (): Promise<ExpenseAdvance[]> => {
+      const { data, error } = await db.from("expense_advances").select("*, employee:employees(first_name, last_name)").eq("tenant_id", tenantId).order("advance_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((a: any) => ({ ...a, amount: Number(a.amount), amount_applied: Number(a.amount_applied), amount_refunded: Number(a.amount_refunded) }));
+    },
+  });
+}
+
+function useInvalidateAdvances() {
+  const qc = useQueryClient();
+  return () => { for (const k of ["expense-advances", "expense-reports", "treasury-movements", "gl-transactions"]) qc.invalidateQueries({ queryKey: [k] }); };
+}
+
+export function usePayAdvance() {
+  const invalidate = useInvalidateAdvances();
+  return useMutation({
+    mutationFn: async (v: { employee: string; date: string; amount: number; purpose: string; method: string; bankAccountId: string | null; reference: string | null }) => {
+      const { error } = await db.rpc("expense_advance_pay", { _employee: v.employee, _date: v.date, _amount: v.amount, _purpose: v.purpose, _payment_method: v.method,
+        _bank_account_id: v.bankAccountId, _reference: v.reference });
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Avance versée"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useRefundAdvance() {
+  const invalidate = useInvalidateAdvances();
+  return useMutation({
+    mutationFn: async (v: { advance: string; date: string; amount: number; method: string; bankAccountId: string | null }) => {
+      const { error } = await db.rpc("expense_advance_refund", { _advance: v.advance, _date: v.date, _amount: v.amount, _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: null });
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Restitution enregistrée"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Justificatif joint (stockage privé du nuage) : <société>/<note>/<fichier>, chemin noté sur la ligne. */
+export function useAttachReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { reportId: string; lineId: string; file: File }) => {
+      const tenant = await fetchTenantId();
+      const safe = v.file.name.normalize("NFD").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-80);
+      const path = `${tenant}/${v.reportId}/${crypto.randomUUID()}-${safe}`;
+      const up = await db.storage.from("expense-receipts").upload(path, v.file, { upsert: false, contentType: v.file.type || undefined });
+      if (up.error) throw new Error(up.error.message);
+      const { data, error } = await db.from("expense_lines").update({ receipt_path: path }).eq("id", v.lineId).select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Ligne non modifiable : la note n'est plus en brouillon.");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense-reports"] }); toast.success("Justificatif joint"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export async function openReceipt(path: string) {
+  const { data, error } = await db.storage.from("expense-receipts").createSignedUrl(path, 120);
+  if (error) { toast.error(error.message); return; }
+  window.open(data.signedUrl, "_blank", "noopener");
 }

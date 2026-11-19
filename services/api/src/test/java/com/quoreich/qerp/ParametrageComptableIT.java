@@ -59,13 +59,13 @@ class ParametrageComptableIT {
   @DisplayName("l'administrateur applique SYSCOHADA : comptes et rôles créés ; rejouer ne change rien")
   void appliquerLeReferentielEstIdempotent() throws Exception {
     assertThat(asUser(BETA_ADMIN, "SELECT apply_accounting_framework('SYSCOHADA_REVISE')::text"))
-        .contains("\"comptes_crees\": 22") // + 408 (V72) ; + 4191 (V49), 311 et 6031 (V51), paie 661 / 664 / 422 / 431 / 447 (V63), caisse 571 et mobile money 552 (V70)
-        .contains("\"roles_parametres\": 22"); // + notes de frais à rembourser (V109, compte 422)
+        .contains("\"comptes_crees\": 23") // + 4211 avances au personnel (V112) // + 408 (V72) ; + 4191 (V49), 311 et 6031 (V51), paie 661 / 664 / 422 / 431 / 447 (V63), caisse 571 et mobile money 552 (V70)
+        .contains("\"roles_parametres\": 23"); // + notes de frais à rembourser (V109, compte 422)
 
     assertThat(rows("SELECT p.role_code || ' ' || g.code FROM tenant_posting_accounts p JOIN"
                 + " gl_accounts g ON g.id = p.gl_account_id WHERE p.tenant_id = ?::uuid ORDER BY 1", B))
         .containsExactly(
-            "AP_PAYABLE 401", "AR_RECEIVABLE 411", "BANK 521", "CASH 571", "CUSTOMER_ADVANCE 4191", "DISPOSAL_BOOK_VALUE 812", "DISPOSAL_PROCEEDS 822", "DISPOSAL_RECEIVABLE 485", "EXPENSE_PAYABLE 422", "GRNI 408", "INVENTORY 311", "MOBILE_MONEY 552", "PAYROLL_EMPLOYER_CHARGES 664",
+            "AP_PAYABLE 401", "AR_RECEIVABLE 411", "BANK 521", "CASH 571", "CUSTOMER_ADVANCE 4191", "DISPOSAL_BOOK_VALUE 812", "DISPOSAL_PROCEEDS 822", "DISPOSAL_RECEIVABLE 485", "EXPENSE_ADVANCE 4211", "EXPENSE_PAYABLE 422", "GRNI 408", "INVENTORY 311", "MOBILE_MONEY 552", "PAYROLL_EMPLOYER_CHARGES 664",
             "PAYROLL_NET_PAYABLE 422", "PAYROLL_SALARIES 661", "PAYROLL_SOCIAL 431", "PAYROLL_TAX 447", "PURCHASES 601",
             "SALES_REVENUE 701", "STOCK_VARIATION 6031", "VAT_INPUT 4452", "VAT_OUTPUT 4431");
     assertThat(rows("SELECT framework_code FROM tenant_accounting_settings WHERE tenant_id = ?::uuid", B))
@@ -92,7 +92,7 @@ class ParametrageComptableIT {
                   + " WHERE role_code = 'BANK'"))
           .isZero();
       // La lecture reste permise dans la société.
-      assertThat(asUser(user, "SELECT count(*)::text FROM tenant_posting_accounts")).isEqualTo("22"); // + avances (V49), stocks (V51), paie (V63), caisse et mobile money (V70)
+      assertThat(asUser(user, "SELECT count(*)::text FROM tenant_posting_accounts")).isEqualTo("23"); // + avances (V49), stocks (V51), paie (V63), caisse et mobile money (V70)
     }
     assertThat(update(ALPHA_ADMIN, "UPDATE tenant_posting_accounts SET updated_at = now()"
             + " WHERE role_code = 'BANK'"))
@@ -157,7 +157,7 @@ class ParametrageComptableIT {
   void referentielInconnuEtLectureSeule() throws Exception {
     assertThatThrownBy(() -> asUser(ALPHA_ADMIN, "SELECT apply_accounting_framework('INCONNU')::text"))
         .hasMessageContaining("Référentiel comptable inconnu");
-    assertThat(asUser(ALPHA_ADMIN, "SELECT count(*)::text FROM posting_roles")).isEqualTo("22"); // + CUSTOMER_ADVANCE (V49), INVENTORY et STOCK_VARIATION (V51), PAYROLL_* (V63), CASH et MOBILE_MONEY (V70)
+    assertThat(asUser(ALPHA_ADMIN, "SELECT count(*)::text FROM posting_roles")).isEqualTo("23"); // + CUSTOMER_ADVANCE (V49), INVENTORY et STOCK_VARIATION (V51), PAYROLL_* (V63), CASH et MOBILE_MONEY (V70)
     assertThatThrownBy(
             () -> asUser(ALPHA_ADMIN, "DELETE FROM accounting_frameworks RETURNING code"))
         .hasMessageContaining("permission denied");

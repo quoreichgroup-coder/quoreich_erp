@@ -75,3 +75,24 @@ export async function approuverFactureFournisseur(browser: import("@playwright/t
   await expect(l).toContainText("Approuvée");
   await ctx.close();
 }
+
+/** Attribue au second membre un rôle (libellé exact, ex. « Approbateur notes de frais ») s'il ne l'a pas. */
+export async function assurerRoleApprobateur(browser: import("@playwright/test").Browser, baseURL: string | undefined, page: Page, role: string) {
+  const { ctx, page: pa } = await pageApprobateur(browser, baseURL);
+  await pa.goto("/");
+  const id = await pa.evaluate(() => {
+    const k = Object.keys(localStorage).find((n) => /^sb-.*-auth-token$/.test(n));
+    return k ? JSON.parse(localStorage.getItem(k)!)?.user?.id : undefined;
+  });
+  await ctx.close();
+  await page.goto("/settings?tab=roles");
+  await page.getByTestId("authz-tab-users").click();
+  const rangee = page.getByTestId(`user-row-${id}`);
+  await expect(rangee).toBeVisible();
+  const detenu = rangee.getByRole("button", { name: new RegExp(`^Retirer ${role} à `) });
+  if ((await detenu.count()) === 0) {
+    const choix = rangee.getByRole("combobox");
+    await choix.selectOption(await choix.locator("option", { hasText: new RegExp(`^${role}$`) }).getAttribute("value") ?? "");
+    await expect(detenu).toHaveCount(1);
+  }
+}

@@ -19,7 +19,7 @@ export function splitTtc(ttc: number, rate: number | null | undefined): { net: n
 
 export interface PolicyCategory { id: string; name: string; receipt_required_above: number | null; max_amount_per_line: number | null; is_active: boolean }
 export interface PolicySettings { receipt_required_above: number | null; max_report_amount: number | null; late_submission_days: number | null }
-export interface PolicyLine { expense_date: string; category_id: string | null; amount: number; receipt_ref: string | null }
+export interface PolicyLine { expense_date: string; category_id: string | null; amount: number; receipt_ref: string | null; on_rate?: boolean }
 
 /** Écarts aux règles de la société, dans les mêmes termes que le refus de la base. */
 export function policyIssues(lines: PolicyLine[], categories: PolicyCategory[], settings: PolicySettings | null, today: string): string[] {
@@ -33,7 +33,8 @@ export function policyIssues(lines: PolicyLine[], categories: PolicyCategory[], 
     if (!c.is_active) out.push(`ligne ${n} : catégorie ${c.name} inactive`);
     if (!(l.amount > 0)) out.push(`ligne ${n} : montant à saisir`);
     const seuil = c.receipt_required_above ?? settings?.receipt_required_above ?? null;
-    if (seuil != null && l.amount >= seuil && !(l.receipt_ref ?? "").trim()) out.push(`ligne ${n} : justificatif exigé à partir de ${seuil}`);
+    // Indemnité au barème : forfait, pas de justificatif de montant (comme la base).
+    if (!l.on_rate && seuil != null && l.amount >= seuil && !(l.receipt_ref ?? "").trim()) out.push(`ligne ${n} : justificatif exigé à partir de ${seuil}`);
     if (c.max_amount_per_line != null && l.amount > c.max_amount_per_line) out.push(`ligne ${n} : dépasse le plafond de la catégorie ${c.name} (${c.max_amount_per_line})`);
     if (settings?.late_submission_days != null && l.expense_date) {
       const limit = new Date(today); limit.setDate(limit.getDate() - settings.late_submission_days);
@@ -50,4 +51,9 @@ export function sumBy<T>(rows: T[], key: (r: T) => string, amount: (r: T) => num
   const m = new Map<string, { amount: number; count: number }>();
   for (const r of rows) { const k = key(r) || "—"; const v = m.get(k) ?? { amount: 0, count: 0 }; v.amount += amount(r); v.count += 1; m.set(k, v); }
   return [...m.entries()].map(([label, v]) => ({ label, amount: round2(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
+}
+
+/** Contre-valeur d'un montant en devise au cours saisi, arrondie au centime (comme la base). */
+export function convert(original: number, rate: number): number {
+  return round2(original * rate);
 }

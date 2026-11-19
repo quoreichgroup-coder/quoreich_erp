@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { policyIssues, splitTtc, sumBy } from "@/lib/expenses";
+import { convert, policyIssues, splitTtc, sumBy } from "@/lib/expenses";
 
 describe("notes de frais", () => {
   it("TVA comprise dans le TTC, comme la base (59 000 à 18 % → 50 000 HT + 9 000)", () => {
@@ -30,6 +30,12 @@ describe("notes de frais", () => {
     expect(policyIssues([{ expense_date: "2041-01-01", category_id: "c2", amount: 10, receipt_ref: null }], cats, settings, "2041-03-10"))
       .toEqual(["ligne 1 : au-delà du délai de 30 jours"]);
     expect(policyIssues([], cats, null, "2041-03-10")).toEqual(["Une note sans dépense ne se soumet pas"]);
+  });
+
+  it("barème sans justificatif ; contre-valeur en devise au centime", () => {
+    const cats = [{ id: "c1", name: "Km", receipt_required_above: 1000, max_amount_per_line: null, is_active: true }];
+    expect(policyIssues([{ expense_date: "2041-03-01", category_id: "c1", amount: 15000, receipt_ref: null, on_rate: true }], cats, null, "2041-03-10")).toEqual([]);
+    expect(convert(100, 655.957)).toBe(65595.7);
   });
 
   it("totaux par clé, du plus grand au plus petit", () => {

@@ -54,3 +54,35 @@ BEGIN
     FROM auth.users u
    WHERE NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = u.id);
 END $$;
+
+-- Justificatifs des notes de frais (V112) : stockage privé du nuage. Chemin <société>/<note>/<fichier> ;
+-- lecture par qui voit la note (sa RLS s'applique dans la sous-requête), dépôt par son auteur ou le droit
+-- « expenses.manage », retrait seulement tant que la note est modifiable. Sur site, pas de stockage :
+-- la référence du justificatif reste obligatoire au-delà du seuil.
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NULL OR to_regclass('public.expense_reports') IS NULL THEN
+    RAISE NOTICE 'storage ou notes de frais absents : stockage des justificatifs ignoré';
+    RETURN;
+  END IF;
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES ('expense-receipts', 'expense-receipts', false, 10485760, ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'])
+  ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+  DROP POLICY IF EXISTS "Justificatifs : lecture avec la note" ON storage.objects;
+  DROP POLICY IF EXISTS "Justificatifs : dépôt par l'auteur" ON storage.objects;
+  DROP POLICY IF EXISTS "Justificatifs : retrait tant que modifiable" ON storage.objects;
+  CREATE POLICY "Justificatifs : lecture avec la note" ON storage.objects FOR SELECT TO authenticated
+    USING (bucket_id = 'expense-receipts' AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+           AND EXISTS (SELECT 1 FROM public.expense_reports r WHERE r.id::text = (storage.foldername(name))[2]));
+  CREATE POLICY "Justificatifs : dépôt par l'auteur" ON storage.objects FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'expense-receipts' AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+           AND EXISTS (SELECT 1 FROM public.expense_reports r WHERE r.id::text = (storage.foldername(name))[2]
+                        AND r.status IN ('draft', 'rejected')
+                        AND (r.created_by = auth.uid() OR public.has_permission(auth.uid(), 'expenses.manage'))));
+  CREATE POLICY "Justificatifs : retrait tant que modifiable" ON storage.objects FOR DELETE TO authenticated
+    USING (bucket_id = 'expense-receipts' AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+           AND EXISTS (SELECT 1 FROM public.expense_reports r WHERE r.id::text = (storage.foldername(name))[2]
+                        AND r.status IN ('draft', 'rejected')
+                        AND (r.created_by = auth.uid() OR public.has_permission(auth.uid(), 'expenses.manage'))));
+END $$;

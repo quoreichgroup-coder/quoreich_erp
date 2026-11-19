@@ -91,18 +91,33 @@
    - l'écran ne propose que des comptes imputables ;
    - la base refuse ce cas à la création de la catégorie (V110).
 
-## 5. Restes
+## 5. Compléments livrés le même jour (V111–V112)
 
-- **Avances sur frais** (acompte versé au salarié, imputé au remboursement) : à faire.
-- **Indemnités kilométriques et barèmes de per diem** : à faire. Ils doivent être paramétrés par la
-  société, aucun barème légal n'étant pré-rempli.
-- **Notes en devise étrangère** : lot des achats internationaux.
-- **Analytique par ligne** (section, projet) : arrivera avec le module Projets.
-- **Pièces jointes** (photo du justificatif) : stockage de fichiers à brancher. La référence du
-  justificatif est obligatoire au-delà du seuil.
-- **Sur site** : pas encore d'API Java pour ce module.
+- **Analytique par ligne** : chaque ligne peut être imputée à un projet actif (V111). L'écriture de
+  charge porte alors la section du projet.
+- **Avances au salarié** :
+  - versement par la trésorerie, numéro `AVS-AAAA-####` ; écriture débit 4211 « Personnel, avances »
+    (rôle `EXPENSE_ADVANCE`), crédit trésorerie ;
+  - au remboursement d'une note, les avances ouvertes s'imputent d'abord, des plus anciennes aux plus
+    récentes, et seul le reste passe par la trésorerie ;
+  - restitution d'un solde non consommé.
+- **Barèmes kilométriques et per diem** : taux par unité (km, jour, nuit, repas), catégorie, validité.
+  Aucun barème légal n'est pré-rempli. La ligne vaut quantité × taux, sans TVA ni justificatif de
+  montant.
+- **Devises** : la ligne garde le montant d'origine, la devise et le cours saisi ; la note porte la
+  contre-valeur arrondie au centime.
+- **Photo du justificatif** : stockage privé du nuage `expense-receipts` (script de plateforme
+  Supabase). Chemin `<société>/<note>/<fichier>` ; lecture par qui voit la note ; dépôt et retrait
+  par l'auteur tant que la note est modifiable.
 
-## 6. Vérification
+## 6. Restes
+
+- **Sur site** : pas d'API Java pour les notes de frais. Comme les achats, le stock, le grand livre et
+  la paie, le module passe aujourd'hui par Supabase ; le portage vers l'API suivra le plan des
+  lots 3 à 5 (`docs/PLAN-BASCULE-JAVA.md`). Le stockage des justificatifs n'existe que dans le nuage ;
+  sur site, la référence du justificatif reste obligatoire au-delà du seuil.
+
+## 7. Vérification
 
 - **Java** :
   - `NotesDeFraisIT` : cycle complet, rejet, gardes, confidentialité, V110 ;

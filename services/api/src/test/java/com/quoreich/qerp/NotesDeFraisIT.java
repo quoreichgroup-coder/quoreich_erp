@@ -140,6 +140,40 @@ class NotesDeFraisIT {
         .as("V110 : compte de charge imputable exigé").hasStackTraceContaining("compte de charge actif et imputable");
   }
 
+  @Test
+  @DisplayName("V112 : barème kilométrique, dépense en devise, avance imputée au remboursement puis restituée")
+  void avancesBaremesDevises() throws SQLException {
+    owner("INSERT INTO expense_rates (id, tenant_id, kind, code, name, unit, rate, category_id) VALUES ('d1120000-0000-0000-0000-000000000001', '" + A
+        + "', 'mileage', 'KM', 'Indemnité kilométrique', 'km', 150, '" + CATEGORIE + "') ON CONFLICT DO NOTHING");
+    String n = note(SALARIE);
+    asUser(SALARIE, "INSERT INTO expense_lines (report_id, line_no, expense_date, rate_id, quantity, description, amount) VALUES ('" + n
+        + "', 1, CURRENT_DATE, 'd1120000-0000-0000-0000-000000000001', 100, 'Trajet Ouaga-Koudougou', 1) RETURNING id::text");
+    asUser(SALARIE, "INSERT INTO expense_lines (report_id, line_no, expense_date, category_id, description, amount, original_currency, original_amount, exchange_rate,"
+        + " receipt_ref, tax_code_id) VALUES ('" + n + "', 2, CURRENT_DATE, '" + CATEGORIE + "', 'Hôtel Paris', 1, 'EUR', 100, 655.957, 'Facture', NULL) RETURNING id::text");
+    assertThat(texte("SELECT string_agg(amount::numeric(18,2)::text || '/' || tax_amount::numeric(18,2)::text, ' ' ORDER BY line_no) FROM expense_lines WHERE report_id = '" + n + "'"))
+        .as("100 km × 150 sans TVA ; 100 EUR au cours 655,957 (TVA 18 % de la catégorie sur la contre-valeur)").isEqualTo("15000.00/0.00 65595.70/10006.12");
+
+    asUser(SALARIE, "SELECT expense_report_submit('" + n + "')::text");
+    asUser(APPROBATEUR, "SELECT expense_report_decide('" + pendingApproval(n) + "', true, NULL)");
+    asUser(COMPTABLE, "SELECT expense_report_post('" + n + "', CURRENT_DATE)::text");
+
+    String avance = asUser(COMPTABLE, "SELECT expense_advance_pay('" + EMPLOYE + "', CURRENT_DATE, 30000, 'Mission', 'cash', NULL, NULL)::text");
+    assertThat(texte("SELECT advance_number LIKE 'AVS-%' FROM expense_advances WHERE id = '" + avance + "'")).isEqualTo("t");
+    assertThat(texte("SELECT je.journal_code || ' ' || string_agg(g.code || ':' || l.debit::numeric(18,0) || '/' || l.credit::numeric(18,0), ' ' ORDER BY g.code)"
+        + " FROM expense_advances a JOIN journal_entries je ON je.id = a.journal_entry_id JOIN journal_lines l ON l.entry_id = je.id JOIN gl_accounts g ON g.id = l.account_id"
+        + " WHERE a.id = '" + avance + "' GROUP BY je.journal_code")).isEqualTo("BQ 4211:30000/0 571:0/30000");
+
+    asUser(COMPTABLE, "SELECT expense_report_pay('" + n + "', CURRENT_DATE, 'cash', NULL, NULL, true)::text");
+    assertThat(texte("SELECT advance_applied::numeric(18,0)::text FROM expense_reports WHERE id = '" + n + "'")).isEqualTo("30000");
+    assertThat(texte("SELECT amount_applied::numeric(18,0)::text FROM expense_advances WHERE id = '" + avance + "'")).isEqualTo("30000");
+    assertThat(ecriture("payment_journal_entry_id", n)).as("reste 80 595,70 − 30 000 payé en caisse").isEqualTo("BQ 422:50596/0 571:0/50596");
+
+    String avance2 = asUser(COMPTABLE, "SELECT expense_advance_pay('" + EMPLOYE + "', CURRENT_DATE, 5000, 'Divers', 'cash', NULL, NULL)::text");
+    assertThatThrownBy(() -> asUser(COMPTABLE, "SELECT expense_advance_refund('" + avance2 + "', CURRENT_DATE, 6000, 'cash', NULL, NULL)::text")).hasMessageContaining("solde");
+    asUser(COMPTABLE, "SELECT expense_advance_refund('" + avance2 + "', CURRENT_DATE, 5000, 'cash', NULL, NULL)::text");
+    assertThat(asUser(SALARIE, "SELECT count(*)::text FROM expense_advances")).as("avances : comptabilité et trésorerie seulement").isEqualTo("0");
+  }
+
   // ─── Outils ───
 
   private static String asUser(String user, String sql) throws SQLException {
