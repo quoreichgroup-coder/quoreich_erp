@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { moduleRpc } from "@/api/rpc";
 
 export type AccessibleTenant = { id: string; name: string; currency: string };
 
@@ -26,7 +26,7 @@ export function useAccessibleTenants() {
     retry: false,
     staleTime: 60_000,
     queryFn: async (): Promise<AccessibleTenant[]> => {
-      const { data, error } = await (supabase as any).rpc("get_accessible_tenants");
+      const { data, error } = await moduleRpc("pilotage", "get_accessible_tenants");
       if (error) throw error;
       return (data ?? []) as AccessibleTenant[];
     },
@@ -41,7 +41,7 @@ export function useConsolidatedCfoKpis(tenantIds: string[]) {
     retry: false,
     staleTime: 15_000,
     queryFn: async (): Promise<ConsolidatedKpiRow[]> => {
-      const { data, error } = await (supabase as any).rpc("get_consolidated_cfo_kpis", {
+      const { data, error } = await moduleRpc("pilotage", "get_consolidated_cfo_kpis", {
         _tenant_ids: tenantIds,
       });
       if (error) throw error;

@@ -59,7 +59,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (table: string) => {
       if (table === "ar_invoices") return makeQB([...arRows]);
       if (table === "ap_invoices") return makeQB([...apRows]);
-      if (table === "bank_accounts") return makeQB([{ current_balance: 1_000_000 }]);
+      if (table === "bank_accounts") return makeQB([{ balance: 1_000_000 }]);
       if (table === "payments") return makeQB([]);
       if (table === "payroll_runs") return makeQB([]);
       if (table === "inventory_period_closes") return makeQB([{ period: "2026-05" }]);

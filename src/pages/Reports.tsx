@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { HelpIcon } from "@/components/HelpIcon";
@@ -327,8 +327,8 @@ function FinancialTable({ data, title, subtitle, currency, rate, fiscalYear }: {
           </thead>
           <tbody>
             {data.map((section) => (
-              <> 
-                <tr key={section.category} className="bg-primary/5">
+              <Fragment key={section.category}>
+                <tr className="bg-primary/5">
                   <td colSpan={5} className="px-4 py-2 font-semibold text-foreground uppercase text-[11px] tracking-wider">{section.category}</td>
                 </tr>
                 {section.rows.map((row) => (
@@ -342,7 +342,7 @@ function FinancialTable({ data, title, subtitle, currency, rate, fiscalYear }: {
                     {fmtCurrency(section.rows.reduce((s, r) => s + r.current, 0) - section.rows.reduce((s, r) => s + r.previous, 0), currency, rate)}
                   </td>
                 </tr>
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { apiPost, isApiEnabled } from "@/api/client";
 import { IMPORT_TEMPLATES, buildCsvTemplate, type ImportEntity } from "@/lib/import-templates";
 import { Upload, Download, CheckCircle2, AlertTriangle, FileSpreadsheet, ArrowRight, ArrowLeft } from "lucide-react";
 
@@ -120,9 +121,9 @@ export default function DataImport() {
         return out;
       });
 
-      const { data, error } = await supabase.functions.invoke("import-data", {
-        body: { entity, rows: payloadRows },
-      });
+      const { data, error } = isApiEnabled()
+        ? { data: await apiPost<ImportResult>("/api/v1/import", { entity, rows: payloadRows }), error: null }
+        : await supabase.functions.invoke("import-data", { body: { entity, rows: payloadRows } });
       if (error) throw error;
       setResult(data as ImportResult);
       setStep(3);

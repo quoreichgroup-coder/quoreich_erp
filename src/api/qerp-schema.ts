@@ -739,6 +739,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Planifications des analyses */
+        get: operations["listAiSchedules"];
+        /** Enregistrer la planification d'une analyse (administrateur) */
+        put: operations["saveAiSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/tax-codes/{id}": {
         parameters: {
             query?: never;
@@ -1300,6 +1318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pilotage/actions/{function}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Consolidation CFO (fonction de la liste autorisée, arguments nommés) */
+        post: operations["runPilotageAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/warehouses": {
         parameters: {
             query?: never;
@@ -1383,6 +1418,23 @@ export interface paths {
         put?: never;
         /** Opération de stock (fonction de la liste autorisée, arguments nommés) */
         post: operations["runInventoryAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importer des lignes d'une entité ({ entity, rows }) : lignes incomplètes ignorées et listées, le reste en une transaction */
+        post: operations["importData"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2830,6 +2882,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/gl-anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Écritures suspectes des derniers jours (30 par défaut) */
+        post: operations["runGlAnomalyDetection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/cashflow-forecast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prévision de trésorerie par horizons (30/60/90 jours par défaut) */
+        post: operations["runCashflowForecast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/onboarding/{mode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Créer sa société (create) ou la rejoindre par un code d'invitation (join) */
+        post: operations["joinOrCreateTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/modules/{module}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Désactiver un module (administrateur de la société) */
+        post: operations["deactivateModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/modules/{module}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activer un module (administrateur de la société) */
+        post: operations["activateModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invitations de la société (administrateurs) */
+        get: operations["listInvitations"];
+        put?: never;
+        /** Émettre un code d'invitation (rôle, durée 1 à 30 jours, note) */
+        post: operations["createInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/invitations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Révoquer une invitation */
+        post: operations["revokeInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/tax-codes": {
         parameters: {
             query?: never;
@@ -4063,6 +4235,108 @@ export interface paths {
         };
         /** Files d'approbation (filtres facultatifs : type, statut) */
         get: operations["listProcurementApprovals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/upcoming-payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cinq prochaines échéances fournisseurs */
+        get: operations["listUpcomingPayables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cinq dernières factures clients et fournisseurs */
+        get: operations["getRecentTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Règlements (montant, date, type) par date */
+        get: operations["listPaymentsTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/overdue/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Créances (ar) ou dettes (ap) échues, filtres de dates, tri par échéance */
+        get: operations["listOverdueInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Données du tableau de bord : factures, nombre de tiers, règlements */
+        get: operations["getDashboardData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pilotage/cfo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Données du cockpit CFO de la société courante */
+        get: operations["getCfoCockpitData"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5874,6 +6148,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Historique des analyses (filtres type et dates, pagination) */
+        get: operations["listAiHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workflow-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Règles de flux de la société */
+        get: operations["listWorkflowRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Modules de la société et leur statut */
+        get: operations["listTenantModules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/licenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Licences de la société */
+        get: operations["listLicenses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/active-modules": {
         parameters: {
             query?: never;
@@ -6061,25 +6403,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            valueNode?: boolean;
-            bigDecimal?: boolean;
-            /** @enum {string} */
-            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            bigInteger?: boolean;
-            missingNode?: boolean;
-            integralNumber?: boolean;
-            floatingPointNumber?: boolean;
-            /** @deprecated */
-            textual?: boolean;
-            binary?: boolean;
             number?: boolean;
-            long?: boolean;
-            string?: boolean;
-            boolean?: boolean;
-            double?: boolean;
-            pojo?: boolean;
             short?: boolean;
             int?: boolean;
+            double?: boolean;
+            pojo?: boolean;
+            long?: boolean;
+            /** @deprecated */
+            textual?: boolean;
+            string?: boolean;
+            boolean?: boolean;
+            binary?: boolean;
+            bigInteger?: boolean;
+            integralNumber?: boolean;
+            floatingPointNumber?: boolean;
+            valueNode?: boolean;
+            /** @enum {string} */
+            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
+            missingNode?: boolean;
+            bigDecimal?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -9747,6 +10089,96 @@ export interface operations {
             };
         };
     };
+    listAiSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    saveAiSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     updateTaxCode: {
         parameters: {
             query?: never;
@@ -11761,6 +12193,56 @@ export interface operations {
             };
         };
     };
+    runPilotageAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     listWarehouses: {
         parameters: {
             query?: never;
@@ -12134,6 +12616,54 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    importData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
             content: {
                 "application/json": {
                     [key: string]: unknown;
@@ -17330,6 +17860,380 @@ export interface operations {
             };
         };
     };
+    runGlAnomalyDetection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    runCashflowForecast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    joinOrCreateTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deactivateModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    activateModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    revokeInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     listTaxCodes: {
         parameters: {
             query?: never;
@@ -21100,6 +22004,264 @@ export interface operations {
                 docType?: string;
                 status?: string;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listUpcomingPayables: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getRecentTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listPaymentsTrend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listOverdueInvoices: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                ascending?: boolean;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getDashboardData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCfoCockpitData: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -25680,6 +26842,180 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listAiHistory: {
+        parameters: {
+            query?: {
+                type?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listWorkflowRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listTenantModules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listLicenses: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;

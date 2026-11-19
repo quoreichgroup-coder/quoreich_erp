@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 import { useTenantId } from "./use-tenant";
 
 const useTenant = () => {
@@ -58,6 +59,7 @@ export interface CashflowParams {
 export function useCashflowForecast() {
   return useMutation<CashflowResponse, Error, CashflowParams | undefined>({
     mutationFn: async (params) => {
+      if (isApiEnabled()) return apiPost<CashflowResponse>("/api/v1/ai/cashflow-forecast", params ?? {});
       const { data, error } = await supabase.functions.invoke("ai-cashflow-forecast", {
         body: params ?? {},
       });
@@ -71,6 +73,7 @@ export function useCashflowForecast() {
 export function useGLAnomalyDetection() {
   return useMutation<GLAnomalyResponse, Error, { days?: number } | undefined>({
     mutationFn: async (params) => {
+      if (isApiEnabled()) return apiPost<GLAnomalyResponse>("/api/v1/ai/gl-anomalies", params ?? {});
       const { data, error } = await supabase.functions.invoke("ai-gl-anomaly-detection", {
         body: params ?? {},
       });
@@ -107,7 +110,7 @@ export function useAiHistory(filter?: { type?: AiHistoryRow["analysis_type"]; li
   const queryKey = ["ai-history", tenantId, filter?.type ?? "all", filter?.limit ?? 50];
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || isApiEnabled()) return;
     const ch = supabase
       .channel(`ai-history-${tenantId}-${instance}`)
       .on("postgres_changes", {
@@ -122,6 +125,11 @@ export function useAiHistory(filter?: { type?: AiHistoryRow["analysis_type"]; li
     queryKey,
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const p = new URLSearchParams({ limit: String(filter?.limit ?? 50) });
+        if (filter?.type) p.set("type", filter.type);
+        return apiGet<AiHistoryRow[]>(`/api/v1/ai/history?${p}`);
+      }
       let q = supabase
         .from("ai_analysis_history")
         .select("*")
@@ -156,7 +164,7 @@ export function useAiHistoryInfinite(filter?: {
   ];
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || isApiEnabled()) return;
     const ch = supabase
       .channel(`ai-history-inf-${tenantId}-${instance}`)
       .on("postgres_changes", {
@@ -174,6 +182,14 @@ export function useAiHistoryInfinite(filter?: {
     queryFn: async ({ pageParam }) => {
       const from = pageParam as number;
       const to = from + pageSize - 1;
+      if (isApiEnabled()) {
+        const p = new URLSearchParams({ offset: String(from), limit: String(pageSize) });
+        if (filter?.type) p.set("type", filter.type);
+        if (filter?.dateFrom) p.set("dateFrom", filter.dateFrom);
+        if (filter?.dateTo) p.set("dateTo", filter.dateTo);
+        const rows = await apiGet<AiHistoryRow[]>(`/api/v1/ai/history?${p}`);
+        return { rows, nextOffset: rows.length === pageSize ? from + pageSize : null };
+      }
       let q = supabase
         .from("ai_analysis_history")
         .select("*")
@@ -213,6 +229,7 @@ export function useAiSchedules() {
     queryKey: ["ai-schedules", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<AiScheduleRow[]>("/api/v1/ai/schedules");
       const { data, error } = await supabase
         .from("ai_analysis_schedules")
         .select("*")
@@ -235,6 +252,7 @@ export function useUpsertAiSchedule() {
       params?: Record<string, unknown>;
     }) => {
       if (!tenantId) throw new Error("Tenant introuvable");
+      if (isApiEnabled()) return apiPut<AiScheduleRow>("/api/v1/ai/schedules", { ...input, params: input.params ?? {} });
       const { data, error } = await supabase
         .from("ai_analysis_schedules")
         .upsert(

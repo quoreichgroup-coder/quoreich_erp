@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 import type { ModuleName, ModuleStatus, PlanTier, LicenseType } from "@/lib/module-manager";
 
 // ─── Types mapped from DB rows ───
@@ -37,6 +38,7 @@ export function useLicenses() {
   return useQuery({
     queryKey: ["licenses"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<LicenseRow[]>("/api/v1/admin/licenses");
       const { data, error } = await supabase
         .from("licenses")
         .select("*")
@@ -51,6 +53,7 @@ export function useTenantModules() {
   return useQuery({
     queryKey: ["tenant-modules"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<TenantModuleRow[]>("/api/v1/admin/modules");
       const { data, error } = await supabase
         .from("tenant_modules")
         .select("*")
@@ -65,6 +68,10 @@ export function useActivateModule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ moduleName, licenseId }: { moduleName: string; licenseId?: string }) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/admin/modules/${encodeURIComponent(moduleName)}/activate`, { licenseId: licenseId || null });
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || user?.id || "system";
 
@@ -84,7 +91,7 @@ export function useActivateModule() {
         );
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-modules"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tenant-modules"] }); qc.invalidateQueries({ queryKey: ["active-modules"] }); },
   });
 }
 
@@ -92,6 +99,10 @@ export function useDeactivateModule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ moduleName }: { moduleName: string }) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/admin/modules/${encodeURIComponent(moduleName)}/deactivate`, {});
+        return;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       const tenantId = (await supabase.rpc("get_user_tenant_id", { _user_id: user!.id })).data!;
 
@@ -106,7 +117,7 @@ export function useDeactivateModule() {
         .eq("module_name", moduleName);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-modules"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tenant-modules"] }); qc.invalidateQueries({ queryKey: ["active-modules"] }); },
   });
 }
 

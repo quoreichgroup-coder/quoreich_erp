@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { moduleRpc } from "@/api/rpc";
 
 export type TrendPoint = {
   month: string; // YYYY-MM
@@ -25,7 +25,7 @@ export function useConsolidatedTrends(tenantIds: string[], months: TrendMonths =
     retry: false,
     staleTime: 30_000,
     queryFn: async (): Promise<TrendPoint[]> => {
-      const { data, error } = await supabase.rpc("get_consolidated_cfo_trends", { _tenant_ids: tenantIds, _months: months });
+      const { data, error } = await moduleRpc("pilotage", "get_consolidated_cfo_trends", { _tenant_ids: tenantIds, _months: months });
       if (error) throw error;
       return (data ?? []).map((row) => ({
         month: row.month,

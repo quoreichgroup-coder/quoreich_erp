@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 import type { ModuleName } from "@/lib/module-manager";
 
 // ─── Types ───
@@ -58,7 +59,9 @@ export function useWorkflowRules() {
   return useQuery({
     queryKey: ["workflow-rules"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled()
+        ? { data: await apiGet<any[]>("/api/v1/admin/workflow-rules"), error: null }
+        : await supabase
         .from("workflow_rules")
         .select("*")
         .order("created_at", { ascending: false });

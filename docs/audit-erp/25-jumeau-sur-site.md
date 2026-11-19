@@ -118,7 +118,17 @@ Fin du chantier :
 | RH et paie (API du 17–18 nov.) | ✅ | ✅ | `HrApiIT` | ✅ nuage 95 rejoué |
 | Conformité, risques | ✅ | ✅ | `ExpensesProjectsGrcApiIT` | ✅ nuage 101 rejoué |
 | Coquille : profil et société (`/me`), société courante, modules actifs, alertes, préférences de notification, calendrier fiscal | ✅ | ✅ | `ProcurementApiIT` (`/me`) | via tous les parcours sur site |
-| Pilotage (tableaux de bord, CFO, IA), administration (sociétés, modules, invitations, import) | à faire | | | |
+| Pilotage (tableau de bord, cockpit CFO, échus, consolidation par liste fermée), administration (modules, licences, règles de flux, invitations, création / rattachement de société), import en masse (jumeau de `import-data`), analyses IA (jumeaux des deux fonctions, fournisseur compatible OpenAI `QERP_AI_*`, historique, planifications) | ✅ | ✅ | `PilotageAdminApiIT` | ✅ parcours 102 (nuage et sur site) |
+| Exécution planifiée des analyses IA sur site (le nuage passe par `ai-scheduler` et pg_cron) | à faire | | | |
 | Identité sur site (connexion sans Supabase Auth) | à faire | | | |
 | Fichiers (justificatifs) | ✅ répertoire `qerp.files.dir` (défaut `./data/files`), mêmes règles que le stockage du nuage | ✅ | `ExpensesProjectsGrcApiIT` | ✅ |
 | Temps réel | à faire (sur site : rafraîchissement React Query) | | | |
+
+**Défauts du nuage trouvés en portant le cockpit CFO (19 nov. 2026)** : la requête lisait `bank_accounts.current_balance`,
+`risk_register.severity` et `payroll_runs.total_net`, trois colonnes qui n'existent pas ; les erreurs étaient ignorées, si bien que la
+trésorerie, les risques élevés et la paie du mois affichaient 0. Le calcul est désormais une fonction pure (`computeCfoCockpit`, testée) :
+trésorerie = soldes calculés des comptes actifs, risques élevés = score net au-delà du seuil « élevé » de la société, paie = `net_total`
+des cycles comptabilisés payés dans le mois ; une lecture en erreur remonte au lieu de donner 0.
+
+**Restes connus** : la création d'une société sur site suppose que le profil existe déjà dans la base locale (le provisionnement du profil
+viendra avec l'identité sur site) ; les règles de flux (`workflow_rules`) restent modifiables par tout membre (point ouvert du lot 4).

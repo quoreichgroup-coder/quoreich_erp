@@ -96,6 +96,12 @@ qerp:
     # Alimente `info.version` du contrat OpenAPI. Surchargé à la construction pour
     # que le document publié porte la version réellement déployée.
     version: @project.version@
+  # Fournisseur d'IA compatible OpenAI (sur site : LiteLLM devant Ollama ou vLLM). Vide = analyses IA refusées
+  # avec un message explicite. Plusieurs modèles séparés par des virgules : essayés dans l'ordre.
+  ai:
+    base-url: ${QERP_AI_BASE_URL:}
+    api-key: ${QERP_AI_API_KEY:}
+    model: ${QERP_AI_MODEL:}
 
 springdoc:
   api-docs:

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { apiPost, isApiEnabled } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +24,12 @@ export default function Onboarding() {
     if (!companyName.trim() || !user) return;
     setLoading(true);
     try {
-      const { error } = await supabase.rpc("create_tenant_for_user", {
-        _tenant_name: companyName.trim(),
-      });
-      if (error) throw error;
+      if (isApiEnabled()) await apiPost("/api/v1/admin/onboarding/create", { value: companyName.trim() });
+      else {
+        const { error } = await supabase.rpc("create_tenant_for_user", { _tenant_name: companyName.trim() });
+        if (error) throw error;
+      }
+      await qc.invalidateQueries({ queryKey: ["tenant-id"] });
       await qc.invalidateQueries({ queryKey: ["profile"] });
       toast.success(`Entreprise "${companyName}" créée !`);
       navigate("/");
@@ -41,10 +44,12 @@ export default function Onboarding() {
     if (!joinCode.trim() || !user) return;
     setLoading(true);
     try {
-      const { error } = await supabase.rpc("join_tenant", {
-        _tenant_name: joinCode.trim(),
-      });
-      if (error) throw error;
+      if (isApiEnabled()) await apiPost("/api/v1/admin/onboarding/join", { value: joinCode.trim() });
+      else {
+        const { error } = await supabase.rpc("join_tenant", { _tenant_name: joinCode.trim() });
+        if (error) throw error;
+      }
+      await qc.invalidateQueries({ queryKey: ["tenant-id"] });
       await qc.invalidateQueries({ queryKey: ["profile"] });
       toast.success(`Entreprise rejointe !`);
       navigate("/");

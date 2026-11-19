@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import type { InvitationRow } from "@/lib/invitations";
 
@@ -18,6 +19,7 @@ export function useInvitations(enabled: boolean) {
     enabled: Boolean(tenantId) && enabled,
     retry: false,
     queryFn: async (): Promise<InvitationRow[]> => {
+      if (isApiEnabled()) return apiGet<InvitationRow[]>("/api/v1/admin/invitations");
       const { data, error } = await db.from("tenant_invitations")
         .select("id, code, role_id, note, created_at, expires_at, used_at, used_by, revoked_at")
         .order("created_at", { ascending: false })
@@ -32,6 +34,7 @@ export function useCreateInvitation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (i: { roleId?: string; validDays: number; note?: string }) => {
+      if (isApiEnabled()) return apiPost<{ id: string; code: string; expires_at: string }>("/api/v1/admin/invitations", { roleId: i.roleId || null, validDays: i.validDays, note: i.note?.trim() || null });
       const { data, error } = await db.rpc("create_tenant_invitation", {
         _role_id: i.roleId || null, _valid_days: i.validDays, _note: i.note?.trim() || null,
       });
@@ -50,6 +53,10 @@ export function useRevokeInvitation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) {
+        await apiPost(`/api/v1/admin/invitations/${id}/revoke`, {});
+        return;
+      }
       const { error } = await db.rpc("revoke_tenant_invitation", { _id: id });
       if (error) throw error;
     },

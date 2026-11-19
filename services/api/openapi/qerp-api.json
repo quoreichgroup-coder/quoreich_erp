@@ -16,23 +16,11 @@
     "bearerAuth" : [ ]
   } ],
   "tags" : [ {
-    "name" : "Pièces",
-    "description" : "Sections analytiques des pièces d'achat et seuils d'approbation des circuits"
-  }, {
     "name" : "Retours et avoirs fournisseurs",
     "description" : "Retours sur réception, avoirs fournisseurs imputés sur les factures"
   }, {
-    "name" : "RH et paie",
-    "description" : "Dossiers salariés et cycles de paie de la société courante"
-  }, {
-    "name" : "Comptes clients (complément)",
-    "description" : "Paramètres AR, brouillons, acomptes et crédits, lettrage, relevé, identité de la société"
-  }, {
     "name" : "Projets",
     "description" : "Projets, budget par compte, réalisé, engagé et grand livre du projet"
-  }, {
-    "name" : "CRM",
-    "description" : "Contacts, opportunités, activités, relances et conversion en devis"
   }, {
     "name" : "Clients",
     "description" : "Comptes clients de la société du porteur du jeton"
@@ -40,23 +28,8 @@
     "name" : "Notes de frais",
     "description" : "Notes, lignes, cycle d'approbation, barèmes, avances et justificatifs"
   }, {
-    "name" : "Stocks",
-    "description" : "Articles, entrepôts, mouvements, inventaires, campagnes, clôtures et indicateurs"
-  }, {
-    "name" : "Autorisations",
-    "description" : "Rôles, droits et affectations de la société du porteur"
-  }, {
-    "name" : "Budget",
-    "description" : "Budgets, contrôle budgétaire, révisions, scénarios et prévisions"
-  }, {
-    "name" : "Plans comptables",
-    "description" : "Référentiels, qualité, import, correspondances, migration, audit du plan, jeux de comptes"
-  }, {
     "name" : "Ventes",
     "description" : "Devis, commandes, livraisons, retours clients, indicateurs et paramètres"
-  }, {
-    "name" : "Approvisionnement",
-    "description" : "Demandes, commandes, réceptions, approbations, suivi et réapprovisionnement"
   }, {
     "name" : "Analytique",
     "description" : "Axes, sections et règles analytiques de la société du porteur"
@@ -69,6 +42,9 @@
   }, {
     "name" : "Immobilisations",
     "description" : "Catégories, fiches, amortissements, cessions et paramètres"
+  }, {
+    "name" : "IA",
+    "description" : "Prévision de trésorerie, anomalies du grand livre, historique et planifications"
   }, {
     "name" : "Grand livre",
     "description" : "Plan de comptes, écritures, balance, périodes, contrôles et états"
@@ -84,6 +60,42 @@
   }, {
     "name" : "Comptes fournisseurs",
     "description" : "Fournisseurs, factures fournisseurs, paiements et paramètres AP"
+  }, {
+    "name" : "Pièces",
+    "description" : "Sections analytiques des pièces d'achat et seuils d'approbation des circuits"
+  }, {
+    "name" : "RH et paie",
+    "description" : "Dossiers salariés et cycles de paie de la société courante"
+  }, {
+    "name" : "Comptes clients (complément)",
+    "description" : "Paramètres AR, brouillons, acomptes et crédits, lettrage, relevé, identité de la société"
+  }, {
+    "name" : "CRM",
+    "description" : "Contacts, opportunités, activités, relances et conversion en devis"
+  }, {
+    "name" : "Stocks",
+    "description" : "Articles, entrepôts, mouvements, inventaires, campagnes, clôtures et indicateurs"
+  }, {
+    "name" : "Import",
+    "description" : "Import en masse de tiers, comptes, articles et factures"
+  }, {
+    "name" : "Autorisations",
+    "description" : "Rôles, droits et affectations de la société du porteur"
+  }, {
+    "name" : "Budget",
+    "description" : "Budgets, contrôle budgétaire, révisions, scénarios et prévisions"
+  }, {
+    "name" : "Plans comptables",
+    "description" : "Référentiels, qualité, import, correspondances, migration, audit du plan, jeux de comptes"
+  }, {
+    "name" : "Approvisionnement",
+    "description" : "Demandes, commandes, réceptions, approbations, suivi et réapprovisionnement"
+  }, {
+    "name" : "Pilotage",
+    "description" : "Tableaux de bord, cockpit CFO, consolidation et échéanciers"
+  }, {
+    "name" : "Administration",
+    "description" : "Licences, modules, règles de flux, invitations, rattachement à une société"
   } ],
   "paths" : {
     "/api/v1/treasury/settings" : {
@@ -3955,6 +3967,105 @@
         }
       }
     },
+    "/api/v1/ai/schedules" : {
+      "get" : {
+        "tags" : [ "IA" ],
+        "summary" : "Planifications des analyses",
+        "operationId" : "listAiSchedules",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "IA" ],
+        "summary" : "Enregistrer la planification d'une analyse (administrateur)",
+        "operationId" : "saveAiSchedule",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/tax-codes/{id}" : {
       "put" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -6353,6 +6464,69 @@
         }
       }
     },
+    "/api/v1/pilotage/actions/{function}" : {
+      "post" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Consolidation CFO (fonction de la liste autorisée, arguments nommés)",
+        "operationId" : "runPilotageAction",
+        "parameters" : [ {
+          "name" : "function",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/warehouses" : {
       "get" : {
         "tags" : [ "Stocks" ],
@@ -6788,6 +6962,62 @@
               }
             }
           }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/import" : {
+      "post" : {
+        "tags" : [ "Import" ],
+        "summary" : "Importer des lignes d'une entité ({ entity, rows }) : lignes incomplètes ignorées et listées, le reste en une transaction",
+        "operationId" : "importData",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
         },
         "responses" : {
           "200" : {
@@ -12998,6 +13228,449 @@
         }
       }
     },
+    "/api/v1/ai/gl-anomalies" : {
+      "post" : {
+        "tags" : [ "IA" ],
+        "summary" : "Écritures suspectes des derniers jours (30 par défaut)",
+        "operationId" : "runGlAnomalyDetection",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/cashflow-forecast" : {
+      "post" : {
+        "tags" : [ "IA" ],
+        "summary" : "Prévision de trésorerie par horizons (30/60/90 jours par défaut)",
+        "operationId" : "runCashflowForecast",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/onboarding/{mode}" : {
+      "post" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Créer sa société (create) ou la rejoindre par un code d'invitation (join)",
+        "operationId" : "joinOrCreateTenant",
+        "parameters" : [ {
+          "name" : "mode",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/modules/{module}/deactivate" : {
+      "post" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Désactiver un module (administrateur de la société)",
+        "operationId" : "deactivateModule",
+        "parameters" : [ {
+          "name" : "module",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/modules/{module}/activate" : {
+      "post" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Activer un module (administrateur de la société)",
+        "operationId" : "activateModule",
+        "parameters" : [ {
+          "name" : "module",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invitations" : {
+      "get" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Invitations de la société (administrateurs)",
+        "operationId" : "listInvitations",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Émettre un code d'invitation (rôle, durée 1 à 30 jours, note)",
+        "operationId" : "createInvitation",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/invitations/{id}/revoke" : {
+      "post" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Révoquer une invitation",
+        "operationId" : "revokeInvitation",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounting/tax-codes" : {
       "get" : {
         "tags" : [ "Paramétrage comptable" ],
@@ -17533,6 +18206,306 @@
             "default" : "pending"
           }
         } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/upcoming-payables" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Cinq prochaines échéances fournisseurs",
+        "operationId" : "listUpcomingPayables",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/recent" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Cinq dernières factures clients et fournisseurs",
+        "operationId" : "getRecentTransactions",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/payments" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Règlements (montant, date, type) par date",
+        "operationId" : "listPaymentsTrend",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/overdue/{kind}" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Créances (ar) ou dettes (ap) échues, filtres de dates, tri par échéance",
+        "operationId" : "listOverdueInvoices",
+        "parameters" : [ {
+          "name" : "kind",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "ascending",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : true
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/dashboard" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Données du tableau de bord : factures, nombre de tiers, règlements",
+        "operationId" : "getDashboardData",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pilotage/cfo" : {
+      "get" : {
+        "tags" : [ "Pilotage" ],
+        "summary" : "Données du cockpit CFO de la société courante",
+        "operationId" : "getCfoCockpitData",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -23118,6 +24091,226 @@
         }
       }
     },
+    "/api/v1/ai/history" : {
+      "get" : {
+        "tags" : [ "IA" ],
+        "summary" : "Historique des analyses (filtres type et dates, pagination)",
+        "operationId" : "listAiHistory",
+        "parameters" : [ {
+          "name" : "type",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "dateFrom",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "dateTo",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 25
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/workflow-rules" : {
+      "get" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Règles de flux de la société",
+        "operationId" : "listWorkflowRules",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/modules" : {
+      "get" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Modules de la société et leur statut",
+        "operationId" : "listTenantModules",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/licenses" : {
+      "get" : {
+        "tags" : [ "Administration" ],
+        "summary" : "Licences de la société",
+        "operationId" : "listLicenses",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/active-modules" : {
       "get" : {
         "tags" : [ "Application" ],
@@ -23642,45 +24835,13 @@
           "container" : {
             "type" : "boolean"
           },
-          "valueNode" : {
-            "type" : "boolean"
-          },
-          "bigDecimal" : {
-            "type" : "boolean"
-          },
-          "nodeType" : {
-            "type" : "string",
-            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
-          },
-          "bigInteger" : {
-            "type" : "boolean"
-          },
-          "missingNode" : {
-            "type" : "boolean"
-          },
-          "integralNumber" : {
-            "type" : "boolean"
-          },
-          "floatingPointNumber" : {
-            "type" : "boolean"
-          },
-          "textual" : {
-            "type" : "boolean",
-            "deprecated" : true
-          },
-          "binary" : {
-            "type" : "boolean"
-          },
           "number" : {
             "type" : "boolean"
           },
-          "long" : {
+          "short" : {
             "type" : "boolean"
           },
-          "string" : {
-            "type" : "boolean"
-          },
-          "boolean" : {
+          "int" : {
             "type" : "boolean"
           },
           "double" : {
@@ -23689,10 +24850,42 @@
           "pojo" : {
             "type" : "boolean"
           },
-          "short" : {
+          "long" : {
             "type" : "boolean"
           },
-          "int" : {
+          "textual" : {
+            "type" : "boolean",
+            "deprecated" : true
+          },
+          "string" : {
+            "type" : "boolean"
+          },
+          "boolean" : {
+            "type" : "boolean"
+          },
+          "binary" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          },
+          "nodeType" : {
+            "type" : "string",
+            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
             "type" : "boolean"
           },
           "embeddedValue" : {

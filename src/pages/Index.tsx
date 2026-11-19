@@ -18,6 +18,7 @@ import { useGLAuditLogs } from "@/hooks/use-gl-audit";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -235,6 +236,7 @@ const Index = () => {
   const { data: paymentsRaw = [] } = useQuery({
     queryKey: ["cash-trend-payments"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/pilotage/payments");
       const { data, error } = await supabase
         .from("payments")
         .select("amount, payment_date, payment_type")

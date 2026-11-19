@@ -1,6 +1,7 @@
 import { CalendarClock, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -11,6 +12,7 @@ export function UpcomingPayments() {
     queryKey: ["upcoming-ap-payments"],
     queryFn: async () => {
       const today = new Date().toISOString().split("T")[0];
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/pilotage/upcoming-payables");
       const { data, error } = await supabase
         .from("ap_invoices")
         .select("id, invoice_number, due_date, total, amount_paid, supplier:suppliers(name)")

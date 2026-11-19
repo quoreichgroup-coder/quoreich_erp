@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 import { Loader2 } from "lucide-react";
 
 const gridStroke = "hsl(220, 14%, 88%)";
@@ -14,6 +15,7 @@ export function RevenueChart() {
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["monthly-payment-trends"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/pilotage/payments");
       const { data, error } = await supabase
         .from("payments")
         .select("amount, payment_date, payment_type")

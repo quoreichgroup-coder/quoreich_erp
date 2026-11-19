@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,14 @@ type Row = {
 type SortKey = "due_date" | "days";
 type SortDir = "asc" | "desc";
 
+/** Sur site : créances / dettes échues lues par l'API (filtrées et triées par la base). */
+function fetchOverdue(kind: string, from: string | undefined | null, to: string | undefined | null, ascending: boolean): Promise<Row[]> {
+  const q = new URLSearchParams({ ascending: String(ascending) });
+  if (from) q.set("from", from);
+  if (to) q.set("to", to);
+  return apiGet<Row[]>(`/api/v1/pilotage/overdue/${kind}?${q}`);
+}
+
 export function AgingDrilldownDialog({
   open,
   onOpenChange,
@@ -85,6 +94,10 @@ export function AgingDrilldownDialog({
     queryKey: ["aging-drilldown", "rows", kind, from, to, sortKey, sortDir, page],
     enabled: open,
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const all = await fetchOverdue(kind, from, to, orderAscending);
+        return { rows: all.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE), count: all.length };
+      }
       const s = supabase as unknown as { from: (t: string) => any };
       let q = s
         .from(table)
@@ -109,6 +122,10 @@ export function AgingDrilldownDialog({
     queryKey: ["aging-drilldown", "summary", kind, from, to],
     enabled: open,
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const rows = await fetchOverdue(kind, from, to, true);
+        return { rows, total: rows.reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid)), 0) };
+      }
       const s = supabase as unknown as { from: (t: string) => any };
       let q = s
         .from(table)

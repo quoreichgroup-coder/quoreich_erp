@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   BookOpen, ArrowDownLeft, ArrowUpRight, Wallet, Landmark,
@@ -89,6 +90,7 @@ export default function ModuleManagement() {
   const { data: tenant } = useQuery({
     queryKey: ["tenant-info", tenantId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<{ name: string; currency: string }>("/api/v1/tenant");
       const { data } = await supabase.from("tenants").select("name, currency").eq("id", tenantId!).single();
       return data;
     },
