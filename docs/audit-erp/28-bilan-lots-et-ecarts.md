@@ -20,14 +20,13 @@ documents. Références : `docs/PLAN-BASCULE-JAVA.md` §6 (lots), `02-analyse-de
 
 ## 2. Écarts de l'analyse ERP (02)
 
-**Traités (36)** : G-01 à G-03, G-05 à G-20, G-23, G-24, G-26 (impression), G-33, G-36 (balayage 27), G-37, G-38, G-39 (API Java
+**Traités (37, dont G-04 par V120)** : G-01 à G-03, G-05 à G-20, G-23, G-24, G-26 (impression), G-33, G-36 (balayage 27), G-37, G-38, G-39 (API Java
 pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-28 en partie (moteur de paie et tests).
 
-**Restants (15)** :
+**Restants (14)** — G-04 traité le 20 nov. 2026 par V120 (chaîne SHA-256 vérifiable, journal intangible) :
 
 | # | Écart | Prio | Note |
 |---|---|---|---|
-| G-04 | Piste d'audit chaînée par un MD5 tronqué à 8 caractères, sans vérification | P0 | Lecture seule depuis V106, mais le chaînage n'est pas probant |
 | G-21 | États financiers complets : tableau des flux de trésorerie (TFT) et notes annexes | P1 🧮 | Bilan et compte de résultat par rubriques faits (V63) ; TFT cadré (17) |
 | G-22 | Clôture d'exercice : détermination du résultat, report à nouveau, à-nouveaux | P1 🧮 | `close_fiscal_year` clôt les périodes, sans écritures d'à-nouveaux |
 | G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Aucune colonne de devise sur les factures |
@@ -46,10 +45,9 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 ## 3. Standard de présentation des modules
 
 - **Menus** : les 15 modules suivent le standard (`standard()`, test `navigation.test.ts` vert).
-- **Pages** : les 6 pages de chaque module ont le cadre, le fil d'Ariane et le bandeau d'aide, sauf :
-  - `/customers` (données de base des comptes clients) : ancienne mise en page sans cadre standard, sans fil d'Ariane ni bandeau ;
-  - `/suppliers` : sans bandeau d'aide ;
-  - `/projects/transactions` : pas d'onglets (pièces | Comptabilisation) contrairement à la règle et aux autres modules.
+- **Pages** : les 6 pages de chaque module ont le cadre, le fil d'Ariane et le bandeau d'aide. Corrigé le 20 nov. 2026 :
+  `/customers` (ancienne mise en page) et `/suppliers` (sans bandeau) au standard ; `/projects/transactions` a ses onglets
+  « Suivi du projet | Comptabilisation » (`?tab=posting`), ce dernier expliquant que le projet comptabilise par sa section analytique.
 - **UX-10** (budget, conformité, risques à revoir) : menus conformes ; à confirmer à l'écran avec le propriétaire.
 
 ## 4. Ordre proposé

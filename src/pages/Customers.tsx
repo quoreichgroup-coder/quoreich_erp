@@ -2,9 +2,9 @@ import { useState } from "react";
 import { AccountSetSelect } from "@/components/AccountSets";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
-import { TopNav } from "@/components/TopNav";
+import { PageShell } from "@/components/PageShell";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,12 +93,10 @@ const Customers = () => {
     new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col">
-          <TopNav />
-          <main className="flex-1 p-4 lg:p-6">
+    <PageShell>
+      <Breadcrumb items={[{ label: "Ventes et clients" }, { label: "Comptes clients", href: "/receivables" }, { label: "Données de base" }]} />
+      <GuidanceBanner title="Clients" description="Fiches clients : coordonnées, identifiants fiscaux, limite de crédit, conditions de paiement, jeu de comptes et sections analytiques par défaut. Un client déjà utilisé ne se supprime pas : désactivez-le." />
+          <div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Clients</h1>
@@ -225,9 +223,7 @@ const Customers = () => {
                 </div>
               </CardContent>
             </Card>
-          </main>
-        </div>
-      </div>
+          </div>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -294,7 +290,7 @@ const Customers = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+    </PageShell>
   );
 };
 

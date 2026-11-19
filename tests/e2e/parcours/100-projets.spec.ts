@@ -129,6 +129,9 @@ test("projet : section, budget, note de frais imputée (barème, devise, avance)
   await aTraiter.click();
   await page.getByRole("dialog").getByRole("button", { name: "Comptabiliser" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Note comptabilisée" })).toBeVisible();
+  // La liste se rafraîchit après la comptabilisation : rouvrir la note avant risque d'afficher l'ancien état.
+  await page.keyboard.press("Escape");
+  await expect(aTraiter).toContainText(/Comptabilis/, { timeout: 30_000 });
   await aTraiter.click();
   const v = page.getByRole("dialog");
   // Avances ouvertes du salarié : au moins celle versée par ce passage (un passage interrompu peut en laisser d'autres).

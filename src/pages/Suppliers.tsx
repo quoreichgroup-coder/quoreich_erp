@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AccountSetSelect } from "@/components/AccountSets";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,7 +116,8 @@ const Suppliers = () => {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Achats et fournisseurs" }, { label: "Fournisseurs" }]} />
+      <Breadcrumb items={[{ label: "Achats et fournisseurs" }, { label: "Comptes fournisseurs", href: "/payables" }, { label: "Données de base" }]} />
+      <GuidanceBanner title="Fournisseurs" description="Fiches fournisseurs : identité légale, coordonnées, devise, Incoterm, délai, jeu de comptes. Toute modification des coordonnées bancaires doit être vérifiée par une autre personne avant un virement." />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Fournisseurs</h1>

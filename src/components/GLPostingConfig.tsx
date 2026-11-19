@@ -255,7 +255,7 @@ export function GLAuditHistory({
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1">
                         <Hash className="w-2.5 h-2.5 text-muted-foreground" />
-                        <span className="font-mono text-[9px] text-muted-foreground">{entry.hash}</span>
+                        <span className="font-mono text-[9px] text-muted-foreground" title={entry.hash}>{entry.hash?.slice(0, 12)}…</span>
                         {i > 0 && <span className="text-[8px] text-muted-foreground">← {entry.prevHash}</span>}
                       </div>
                     </td>
@@ -337,7 +337,7 @@ export function GLAuditHistory({
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 bg-muted/30 rounded">
                     <div className="text-[9px] text-muted-foreground mb-0.5">Current Hash</div>
-                    <div className="font-mono text-[10px]">{viewDetail.hash}</div>
+                    <div className="font-mono text-[10px] break-all">{viewDetail.hash}</div>
                   </div>
                   <div className="p-2 bg-muted/30 rounded">
                     <div className="text-[9px] text-muted-foreground mb-0.5">Empreinte précédente</div>

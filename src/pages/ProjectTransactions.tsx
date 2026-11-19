@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -92,6 +92,7 @@ export default function ProjectTransactions() {
   const [params, setParams] = useSearchParams();
   const { data: projects = [], isLoading } = useProjects();
   const pickedId = params.get("project") ?? projects.find((p) => p.status === "active")?.id ?? projects[0]?.id ?? null;
+  const tab = params.get("tab") === "posting" ? "posting" : "suivi";
   const p = projects.find((x) => x.id === pickedId) ?? null;
   const ledger = useProjectLedger(p?.id ?? null);
   const { data: access } = useMyAccess();
@@ -104,6 +105,22 @@ export default function ProjectTransactions() {
     <PageShell>
       <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Projets", href: "/projects" }, { label: "Transactions" }]} />
       <GuidanceBanner title="Suivi d'un projet" description="Budget, réalisé (écritures portant la section du projet), engagé (commandes en cours), disponible et marge. Pour imputer un coût au projet, choisir sa section sur la pièce (demande, commande, facture, note de frais, écriture)." />
+      <div className="flex gap-1 border-b border-border" role="tablist">
+        {([["suivi", "Suivi du projet"], ["posting", "Comptabilisation"]] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setParams((x) => { x.set("tab", k); return x; }, { replace: true })}
+            className={`px-3 py-2 text-xs border-b-2 -mb-px ${tab === k ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{l}</button>
+        ))}
+      </div>
+      {tab === "posting" ? (
+        <div className="bg-card border border-border rounded-lg p-4 text-xs text-muted-foreground max-w-3xl space-y-2" data-testid="project-posting">
+          <p>Un projet ne passe pas d'écriture propre : il est une <strong>section analytique</strong> (axe choisi dans Paramètres des projets). Son réalisé est
+            l'ensemble des écritures comptabilisées par les autres modules qui portent sa section — demandes et commandes d'achat, factures fournisseurs,
+            notes de frais, écritures manuelles — et son engagé les commandes approuvées non encore facturées.</p>
+          <p>Les comptes utilisés sont ceux de chaque module (comptes par défaut et jeux de comptes) :{" "}
+            <Link className="text-primary underline" to="/settings?tab=posting">paramétrage comptable central</Link> ;{" "}
+            <Link className="text-primary underline" to="/projects/settings">axe analytique des projets</Link>.</p>
+        </div>
+      ) : (<>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="space-y-1"><label htmlFor="pj-pick" className="text-xs text-muted-foreground">Projet</label>
           <select id="pj-pick" className="h-9 rounded-md border border-input bg-background px-2 text-sm w-80" value={pickedId ?? ""} onChange={(e) => setParams((x) => { x.set("project", e.target.value); return x; }, { replace: true })}>
@@ -153,6 +170,7 @@ export default function ProjectTransactions() {
           </section>
         </>
       )}
+      </>)}
     </PageShell>
   );
 }

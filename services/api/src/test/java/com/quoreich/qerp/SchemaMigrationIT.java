@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "119";
+  private static final String DERNIERE_MIGRATION = "120";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -298,6 +298,8 @@ class SchemaMigrationIT {
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
+          // V120 — piste d'audit chaînée en SHA-256.
+          "gl_audit_chain_breaks", "gl_audit_hash", "guard_gl_audit_log",
           // V118 — temps réel sur site.
           "realtime_notify_change",
           "is_tenant_admin",
@@ -927,6 +929,8 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V120.
+          "gl_audit_logs/trg_guard_gl_audit_log",
           // V118 — temps réel sur site.
           "ar_invoices/trg_zz_realtime_notify",
           "ap_invoices/trg_zz_realtime_notify",
