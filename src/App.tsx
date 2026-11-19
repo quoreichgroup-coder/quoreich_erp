@@ -18,7 +18,6 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Index = lazy(() => import("./pages/Index"));
 const JournalEntries = lazy(() => import("./pages/JournalEntries"));
-const Invoices = lazy(() => import("./pages/Invoices"));
 const Treasury = lazy(() => import("./pages/Treasury"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -275,7 +274,7 @@ const App = () => (
               <Route path="/cockpit" element={<P><CfoCockpit /></P>} />
               <Route path="/cockpit/consolidated" element={<P><CfoConsolidated /></P>} />
               <Route path="/alerts" element={<P><Alerts /></P>} />
-              <Route path="/invoices" element={<P><Invoices /></P>} />
+              <Route path="/invoices" element={<P><Navigate to="/receivables/transactions" replace /></P>} />
               <Route path="/reports" element={<P><Reports /></P>} />
               <Route path="/settings" element={<P><Settings /></P>} />
               <Route path="/docs" element={<P><Documentation /></P>} />

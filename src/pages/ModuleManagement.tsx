@@ -34,8 +34,10 @@ import { useTableFeatures } from "@/hooks/use-table-features";
 import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantId } from "@/hooks/use-tenant";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { apiGet, isApiEnabled } from "@/api/client";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -81,6 +83,7 @@ export default function ModuleManagement() {
   // Live DB data
   const { data: dbLicenses = [] } = useLicenses();
   const { data: dbTenantModules = [] } = useTenantModules();
+  const qcModules = useQueryClient();
   const { data: dbWorkflowRules = [] } = useWorkflowRules();
   const { data: dbAlerts = [] } = useERPAlerts();
   const activateModuleMut = useActivateModule();
@@ -247,8 +250,10 @@ export default function ModuleManagement() {
             <span className="text-xs font-medium">{tenantName}</span>
             <Badge variant="outline" className="text-[9px] h-4">{tenantCurrency}</Badge>
           </div>
-          <Button size="sm" variant="outline" className="gap-1.5"><RefreshCw className="w-3.5 h-3.5" />Refresh</Button>
-          <Button size="sm" variant="outline" className="gap-1.5"><FileText className="w-3.5 h-3.5" />Export</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { qcModules.invalidateQueries({ queryKey: ["tenant-modules"] }); qcModules.invalidateQueries({ queryKey: ["licenses"] }); }}><RefreshCw className="w-3.5 h-3.5" />Actualiser</Button>
+          <ExportMenu size="sm" variant="outline" className="gap-1.5" disabled={dbTenantModules.length === 0}
+            onPick={(f) => exportTable(f, dbTenantModules as any[], [{ key: "module_name", header: "Module" }, { key: "status", header: "Statut" },
+              { key: "activated_at", header: "Activé le" }, { key: "deactivated_at", header: "Désactivé le" }], "modules-societe", "Modules de la société")}><FileText className="w-3.5 h-3.5" />Exporter</ExportMenu>
         </div>
       </div>
 

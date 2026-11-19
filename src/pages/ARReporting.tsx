@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
+import { exportTable, type ExportFormat } from "@/lib/table-export";
+import { FiscalYearLabel, useCurrentFiscalYear } from "@/components/FiscalYearLabel";
 import { useReportTemplates, useSaveReportTemplate, useDeleteReportTemplate, useARAging, useARInvoices } from "@/hooks/use-ar-data";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -38,6 +40,19 @@ import {
   Cell,
   Legend,
 } from "recharts";
+
+const AGING_BUCKETS = ["Non échue", "0-30 jours", "30-60 jours", "60-90 jours", "90+ jours"];
+/** Tranche d'âge d'une facture ouverte, d'après son échéance (une facture soldée n'a pas de tranche). */
+function agingBucket(inv: any): string {
+  if (inv.status === "paid" || Number(inv.total || 0) - Number(inv.amount_paid || 0) <= 0) return "Soldée";
+  if (!inv.due_date) return "Non échue";
+  const days = Math.floor((Date.now() - new Date(inv.due_date).getTime()) / 86_400_000);
+  if (days <= 0) return "Non échue";
+  if (days <= 30) return "0-30 jours";
+  if (days <= 60) return "30-60 jours";
+  if (days <= 90) return "60-90 jours";
+  return "90+ jours";
+}
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
@@ -87,9 +102,8 @@ const groupingOptions = [
 /* ──────── NAVIGATION ──────── */
 
 const navSections = [
-  { id: "builder", label: "Report Builder", icon: Layers },
+  { id: "builder", label: "Constructeur de rapport", icon: Layers },
   { id: "templates", label: "Templates sauvegardés", icon: FolderOpen },
-  { id: "scheduled", label: "Rapports planifiés", icon: Clock },
   { id: "permissions", label: "Permissions", icon: Shield },
 ];
 
@@ -105,11 +119,19 @@ export default function ARReporting() {
 
   // Filters state
   const [filterStatus, setFilterStatus] = useState("Tous");
-  const [filterPeriodFrom, setFilterPeriodFrom] = useState("2026-01-01");
-  const [filterPeriodTo, setFilterPeriodTo] = useState("2026-12-31");
+  // Période par défaut : l'exercice en cours du calendrier fiscal (vide = toutes les dates).
+  const currentFy = useCurrentFiscalYear();
+  const [filterPeriodFrom, setFilterPeriodFrom] = useState("");
+  const [filterPeriodTo, setFilterPeriodTo] = useState("");
+  useEffect(() => {
+    if (currentFy && !filterPeriodFrom && !filterPeriodTo) { setFilterPeriodFrom(currentFy.start_date); setFilterPeriodTo(currentFy.end_date); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFy?.id]);
   const [filterAmountMin, setFilterAmountMin] = useState("");
   const [filterAmountMax, setFilterAmountMax] = useState("");
   const [filterClient, setFilterClient] = useState("Tous");
+  const [filterCurrency, setFilterCurrency] = useState("Toutes");
+  const [filterBucket, setFilterBucket] = useState("Toutes");
 
   // DB hooks
   const { data: templates = [] } = useReportTemplates("ar");
@@ -128,9 +150,10 @@ export default function ARReporting() {
         const total = Number(inv.total || 0);
         if (filterAmountMin && total < Number(filterAmountMin)) return false;
         if (filterAmountMax && total > Number(filterAmountMax)) return false;
+        if (filterCurrency !== "Toutes" && (inv.currency ?? "XOF") !== filterCurrency) return false;
+        if (filterBucket !== "Toutes" && agingBucket(inv) !== filterBucket) return false;
         return true;
       })
-      .slice(0, 100)
       .map((inv: any) => ({
         client: inv.customer?.name ?? "—",
         invoice: inv.invoice_number,
@@ -142,9 +165,23 @@ export default function ARReporting() {
         paid: Number(inv.amount_paid || 0),
         balance: Number(inv.total || 0) - Number(inv.amount_paid || 0),
         status: inv.status,
-        bucket: "—",
+        bucket: agingBucket(inv),
       }));
-  }, [invoices, filterStatus, filterClient, filterPeriodFrom, filterPeriodTo, filterAmountMin, filterAmountMax]);
+  }, [invoices, filterStatus, filterClient, filterPeriodFrom, filterPeriodTo, filterAmountMin, filterAmountMax, filterCurrency, filterBucket]);
+  const currencyOptions = useMemo(() => Array.from(new Set(invoices.map((i: any) => i.currency ?? "XOF"))).sort(), [invoices]);
+
+  const exportPreview = (format: ExportFormat) => {
+    const all: { id: string; key: string; header: string }[] = [
+      { id: "client", key: "client", header: "Client" }, { id: "invoice_no", key: "invoice", header: "N° Facture" },
+      { id: "date", key: "date", header: "Date" }, { id: "due_date", key: "due", header: "Échéance" },
+      { id: "amount_ht", key: "amountHT", header: "Montant HT" }, { id: "tva", key: "tva", header: "TVA" },
+      { id: "amount_ttc", key: "amountTTC", header: "Montant TTC" }, { id: "paid", key: "paid", header: "Réglé" },
+      { id: "balance", key: "balance", header: "Solde" }, { id: "status", key: "status", header: "Statut" },
+      { id: "aging_bucket", key: "bucket", header: "Tranche d'âge" },
+    ];
+    const cols = all.filter((c) => selectedColumns.includes(c.id));
+    exportTable(format, previewRows as any[], (cols.length ? cols : all) as any, "rapport-clients", "Rapport clients");
+  };
 
   const customerOptions = useMemo(() => {
     const set = new Set<string>();
@@ -227,7 +264,7 @@ export default function ARReporting() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Reporting — Comptes Clients</h1>
-          <p className="text-xs text-muted-foreground">Moteur de reporting dynamique · FY 2025-2026</p>
+          <FiscalYearLabel prefix="Rapports clients" />
         </div>
       </div>
 
@@ -404,21 +441,16 @@ export default function ARReporting() {
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-foreground block mb-1">Devise</label>
-                    <select className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs">
+                    <select aria-label="Devise" value={filterCurrency} onChange={(e) => setFilterCurrency(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs">
                       <option>Toutes</option>
-                      <option>XOF</option>
-                      <option>EUR</option>
-                      <option>USD</option>
+                      {currencyOptions.map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-foreground block mb-1">Tranche d'âge</label>
-                    <select className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs">
+                    <select aria-label="Tranche d'âge" value={filterBucket} onChange={(e) => setFilterBucket(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs">
                       <option>Toutes</option>
-                      <option>0-30 jours</option>
-                      <option>30-60 jours</option>
-                      <option>60-90 jours</option>
-                      <option>90+ jours</option>
+                      {AGING_BUCKETS.map((b) => <option key={b}>{b}</option>)}
                     </select>
                   </div>
                 </div>
@@ -453,20 +485,17 @@ export default function ARReporting() {
 
               {/* Actions Bar */}
               <div className="flex items-center gap-2 flex-wrap">
-                <button className="btn-primary h-8 px-4 text-xs flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5" /> Générer l'aperçu
-                </button>
                 <button onClick={handleSaveTemplate} disabled={saveTemplate.isPending} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Sauvegarder modèle
                 </button>
-                <button className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
+                <button onClick={() => exportPreview("pdf")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
                   <Download className="w-3.5 h-3.5" /> Export PDF
                 </button>
-                <button className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
+                <button onClick={() => exportPreview("xlsx")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
                   <Download className="w-3.5 h-3.5" /> Export Excel
                 </button>
-                <button className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
-                  <Printer className="w-3.5 h-3.5" /> Imprimer
+                <button onClick={() => exportPreview("csv")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
+                  <Printer className="w-3.5 h-3.5" /> Export CSV
                 </button>
               </div>
 
@@ -630,7 +659,7 @@ export default function ARReporting() {
                       className="h-8 pl-8 pr-3 w-48 rounded-md border border-input bg-background text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                   </div>
-                  <button className="btn-primary h-7 px-3 text-[11px] flex items-center gap-1">
+                  <button onClick={() => setActiveSection("builder")} className="btn-primary h-7 px-3 text-[11px] flex items-center gap-1">
                     <Plus className="w-3 h-3" /> Nouveau modèle
                   </button>
                 </div>
@@ -683,40 +712,6 @@ export default function ARReporting() {
           )}
 
           {/* ════════════ SCHEDULED ════════════ */}
-          {activeSection === "scheduled" && (
-            <div className="card-elevated overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-medium text-foreground">Rapports planifiés</h3>
-                  <HelpIcon text="Automatisez la génération et l'envoi de rapports par email selon un calendrier défini." />
-                </div>
-                <button className="btn-primary h-7 px-3 text-[11px] flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> Planifier un rapport
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Rapport</th>
-                      <th>Fréquence</th>
-                      <th>Prochaine exécution</th>
-                      <th>Destinataires</th>
-                      <th>Format</th>
-                      <th>Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Aucune planification n'est gérée par la base : pas de liste inventée (audit U-01). */}
-                    <tr><td colSpan={6} className="text-center text-muted-foreground py-6">
-                      Planification des rapports : non disponible à ce jour. Exportez un modèle depuis « Templates sauvegardés ».
-                    </td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {/* ════════════ PERMISSIONS ════════════ */}
           {activeSection === "permissions" && (
             <div className="card-elevated overflow-hidden">

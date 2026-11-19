@@ -10,17 +10,14 @@ import { cn } from "@/lib/utils";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { Switch } from "@/components/ui/switch";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { useTreasuryRequireAccount } from "@/hooks/use-treasury-accounts";
+import { useTreasuryRequireAccount, useTreasurySettingsRow } from "@/hooks/use-treasury-accounts";
 import { TreasuryRolesPanel } from "@/components/TreasuryRolesPanel";
 
 const tabs = [
   { id: "general", label: "Général", icon: Settings },
   { id: "glposting", label: "Comptabilisation", icon: BookOpen },
-  { id: "banks", label: "Bank Integration", icon: Building2 },
-  { id: "alerts", label: "Alerts & Thresholds", icon: Bell },
-  { id: "fx", label: "FX Policy", icon: Globe },
-  { id: "controls", label: "Controls", icon: ShieldCheck },
-  { id: "roles", label: "Rôles RBAC", icon: Users },
+  { id: "reconciliation", label: "Rapprochement et alertes", icon: Bell },
+  { id: "roles", label: "Rôles", icon: Users },
 ];
 
 export default function TreasurySettings() {
@@ -34,7 +31,7 @@ export default function TreasurySettings() {
         { label: "Settings" },
       ]} />
 
-      <GuidanceBanner title="Treasury Settings" description="Configure bank integrations, alert thresholds, FX policies and control parameters." />
+      <GuidanceBanner title="Paramètres de trésorerie" description="Règlements, comptabilisation, rapprochement bancaire et alertes. Les limites (solde minimum, maximum, découvert) se fixent par compte dans Trésorerie → Données de base." />
 
       <div className="flex gap-1 border-b border-border">
         {tabs.map(t => (
@@ -55,86 +52,7 @@ export default function TreasurySettings() {
         </div>
       )}
 
-      {activeTab === "banks" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">Bank Integration</h3>
-          {[
-            { bank: "SGBS", protocol: "SWIFT MT940", status: "Connected", lastSync: "2025-02-15 14:00" },
-            { bank: "BOA", protocol: "SWIFT MT940", status: "Connected", lastSync: "2025-02-15 13:00" },
-          ].map(b => (
-            <div key={b.bank} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-              <div>
-                <div className="text-xs font-medium text-foreground">{b.bank}</div>
-                <div className="text-[10px] text-muted-foreground">{b.protocol} · Last sync: {b.lastSync}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-success font-medium">{b.status}</span>
-                <Button size="sm" variant="ghost" className="h-6 text-[10px]">Configure</Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "alerts" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">Alert Thresholds</h3>
-          {[
-            { alert: "Low Balance Warning", threshold: "< 10M XOF", channel: "Email + In-app" },
-            { alert: "Large Transaction", threshold: "> 50M XOF", channel: "In-app" },
-            { alert: "FX Exposure Limit", threshold: "> 80% utilization", channel: "Email" },
-            { alert: "Unreconciled > 48h", threshold: "48 hours", channel: "Email" },
-          ].map((a, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <div>
-                <div className="text-xs font-medium text-foreground">{a.alert}</div>
-                <div className="text-[10px] text-muted-foreground">Threshold: {a.threshold} · {a.channel}</div>
-              </div>
-              <Button size="sm" variant="ghost" className="h-6 text-[10px]">Edit</Button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "fx" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">FX Policy</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><Label className="text-xs">Hedging Policy</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Conservative (80%)</option><option>Moderate (50%)</option><option>None</option>
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Max Single FX Transaction (EUR)</Label>
-              <Input defaultValue="100000" className="h-9 text-xs" /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Rate Source</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>BCEAO Official</option><option>Market Mid</option>
-              </select></div>
-            <div className="space-y-1.5"><Label className="text-xs">Auto-revaluation</Label>
-              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs">
-                <option>Monthly</option><option>Daily</option><option>Disabled</option>
-              </select></div>
-          </div>
-          <Button size="sm" className="text-xs">Save Changes</Button>
-        </div>
-      )}
-
-      {activeTab === "controls" && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
-          <h3 className="text-sm font-semibold text-foreground">Treasury Controls</h3>
-          {[
-            { control: "Dual Authorization for Payments > 20M XOF", status: "Enabled" },
-            { control: "4-Eye Principle for FX Operations", status: "Enabled" },
-            { control: "Automated Reconciliation Matching", status: "Enabled" },
-            { control: "Daily Position Reporting", status: "Enabled" },
-          ].map((c, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <div className="text-xs font-medium text-foreground">{c.control}</div>
-              <span className="text-[10px] text-success font-medium">{c.status}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {activeTab === "reconciliation" && <TreasuryReconciliationSettings />}
 
       {activeTab === "roles" && <TreasuryRolesPanel />}
     </PageShell>
@@ -154,6 +72,47 @@ function TreasuryGeneralSettings() {
         <span>Compte de trésorerie obligatoire sur les règlements, acomptes et remboursements
           <span className="block text-muted-foreground">Désactivé : sans compte choisi ni compte par défaut du type, l'écriture passe sur le rôle Banque, Caisse ou Monnaie électronique du paramétrage comptable, sans mouvement de trésorerie.</span></span>
       </label>
+      {!canEdit && <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres de trésorerie » est requis.</p>}
+    </section>
+  );
+}
+
+/* Rapprochement bancaire et alertes (V70, V71) : réglages enregistrés dans treasury_settings, appliqués par la base. */
+function TreasuryReconciliationSettings() {
+  const { data: access } = useMyAccess();
+  const canEdit = (access?.permissions ?? []).includes("treasury.settings");
+  const { query, save } = useTreasurySettingsRow();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const row = query.data ?? {};
+  const val = (k: string) => draft[k] ?? (row[k] == null ? "" : String(row[k]));
+  const fields: { key: string; label: string; help: string }[] = [
+    { key: "match_amount_tolerance", label: "Tolérance de montant au rapprochement (XOF)", help: "Écart accepté entre une ligne de relevé et un mouvement" },
+    { key: "match_date_window_days", label: "Fenêtre de dates au rapprochement (jours)", help: "Écart de dates accepté" },
+    { key: "unreconciled_alert_days", label: "Alerte sur mouvement non rapproché après (jours)", help: "Vide = pas d'alerte" },
+    { key: "low_cash_threshold", label: "Seuil global de trésorerie basse (XOF)", help: "Vide = pas de seuil global ; les seuils par compte restent dans les données de base" },
+  ];
+  return (
+    <section aria-label="Rapprochement et alertes" className="bg-card border border-border rounded-lg p-5 space-y-4 max-w-2xl">
+      <h3 className="text-sm font-semibold text-foreground">Rapprochement et alertes</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {fields.map((f) => (
+          <div key={f.key} className="space-y-1.5">
+            <Label htmlFor={`tre-${f.key}`} className="text-xs">{f.label}</Label>
+            <Input id={`tre-${f.key}`} type="number" className="h-9 text-xs" disabled={!canEdit} value={val(f.key)}
+              onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} />
+            <p className="text-[10px] text-muted-foreground">{f.help}</p>
+          </div>
+        ))}
+      </div>
+      <label className="flex items-start gap-3 text-xs">
+        <Switch aria-label="Contrôle de continuité des relevés" disabled={!canEdit} checked={draft.statement_continuity_check != null ? draft.statement_continuity_check === "true" : row.statement_continuity_check !== false}
+          onCheckedChange={(v) => setDraft((d) => ({ ...d, statement_continuity_check: String(v) }))} />
+        <span>Contrôle de continuité des relevés<span className="block text-muted-foreground">Le solde d'ouverture d'un relevé doit égaler la clôture du précédent.</span></span>
+      </label>
+      <Button size="sm" className="text-xs" disabled={!canEdit || save.isPending || Object.keys(draft).length === 0}
+        onClick={() => save.mutate(Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, k === "statement_continuity_check" ? v === "true" : v === "" ? null : Number(v)])), { onSuccess: () => setDraft({}) })}>
+        Enregistrer
+      </Button>
       {!canEdit && <p className="text-[11px] text-muted-foreground">Lecture seule : le droit « Modifier les paramètres de trésorerie » est requis.</p>}
     </section>
   );

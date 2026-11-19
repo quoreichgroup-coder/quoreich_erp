@@ -16,7 +16,12 @@ test("pilotage et administration : tableaux de bord, cockpits, modules, import d
   obs.etape("tableau de bord");
   await page.goto("/");
   await verifierSocieteE2E(page);
-  await expect(page.getByRole("heading", { name: "CFO Dashboard — Consolidated View" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tableau de bord", exact: true })).toBeVisible();
+  // Données réelles seulement : alertes de la base, sociétés accessibles (plus d'entités ni de score inventés).
+  await expect(page.getByTestId("dashboard-alerts")).toBeVisible();
+  await expect(page.getByTestId("dashboard-entities").getByText(/E2E QUOREICH/).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("QUOREICH SN")).toHaveCount(0);
+  await expect(page.getByText(/Risk Score/)).toHaveCount(0);
 
   obs.etape("cockpit CFO et créances échues");
   await page.goto("/cockpit");
@@ -35,6 +40,11 @@ test("pilotage et administration : tableaux de bord, cockpits, modules, import d
   obs.etape("rapports, modules, historique IA");
   await page.goto("/reports");
   await verifierSocieteE2E(page);
+  await expect(page.getByTestId("reports-hub").getByRole("link", { name: /États financiers et grand livre/ })).toBeVisible();
+  await page.goto("/settings?tab=audit");
+  await expect(page.getByTestId("settings-audit-hub")).toBeVisible();
+  await page.goto("/settings?tab=workflow");
+  await expect(page.getByTestId("settings-workflow-hub")).toBeVisible();
   await page.goto("/admin/modules");
   await expect(page.getByRole("heading", { name: "Module Management" })).toBeVisible();
   await page.goto("/ai/history");

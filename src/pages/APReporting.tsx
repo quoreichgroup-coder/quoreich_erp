@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportTable } from "@/lib/table-export";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -172,7 +174,10 @@ export default function APReporting() {
         <div className="bg-card border border-border rounded-lg">
           <div className="p-3 border-b border-border flex justify-between">
             <h3 className="text-sm font-semibold text-foreground">Performance fournisseurs</h3>
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Download className="w-3 h-3" />Export</Button>
+            <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={supplierStats.length === 0}
+              onPick={(f) => exportTable(f, supplierStats as any[], [{ key: "supplier", header: "Fournisseur" }, { key: "total", header: "Total à payer (XOF)" },
+                { key: "invoices", header: "Factures" }, { key: "avgDays", header: "Délai moyen (jours)" }, { key: "onTimeRate", header: "% à temps" }],
+                "performance-fournisseurs", "Performance fournisseurs")}><Download className="w-3 h-3" />Export</ExportMenu>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">

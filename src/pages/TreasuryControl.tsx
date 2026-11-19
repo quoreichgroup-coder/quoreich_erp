@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle, AlertTriangle, Eye, ShieldCheck, Lock, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMyTreasuryRoles } from "@/hooks/use-treasury-data";
+import { useMyTreasuryRoles, useReconciliationStatus } from "@/hooks/use-treasury-data";
 import { canDo, missingRoleHint } from "@/lib/treasury-roles";
 import { currentPeriod, isValidTreasuryPeriod, isPeriodInAllowedRange, DEFAULT_PERIOD_RANGE } from "@/lib/treasury-close";
 import { useCloseTreasuryPeriod, useTreasuryCloseHistory, type TreasuryCloseHistoryRow } from "@/hooks/use-treasury-close";
@@ -34,6 +34,23 @@ const fmt = (n: number) => n.toLocaleString("fr-FR");
 export default function TreasuryControl() {
   const [activeTab, setActiveTab] = useState("reconciliation");
   const perms = useMyTreasuryRoles();
+  // Indicateurs calculés : statut de rapprochement par compte et limites de trésorerie (V107).
+  const { data: recon = [] } = useReconciliationStatus();
+  const { data: tenantIdKpi } = useTenantId();
+  const { data: limits = [] } = useQuery({
+    queryKey: ["treasury-limit-status", tenantIdKpi],
+    enabled: Boolean(tenantIdKpi),
+    retry: false,
+    queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/treasury/views/limits");
+      const { data, error } = await (supabase as any).from("treasury_limit_status").select("*").eq("tenant_id", tenantIdKpi).order("name");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const fullyReconciled = (recon as any[]).filter((r) => Number(r.unreconciled_count) === 0).length;
+  const openItems = (recon as any[]).reduce((t, r) => t + Number(r.unreconciled_count ?? 0), 0);
+  const breaches = (limits as any[]).filter((l) => ["below_min", "above_max", "overdraft_exceeded"].includes(l.status)).length;
   const canClose = canDo(perms, "close_period");
   const [period, setPeriod] = useState<string>(currentPeriod());
   const closeMut = useCloseTreasuryPeriod();
@@ -88,9 +105,9 @@ export default function TreasuryControl() {
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
-          { label: "Accounts Reconciled", value: "2/3", icon: CheckCircle, color: "text-success" },
-          { label: "Open Items", value: "3", icon: AlertTriangle, color: "text-amber-600" },
-          { label: "Limit Breaches", value: "0", icon: ShieldCheck, color: "text-success" },
+          { label: "Comptes entièrement rapprochés", value: `${fullyReconciled}/${recon.length}`, icon: CheckCircle, color: fullyReconciled === recon.length ? "text-success" : "text-amber-600" },
+          { label: "Mouvements non rapprochés", value: String(openItems), icon: AlertTriangle, color: openItems > 0 ? "text-amber-600" : "text-success" },
+          { label: "Limites dépassées", value: String(breaches), icon: ShieldCheck, color: breaches > 0 ? "text-destructive" : "text-success" },
         ].map(kpi => (
           <div key={kpi.label} className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
             <kpi.icon className={cn("w-5 h-5", kpi.color)} />

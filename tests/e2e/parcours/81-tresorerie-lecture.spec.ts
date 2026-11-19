@@ -72,7 +72,7 @@ test("Trésorerie : audit en lecture seule, filtre Attribution et export", async
   expect(permissions.has("treasury.export")).toBe(true);
   const [response] = await Promise.all([
     page.waitForResponse((r) => /\/rest\/v1\/treasury_role_audit$|\/treasury\/role-audit$/.test(new URL(r.url()).pathname)),
-    page.getByRole("button", { name: "Rôles RBAC", exact: true }).click(),
+    page.getByRole("button", { name: "Rôles", exact: true }).click(),
   ]);
   expect(response.ok(), "La lecture du journal d’audit doit réussir").toBe(true);
   const rows = await response.json() as Array<{ action: string }>;

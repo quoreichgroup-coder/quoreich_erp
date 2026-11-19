@@ -77,7 +77,7 @@ function GeneralTab() {
   );
 }
 
-function PaymentTermsTab() {
+export function PaymentTermsTab() {
   const remove = useDeleteARPaymentTerm();
   const { data: terms = [], isLoading } = useARPaymentTerms();
   const upsert = useUpsertARPaymentTerm();

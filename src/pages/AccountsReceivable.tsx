@@ -1,5 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
+import { FiscalYearLabel, useCurrentFiscalYear } from "@/components/FiscalYearLabel";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { HelpIcon } from "@/components/HelpIcon";
@@ -24,8 +26,7 @@ import {
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 export default function AccountsReceivable() {
-  const [fiscalYear] = useState("2025-2026");
-  const [period] = useState("P11 – Février 2026");
+  const navigate = useNavigate();
 
   const { data: invoices = [], isLoading: loadingInv } = useARInvoices();
   const { data: customers = [], isLoading: loadingCust } = useCustomers();
@@ -175,10 +176,7 @@ export default function AccountsReceivable() {
           <Filter className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtres :</span>
         </div>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs"><option>{fiscalYear}</option></select>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs"><option>{period}</option></select>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs"><option>Tous les clients</option></select>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs"><option>Toutes devises (XOF)</option></select>
+        <FiscalYearLabel />
       </div>
 
       {/* ── KPI Cards ── */}
@@ -265,7 +263,7 @@ export default function AccountsReceivable() {
             ))}
           </div>
           <div className="p-2 border-t border-border">
-            <button className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Voir toutes les factures <ChevronRight className="w-3 h-3" /></button>
+            <button onClick={() => navigate("/receivables/transactions")} className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Voir toutes les factures <ChevronRight className="w-3 h-3" /></button>
           </div>
         </div>
 
@@ -295,7 +293,7 @@ export default function AccountsReceivable() {
             ))}
           </div>
           <div className="p-2 border-t border-border">
-            <button className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Gérer les limites <ChevronRight className="w-3 h-3" /></button>
+            <button onClick={() => navigate("/customers")} className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Gérer les limites <ChevronRight className="w-3 h-3" /></button>
           </div>
         </div>
 
@@ -319,7 +317,7 @@ export default function AccountsReceivable() {
             ))}
           </div>
           <div className="p-2 border-t border-border">
-            <button className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Voir le rapport d'antériorité <ChevronRight className="w-3 h-3" /></button>
+            <button onClick={() => navigate("/receivables/aging")} className="w-full text-xs text-primary font-medium flex items-center justify-center gap-1 py-1.5 hover:bg-muted/30 rounded transition-colors">Voir le rapport d'antériorité <ChevronRight className="w-3 h-3" /></button>
           </div>
         </div>
       </div>

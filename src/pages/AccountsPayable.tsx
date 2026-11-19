@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
+import { FiscalYearLabel, useCurrentFiscalYear } from "@/components/FiscalYearLabel";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { HelpIcon } from "@/components/HelpIcon";
@@ -158,13 +159,7 @@ export default function AccountsPayable() {
           <Filter className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtres :</span>
         </div>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs">
-          <option>FY 2025-2026</option>
-        </select>
-        <select className="h-8 px-3 rounded-md border border-input bg-background text-xs">
-          <option>Tous les fournisseurs</option>
-          {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
+        <FiscalYearLabel />
       </div>
 
       {/* KPI Cards */}

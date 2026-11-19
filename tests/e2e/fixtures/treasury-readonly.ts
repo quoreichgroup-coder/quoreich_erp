@@ -36,7 +36,7 @@ export async function ouvrirAudit(page: Page, base: string, role: "auteur" | "ap
   await lireEcran(page, `${base}/treasury/settings`, role);
   const [response] = await Promise.all([
     page.waitForResponse((r) => new URL(r.url()).pathname.endsWith("/rest/v1/treasury_role_audit")),
-    page.getByRole("button", { name: "Rôles RBAC", exact: true }).click(),
+    page.getByRole("button", { name: "Rôles", exact: true }).click(),
   ]);
   expect(response.ok(), "Lecture de l'audit Trésorerie").toBe(true);
   const actions = await response.json() as unknown[];

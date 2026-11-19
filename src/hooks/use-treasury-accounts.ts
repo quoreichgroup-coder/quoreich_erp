@@ -119,3 +119,35 @@ export function useTreasuryRequireAccount() {
   });
   return { query, save };
 }
+
+/** Ligne treasury_settings de la société (rapprochement, alertes) ; écriture avec treasury.settings (RLS). */
+export function useTreasurySettingsRow() {
+  const { data: tenantId } = useTenantId();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["treasury-settings-row", tenantId],
+    enabled: !!tenantId,
+    queryFn: async (): Promise<Record<string, any>> => {
+      if (isApiEnabled()) return (await apiGet<any>("/api/v1/treasury/settings")) ?? {};
+      const { data, error } = await db.from("treasury_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+      if (error) throw error;
+      return data ?? {};
+    },
+  });
+  const save = useMutation({
+    mutationFn: async (patch: Record<string, unknown>) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/treasury/settings", patch); return; }
+      const { data, error } = await db.from("treasury_settings")
+        .upsert({ tenant_id: tenantId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Refusé : droit « Modifier les paramètres de trésorerie » requis.");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["treasury-settings-row"] });
+      qc.invalidateQueries({ queryKey: ["treasury-settings-v70"] });
+      toast.success("Paramètres de trésorerie enregistrés");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return { query, save };
+}
