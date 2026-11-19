@@ -102,6 +102,14 @@ qerp:
     base-url: ${QERP_AI_BASE_URL:}
     api-key: ${QERP_AI_API_KEY:}
     model: ${QERP_AI_MODEL:}
+  # Identité sur site (V114) : « local » = l'API émet et vérifie ses jetons (protocole compatible supabase-js) ;
+  # « external » = jetons d'un émetteur externe (spring.security.oauth2.resourceserver.jwt.*). La clé de signature
+  # est créée au premier démarrage : la sauvegarder et la protéger comme un secret.
+  identity:
+    mode: ${QERP_IDENTITY_MODE:local}
+    issuer: ${QERP_IDENTITY_ISSUER:qerp}
+    key-file: ${QERP_IDENTITY_KEY_FILE:./data/identity/signing-key.json}
+    signup-enabled: ${QERP_IDENTITY_SIGNUP_ENABLED:true}
 
 springdoc:
   api-docs:

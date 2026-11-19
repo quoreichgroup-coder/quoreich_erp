@@ -120,7 +120,7 @@ Fin du chantier :
 | Coquille : profil et société (`/me`), société courante, modules actifs, alertes, préférences de notification, calendrier fiscal | ✅ | ✅ | `ProcurementApiIT` (`/me`) | via tous les parcours sur site |
 | Pilotage (tableau de bord, cockpit CFO, échus, consolidation par liste fermée), administration (modules, licences, règles de flux, invitations, création / rattachement de société), import en masse (jumeau de `import-data`), analyses IA (jumeaux des deux fonctions, fournisseur compatible OpenAI `QERP_AI_*`, historique, planifications) | ✅ | ✅ | `PilotageAdminApiIT` | ✅ parcours 102 (nuage et sur site) |
 | Exécution planifiée des analyses IA sur site (le nuage passe par `ai-scheduler` et pg_cron) | à faire | | | |
-| Identité sur site (connexion sans Supabase Auth) | à faire | | | |
+| Identité sur site (connexion sans Supabase Auth) : API au protocole `/auth/v1` de Supabase, comptes repris avec leur mot de passe — voir `26-identite-sur-site.md` | ✅ | ✅ (aucune ligne front métier modifiée : le client Supabase pointe sur l'API) | `IdentityApiIT` | ✅ tous les parcours, aucune requête vers Supabase |
 | Fichiers (justificatifs) | ✅ répertoire `qerp.files.dir` (défaut `./data/files`), mêmes règles que le stockage du nuage | ✅ | `ExpensesProjectsGrcApiIT` | ✅ |
 | Temps réel | à faire (sur site : rafraîchissement React Query) | | | |
 

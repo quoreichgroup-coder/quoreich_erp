@@ -1,22 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /*
- * Parcours SUR SITE : le front parle à l'API Java (VITE_QERP_API_URL), qui écrit dans le
- * PostgreSQL local. Identité : jetons du projet Supabase tant que Keycloak n'existe pas.
+ * Parcours SUR SITE : le front parle uniquement à l'API Java (VITE_QERP_API_URL), connexion comprise (identité
+ * sur site, V114), et l'API écrit dans le PostgreSQL local. Aucune requête ne doit partir vers Supabase.
  *
  *   npm run test:e2e:sur-site
  *
  * Prérequis :
- *   - PostgreSQL local (infra/compose.dev.yml) avec la société de test (scripts/e2e/societe-sur-site.sql) ;
- *   - l'API sur 8090 avec SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=<projet>/auth/v1/.well-known/jwks.json,
- *     SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWS_ALGORITHMS=ES256 et
- *     QERP_API_CORS_ALLOWED_ORIGINS=http://localhost:8083 ;
- *   - le compte de test (identifiants hors dépôt, comme pour les parcours nuage).
- *
- * Périmètre : ce que l'API porte aujourd'hui (Lot 2 : clients, factures et encaissements AR,
- * paramétrage comptable, analytique, autorisations). Les autres modules passent encore par
- * Supabase et seront portés aux Lots 3 à 5 ; les parcours vérifient qu'AUCUNE écriture du
- * périmètre sur site ne part vers Supabase.
+ *   - PostgreSQL local (infra/compose.dev.yml) avec la société de test (scripts/e2e/societe-sur-site.sql) et les
+ *     deux comptes de test repris du nuage (scripts/identite/reprendre-comptes.sh, FILTRE='%@quoreich-e2e.invalid') ;
+ *   - l'API sur 8090 (identité locale par défaut) avec QERP_API_CORS_ALLOWED_ORIGINS=http://localhost:8083 ;
+ *   - les identifiants des comptes de test (hors dépôt, comme pour les parcours nuage).
  */
 const PORT = process.env.E2E_SUR_SITE_PORT ?? "8083";
 const BASE = `http://localhost:${PORT}`;

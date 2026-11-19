@@ -4,6 +4,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -62,6 +63,8 @@ public class SecurityConfig {
               auth.requestMatchers(
                       "/health", "/actuator/health", "/actuator/health/**", "/actuator/info")
                   .permitAll();
+              // Connexion sur site (identité locale) : ouvertes, protégées par le verrouillage après échecs.
+              auth.requestMatchers(HttpMethod.POST, "/auth/v1/token", "/auth/v1/signup", "/auth/v1/recover").permitAll();
               if (posteDeDeveloppement) {
                 auth.requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll();

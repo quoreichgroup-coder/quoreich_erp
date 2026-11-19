@@ -27,12 +27,14 @@ public class CorsConfig {
     CorsConfiguration cors = new CorsConfiguration();
     cors.setAllowedOrigins(origins);
     cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id"));
+    // apikey, x-client-info, x-supabase-api-version : en-têtes envoyés par supabase-js vers /auth/v1 (identité sur site).
+    cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id", "apikey", "x-client-info", "x-supabase-api-version"));
     cors.setExposedHeaders(List.of("Content-Disposition", "X-Correlation-Id"));
     cors.setAllowCredentials(false);
     cors.setMaxAge(3600L);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", cors);
+    source.registerCorsConfiguration("/auth/v1/**", cors);
     return source;
   }
 }

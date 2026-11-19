@@ -366,7 +366,7 @@ Ces deux chantiers sont réversibles, sans impact fonctionnel, et réduisent le 
 
 | Réf. | Sujet | Bloque |
 |---|---|---|
-| DEC-07 | Migration des identités (réinitialisation, import ou coexistence) | Lot 1 |
+| DEC-07 | Migration des identités (réinitialisation, import ou coexistence) | **Tranchée le 19 nov. 2026** : identité portée par l'API Java (V114, `docs/audit-erp/26-identite-sur-site.md`), comptes repris avec leur identifiant et leur empreinte bcrypt — mots de passe conservés ; Keycloak n'est pas retenu (il ne vérifie pas bcrypt sans extension tierce) |
 | DEC-08 | RPO/RTO et engagement de service | Mise en service |
 | DEC-09 | Version iOS | Lot 7 (Android non bloqué) |
 | DEC-01 | Référentiel réglementaire et fiscal par pays | Lots 3, 4, 5 |

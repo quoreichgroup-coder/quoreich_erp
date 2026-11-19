@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { brokeredPreviewStorage } from './previewAuthStorage';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Sur site (VITE_QERP_API_URL définie), le client parle à l'API Java, qui porte l'identité au protocole de
+// Supabase (/auth/v1) : session, renouvellement et déconnexion inchangés, aucun appel au nuage. La clé publique
+// n'y sert à rien (l'API l'ignore) mais supabase-js en exige une.
+const QERP_API_URL = ((import.meta.env.VITE_QERP_API_URL as string | undefined) ?? "").replace(/\/+$/, "");
+const SUPABASE_URL = QERP_API_URL || import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = QERP_API_URL ? "qerp-sur-site" : import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

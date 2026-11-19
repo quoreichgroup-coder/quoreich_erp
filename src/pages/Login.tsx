@@ -66,7 +66,9 @@ const Login = () => {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
-      toast.error("Email ou mot de passe incorrect");
+      // Identifiants faux : message neutre ; compte verrouillé ou désactivé : le message du serveur l'explique.
+      const code = (error as { code?: string }).code;
+      toast.error(!code || code === "invalid_credentials" || /invalid login/i.test(error.message) ? "Email ou mot de passe incorrect" : error.message);
     } else {
       navigate("/");
     }

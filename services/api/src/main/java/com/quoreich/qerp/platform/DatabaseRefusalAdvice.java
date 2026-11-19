@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * avec son SQLSTATE dans le journal. Les contrôleurs du lot 2 gardent leurs propres gestionnaires, qui
  * priment sur celui-ci.
  */
-@RestControllerAdvice(basePackages = "com.quoreich.qerp.modules")
+@RestControllerAdvice(basePackages = {"com.quoreich.qerp.modules", "com.quoreich.qerp.identity"})
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class DatabaseRefusalAdvice {
 

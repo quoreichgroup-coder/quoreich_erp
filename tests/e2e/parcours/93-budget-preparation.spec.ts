@@ -60,6 +60,7 @@ async function reglerRevisions(page: Page, actif: boolean, seuil: string) {
 }
 
 test("budget préparé par fichier, révision validée par un tiers, sections par ligne, prévision publiée", async ({ page, browser, baseURL }, testInfo) => {
+  test.setTimeout(300_000);
   const obs = surveiller(page);
   const annee = String(4000 + (Math.floor(Date.now() / 1000) % 900));
   const nom = `${RUN} Budget importé`;

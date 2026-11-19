@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy, History, KeyRound, Loader2, Lock, MailPlus, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { apiPost, isApiEnabled } from "@/api/client";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -249,6 +251,43 @@ function moduleOfCode(code: string): string {
   return map[prefix] ?? "general";
 }
 
+/**
+ * Sur site, sans messagerie : un administrateur fixe un mot de passe provisoire à un membre de sa société (oubli).
+ * Le mot de passe n'est affiché qu'une fois ; les sessions du membre sont fermées. Refusé pour soi-même.
+ */
+function TemporaryPassword({ userId, name }: { userId: string; name: string }) {
+  const [password, setPassword] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const run = async () => {
+    if (!window.confirm(`Fixer un mot de passe provisoire pour ${name} ? Ses sessions ouvertes seront fermées.`)) return;
+    setPending(true);
+    try {
+      const r = await apiPost<{ password: string }>(`/api/v1/identity/members/${userId}/temporary-password`, {});
+      setPassword(r.password);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(false);
+    }
+  };
+  if (password) {
+    return (
+      <div className="mt-2 rounded border border-border bg-muted/40 p-2 text-[11px]" data-testid={`temporary-password-${userId}`}>
+        <div className="text-muted-foreground">Mot de passe provisoire (affiché une seule fois) :</div>
+        <div className="flex items-center gap-2 mt-1">
+          <code className="font-mono text-foreground">{password}</code>
+          <button aria-label="Copier le mot de passe provisoire" onClick={() => navigator.clipboard?.writeText(password)} className="hover:text-primary"><Copy className="w-3 h-3" /></button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <Button variant="outline" size="sm" className="mt-2 h-7 text-[11px]" disabled={pending} onClick={run} aria-label={`Mot de passe provisoire pour ${name}`}>
+      <KeyRound className="w-3 h-3 mr-1" /> Mot de passe provisoire
+    </Button>
+  );
+}
+
 function UsersTab({ view }: { view: Authorizations }) {
   const assign = useAssignRole();
   const revoke = useRevokeRole();
@@ -298,6 +337,7 @@ function UsersTab({ view }: { view: Authorizations }) {
                       <option value="">— Choisir un rôle —</option>
                       {assignable.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
+                    {isApiEnabled() && <TemporaryPassword userId={u.id} name={u.fullName} />}
                   </td>
                 )}
               </tr>

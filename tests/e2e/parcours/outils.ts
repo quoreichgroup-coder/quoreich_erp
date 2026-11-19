@@ -57,11 +57,12 @@ export function surveiller(page: Page) {
     const u = new URL(r.url());
     incidents.push({ quand: etape, type: "refus-serveur", detail: `${r.request().method()} ${u.pathname}${u.search.slice(0, 120)} → ${r.status()} ${corps}` });
   });
-  // Sur site, toute donnée doit venir de l'API Java : un accès aux données de Supabase (hors connexion)
-  // est un incident, lecture comprise — c'est la preuve qu'un module est entièrement porté.
+  // Sur site, tout doit venir de l'API Java, connexion comprise (identité sur site, V114) : le moindre accès au
+  // nuage est un incident, de même qu'un appel aux routes de données Supabase (/rest, /functions, /storage) que
+  // l'API ne sert pas.
   if (SUR_SITE) page.on("request", (r) => {
     const u = r.url();
-    if (r.method() !== "OPTIONS" && /supabase\.co\/(rest|functions|storage)\//.test(u)) {
+    if (r.method() !== "OPTIONS" && (/supabase\.co\//.test(u) || /\/(rest|functions|storage|realtime)\/v1\//.test(u))) {
       const x = new URL(u);
       incidents.push({ quand: etape, type: "acces-nuage", detail: `${r.method()} ${x.pathname}${x.search.slice(0, 80)}` });
     }
