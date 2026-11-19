@@ -67,3 +67,6 @@ test-results-sur-site/
 # Exécutions isolées des parcours (copies .tmp_*, sorties séparées)
 playwright-report-*/
 test-results-*/
+
+# Fichiers déposés sur site (justificatifs), jamais versionnés
+services/api/data/

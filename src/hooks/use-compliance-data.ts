@@ -9,6 +9,8 @@ import {
   ALL_COMPLIANCE_ROLES, type CompliancePerms, type ComplianceRole,
 } from "@/lib/compliance-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 export function useMyComplianceRoles(): CompliancePerms {
   // Droits du catalogue de la société courante (V113 : compliance.*).
@@ -29,6 +31,7 @@ export function useComplianceRoleAudit() {
   return useQuery({
     queryKey: ["compliance-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/grc/role-audit/compliance");
       const { data, error } = await supabase
         .from("compliance_role_audit" as never).select("*")
         .order("created_at", { ascending: false }).limit(500);
@@ -56,7 +59,7 @@ export function useAssignComplianceRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: ComplianceRole; action: "grant" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_compliance_role" as never, {
+      const { error } = await moduleRpc("grc", "assign_compliance_role", {
         _target_user: input.target_user, _role: input.role,
         _action: input.action, _reason: input.reason ?? null,
       } as never);

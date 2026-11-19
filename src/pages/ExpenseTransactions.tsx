@@ -24,8 +24,8 @@ import {
   useAttachReceipt, openReceipt, RATE_UNIT, type ExpenseLine, type ExpenseReport,
 } from "@/hooks/use-expenses";
 import { useProjects } from "@/hooks/use-projects";
-import { isApiEnabled } from "@/api/client";
 import { EXPENSE_STATUS, convert, policyIssues, splitTtc } from "@/lib/expenses";
+import { moduleRpc } from "@/api/rpc";
 
 /*
  * Notes de frais → Transactions (V109) : notes (les siennes ; toutes avec « expenses.view_all »),
@@ -232,7 +232,7 @@ function ExpenseView({ report, onClose, onEdit }: { report: ExpenseReport; onClo
             ))}
           </section>
         )}
-        {!isApiEnabled() && report.lines.some((l) => l.id) && (
+        {report.lines.some((l) => l.id) && (
           <section aria-label="Justificatifs" className="text-xs space-y-1" data-testid="expense-receipts">
             <h4 className="font-medium">Justificatifs joints</h4>
             {report.lines.map((l) => (
@@ -342,11 +342,11 @@ export default function ExpenseTransactions() {
         <BulkBar count={sel.chosen.length} onClear={sel.clear} testId="bulk-bar-expenses">
           <BulkButton count={drafts.length} label="Soumettre" disabled={bulk.isPending} onClick={() => {
             if (window.confirm(`Soumettre ${drafts.length} note(s) ?`)) bulk.mutate({ ids: drafts, done: "note(s) soumise(s)", invalidate: ["expense-reports"],
-              run: async (id) => check(await (supabase as any).rpc("expense_report_submit", { _id: id })) }, { onSuccess: sel.clear });
+              run: async (id) => check(await moduleRpc("expenses", "expense_report_submit", { _id: id })) }, { onSuccess: sel.clear });
           }} />
           {perms.post && <BulkButton count={approved.length} label="Comptabiliser" disabled={bulk.isPending} onClick={() => {
             if (window.confirm(`Comptabiliser ${approved.length} note(s) à la date du jour ?`)) bulk.mutate({ ids: approved, done: "note(s) comptabilisée(s)", invalidate: ["expense-reports", "gl-transactions"],
-              run: async (id) => check(await (supabase as any).rpc("expense_report_post", { _id: id, _date: today() })) }, { onSuccess: sel.clear });
+              run: async (id) => check(await moduleRpc("expenses", "expense_report_post", { _id: id, _date: today() })) }, { onSuccess: sel.clear });
           }} />}
         </BulkBar>
         {isLoading ? <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin" /></div> : (

@@ -49,7 +49,7 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  if (init.body !== undefined) headers.set("Content-Type", "application/json");
+  if (init.body !== undefined && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   const response = await fetch(`${apiBaseUrl()}${path}`, { ...init, headers });
   if (!response.ok) {
@@ -110,4 +110,19 @@ export async function apiDownloadCsv(path: string, filename: string): Promise<vo
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/** Envoie un fichier (multipart) à l'API ; le navigateur pose lui-même l'en-tête de type. */
+export async function apiUpload<T>(path: string, field: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append(field, file);
+  return (await authorizedFetch(path, { method: "POST", body: form })).json() as Promise<T>;
+}
+
+/** Ouvre dans un nouvel onglet un fichier servi par l'API (avec jeton : un lien direct n'en porte pas). */
+export async function apiOpenFile(path: string): Promise<void> {
+  const blob = await (await authorizedFetch(path)).blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

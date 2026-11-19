@@ -49,6 +49,12 @@ public class ShellController {
         + " FROM public.profiles p WHERE p.id = auth.uid()");
   }
 
+  @GetMapping("/profiles")
+  @Operation(operationId = "listTenantProfiles", summary = "Membres de la société courante (nom affiché)")
+  public JsonNode profiles() {
+    return sql.list("SELECT id, full_name, avatar_url, tenant_id, created_at FROM public.profiles WHERE tenant_id = public.get_user_tenant_id(auth.uid())");
+  }
+
   @GetMapping("/tenant")
   @Operation(operationId = "getCurrentTenant", summary = "Société courante (nom, devise)")
   public JsonNode tenant() {

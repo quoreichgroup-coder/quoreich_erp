@@ -26,8 +26,14 @@ process.env.E2E_API_URL = API;
 // locales, tout accès aux données de Supabase compté comme incident (tests/e2e/parcours/outils.ts).
 process.env.E2E_SUR_SITE = "1";
 process.env.E2E_AUTH_DIR = "test-results-sur-site/.auth";
-/** Parcours du nuage dont tous les modules sont portés sur l'API (étendu module par module). */
-const PARCOURS_PORTES = process.env.E2E_PARCOURS_SUR_SITE ? new RegExp(process.env.E2E_PARCOURS_SUR_SITE) : /(10-tiers|20-achats|30-fournisseurs|40-clients|50-comptabilite|60-crm|61-crm|70-stocks|71-inventaires|80-tresorerie|81-tresorerie|90-budget|91-immobilisations|92-budget|93-budget|94-budget)/;
+/**
+ * Parcours du nuage rejoués sur site : tous les parcours métier (00 et 01, propres au nuage — création de la
+ * société, invitation —, sont remplacés par les deux connexions sur site). Les parcours à trois chiffres
+ * passent après les autres : ils s'appuient sur des données créées plus tôt (salarié du parcours 95).
+ */
+const filtre = process.env.E2E_PARCOURS_SUR_SITE ? new RegExp(process.env.E2E_PARCOURS_SUR_SITE) : null;
+const PARCOURS_PORTES = filtre ?? /parcours[\\/](?!0[01]-)\d{2}-[^\\/]*\.spec\.ts$/;
+const PARCOURS_SUITE = filtre ? /^$/ : /parcours[\\/]\d{3}-[^\\/]*\.spec\.ts$/;
 
 export default defineConfig({
   testDir: "tests/e2e/sur-site",
@@ -56,6 +62,13 @@ export default defineConfig({
       testDir: "tests/e2e/parcours",
       testMatch: PARCOURS_PORTES,
       dependencies: ["connexion-sur-site", "approbateur-sur-site"],
+      use: { ...devices["Desktop Chrome"], storageState: "test-results-sur-site/.auth/session.json" },
+    },
+    {
+      name: "parcours-sur-site-suite",
+      testDir: "tests/e2e/parcours",
+      testMatch: PARCOURS_SUITE,
+      dependencies: ["parcours-sur-site"],
       use: { ...devices["Desktop Chrome"], storageState: "test-results-sur-site/.auth/session.json" },
     },
     {

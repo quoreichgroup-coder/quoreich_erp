@@ -84,8 +84,10 @@ c'est ce qui a imposé de porter la coquille avec les premiers modules.
 `playwright.sur-site.config.ts`, `npm run test:e2e:sur-site`) : société locale, sessions locales, et
 tout accès aux données de Supabase (hors connexion) compté comme incident par `surveiller()` (type
 `acces-nuage`). La liste des parcours rejoués (`PARCOURS_PORTES`) s'étend à chaque module porté ;
-`E2E_PARCOURS_SUR_SITE=<regex>` la remplace pour un essai. État au 19 novembre 2026 : 35 parcours du
-nuage verts sur site (10, 20, 30, 40, 50, 60, 61, 70, 71, 80, 81, 90–94), plus les 4 parcours propres au sur site.
+`E2E_PARCOURS_SUR_SITE=<regex>` la remplace pour un essai. État au 19 novembre 2026 : **tous les parcours métier
+du nuage sont verts sur site** (46 tests dans 29 fichiers, dont les 4 parcours propres au sur site ; 21 min). Les
+parcours à trois chiffres forment une seconde passe (`parcours-sur-site-suite`) : ils utilisent le salarié du
+parcours 95.
 
 Les refus de l'API portent leur code SQLSTATE (`{"code": "QG007", "error": "…"}`), comme les réponses
 de Supabase : les refus métier annoncés par les parcours (`refusAttendu(/QG007.*/)`) sont reconnus
@@ -111,11 +113,12 @@ Fin du chantier :
 | Trésorerie (comptes, mouvements, virements, relevés, rapprochement, prévisions, clôture, limites, audit) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | ✅ nuage 80 rejoué |
 | Immobilisations (catégories, fiches, amortissements, cessions, paramètres) | ✅ | ✅ | `StocksCrmAssetsApiIT` | ✅ nuage 91 rejoué |
 | Budget (budgets, lignes, cycle, révisions, scénarios, contrôle, prévisions, paramètres) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | ✅ nuage 90, 92, 93, 94 rejoués |
-| Notes de frais, projets | à faire | | | |
+| Notes de frais (brouillon en une transaction, cycle, catégories, barèmes, avances, justificatifs stockés sur le serveur), projets | ✅ | ✅ | `ExpensesProjectsGrcApiIT` | ✅ nuage 99, 100 rejoués |
 | CRM (contacts, import, actions groupées, opportunités, activités, conversion en devis) | ✅ | ✅ | `StocksCrmAssetsApiIT` | ✅ nuage 60, 61 rejoués |
-| RH et paie (reste) | partiel | | | |
-| Conformité, risques | à faire | | | |
+| RH et paie (API du 17–18 nov.) | ✅ | ✅ | `HrApiIT` | ✅ nuage 95 rejoué |
+| Conformité, risques | ✅ | ✅ | `ExpensesProjectsGrcApiIT` | ✅ nuage 101 rejoué |
 | Coquille : profil et société (`/me`), société courante, modules actifs, alertes, préférences de notification, calendrier fiscal | ✅ | ✅ | `ProcurementApiIT` (`/me`) | via tous les parcours sur site |
 | Pilotage (tableaux de bord, CFO, IA), administration (sociétés, modules, invitations, import) | à faire | | | |
 | Identité sur site (connexion sans Supabase Auth) | à faire | | | |
-| Fichiers (justificatifs) et temps réel | à faire | | | |
+| Fichiers (justificatifs) | ✅ répertoire `qerp.files.dir` (défaut `./data/files`), mêmes règles que le stockage du nuage | ✅ | `ExpensesProjectsGrcApiIT` | ✅ |
+| Temps réel | à faire (sur site : rafraîchissement React Query) | | | |

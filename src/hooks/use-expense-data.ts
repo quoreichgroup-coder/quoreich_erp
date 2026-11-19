@@ -6,6 +6,8 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { ALL_EXPENSE_ROLES, type ExpensePerms, type ExpenseRole } from "@/lib/expense-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 // Notes, lignes et indicateurs : voir use-expenses.ts (V109). Ce module ne garde que les rôles du module.
 
@@ -39,6 +41,7 @@ export function useExpenseRoleAudit() {
   return useQuery({
     queryKey: ["expense-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/expenses/role-audit");
       const { data, error } = await supabase
         .from("expense_role_audit" as never)
         .select("*")
@@ -57,7 +60,7 @@ export function useAssignExpenseRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: ExpenseRole; action: "grant" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_expense_role" as never, {
+      const { error } = await moduleRpc("expenses", "assign_expense_role", {
         _target_user: input.target_user,
         _role: input.role,
         _action: input.action,

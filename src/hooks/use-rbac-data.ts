@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "./use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export function useTenantProfiles() {
     queryKey: ["tenant-profiles", tenantId],
     queryFn: async () => {
       if (!tenantId) return [];
+      if (isApiEnabled()) return apiGet<TenantProfile[]>("/api/v1/profiles");
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, tenant_id, created_at")

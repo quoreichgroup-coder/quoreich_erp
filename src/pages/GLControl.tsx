@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { useGLPeriods } from "@/hooks/use-gl-data";
 import { useGlAccountOptions } from "@/hooks/use-accounting-setup";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { isApiEnabled } from "@/api/client";
 import {
   CHECK_LABELS, useGlAuditTrail, useGlFindings, useGlIntegrity, useGlReconciliation, useReviewFinding, type GlFinding,
 } from "@/hooks/use-gl-controls";
@@ -302,14 +301,6 @@ export default function GLControl() {
   const recon = useGlReconciliation(today());
   const { data: periods = [] } = useGLPeriods();
 
-  if (isApiEnabled()) {
-    return (
-      <PageShell>
-        <Breadcrumb items={[{ label: "Comptabilité et finance" }, { label: "Grand livre", href: "/journal" }, { label: "Contrôle" }]} />
-        <p className="text-sm text-muted-foreground mt-4">Sur site, les contrôles du grand livre arrivent avec la tranche comptable de l'API.</p>
-      </PageShell>
-    );
-  }
   const open = (findings.data ?? []).filter((f) => !f.reviewed);
   const kpis = [
     { label: "Anomalies critiques", value: open.filter((f) => f.severity === "critical").length, icon: AlertTriangle, bad: true },

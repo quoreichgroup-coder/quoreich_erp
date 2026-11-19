@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { apiDelete, apiGet, apiOpenFile, apiPatch, apiPost, apiPut, apiUpload, isApiEnabled } from "@/api/client";
 import {
   DEFAULT_RISK_SETTINGS, type ControlStatus, type IssueStatus, type RiskLevel, type RiskSettings, type RiskStatus, type TestResult, type Treatment,
 } from "@/lib/grc";
@@ -55,7 +56,7 @@ export function useRiskSettings() {
   return useQuery({
     queryKey: ["risk-settings", tenantId], enabled: Boolean(tenantId),
     queryFn: async (): Promise<RiskSettings & { saved: boolean }> => {
-      const { data, error } = await db.from("risk_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/risks/settings"), error: null } : await db.from("risk_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return data ? { ...data, saved: true } : { ...DEFAULT_RISK_SETTINGS, saved: false };
     },
@@ -66,6 +67,7 @@ export function useSaveRiskSettings() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (s: RiskSettings) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/risks/settings", s); return; }
       const tenant_id = await fetchTenantId();
       const { data, error } = await db.from("risk_settings").upsert({ tenant_id, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       fail(error); touched(data, "risks.settings");
@@ -80,7 +82,7 @@ export function useRiskCategories() {
   return useQuery({
     queryKey: ["risk-categories", tenantId], enabled: Boolean(tenantId),
     queryFn: async (): Promise<RiskCategory[]> => {
-      const { data, error } = await db.from("risk_categories").select("*").eq("tenant_id", tenantId).order("code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/risks/categories"), error: null } : await db.from("risk_categories").select("*").eq("tenant_id", tenantId).order("code");
       if (error) throw error;
       return data ?? [];
     },
@@ -91,6 +93,7 @@ export function useSaveRiskCategory() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (c: Partial<RiskCategory> & { code: string; name: string }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/risks/categories", { id: c.id, code: c.code, name: c.name.trim(), is_active: c.is_active ?? true }); return; }
       const tenant_id = await fetchTenantId();
       const row = { code: c.code, name: c.name.trim(), is_active: c.is_active ?? true };
       const { data, error } = c.id ? await db.from("risk_categories").update(row).eq("id", c.id).select("id")
@@ -107,7 +110,7 @@ export function useRisks() {
   return useQuery({
     queryKey: ["risks", tenantId], enabled: Boolean(tenantId), retry: false,
     queryFn: async (): Promise<Risk[]> => {
-      const { data, error } = await db.from("risk_register").select("*").eq("tenant_id", tenantId).order("risk_code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/risks"), error: null } : await db.from("risk_register").select("*").eq("tenant_id", tenantId).order("risk_code");
       if (error) throw error;
       return data ?? [];
     },
@@ -118,6 +121,12 @@ export function useSaveRisk() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (r: Partial<Risk> & { title: string }) => {
+      if (isApiEnabled()) {
+        const row = { title: r.title.trim(), description: r.description || null, category: r.category || "—", category_id: r.category_id || null, owner: r.owner || null,
+          mitigation_plan: r.mitigation_plan || null, review_date: r.review_date || null, project_id: r.project_id || null, treatment: r.treatment || null };
+        if (r.id) { await apiPatch(`/api/v1/risks/${r.id}`, row); return r.id; }
+        return (await apiPost<{ id: string }>("/api/v1/risks", { risk_code: r.risk_code, likelihood: r.likelihood ?? 1, impact: r.impact ?? 1, ...row })).id;
+      }
       const row = { title: r.title.trim(), description: r.description || null, category: r.category || "—", category_id: r.category_id || null, owner: r.owner || null,
         mitigation_plan: r.mitigation_plan || null, review_date: r.review_date || null, project_id: r.project_id || null, treatment: r.treatment || null };
       if (r.id) {
@@ -140,6 +149,8 @@ export function useAssessRisk() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (v: { risk: string; likelihood: number; impact: number; residual_likelihood: number | null; residual_impact: number | null; notes: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/grc/actions/risk_assess", { _risk: v.risk, _likelihood: v.likelihood, _impact: v.impact,
+        _residual_likelihood: v.residual_likelihood, _residual_impact: v.residual_impact, _notes: v.notes || null }); return; }
       const { error } = await db.rpc("risk_assess", { _risk: v.risk, _likelihood: v.likelihood, _impact: v.impact, _residual_likelihood: v.residual_likelihood,
         _residual_impact: v.residual_impact, _notes: v.notes || null });
       fail(error);
@@ -153,6 +164,7 @@ export function useSetRiskStatus() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (v: { risk: string; status: RiskStatus; treatment?: Treatment | null; reason?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/grc/actions/risk_set_status", { _risk: v.risk, _status: v.status, _treatment: v.treatment ?? null, _reason: v.reason || null }); return; }
       const { error } = await db.rpc("risk_set_status", { _risk: v.risk, _status: v.status, _treatment: v.treatment ?? null, _reason: v.reason || null });
       fail(error);
     },
@@ -166,6 +178,7 @@ export function useRiskAssessments(riskId?: string | null) {
   return useQuery({
     queryKey: ["risk-assessments", tenantId, riskId ?? "all"], enabled: Boolean(tenantId),
     queryFn: async (): Promise<RiskAssessment[]> => {
+      if (isApiEnabled()) return apiGet<RiskAssessment[]>(`/api/v1/risks/assessments${riskId ? `?riskId=${riskId}` : ""}`);
       let q = db.from("risk_assessments").select("*").eq("tenant_id", tenantId);
       if (riskId) q = q.eq("risk_id", riskId);
       const { data, error } = await q.order("created_at", { ascending: false });
@@ -180,7 +193,7 @@ export function useRiskActions() {
   return useQuery({
     queryKey: ["risk-actions", tenantId], enabled: Boolean(tenantId),
     queryFn: async (): Promise<RiskAction[]> => {
-      const { data, error } = await db.from("risk_actions").select("*").eq("tenant_id", tenantId).order("due_date", { nullsFirst: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/risks/actions"), error: null } : await db.from("risk_actions").select("*").eq("tenant_id", tenantId).order("due_date", { nullsFirst: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -191,6 +204,10 @@ export function useSaveRiskAction() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (a: Partial<RiskAction> & { risk_id: string }) => {
+      if (isApiEnabled()) {
+        await (a.id ? apiPatch(`/api/v1/risks/actions/${a.id}`, { status: a.status }) : apiPost("/api/v1/risks/actions", { risk_id: a.risk_id, title: a.title, owner: a.owner || null, due_date: a.due_date || null }));
+        return;
+      }
       if (a.id) {
         const patch: Record<string, unknown> = { status: a.status };
         if (a.status === "done") patch.done_at = new Date().toISOString();
@@ -212,7 +229,7 @@ export function useRiskControlLinks() {
   return useQuery({
     queryKey: ["risk-links", tenantId], enabled: Boolean(tenantId),
     queryFn: async (): Promise<{ risk_id: string; control_id: string }[]> => {
-      const { data, error } = await db.from("risk_control_links").select("risk_id, control_id").eq("tenant_id", tenantId);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/risks/control-links"), error: null } : await db.from("risk_control_links").select("risk_id, control_id").eq("tenant_id", tenantId);
       if (error) throw error;
       return data ?? [];
     },
@@ -223,6 +240,10 @@ export function useLinkRiskControl() {
   const inv = useInvalidate(RISK_KEYS);
   return useMutation({
     mutationFn: async (v: { risk_id: string; control_id: string; remove?: boolean }) => {
+      if (isApiEnabled()) {
+        await (v.remove ? apiDelete(`/api/v1/risks/${v.risk_id}/control-links/${v.control_id}`) : apiPost("/api/v1/risks/control-links", { risk_id: v.risk_id, control_id: v.control_id }));
+        return;
+      }
       const tenant_id = await fetchTenantId();
       const { data, error } = v.remove
         ? await db.from("risk_control_links").delete().eq("risk_id", v.risk_id).eq("control_id", v.control_id).select("risk_id")
@@ -248,6 +269,7 @@ function useTenantList<T>(key: string, table: string, order: string) {
   return useQuery({
     queryKey: [key, tenantId], enabled: Boolean(tenantId), retry: false,
     queryFn: async (): Promise<T[]> => {
+      if (isApiEnabled()) return apiGet<T[]>(`/api/v1/compliance/${({ compliance_frameworks: "frameworks", compliance_controls: "controls", compliance_test_logs: "tests", compliance_issues: "issues" } as Record<string, string>)[table]}`);
       const { data, error } = await db.from(table).select("*").eq("tenant_id", tenantId).order(order, { ascending: order === "created_at" || order === "test_date" ? false : true });
       if (error) throw error;
       return data ?? [];
@@ -264,7 +286,7 @@ export function useComplianceSettings() {
   return useQuery({
     queryKey: ["compliance-settings", tenantId], enabled: Boolean(tenantId),
     queryFn: async (): Promise<{ issue_second_person: boolean }> => {
-      const { data, error } = await db.from("compliance_settings").select("issue_second_person").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/compliance/settings"), error: null } : await db.from("compliance_settings").select("issue_second_person").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return data ?? { issue_second_person: true };
     },
@@ -275,6 +297,7 @@ export function useSaveComplianceSettings() {
   const inv = useInvalidate(COMPLIANCE_KEYS);
   return useMutation({
     mutationFn: async (s: { issue_second_person: boolean }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/compliance/settings", s); return; }
       const tenant_id = await fetchTenantId();
       const { data, error } = await db.from("compliance_settings").upsert({ tenant_id, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       fail(error); touched(data, "compliance.settings");
@@ -288,6 +311,7 @@ export function useSaveFramework() {
   const inv = useInvalidate(COMPLIANCE_KEYS);
   return useMutation({
     mutationFn: async (f: Partial<Framework> & { name: string }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/compliance/frameworks", { id: f.id, name: f.name.trim(), version: f.version || null, description: f.description || null, status: f.status ?? "active" }); return; }
       const row = { name: f.name.trim(), version: f.version || null, description: f.description || null, status: f.status ?? "active" };
       const tenant_id = await fetchTenantId();
       const { data, error } = f.id ? await db.from("compliance_frameworks").update(row).eq("id", f.id).select("id")
@@ -303,6 +327,12 @@ export function useSaveControl() {
   const inv = useInvalidate(COMPLIANCE_KEYS);
   return useMutation({
     mutationFn: async (c: Partial<Control> & { framework_id: string; control_code: string; title: string }) => {
+      if (isApiEnabled()) {
+        await apiPut("/api/v1/compliance/controls", { id: c.id, framework_id: c.framework_id, control_code: c.control_code.trim(), title: c.title.trim(), description: c.description || null,
+          category: c.category || null, owner: c.owner || null, risk_level: c.risk_level || "medium", frequency: c.frequency || null, test_procedure: c.test_procedure || null,
+          next_review_at: c.next_review_at || null, is_active: c.is_active ?? true });
+        return;
+      }
       const row = { title: c.title.trim(), description: c.description || null, category: c.category || null, owner: c.owner || null, risk_level: c.risk_level || "medium",
         frequency: c.frequency || null, test_procedure: c.test_procedure || null, next_review_at: c.next_review_at || null, is_active: c.is_active ?? true };
       const { data, error } = c.id ? await db.from("compliance_controls").update(row).eq("id", c.id).select("id")
@@ -319,6 +349,8 @@ export function useRecordTest() {
   return useMutation({
     mutationFn: async (v: { control: string; date: string; result: TestResult; findings: number; notes: string; issue_title?: string; issue_severity?: RiskLevel;
       issue_due?: string; issue_owner?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/grc/actions/compliance_record_test", { _control: v.control, _date: v.date, _result: v.result, _findings: v.findings,
+        _notes: v.notes || null, _issue_title: v.issue_title || null, _issue_severity: v.issue_severity ?? "medium", _issue_due: v.issue_due || null, _issue_owner: v.issue_owner || null }); return; }
       const { error } = await db.rpc("compliance_record_test", { _control: v.control, _date: v.date, _result: v.result, _findings: v.findings, _notes: v.notes || null,
         _issue_title: v.issue_title || null, _issue_severity: v.issue_severity ?? "medium", _issue_due: v.issue_due || null, _issue_owner: v.issue_owner || null });
       fail(error);
@@ -332,6 +364,7 @@ export function useUpdateIssue() {
   const inv = useInvalidate(COMPLIANCE_KEYS);
   return useMutation({
     mutationFn: async (v: { issue: string; status: "in_progress" | "closed"; notes: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/grc/actions/compliance_issue_update", { _issue: v.issue, _status: v.status, _notes: v.notes || null }); return; }
       const { error } = await db.rpc("compliance_issue_update", { _issue: v.issue, _status: v.status, _notes: v.notes || null });
       fail(error);
     },

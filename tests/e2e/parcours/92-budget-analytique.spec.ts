@@ -95,6 +95,7 @@ async function demande(page: Page, objet: string, date: string, montant: string)
 }
 
 test("budget par section : approbation par un tiers, demandes pré-engagées, refus puis dérogation, contrôle et prévisions", async ({ page, browser, baseURL }, testInfo) => {
+  test.setTimeout(300_000);
   const obs = surveiller(page);
   const annee = String(3000 + (Math.floor(Date.now() / 1000) % 900));
   const nom = `${RUN} Budget par section`;

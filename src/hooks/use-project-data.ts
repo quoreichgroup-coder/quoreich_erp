@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import type { ProjectPerms, ProjectRole } from "@/lib/project-roles";
 import { ALL_PROJECT_ROLES } from "@/lib/project-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 // Projets, budget et chiffres : voir use-projects.ts (V111). Ce module ne garde que les rôles.
 
@@ -40,6 +42,7 @@ export function useProjectRoleAudit() {
   return useQuery({
     queryKey: ["project-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/projects/role-audit");
       const { data, error } = await supabase
         .from("project_role_audit" as never)
         .select("*")
@@ -59,7 +62,7 @@ export function useAssignProjectRole() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: ProjectRole; action: "grant" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_project_role" as never, {
+      const { error } = await moduleRpc("projects", "assign_project_role", {
         _tenant_id: tenantId,
         _target_user_id: input.target_user,
         _role: input.role,

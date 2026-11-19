@@ -7,6 +7,8 @@ import { toast } from "sonner";
 // ---------- RBAC ----------
 import { ALL_RISK_ROLES, type RiskPerms, type RiskRole } from "@/lib/risk-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 export function useMyRiskRoles(): RiskPerms {
   // Droits du catalogue de la société courante (V113 : risks.*).
@@ -27,6 +29,7 @@ export function useRiskRoleAudit() {
   return useQuery({
     queryKey: ["risk-role-audit"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/grc/role-audit/risk");
       const { data, error } = await supabase
         .from("risk_role_audit" as never).select("*")
         .order("created_at", { ascending: false }).limit(500);
@@ -54,7 +57,7 @@ export function useAssignRiskRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: RiskRole; action: "grant" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_risk_role" as never, {
+      const { error } = await moduleRpc("grc", "assign_risk_role", {
         _target_user: input.target_user, _role: input.role,
         _action: input.action, _reason: input.reason ?? null,
       } as never);

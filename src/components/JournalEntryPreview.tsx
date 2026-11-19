@@ -7,8 +7,7 @@ const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 
 
 /**
  * Écriture comptable d'une pièce (comptes, débit, crédit), affichée dans son panneau de détail :
- * la preuve que la pièce est comptabilisée. Sur site, l'API n'expose pas encore le grand livre
- * (Lot 3) : le panneau l'indique au lieu d'interroger une autre base.
+ * la preuve que la pièce est comptabilisée. Sur site, l'écriture est lue par l'API (/api/v1/gl/journal-entries/{id}).
  */
 export function JournalEntryPreview({ entryId }: { entryId: string | null | undefined }) {
   const api = isApiEnabled();

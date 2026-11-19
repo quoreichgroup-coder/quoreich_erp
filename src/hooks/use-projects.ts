@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import type { ProjectFigures, ProjectStatus } from "@/lib/projects";
+import { apiDelete, apiGet, apiOpenFile, apiPatch, apiPost, apiPut, apiUpload, isApiEnabled } from "@/api/client";
 
 /*
  * Projets (V111) : fiches, budget par compte, chiffres (project_financials) et grand livre du projet
@@ -25,7 +26,7 @@ export function useProjectSettings() {
     queryKey: ["project-settings", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await db.from("project_settings").select("project_axis_id, include_requisitions_in_commitments").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/projects/settings"), error: null } : await db.from("project_settings").select("project_axis_id, include_requisitions_in_commitments").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return (data ?? null) as { project_axis_id: string; include_requisitions_in_commitments: boolean } | null;
     },
@@ -36,6 +37,7 @@ export function useSaveProjectSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (s: { project_axis_id: string; include_requisitions_in_commitments: boolean }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/projects/settings", s); return; }
       const tenant_id = await fetchTenantId();
       const { data, error } = await db.from("project_settings").upsert({ tenant_id, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;
@@ -53,7 +55,9 @@ export function useProjects() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async (): Promise<Project[]> => {
-      const [p, f] = await Promise.all([
+      const viaApi = async () => { const [pp, ff] = await Promise.all([apiGet<any[]>("/api/v1/projects"), apiPost<any[]>("/api/v1/projects/actions/project_financials", { _from: null, _to: null })]);
+        return [{ data: pp, error: null }, { data: ff, error: null }] as const; };
+      const [p, f] = isApiEnabled() ? await viaApi() : await Promise.all([
         db.from("projects").select("*, customer:customers(name)").eq("tenant_id", tenantId).order("project_code"),
         db.rpc("project_financials", { _from: null, _to: null }),
       ]);
@@ -78,6 +82,12 @@ export function useSaveProject() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (v: Partial<Project> & { project_code: string; name: string }) => {
+      if (isApiEnabled()) {
+        const row = { name: v.name.trim(), description: v.description ?? null, customer_id: v.customer_id || null, project_manager: v.project_manager ?? null,
+          department: v.department ?? null, start_date: v.start_date || null, end_date: v.end_date || null, completion_pct: v.completion_pct ?? 0 };
+        if (v.id) { await apiPatch(`/api/v1/projects/${v.id}`, row); return v.id; }
+        return (await apiPost<{ id: string }>("/api/v1/projects", { project_code: v.project_code, status: v.status ?? "planned", ...row })).id;
+      }
       const row = { name: v.name.trim(), description: v.description ?? null, customer_id: v.customer_id || null, project_manager: v.project_manager ?? null,
         department: v.department ?? null, start_date: v.start_date || null, end_date: v.end_date || null, completion_pct: v.completion_pct ?? 0 };
       if (v.id) {
@@ -100,6 +110,7 @@ export function useSetProjectStatus() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (v: { id: string; status: ProjectStatus; reason?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/projects/actions/project_set_status", { _project: v.id, _status: v.status, _reason: v.reason ?? null }); return; }
       const { error } = await db.rpc("project_set_status", { _project: v.id, _status: v.status, _reason: v.reason ?? null });
       if (error) throw error;
     },
@@ -113,7 +124,7 @@ export function useProjectBudget(projectId: string | null) {
     queryKey: ["project-budget", projectId],
     enabled: Boolean(projectId),
     queryFn: async (): Promise<ProjectBudgetLine[]> => {
-      const { data, error } = await db.from("project_budget_lines").select("*").eq("project_id", projectId);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/projects/${projectId}/budget`), error: null } : await db.from("project_budget_lines").select("*").eq("project_id", projectId);
       if (error) throw error;
       return (data ?? []).map((l: any) => ({ ...l, amount: Number(l.amount) }));
     },
@@ -124,6 +135,12 @@ export function useSaveProjectBudgetLine() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (v: { id?: string; project_id: string; gl_account_id: string; amount: number; description?: string | null; remove?: boolean }) => {
+      if (isApiEnabled()) {
+        if (v.remove && v.id) { await apiDelete(`/api/v1/projects/budget-lines/${v.id}`); return; }
+        const row = { gl_account_id: v.gl_account_id, amount: v.amount, description: v.description ?? null };
+        await (v.id ? apiPatch(`/api/v1/projects/budget-lines/${v.id}`, row) : apiPost("/api/v1/projects/budget-lines", { project_id: v.project_id, ...row }));
+        return;
+      }
       if (v.remove && v.id) {
         const { data, error } = await db.from("project_budget_lines").delete().eq("id", v.id).select("id");
         if (error) throw error;
@@ -149,7 +166,7 @@ export function useProjectLedger(projectId: string | null) {
     enabled: Boolean(projectId),
     retry: false,
     queryFn: async (): Promise<ProjectLedgerRow[]> => {
-      const { data, error } = await db.rpc("project_ledger", { _project: projectId });
+      const { data, error } = isApiEnabled() ? { data: await apiPost<any[]>("/api/v1/projects/actions/project_ledger", { _project: projectId }), error: null } : await db.rpc("project_ledger", { _project: projectId });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, debit: Number(r.debit), credit: Number(r.credit) }));
     },

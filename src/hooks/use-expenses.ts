@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import type { ExpenseStatus } from "@/lib/expenses";
+import { apiDelete, apiGet, apiOpenFile, apiPatch, apiPost, apiPut, apiUpload, isApiEnabled } from "@/api/client";
 
 /*
  * Notes de frais (V109). Lecture : la base ne renvoie que les notes de l'appelant, sauf droit
@@ -46,6 +47,7 @@ export function useExpenseReports() {
     queryFn: async (): Promise<ExpenseReport[]> => {
       const all: any[] = [];
       for (let from = 0; ; from += 1000) {
+        if (isApiEnabled()) { all.push(...await apiGet<any[]>("/api/v1/expenses/reports")); break; }
         const { data, error } = await db.from("expense_reports")
           .select("*, employee:employees(first_name, last_name, matricule), lines:expense_lines!expense_lines_report_fkey(*), approvals:expense_report_approvals(*),"
             + " entry:journal_entries!expense_reports_journal_entry_id_fkey(piece_number), payment_entry:journal_entries!expense_reports_payment_journal_entry_id_fkey(piece_number)")
@@ -70,7 +72,7 @@ export function useExpenseCategories() {
     queryKey: ["expense-categories", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<ExpenseCategory[]> => {
-      const { data, error } = await db.from("expense_categories").select("*").eq("tenant_id", tenantId).order("code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/expenses/categories"), error: null } : await db.from("expense_categories").select("*").eq("tenant_id", tenantId).order("code");
       if (error) throw error;
       return (data ?? []).map((c: any) => ({ ...c, receipt_required_above: num(c.receipt_required_above), max_amount_per_line: num(c.max_amount_per_line) }));
     },
@@ -83,7 +85,7 @@ export function useExpenseSettings() {
     queryKey: ["expense-settings", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<ExpenseSettingsRow> => {
-      const { data, error } = await db.from("expense_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/expenses/settings"), error: null } : await db.from("expense_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return { receipt_required_above: num(data?.receipt_required_above), max_report_amount: num(data?.max_report_amount), late_submission_days: data?.late_submission_days ?? null };
     },
@@ -96,7 +98,7 @@ export function useEmployeesForExpenses() {
     queryKey: ["expense-employees", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await db.from("employees").select("id, matricule, first_name, last_name, status").eq("tenant_id", tenantId).order("last_name");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/expenses/employees"), error: null } : await db.from("employees").select("id, matricule, first_name, last_name, status").eq("tenant_id", tenantId).order("last_name");
       if (error) throw error;
       return (data ?? []) as { id: string; matricule: string; first_name: string; last_name: string; status: string }[];
     },
@@ -120,6 +122,10 @@ export function useSaveExpenseDraft() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (d: ExpenseDraft) => {
+      if (isApiEnabled()) {
+        const body = { employee_id: d.employee_id, purpose: d.purpose.trim() || null, period_start: d.period_start, period_end: d.period_end, notes: d.notes, lines: d.lines };
+        return (d.id ? await apiPut<{ id: string }>(`/api/v1/expenses/reports/${d.id}`, body) : await apiPost<{ id: string }>("/api/v1/expenses/reports", body)).id;
+      }
       const header = { employee_id: d.employee_id, purpose: d.purpose.trim() || null, period_start: d.period_start, period_end: d.period_end, notes: d.notes };
       let id = d.id;
       if (id) {
@@ -149,6 +155,7 @@ export function useDeleteExpenseDraft() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/expenses/reports/${id}`); return; }
       const { data, error } = await db.from("expense_reports").delete().eq("id", id).select("id");
       if (error) throw refused(error);
       if (!data?.length) throw new Error("Seul un brouillon se supprime.");
@@ -163,6 +170,7 @@ function rpcMutation<V>(name: string, args: (v: V) => Record<string, unknown>, d
     const invalidate = useInvalidate();
     return useMutation({
       mutationFn: async (v: V) => {
+        if (isApiEnabled()) return apiPost<any>(`/api/v1/expenses/actions/${name}`, args(v));
         const { data, error } = await db.rpc(name, args(v));
         if (error) throw error;
         return data;
@@ -184,6 +192,12 @@ export function useSaveExpenseCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (c: Partial<ExpenseCategory> & { code: string; name: string; gl_account_id: string }) => {
+      if (isApiEnabled()) {
+        const row = { code: c.code, name: c.name, gl_account_id: c.gl_account_id, default_tax_code_id: c.default_tax_code_id || null,
+          receipt_required_above: c.receipt_required_above ?? null, max_amount_per_line: c.max_amount_per_line ?? null, is_active: c.is_active ?? true };
+        await (c.id ? apiPatch(`/api/v1/expenses/categories/${c.id}`, row) : apiPost("/api/v1/expenses/categories", row));
+        return;
+      }
       const tenant_id = await fetchTenantId();
       const row = { code: c.code, name: c.name, gl_account_id: c.gl_account_id, default_tax_code_id: c.default_tax_code_id || null,
         receipt_required_above: c.receipt_required_above ?? null, max_amount_per_line: c.max_amount_per_line ?? null, is_active: c.is_active ?? true };
@@ -202,6 +216,7 @@ export function useSaveExpenseSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (s: ExpenseSettingsRow) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/expenses/settings", s); return; }
       const tenant_id = await fetchTenantId();
       const { data, error } = await db.from("expense_settings").upsert({ tenant_id, ...s, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;
@@ -223,7 +238,7 @@ export function useExpenseRates() {
     queryKey: ["expense-rates", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<ExpenseRate[]> => {
-      const { data, error } = await db.from("expense_rates").select("*").eq("tenant_id", tenantId).order("code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/expenses/rates"), error: null } : await db.from("expense_rates").select("*").eq("tenant_id", tenantId).order("code");
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, rate: Number(r.rate) }));
     },
@@ -234,6 +249,11 @@ export function useSaveExpenseRate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (r: Partial<ExpenseRate> & { kind: ExpenseRate["kind"]; code: string; name: string; unit: ExpenseRate["unit"]; rate: number; category_id: string }) => {
+      if (isApiEnabled()) {
+        const row = { kind: r.kind, code: r.code, name: r.name, unit: r.unit, rate: r.rate, category_id: r.category_id, valid_from: r.valid_from || null, valid_to: r.valid_to || null, is_active: r.is_active ?? true };
+        await (r.id ? apiPatch(`/api/v1/expenses/rates/${r.id}`, row) : apiPost("/api/v1/expenses/rates", row));
+        return;
+      }
       const tenant_id = await fetchTenantId();
       const row = { kind: r.kind, code: r.code, name: r.name, unit: r.unit, rate: r.rate, category_id: r.category_id, valid_from: r.valid_from || null, valid_to: r.valid_to || null, is_active: r.is_active ?? true };
       const { data, error } = r.id ? await db.from("expense_rates").update(row).eq("id", r.id).select("id") : await db.from("expense_rates").insert({ tenant_id, ...row }).select("id");
@@ -254,7 +274,7 @@ export function useExpenseAdvances() {
     queryKey: ["expense-advances", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<ExpenseAdvance[]> => {
-      const { data, error } = await db.from("expense_advances").select("*, employee:employees(first_name, last_name)").eq("tenant_id", tenantId).order("advance_date", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/expenses/advances"), error: null } : await db.from("expense_advances").select("*, employee:employees(first_name, last_name)").eq("tenant_id", tenantId).order("advance_date", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((a: any) => ({ ...a, amount: Number(a.amount), amount_applied: Number(a.amount_applied), amount_refunded: Number(a.amount_refunded) }));
     },
@@ -270,6 +290,8 @@ export function usePayAdvance() {
   const invalidate = useInvalidateAdvances();
   return useMutation({
     mutationFn: async (v: { employee: string; date: string; amount: number; purpose: string; method: string; bankAccountId: string | null; reference: string | null }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/expenses/actions/expense_advance_pay", { _employee: v.employee, _date: v.date, _amount: v.amount, _purpose: v.purpose,
+        _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: v.reference }); return; }
       const { error } = await db.rpc("expense_advance_pay", { _employee: v.employee, _date: v.date, _amount: v.amount, _purpose: v.purpose, _payment_method: v.method,
         _bank_account_id: v.bankAccountId, _reference: v.reference });
       if (error) throw error;
@@ -283,6 +305,8 @@ export function useRefundAdvance() {
   const invalidate = useInvalidateAdvances();
   return useMutation({
     mutationFn: async (v: { advance: string; date: string; amount: number; method: string; bankAccountId: string | null }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/expenses/actions/expense_advance_refund", { _advance: v.advance, _date: v.date, _amount: v.amount,
+        _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: null }); return; }
       const { error } = await db.rpc("expense_advance_refund", { _advance: v.advance, _date: v.date, _amount: v.amount, _payment_method: v.method, _bank_account_id: v.bankAccountId, _reference: null });
       if (error) throw error;
     },
@@ -296,6 +320,7 @@ export function useAttachReceipt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { reportId: string; lineId: string; file: File }) => {
+      if (isApiEnabled()) { await apiUpload(`/api/v1/expenses/reports/${v.reportId}/lines/${v.lineId}/receipt`, "file", v.file); return; }
       const tenant = await fetchTenantId();
       const safe = v.file.name.normalize("NFD").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-80);
       const path = `${tenant}/${v.reportId}/${crypto.randomUUID()}-${safe}`;
@@ -311,6 +336,7 @@ export function useAttachReceipt() {
 }
 
 export async function openReceipt(path: string) {
+  if (isApiEnabled()) { try { await apiOpenFile(`/api/v1/expenses/receipts?path=${encodeURIComponent(path)}`); } catch (e) { toast.error(e instanceof Error ? e.message : String(e)); } return; }
   const { data, error } = await db.storage.from("expense-receipts").createSignedUrl(path, 120);
   if (error) { toast.error(error.message); return; }
   window.open(data.signedUrl, "_blank", "noopener");
