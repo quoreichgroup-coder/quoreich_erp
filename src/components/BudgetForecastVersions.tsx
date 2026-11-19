@@ -29,8 +29,10 @@ const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR", { maximumFract
 const keyOf = (account: string, section: string | null) => `${account}|${section ?? ""}`;
 type Init = "calculated" | "budget" | "empty" | string;
 
-export function BudgetForecastVersions({ year, status, forecast, canForecast, canExport }: {
+export function BudgetForecastVersions({ year, status, forecast, canForecast, canExport, ready = true }: {
   year: string; status: BudgetStatusRow[]; forecast: ForecastRow[]; canForecast: boolean; canExport: boolean;
+  /** Chiffres de l'exercice chargés : sans eux, une version « atterrissage » ou « budget » naîtrait vide. */
+  ready?: boolean;
 }) {
   const { data: versions = [] } = useBudgetForecasts(year);
   const [picked, setPicked] = useState<string | null>(null);
@@ -176,7 +178,7 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
           </>
         )}
       </CardContent>
-      {creating && <NewVersionDialog year={year} versions={versions.map((v) => ({ id: v.id, name: v.name }))} pending={create.isPending} onClose={() => setCreating(false)}
+      {creating && <NewVersionDialog year={year} versions={versions.map((v) => ({ id: v.id, name: v.name }))} pending={create.isPending} ready={ready} onClose={() => setCreating(false)}
         onCreate={async (name, init) => {
           let seed: { gl_account_id: string; analytic_value_id: string | null; amount: number }[] = [];
           if (init === "calculated" && forecast.length > 0 && accByCode.size === 0) { toast.error("Plan comptable non chargé : réessayez dans un instant."); return; }
@@ -199,8 +201,8 @@ export function BudgetForecastVersions({ year, status, forecast, canForecast, ca
   );
 }
 
-function NewVersionDialog({ year, versions, pending, onClose, onCreate }: {
-  year: string; versions: { id: string; name: string }[]; pending: boolean; onClose: () => void; onCreate: (name: string, init: Init) => void;
+function NewVersionDialog({ year, versions, pending, ready, onClose, onCreate }: {
+  year: string; versions: { id: string; name: string }[]; pending: boolean; ready: boolean; onClose: () => void; onCreate: (name: string, init: Init) => void;
 }) {
   const [name, setName] = useState("");
   const [init, setInit] = useState<Init>("calculated");
@@ -219,7 +221,8 @@ function NewVersionDialog({ year, versions, pending, onClose, onCreate }: {
             </select></div>
         </div>
         <DialogFooter><Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
-          <Button size="sm" disabled={!name.trim() || pending} onClick={() => onCreate(name.trim(), init)}>Créer la version</Button></DialogFooter>
+          <Button size="sm" disabled={!name.trim() || pending || (!ready && (init === "calculated" || init === "budget"))} onClick={() => onCreate(name.trim(), init)}>
+            {!ready && (init === "calculated" || init === "budget") ? "Chargement des chiffres…" : "Créer la version"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

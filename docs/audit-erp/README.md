@@ -47,6 +47,7 @@ Légende utilisée dans tous les livrables :
 | 21 | [21-ecrans-de-controle-et-parametres-reels.md](21-ecrans-de-controle-et-parametres-reels.md) | Lot 3 : contrôle du grand livre, limites et audit de trésorerie, rapports et seuils d'approbation réels ; écritures directes fermées (V106–V108) |
 | 22 | [22-notes-de-frais.md](22-notes-de-frais.md) | Lot 4 — notes de frais : catégories, règles, approbation, comptabilisation, remboursement ; avances, barèmes, devises, justificatifs (V109–V112) |
 | 23 | [23-projets.md](23-projets.md) | Lot 4 — projets : projet = section analytique, budget par compte, réalisé et engagé lus dans la comptabilité (V111) |
+| 24 | [24-conformite-et-risques.md](24-conformite-et-risques.md) | Lot 4 — conformité (référentiels, contrôles testés, constats) et risques (registre, évaluations inhérent / résiduel, appétence, actions) (V113) |
 
 ## Synthèse pour la direction
 

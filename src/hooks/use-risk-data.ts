@@ -1,78 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
-import { useTenantId } from "@/hooks/use-tenant";
-import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-export function useRiskRegister() {
-  return useQuery({
-    queryKey: ["risk-register"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("risk_register").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-}
-
-export function useRiskAssessments(riskId?: string) {
-  return useQuery({
-    queryKey: ["risk-assessments", riskId],
-    queryFn: async () => {
-      let q = supabase.from("risk_assessments").select("*");
-      if (riskId) q = q.eq("risk_id", riskId);
-      const { data, error } = await q.order("assessment_date", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-}
-
-export function useCreateRisk() {
-  const qc = useQueryClient();
-  const { data: tenantId } = useTenantId();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async (input: { risk_code: string; title: string; description?: string; category: string; likelihood?: number; impact?: number; owner?: string; mitigation_plan?: string }) => {
-      const { error } = await supabase.from("risk_register").insert({ ...input, tenant_id: tenantId!, created_by: user!.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["risk-register"] }); toast.success("Risque créé"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-export function useRiskKpis() {
-  const { data: risks = [] } = useRiskRegister();
-  const open = risks.filter(r => r.status === "open");
-  const critical = risks.filter(r => Number(r.risk_score) >= 16);
-  const high = risks.filter(r => Number(r.risk_score) >= 9 && Number(r.risk_score) < 16);
-  const mitigated = risks.filter(r => r.status === "mitigated").length;
-
-  return { risks, open, critical, high, mitigated };
-}
-
+/* Rôles du module Risques (les données sont dans use-grc.ts, V113). */
 // ---------- RBAC ----------
 import { ALL_RISK_ROLES, type RiskPerms, type RiskRole } from "@/lib/risk-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 
 export function useMyRiskRoles(): RiskPerms {
-  const { user } = useAuth();
-  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
-  // par has_role, d'où une logique encore par rôle.
-  const roles = useMyAccess().data?.roles ?? [];
-  const has = (r: RiskRole) => roles.includes(r);
-  const admin = has("risk_admin") || roles.includes("admin");
+  // Droits du catalogue de la société courante (V113 : risks.*).
+  const p = useMyAccess().data?.permissions ?? [];
+  const has = (c: string) => p.includes(c);
   return {
-    canCreate: admin || has("risk_owner"),
-    canEdit: admin || has("risk_owner"),
-    canAssess: admin || has("risk_assessor"),
-    canApprove: admin,
-    canClose: admin || has("risk_owner"),
-    canManageSettings: admin,
-    canExport: admin || has("risk_owner") || has("risk_assessor"),
-    canViewSensitive: admin || has("risk_owner") || has("risk_assessor"),
+    canCreate: has("risks.manage"), canEdit: has("risks.manage"), canAssess: has("risks.assess"), canApprove: has("risks.manage"),
+    canClose: has("risks.manage"), canManageSettings: has("risks.settings"), canExport: has("risks.export"),
+    canViewSensitive: has("risks.manage") || has("risks.assess") || has("risks.export"),
   };
 }
 

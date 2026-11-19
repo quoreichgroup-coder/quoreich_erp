@@ -1,81 +1,51 @@
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { useTableFeatures } from "@/hooks/use-table-features";
-import { SortableHead, FilterBar, PaginationBar } from "@/components/DataTableControls";
-import { useMyComplianceRoles } from "@/hooks/use-compliance-data";
-import { maskAmount } from "@/lib/compliance-roles";
+import { Kpis } from "@/components/GrcWidgets";
+import { useControls, useIssues } from "@/hooks/use-grc";
+import { isOverdue, SEVERITY } from "@/lib/grc";
 
-const auditFindings = [
-  { id: "AUD-2025-001", title: "Missing approval for JE > 10M XOF", severity: "High", status: "Open", dueDate: "2025-03-30", assignee: "A. Koné" },
-  { id: "AUD-2025-002", title: "SoD conflict: AP Clerk + Payment Approver", severity: "Critical", status: "In Remediation", dueDate: "2025-03-15", assignee: "M. Diallo" },
-  { id: "AUD-2025-003", title: "Unreconciled bank items > 30 days", severity: "Medium", status: "Open", dueDate: "2025-04-15", assignee: "S. Bamba" },
-  { id: "AUD-2025-004", title: "Lease classification review incomplete", severity: "Low", status: "Closed", dueDate: "2025-02-28", assignee: "B. Coulibaly" },
-];
+/* Conformité → Contrôle : contrôles déficients, jamais testés, tests échus, constats en retard ou graves. */
+const today = () => new Date().toISOString().slice(0, 10);
 
-const sodConflicts = [
-  { user: "J. Ouattara", role1: "AP Clerk", role2: "Payment Approver", severity: "Critical", status: "Active" },
-  { user: "F. Traoré", role1: "JE Creator", role2: "JE Approver", severity: "High", status: "Mitigated" },
-];
+function Liste({ titre, lignes, testId }: { titre: string; lignes: [string, string, string][]; testId: string }) {
+  return (
+    <div className="card-elevated" data-testid={testId}>
+      <h2 className="text-xs font-semibold p-2">{titre} ({lignes.length})</h2>
+      {lignes.length === 0 ? <p className="text-xs text-muted-foreground px-2 pb-3">Rien à signaler.</p> : (
+        <table className="w-full text-xs"><tbody>
+          {lignes.map(([a, b, c], i) => <tr key={i} className="border-t border-border/50"><td className="p-2 font-mono w-24">{a}</td><td>{b}</td><td className="text-right pr-3 text-muted-foreground">{c}</td></tr>)}
+        </tbody></table>
+      )}
+    </div>
+  );
+}
 
 export default function ComplianceControl() {
-  const perms = useMyComplianceRoles();
-  const table = useTableFeatures({
-    data: auditFindings, pageSize: 10, searchableKeys: ["title", "id", "assignee"],
-    filterConfigs: [
-      { key: "severity", label: "Severity", options: ["Critical", "High", "Medium", "Low"] },
-      { key: "status", label: "Status", options: ["Open", "In Remediation", "Closed"] },
-    ],
-  });
-
+  const { data: controls = [] } = useControls();
+  const { data: issues = [] } = useIssues();
+  const active = controls.filter((c) => c.is_active);
+  const code = new Map(controls.map((c) => [c.id, c.control_code]));
+  const deficient = active.filter((c) => c.status === "deficient" || c.status === "partially_effective");
+  const never = active.filter((c) => c.status === "not_tested");
+  const due = active.filter((c) => isOverdue(c.next_review_at, today()));
+  const open = issues.filter((i) => i.status !== "closed");
+  const late = open.filter((i) => isOverdue(i.due_date, today()));
+  const grave = open.filter((i) => i.severity === "high" || i.severity === "critical");
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Compliance", href: "/compliance" }, { label: "Control" }]} />
-      <GuidanceBanner title="Compliance Control" description="Audit findings, remediation tracking, and Segregation of Duties (SoD) conflicts." />
-
-      <h1 className="text-lg font-semibold text-foreground mb-4">Compliance Control</h1>
-
-      <Card className="border-border mb-4"><CardContent className="p-0">
-        <FilterBar search={table.search} onSearch={table.setSearch} filters={table.filters} onFilter={table.setFilter} onClear={table.clearFilters} filterConfigs={table.filterConfigs} activeCount={table.activeFilterCount} searchPlaceholder="Rechercher un finding…" />
-        <Table><TableHeader><TableRow className="bg-muted/30">
-          <SortableHead label="ID" sortKey="id" sort={table.sort} onSort={table.toggleSort} />
-          <SortableHead label="Finding" sortKey="title" sort={table.sort} onSort={table.toggleSort} />
-          <SortableHead label="Severity" sortKey="severity" sort={table.sort} onSort={table.toggleSort} />
-          <SortableHead label="Status" sortKey="status" sort={table.sort} onSort={table.toggleSort} />
-          <SortableHead label="Due Date" sortKey="dueDate" sort={table.sort} onSort={table.toggleSort} />
-          <SortableHead label="Assignee" sortKey="assignee" sort={table.sort} onSort={table.toggleSort} />
-        </TableRow></TableHeader>
-        <TableBody>{table.pagedData.map(f => (
-          <TableRow key={f.id} className="text-xs">
-            <TableCell className="font-mono text-primary">{f.id}</TableCell>
-            <TableCell className="font-medium">{f.title}</TableCell>
-            <TableCell><Badge variant={f.severity === "Critical" || f.severity === "High" ? "destructive" : "outline"} className="text-[10px]">{f.severity}</Badge></TableCell>
-            <TableCell><Badge variant={f.status === "Closed" ? "secondary" : "outline"} className="text-[10px]">{f.status}</Badge></TableCell>
-            <TableCell className="font-mono text-muted-foreground">{f.dueDate}</TableCell>
-            <TableCell className="text-muted-foreground">{maskAmount(perms, f.assignee)}</TableCell>
-          </TableRow>
-        ))}</TableBody></Table>
-        <PaginationBar page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} pageSize={table.pageSize} onPageChange={table.setPage} />
-      </CardContent></Card>
-
-      <Card className="border-border">
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">SoD Conflicts</CardTitle></CardHeader>
-        <CardContent className="p-4 pt-0 space-y-2">
-          {sodConflicts.map((c, i) => (
-            <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border text-xs ${c.severity === "Critical" ? "bg-destructive/5 border-destructive/20" : "bg-amber-500/5 border-amber-500/20"}`}>
-              <div className="flex-1">
-                <div className="font-medium">{maskAmount(perms, c.user)}</div>
-                <div className="text-muted-foreground">{c.role1} ↔ {c.role2}</div>
-              </div>
-              <Badge variant={c.severity === "Critical" ? "destructive" : "secondary"} className="text-[10px]">{c.severity}</Badge>
-              <Badge variant={c.status === "Active" ? "destructive" : "outline"} className="text-[10px]">{c.status}</Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <Breadcrumb items={[{ label: "Gouvernance" }, { label: "Conformité", href: "/compliance" }, { label: "Contrôle" }]} />
+      <GuidanceBanner title="Contrôle de la conformité" description="Ce qui doit être testé ou remédié, d'après les fréquences et les échéances des contrôles et constats." />
+      <h1 className="text-lg font-semibold">Conformité — Contrôle</h1>
+      <Kpis items={[["Contrôles déficients ou partiels", deficient.length, deficient.length > 0], ["Jamais testés", never.length], ["Tests échus", due.length, due.length > 0],
+        ["Constats en retard", late.length, late.length > 0], ["Constats graves ouverts", grave.length, grave.length > 0]]} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Liste testId="cc-deficient" titre="Contrôles déficients ou partiellement efficaces" lignes={deficient.map((c) => [c.control_code, c.title, c.last_tested_at?.slice(0, 10) ?? ""])} />
+        <Liste testId="cc-due" titre="Tests échus" lignes={due.map((c) => [c.control_code, c.title, c.next_review_at ?? ""])} />
+        <Liste testId="cc-never" titre="Contrôles jamais testés" lignes={never.map((c) => [c.control_code, c.title, ""])} />
+        <Liste testId="cc-late" titre="Constats en retard de remédiation" lignes={late.map((i) => [code.get(i.control_id) ?? "", i.title, i.due_date ?? ""])} />
+        <Liste testId="cc-grave" titre="Constats graves ouverts" lignes={grave.map((i) => [code.get(i.control_id) ?? "", i.title, SEVERITY[i.severity][1]])} />
+      </div>
     </PageShell>
   );
 }

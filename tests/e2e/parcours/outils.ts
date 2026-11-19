@@ -66,7 +66,7 @@ export function surveiller(page: Page) {
     /**
      * Refus métier ANNONCÉ dans l'étape courante (ex. un paramètre de la société qui interdit
      * l'action) : le refus du serveur qui porte ce motif, et la ligne de console que le navigateur
-     * écrit pour toute réponse 400, ne comptent pas comme incidents. Tout autre refus, oui.
+     * écrit pour toute réponse 400 ou 403, ne comptent pas comme incidents. Tout autre refus, oui.
      */
     refusAttendu(motif: RegExp) { attendus.push({ etape, motif }); },
     /** Incidents hors refus annoncés : c'est ce qu'un parcours exige vide. */
@@ -76,7 +76,7 @@ export function surveiller(page: Page) {
           .map((i) => i.quand));
       return incidents.filter((i) => {
         if (i.type === "refus-serveur") return !attendus.some((a) => a.etape === i.quand && a.motif.test(i.detail));
-        if (i.type === "erreur-console" && etapesTolerees.has(i.quand) && /status of 400/.test(i.detail)) return false;
+        if (i.type === "erreur-console" && etapesTolerees.has(i.quand) && /status of 40[03]/.test(i.detail)) return false;
         return true;
       });
     },

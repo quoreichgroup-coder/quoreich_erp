@@ -1,77 +1,56 @@
+import { useEffect, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { RiskRolesPanel } from "@/components/RiskRolesPanel";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useGrcPerms, useRiskSettings, useSaveRiskSettings } from "@/hooks/use-grc";
 
-const impactMatrix = [
-  { impact: "Critical", financial: "> 100M XOF", operational: "Business stoppage", compliance: "Regulatory sanction" },
-  { impact: "High", financial: "50-100M XOF", operational: "Major disruption", compliance: "Audit finding" },
-  { impact: "Medium", financial: "10-50M XOF", operational: "Moderate impact", compliance: "Process gap" },
-  { impact: "Low", financial: "< 10M XOF", operational: "Minor impact", compliance: "Documentation gap" },
-];
-
-const categories = ["Financial", "Operational", "Compliance", "Strategic", "Reputational"];
-
-const notifications = [
-  { trigger: "Risk score > 80", channel: "Email + SMS", recipients: "CFO, CRO" },
-  { trigger: "New critical incident", channel: "Immediate alert", recipients: "Board, CFO" },
-  { trigger: "Mitigation SLA breach", channel: "Email", recipients: "Risk Owner, CRO" },
-  { trigger: "Weekly risk summary", channel: "Email", recipients: "All executives" },
-];
-
+/* Risques → Paramètres : échelle de cotation, seuils de criticité, appétence, revue périodique ; rôles. */
 export default function RiskSettings() {
+  const perms = useGrcPerms();
+  const { data } = useRiskSettings();
+  const save = useSaveRiskSettings();
+  const [f, setF] = useState({ scale_max: "5", medium_from: "5", high_from: "10", critical_from: "15", appetite_score: "", review_days: "" });
+  useEffect(() => {
+    if (data) setF({ scale_max: String(data.scale_max), medium_from: String(data.medium_from), high_from: String(data.high_from), critical_from: String(data.critical_from),
+      appetite_score: data.appetite_score == null ? "" : String(data.appetite_score), review_days: data.review_days == null ? "" : String(data.review_days) });
+  }, [data]);
+  const n = (v: string) => Number(v);
+  const max = n(f.scale_max) ** 2;
+  const err = !(n(f.scale_max) >= 3 && n(f.scale_max) <= 10) ? "Échelle de 3 à 10."
+    : !(1 <= n(f.medium_from) && n(f.medium_from) <= n(f.high_from) && n(f.high_from) <= n(f.critical_from) && n(f.critical_from) <= max) ? `Seuils croissants, entre 1 et ${max}.`
+    : f.appetite_score && !(n(f.appetite_score) >= 1 && n(f.appetite_score) <= max) ? `Appétence entre 1 et ${max}.` : "";
+  const field = (k: keyof typeof f, label: string, hint?: string) => (
+    <div className="space-y-1"><label htmlFor={`rs-${k}`} className="text-xs font-medium">{label}</label>
+      <Input id={`rs-${k}`} inputMode="numeric" className="h-8 text-xs w-32" disabled={!perms.risksSettings} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}</div>
+  );
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Risk Management", href: "/risk" }, { label: "Settings" }]} />
-      <GuidanceBanner title="Risk Settings" description="Impact/probability matrices, thresholds, categories, and notification rules." />
-
-      <h1 className="text-lg font-semibold text-foreground mb-4">Risk Settings</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Impact Matrix</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 space-y-2">
-            {impactMatrix.map(m => (
-              <div key={m.impact} className="p-3 border border-border rounded text-xs">
-                <Badge variant={m.impact === "Critical" ? "destructive" : m.impact === "High" ? "secondary" : "outline"} className="text-[10px] mb-2">{m.impact}</Badge>
-                <div className="grid grid-cols-3 gap-2 text-muted-foreground">
-                  <div><span className="text-[10px]">Financial:</span> <span className="text-foreground">{m.financial}</span></div>
-                  <div><span className="text-[10px]">Operational:</span> <span className="text-foreground">{m.operational}</span></div>
-                  <div><span className="text-[10px]">Compliance:</span> <span className="text-foreground">{m.compliance}</span></div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Risk Categories</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="flex flex-wrap gap-2">
-                {categories.map(c => <Badge key={c} variant="outline" className="text-xs">{c}</Badge>)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border">
-            <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Notification Rules</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2">
-              {notifications.map((n, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 border border-border rounded text-xs">
-                  <div className="flex-1"><div className="font-medium">{n.trigger}</div><div className="text-muted-foreground">{n.channel}</div></div>
-                  <span className="text-muted-foreground">{n.recipients}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+      <Breadcrumb items={[{ label: "Gouvernance" }, { label: "Risques", href: "/risk" }, { label: "Paramètres" }]} />
+      <GuidanceBanner title="Paramètres des risques" description="Tout est propre à la société : aucune échelle ni appétence n'est imposée. Score = probabilité × impact." />
+      <h1 className="text-lg font-semibold">Risques — Paramètres</h1>
+      <section className="bg-card border border-border rounded-lg p-4 space-y-3" data-testid="risk-settings">
+        <h2 className="text-sm font-semibold">Échelle et seuils</h2>
+        <div className="flex flex-wrap gap-4">
+          {field("scale_max", "Échelle (probabilité et impact de 1 à)")}
+          {field("medium_from", "Modéré à partir du score")}
+          {field("high_from", "Élevé à partir du score")}
+          {field("critical_from", "Critique à partir du score")}
+          {field("appetite_score", "Appétence (score maximal toléré)", "Vide : pas d'alerte d'appétence.")}
+          {field("review_days", "Revue après évaluation (jours)", "Vide : date de revue saisie à la main.")}
         </div>
-      </div>
-
-      <section className="mt-6 space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Rôles & RBAC</h2>
+        {err && <p className="text-xs text-destructive">{err}</p>}
+        {perms.risksSettings ? (
+          <Button size="sm" disabled={Boolean(err) || save.isPending} onClick={() => save.mutate({ scale_max: n(f.scale_max), medium_from: n(f.medium_from), high_from: n(f.high_from),
+            critical_from: n(f.critical_from), appetite_score: f.appetite_score ? n(f.appetite_score) : null, review_days: f.review_days ? n(f.review_days) : null })}>Enregistrer</Button>
+        ) : <p className="text-xs text-muted-foreground">Droit « risks.settings » requis pour modifier.</p>}
+      </section>
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold">Rôles</h2>
+        <p className="text-xs text-muted-foreground">Droits du catalogue : risks.manage (registre, statut, actions), risks.assess (évaluation), risks.settings, risks.export.</p>
         <RiskRolesPanel />
       </section>
     </PageShell>

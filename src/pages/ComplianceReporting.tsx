@@ -1,76 +1,59 @@
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Download, Lock } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useMyComplianceRoles } from "@/hooks/use-compliance-data";
-import { canDo, actionTooltip } from "@/lib/compliance-roles";
+import { ExportButtons } from "@/components/ExportButtons";
+import { useControls, useControlTests, useFrameworks, useGrcPerms, useIssues } from "@/hooks/use-grc";
+import { CONTROL_STATUS, FREQUENCY, ISSUE_STATUS, SEVERITY, TEST_RESULT } from "@/lib/grc";
 
-const complianceTrend = [
-  { quarter: "Q1 2024", effectiveness: 58, findings: 8 },
-  { quarter: "Q2 2024", effectiveness: 63, findings: 6 },
-  { quarter: "Q3 2024", effectiveness: 70, findings: 5 },
-  { quarter: "Q4 2024", effectiveness: 72, findings: 4 },
-  { quarter: "Q1 2025", effectiveness: 67, findings: 4 },
-];
-
-const gapAnalysis = [
-  { area: "Journal Entry Controls", coverage: 95, gaps: 1, status: "Good" },
-  { area: "Access Management", coverage: 88, gaps: 2, status: "Adequate" },
-  { area: "Bank Reconciliation", coverage: 70, gaps: 3, status: "Needs Work" },
-  { area: "Revenue Recognition", coverage: 92, gaps: 1, status: "Good" },
-  { area: "Lease Accounting", coverage: 45, gaps: 4, status: "Critical" },
-  { area: "Procurement Controls", coverage: 60, gaps: 3, status: "Needs Work" },
-];
-
+/* Conformité → Rapports : matrice des contrôles, journal des tests et constats, exportables. */
 export default function ComplianceReporting() {
-  const perms = useMyComplianceRoles();
-  const canExport = canDo(perms, "export");
+  const perms = useGrcPerms();
+  const { data: frameworks = [] } = useFrameworks();
+  const { data: controls = [] } = useControls();
+  const { data: tests = [] } = useControlTests();
+  const { data: issues = [] } = useIssues();
+  const fw = new Map(frameworks.map((f) => [f.id, f.name]));
+  const ctl = new Map(controls.map((c) => [c.id, c]));
+  const matrix = controls.map((c) => ({ referentiel: fw.get(c.framework_id) ?? "", code: c.control_code, controle: c.title, processus: c.category ?? "", responsable: c.owner ?? "",
+    frequence: c.frequency ? FREQUENCY[c.frequency] : "Ponctuelle", etat: c.is_active ? CONTROL_STATUS[c.status][1] : "Inactif", dernier_test: c.last_tested_at?.slice(0, 10) ?? "",
+    echeance: c.next_review_at ?? "", constats_ouverts: issues.filter((i) => i.control_id === c.id && i.status !== "closed").length }));
+  const testRows = tests.map((t) => ({ date: t.test_date, code: ctl.get(t.control_id)?.control_code ?? "", controle: ctl.get(t.control_id)?.title ?? "", testeur: t.tester,
+    resultat: TEST_RESULT[t.result][1], anomalies: t.findings, constatations: t.notes ?? "" }));
+  const issueRows = issues.map((i) => ({ constat: i.title, code: ctl.get(i.control_id)?.control_code ?? "", gravite: SEVERITY[i.severity][1], responsable: i.owner ?? "",
+    echeance: i.due_date ?? "", etat: ISSUE_STATUS[i.status][1], remediation: i.closure_notes ?? "", cloture: i.closed_at?.slice(0, 10) ?? "" }));
+  const cols = (headers: Record<string, string>) => Object.keys(headers).map((key) => ({ key, header: headers[key] }));
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Compliance", href: "/compliance" }, { label: "Reporting" }]} />
-      <GuidanceBanner title="Compliance Reporting" description="Audit reports, compliance trends, and gap analysis." />
-
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Compliance Reporting</h1>
-        <Button size="sm" variant="outline" className="gap-1.5" disabled={!canExport} aria-label={actionTooltip(perms, "export", "Exporter PDF")} title={actionTooltip(perms, "export", "Exporter PDF")}>
-          {canExport ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}Export PDF
-        </Button>
-      </div>
-
-      <Card className="border-border mb-4">
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Compliance Effectiveness Trend</CardTitle></CardHeader>
-        <CardContent className="p-4 pt-0">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={complianceTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="quarter" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-              <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-              <Tooltip contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }} />
-              <Bar dataKey="effectiveness" name="Effectiveness %" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="findings" name="Open Findings" fill="hsl(var(--chart-3))" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border">
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Gap Analysis</CardTitle></CardHeader>
-        <CardContent className="p-4 pt-0 space-y-3">
-          {gapAnalysis.map(g => (
-            <div key={g.area} className="flex items-center gap-4 p-3 rounded-lg border border-border">
-              <div className="flex-1"><div className="text-xs font-medium">{g.area}</div></div>
-              <div className="w-28"><Progress value={g.coverage} className="h-1.5" /><div className="text-[10px] text-muted-foreground mt-0.5">{g.coverage}% coverage</div></div>
-              <div className="text-xs text-muted-foreground">{g.gaps} gaps</div>
-              <Badge className={`text-[10px] ${g.status === "Good" ? "bg-success/15 text-success border-success/20" : g.status === "Critical" ? "bg-destructive/15 text-destructive border-destructive/20" : "bg-amber-500/15 text-amber-700 border-amber-500/20"}`} variant="outline">{g.status}</Badge>
+      <Breadcrumb items={[{ label: "Gouvernance" }, { label: "Conformité", href: "/compliance" }, { label: "Rapports" }]} />
+      <GuidanceBanner title="Rapports de conformité" description="Matrice des contrôles avec leur dernier test, journal des tests et constats : la piste d'audit du contrôle interne." />
+      <h1 className="text-lg font-semibold">Conformité — Rapports</h1>
+      {!perms.complianceExport && <p className="text-xs text-muted-foreground">Droit « compliance.export » requis pour exporter.</p>}
+      {perms.complianceExport && (
+        <div className="grid gap-3 md:grid-cols-3">
+          {([["Matrice des contrôles", matrix, "matrice-des-controles", { referentiel: "Référentiel", code: "Code", controle: "Contrôle", processus: "Processus", responsable: "Responsable",
+              frequence: "Fréquence", etat: "État", dernier_test: "Dernier test", echeance: "Échéance", constats_ouverts: "Constats ouverts" }],
+            ["Journal des tests", testRows, "journal-des-tests", { date: "Date", code: "Code", controle: "Contrôle", testeur: "Testeur", resultat: "Résultat", anomalies: "Anomalies", constatations: "Constatations" }],
+            ["Constats", issueRows, "constats-de-conformite", { constat: "Constat", code: "Contrôle", gravite: "Gravité", responsable: "Responsable", echeance: "Échéance", etat: "État",
+              remediation: "Remédiation", cloture: "Clôturé le" }]] as const).map(([title, rows, file, headers]) => (
+            <div key={file} className="bg-card border border-border rounded-lg p-3 space-y-2">
+              <h2 className="text-sm font-semibold">{title}</h2>
+              <p className="text-xs text-muted-foreground">{rows.length} ligne(s)</p>
+              <ExportButtons label={title} rows={rows as unknown as Record<string, unknown>[]} filename={file} columns={cols(headers as Record<string, string>)} />
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      )}
+      <div className="card-elevated overflow-x-auto">
+        <table className="w-full text-xs" data-testid="compliance-matrix">
+          <thead><tr className="bg-muted/30 text-muted-foreground"><th className="text-left p-2">Référentiel</th><th className="text-left">Code</th><th className="text-left">Contrôle</th><th className="text-left">État</th>
+            <th className="text-left">Dernier test</th><th className="text-left">Échéance</th><th className="text-right pr-3">Constats ouverts</th></tr></thead>
+          <tbody>
+            {matrix.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Aucun contrôle.</td></tr>}
+            {matrix.map((m) => <tr key={`${m.referentiel}-${m.code}`} className="border-t border-border/50"><td className="p-2">{m.referentiel}</td><td className="font-mono">{m.code}</td><td>{m.controle}</td>
+              <td>{m.etat}</td><td>{m.dernier_test || "—"}</td><td>{m.echeance || "—"}</td><td className="text-right pr-3 tabular-nums">{m.constats_ouverts || ""}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
     </PageShell>
   );
 }

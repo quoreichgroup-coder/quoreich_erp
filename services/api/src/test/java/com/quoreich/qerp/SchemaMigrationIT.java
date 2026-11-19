@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "112";
+  private static final String DERNIERE_MIGRATION = "113";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -84,6 +84,9 @@ class SchemaMigrationIT {
           "user_roles/Admins update roles",
           "user_roles/Admins view all roles",
           "user_roles/Users can view own roles",
+          // V113 — FOR ALL à tout membre.
+          "risk_register/Tenant isolation", "risk_assessments/Access via risk", "compliance_frameworks/Tenant isolation",
+          "compliance_controls/Access via framework", "compliance_test_logs/Access via control",
           // V34 — FOR ALL à tout membre, annulait les politiques comptable / administrateur.
           "journal_lines/Access via entry",
           // V40 — paramètres des ventes : lecture pour tous, modification par l'administrateur.
@@ -284,7 +287,9 @@ class SchemaMigrationIT {
           // V111 — projets.
           "project_settings", "project_budget_lines",
           // V112 — barèmes et avances des notes de frais.
-          "expense_rates", "expense_advances", "expense_advance_movements");
+          "expense_rates", "expense_advances", "expense_advance_movements",
+          // V113 — conformité et risques.
+          "risk_settings", "risk_categories", "risk_actions", "risk_control_links", "compliance_settings", "compliance_issues");
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
@@ -621,7 +626,10 @@ class SchemaMigrationIT {
           // V111 — projets.
           "project_analytic_value", "guard_project", "guard_project_budget_line", "project_set_status", "project_financials", "project_ledger",
           // V112
-          "expense_advance_pay", "expense_advance_refund", "guard_expense_report_advance");
+          "expense_advance_pay", "expense_advance_refund", "guard_expense_report_advance",
+          // V113
+          "risk_setting", "guard_risk", "risk_assess", "risk_set_status", "sync_framework_counts", "guard_compliance_control",
+          "compliance_record_test", "compliance_issue_update");
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
@@ -889,7 +897,14 @@ class SchemaMigrationIT {
           "projects/Lecture société", "projects/Gestion habilitée", "project_costs/Lecture avec le projet",
           "project_settings/Lecture société", "project_settings/Paramétrage habilité", "project_budget_lines/Lecture société", "project_budget_lines/Budget habilité",
           // V112
-          "expense_rates/Lecture société", "expense_rates/Paramétrage habilité", "expense_advances/Lecture habilitée", "expense_advance_movements/Lecture habilitée");
+          "expense_rates/Lecture société", "expense_rates/Paramétrage habilité", "expense_advances/Lecture habilitée", "expense_advance_movements/Lecture habilitée",
+          // V113
+          "risk_register/Lecture société", "risk_register/Gestion habilitée", "risk_assessments/Lecture société", "risk_actions/Lecture société",
+          "risk_actions/Gestion habilitée", "risk_control_links/Lecture société", "risk_control_links/Gestion habilitée", "risk_categories/Lecture société",
+          "risk_categories/Paramétrage habilité", "risk_settings/Lecture société", "risk_settings/Paramétrage habilité",
+          "compliance_frameworks/Lecture société", "compliance_frameworks/Gestion habilitée", "compliance_controls/Lecture société",
+          "compliance_controls/Gestion habilitée", "compliance_test_logs/Lecture société", "compliance_issues/Lecture société",
+          "compliance_settings/Lecture société", "compliance_settings/Paramétrage habilité");
 
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
@@ -1038,7 +1053,9 @@ class SchemaMigrationIT {
           // V111
           "projects/trg_project_analytic_value", "projects/trg_guard_project", "project_budget_lines/trg_guard_project_budget_line",
           // V112
-          "expense_reports/trg_guard_expense_report_advance");
+          "expense_reports/trg_guard_expense_report_advance",
+          // V113
+          "risk_register/trg_guard_risk", "compliance_controls/trg_sync_framework_counts", "compliance_controls/trg_guard_compliance_control");
 
   /** V38 — synthèse des lots du grand livre. */
   private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view",

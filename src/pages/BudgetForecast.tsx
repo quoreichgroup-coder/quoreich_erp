@@ -151,7 +151,8 @@ export default function BudgetForecast() {
           </Card>
         </>
       )}
-      {validYear && <BudgetForecastVersions year={year} status={rows} forecast={allForecast} canForecast={canForecast} canExport={canExport} />}
+      {validYear && <BudgetForecastVersions year={year} status={rows} forecast={allForecast} canForecast={canForecast} canExport={canExport}
+        ready={!status.isFetching && !monthly.isFetching && status.isSuccess} />}
     </PageShell>
   );
 }

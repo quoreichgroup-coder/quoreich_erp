@@ -1,62 +1,57 @@
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, Clock, ShieldCheck } from "lucide-react";
-import { useMyRiskRoles } from "@/hooks/use-risk-data";
-import { maskAmount } from "@/lib/risk-roles";
+import { Loader2 } from "lucide-react";
+import { Kpis } from "@/components/GrcWidgets";
+import { useRiskActions, useRiskControlLinks, useRisks, useRiskSettings } from "@/hooks/use-grc";
+import { aboveAppetite, isOverdue, netScore } from "@/lib/grc";
 
-const mitigationPlans = [
-  { risk: "FX Exposure", plan: "Quarterly hedging review", sla: "30 days", progress: 80, status: "On Track", owner: "Treasury" },
-  { risk: "Credit Default", plan: "Monthly credit scoring", sla: "15 days", progress: 65, status: "On Track", owner: "AR" },
-  { risk: "Liquidity Shortfall", plan: "Reserve fund establishment", sla: "45 days", progress: 25, status: "At Risk", owner: "Treasury" },
-  { risk: "Regulatory Compliance", plan: "Compliance gap analysis", sla: "60 days", progress: 50, status: "On Track", owner: "Compliance" },
-  { risk: "Vendor Concentration", plan: "Secondary vendor program", sla: "90 days", progress: 30, status: "Delayed", owner: "Procurement" },
-];
+/* Risques → Contrôle : ce qui demande une décision (au-delà de l'appétence sans traitement, jamais évalués, revues et actions échues, sans contrôle). */
+const today = () => new Date().toISOString().slice(0, 10);
+
+function Liste({ titre, lignes, testId }: { titre: string; lignes: [string, string, string][]; testId: string }) {
+  return (
+    <div className="card-elevated" data-testid={testId}>
+      <h2 className="text-xs font-semibold p-2">{titre} ({lignes.length})</h2>
+      {lignes.length === 0 ? <p className="text-xs text-muted-foreground px-2 pb-3">Rien à signaler.</p> : (
+        <table className="w-full text-xs"><tbody>
+          {lignes.map(([a, b, c], i) => <tr key={i} className="border-t border-border/50"><td className="p-2 font-mono w-24">{a}</td><td>{b}</td><td className="text-right pr-3 text-muted-foreground">{c}</td></tr>)}
+        </tbody></table>
+      )}
+    </div>
+  );
+}
 
 export default function RiskControl() {
-  const perms = useMyRiskRoles();
+  const { data: risks = [], isLoading } = useRisks();
+  const { data: actions = [] } = useRiskActions();
+  const { data: links = [] } = useRiskControlLinks();
+  const { data: s } = useRiskSettings();
+  if (isLoading || !s) return <PageShell><div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin" /></div></PageShell>;
+  const open = risks.filter((r) => r.status !== "closed");
+  const code = new Map(risks.map((r) => [r.id, r.risk_code]));
+  const appetite = open.filter((r) => aboveAppetite(r, s) && r.status !== "treating");
+  const never = open.filter((r) => !r.last_assessed_at);
+  const reviews = open.filter((r) => isOverdue(r.review_date, today()));
+  const late = actions.filter((a) => a.status === "open" && isOverdue(a.due_date, today()));
+  const uncovered = open.filter((r) => r.last_assessed_at && !links.some((l) => l.risk_id === r.id));
+  const accepted = risks.filter((r) => r.status === "accepted");
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Risk Management", href: "/risk" }, { label: "Control" }]} />
-      <GuidanceBanner title="Risk Control" description="Mitigation plan tracking, SLA monitoring, and escalation management." />
-
-      <h1 className="text-lg font-semibold text-foreground mb-4">Risk Control</h1>
-
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShieldCheck className="w-3.5 h-3.5" />On Track</div>
-          <div className="text-xl font-bold text-success">{mitigationPlans.filter(p => p.status === "On Track").length}</div>
-        </CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle className="w-3.5 h-3.5" />At Risk</div>
-          <div className="text-xl font-bold text-amber-600">{mitigationPlans.filter(p => p.status === "At Risk").length}</div>
-        </CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Clock className="w-3.5 h-3.5" />Delayed</div>
-          <div className="text-xl font-bold text-destructive">{mitigationPlans.filter(p => p.status === "Delayed").length}</div>
-        </CardContent></Card>
+      <Breadcrumb items={[{ label: "Gouvernance" }, { label: "Risques", href: "/risk" }, { label: "Contrôle" }]} />
+      <GuidanceBanner title="Contrôle des risques" description="Points à traiter selon l'appétence et la revue périodique paramétrées par la société." />
+      <h1 className="text-lg font-semibold">Risques — Contrôle</h1>
+      <Kpis items={[["Au-delà de l'appétence sans traitement", appetite.length, appetite.length > 0], ["Jamais évalués", never.length], ["Revues échues", reviews.length, reviews.length > 0],
+        ["Actions en retard", late.length, late.length > 0], ["Évalués sans contrôle", uncovered.length]]} />
+      {s.appetite_score == null && <p className="text-xs text-muted-foreground">Appétence non paramétrée : la renseigner dans les paramètres pour signaler les risques à traiter.</p>}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Liste testId="risk-control-appetite" titre="Au-delà de l'appétence, sans traitement" lignes={appetite.map((r) => [r.risk_code, r.title, `score ${netScore(r)} > ${s.appetite_score}`])} />
+        <Liste testId="risk-control-reviews" titre="Revues échues" lignes={reviews.map((r) => [r.risk_code, r.title, r.review_date ?? ""])} />
+        <Liste testId="risk-control-actions" titre="Actions en retard" lignes={late.map((a) => [code.get(a.risk_id) ?? "", a.title, a.due_date ?? ""])} />
+        <Liste testId="risk-control-never" titre="Jamais évalués" lignes={never.map((r) => [r.risk_code, r.title, r.created_at.slice(0, 10)])} />
+        <Liste testId="risk-control-uncovered" titre="Évalués sans contrôle rattaché" lignes={uncovered.map((r) => [r.risk_code, r.title, ""])} />
+        <Liste testId="risk-control-accepted" titre="Risques acceptés (motif)" lignes={accepted.map((r) => [r.risk_code, r.title, r.status_reason ?? ""])} />
       </div>
-
-      <Card className="border-border">
-        <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Mitigation Plans</CardTitle></CardHeader>
-        <CardContent className="p-4 pt-0 space-y-3">
-          {mitigationPlans.map((p, i) => (
-            <div key={i} className="flex items-center gap-4 p-3 rounded-lg border border-border">
-              <div className="flex-1">
-                <div className="text-xs font-medium">{p.risk}</div>
-                <div className="text-[10px] text-muted-foreground">{p.plan}</div>
-              </div>
-              <div className="w-24"><Progress value={p.progress} className="h-1.5" /><div className="text-[10px] text-muted-foreground mt-0.5">{p.progress}%</div></div>
-              <div className="text-xs text-muted-foreground">SLA: {p.sla}</div>
-              <Badge className={`text-[10px] ${p.status === "On Track" ? "bg-success/15 text-success border-success/20" : p.status === "At Risk" ? "bg-amber-500/15 text-amber-700 border-amber-500/20" : "bg-destructive/15 text-destructive border-destructive/20"}`} variant="outline">{p.status}</Badge>
-              <div className="text-[10px] text-muted-foreground">{maskAmount(perms, p.owner)}</div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </PageShell>
   );
 }
