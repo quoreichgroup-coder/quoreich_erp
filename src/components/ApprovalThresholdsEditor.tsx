@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { apiDelete, apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Seuils d'approbation (V39 achats, V41 fournisseurs ; écriture protégée par V108) : un niveau par ligne,
@@ -36,6 +37,7 @@ export function ApprovalThresholdsEditor({ kind }: { kind: Kind }) {
     queryKey: ["approval-thresholds", kind, tenantId],
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<Row[]> => {
+      if (isApiEnabled()) return apiGet<Row[]>(`/api/v1/approval-thresholds/${kind}`);
       const { data, error } = await db.from(c.table).select("*").eq("tenant_id", tenantId).order("max_amount", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return data ?? [];
@@ -44,9 +46,10 @@ export function ApprovalThresholdsEditor({ kind }: { kind: Kind }) {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["approval-thresholds", kind] });
   const save = useMutation({
     mutationFn: async (r: Partial<Row> & { id?: string }) => {
-      const tenant_id = await fetchTenantId();
       const row: Record<string, unknown> = { level: r.level?.trim(), approver: r.approver?.trim(), max_amount: r.max_amount, sla_hours: r.sla_hours };
       if (kind === "procurement") row.doc_type = r.doc_type; else if (kind === "ap") row.doc_types = "factures";
+      if (isApiEnabled()) { await (r.id ? apiPut(`/api/v1/approval-thresholds/${kind}/${r.id}`, row) : apiPost(`/api/v1/approval-thresholds/${kind}`, row)); return; }
+      const tenant_id = await fetchTenantId();
       const { data, error } = r.id
         ? await db.from(c.table).update(row).eq("id", r.id).select("id")
         : await db.from(c.table).insert({ ...row, tenant_id }).select("id");
@@ -58,6 +61,7 @@ export function ApprovalThresholdsEditor({ kind }: { kind: Kind }) {
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/approval-thresholds/${kind}/${id}`); return; }
       const { data, error } = await db.from(c.table).delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error(`Droit « ${c.right} » requis.`);

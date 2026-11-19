@@ -19,6 +19,7 @@ import {
 } from "@/hooks/use-ap-data";
 import { DEFAULT_BUDGET_SETTINGS, useBudgetControlSettings, useBudgetStatus } from "@/hooks/use-budget-control";
 import { consumed, consumptionPct } from "@/lib/budget-forecast";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const tabs = [
   { id: "validation", label: "File de validation", icon: Clock },
@@ -213,6 +214,16 @@ function useAPPendingApprovals() {
     retry: false,
     queryFn: async () => {
       const db = supabase as any;
+      if (isApiEnabled()) {
+        const rows = await apiGet<any[]>("/api/v1/ap/pending-approvals");
+        const seenApi = new Set<string>();
+        return rows.filter((r) => r.invoice?.approval_status === "submitted" && !seenApi.has(r.invoice_id) && seenApi.add(r.invoice_id)).map((r) => ({
+          id: r.id as string, invoice_number: r.invoice?.invoice_number ?? "", supplier: r.invoice?.supplier?.name ?? "", amount: Number(r.amount),
+          level_label: r.level_label as string, approver_label: r.approver_label as string, created_at: r.created_at as string,
+          elapsed_hours: Math.max(0, Math.round((Date.now() - new Date(r.created_at).getTime()) / 3600000)),
+          sla_hours: r.sla_hours == null ? null : Number(r.sla_hours),
+        }));
+      }
       const [a, t] = await Promise.all([
         db.from("ap_invoice_approvals").select("id, invoice_id, level_order, level_label, approver_label, amount, created_at, status,"
           + " invoice:ap_invoices(invoice_number, approval_status, supplier:suppliers(name))").eq("tenant_id", tenantId).eq("status", "pending").order("level_order"),

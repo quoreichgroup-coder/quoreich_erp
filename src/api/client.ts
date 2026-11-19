@@ -85,8 +85,14 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return (await authorizedFetch(path, { method: "PUT", body: JSON.stringify(body) })).json() as Promise<T>;
 }
 
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  return (await authorizedFetch(path, { method: "PATCH", body: JSON.stringify(body) })).json() as Promise<T>;
+}
+
 export async function apiDelete<T>(path: string): Promise<T> {
-  return (await authorizedFetch(path, { method: "DELETE" })).json() as Promise<T>;
+  const response = await authorizedFetch(path, { method: "DELETE" });
+  // 204 : pas de corps (suppressions des modules portés aux lots 3 à 5).
+  return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
 /** Télécharge un CSV servi par l'API (avec jeton : un simple lien `<a href>` n'en porte pas). */

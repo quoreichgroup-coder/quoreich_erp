@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Retours et avoirs fournisseurs (V52). Les tables sont en lecture seule pour l'application :
@@ -34,7 +35,7 @@ export function useSupplierReturns() {
     queryKey: ["supplier-returns", tenantId],
     enabled: !!tenantId,
     queryFn: async (): Promise<SupplierReturn[]> => {
-      const { data, error } = await (supabase as any).from("supplier_returns")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/procurement/supplier-returns"), error: null } : await (supabase as any).from("supplier_returns")
         .select("*, supplier:suppliers(name), gr:goods_receipts(gr_number), po:purchase_orders(po_number),"
           + " credit_note:ap_credit_notes!supplier_returns_credit_note_id_fkey(credit_note_number), lines:supplier_return_lines(*)")
         .order("return_date", { ascending: false }).order("created_at", { ascending: false });
@@ -55,6 +56,8 @@ export function useCreateSupplierReturn() {
       grId: string; reason: string; date: string; lines: { gr_line_id: string; quantity: number }[];
       replacement: boolean; invoiceId: string | null; supplierReference: string;
     }) => {
+      if (isApiEnabled()) return apiPost<string>("/api/v1/procurement/supplier-returns", { gr_id: p.grId, reason: p.reason, return_date: p.date, lines: p.lines,
+        replacement_expected: p.replacement, ap_invoice_id: p.invoiceId, supplier_reference: p.supplierReference || null });
       const { data, error } = await (supabase as any).rpc("create_supplier_return", {
         _gr_id: p.grId, _reason: p.reason, _return_date: p.date, _lines: p.lines, _replacement_expected: p.replacement,
         _ap_invoice_id: p.invoiceId, _supplier_reference: p.supplierReference || null,
@@ -74,6 +77,8 @@ export function useCreditSupplierReturn() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (p: { returnId: string; invoiceId: string; supplierReference: string; date: string }) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/procurement/supplier-returns/${p.returnId}/credit`, { invoice_id: p.invoiceId,
+        supplier_reference: p.supplierReference || null, credit_date: p.date }); return; }
       const { error } = await (supabase as any).rpc("credit_supplier_return", {
         _return_id: p.returnId, _invoice_id: p.invoiceId, _supplier_reference: p.supplierReference || null, _credit_date: p.date,
       });
@@ -93,6 +98,12 @@ export function useAPCreditNotes(invoiceId?: string) {
     queryKey: ["ap-credit-notes", tenantId, invoiceId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<APCreditNote[]> => {
+      if (isApiEnabled()) {
+        const data = await apiGet<any[]>(`/api/v1/ap/credit-notes${invoiceId ? `?invoiceId=${invoiceId}` : ""}`);
+        return data.map((r: any) => ({ ...r, subtotal: Number(r.subtotal), tax_amount: Number(r.tax_amount), total: Number(r.total),
+          amount_allocated: Number(r.amount_allocated), invoice_number: r.invoice?.invoice_number ?? "", supplier_name: r.supplier?.name ?? "",
+          return_number: r.supplier_return?.return_number ?? null }));
+      }
       let q = (supabase as any).from("ap_credit_notes")
         .select("*, invoice:ap_invoices(invoice_number), supplier:suppliers(name),"
           + " supplier_return:supplier_returns!ap_credit_notes_supplier_return_id_fkey(return_number)")
@@ -113,6 +124,8 @@ export function useCreateAPCreditNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (p: { invoiceId: string; reason: string; date: string; subtotal: number; tax: number; supplierReference: string }) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/ap/invoices/${p.invoiceId}/credit-notes`, { reason: p.reason, credit_date: p.date, subtotal: p.subtotal,
+        tax_amount: p.tax, supplier_reference: p.supplierReference || null }); return; }
       const { error } = await (supabase as any).rpc("create_ap_credit_note", {
         _invoice_id: p.invoiceId, _reason: p.reason, _credit_date: p.date, _subtotal: p.subtotal, _tax_amount: p.tax,
         _supplier_reference: p.supplierReference || null,

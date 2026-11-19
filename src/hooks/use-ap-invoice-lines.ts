@@ -4,6 +4,7 @@ import { saveDocumentAnalytics, saveLineAnalytics, type LineAnalytics } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Factures fournisseurs à lignes (V72) : en-tête puis lignes (l'en-tête est recalculé par la base) ;
@@ -34,6 +35,7 @@ export function useAPInvoiceLines(invoiceId: string | null) {
     queryKey: ["ap-invoice-lines", invoiceId],
     enabled: !!invoiceId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<APInvoiceLine[]>(`/api/v1/ap/invoices/${invoiceId}/lines`);
       const { data, error } = await db.from("ap_invoice_lines").select("*").eq("invoice_id", invoiceId).order("line_no");
       if (error) throw error;
       return (data ?? []) as APInvoiceLine[];
@@ -46,7 +48,9 @@ export function usePOLinesToInvoice(poId: string | null, exceptInvoice?: string 
     queryKey: ["ap-po-lines-to-invoice", poId, exceptInvoice ?? null],
     enabled: !!poId,
     queryFn: async () => {
-      const { data, error } = await db.rpc("ap_po_lines_to_invoice", { _po: poId, _except: exceptInvoice ?? null });
+      const { data, error } = isApiEnabled()
+        ? { data: await apiGet<any[]>(`/api/v1/ap/purchase-orders/${poId}/lines-to-invoice${exceptInvoice ? `?except=${exceptInvoice}` : ""}`), error: null }
+        : await db.rpc("ap_po_lines_to_invoice", { _po: poId, _except: exceptInvoice ?? null });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({ ...r, unit_cost: Number(r.unit_cost), ordered: Number(r.ordered), received: Number(r.received),
         invoiced: Number(r.invoiced), remaining: Number(r.remaining) })) as POLineToInvoice[];
@@ -59,8 +63,16 @@ export function useSaveAPInvoiceWithLines() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (v: { id?: string; header: APInvoiceHeader; lines: APLineInput[]; analytics?: Record<string, string> }) => {
-      const tenantId = await fetchTenantId();
       if (v.lines.length === 0) throw new Error("Au moins une ligne de facture");
+      if (isApiEnabled()) {
+        // Sur site : en-tête, lignes et sections en une transaction (un refus n'en laisse rien).
+        const body = { header: v.header, analytics: v.analytics ?? null, lines: v.lines.map((l) => ({ description: l.description.trim(), quantity: l.quantity,
+          unit_price: l.unit_price, discount_pct: l.discount_pct || 0, tax_code_id: l.tax_code_id || null, po_line_id: l.po_line_id || null,
+          expense_account_id: l.expense_account_id || null, analytics: l.analytics ?? null })) };
+        const r = v.id ? await apiPut<{ id: string }>(`/api/v1/ap/invoices/${v.id}/with-lines`, body) : await apiPost<{ id: string }>("/api/v1/ap/invoices/with-lines", body);
+        return r.id;
+      }
+      const tenantId = await fetchTenantId();
       if (v.id) {
         const { data, error } = await db.from("ap_invoices").update(v.header).eq("id", v.id).select("id");
         if (error) throw error;

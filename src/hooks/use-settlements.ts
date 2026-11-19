@@ -39,6 +39,11 @@ export function useRecordSettlement(kind: SettlementKind) {
         }
         return;
       }
+      if (kind === "ap" && isApiEnabled()) {
+        await apiPost("/api/v1/ap/settlements", { party_id: s.partyId, payment_date: s.paymentDate, payment_method: s.paymentMethod, reference: s.reference,
+          allocations: s.allocations, bank_account_id: s.bankAccountId ?? null });
+        return;
+      }
       const { error } = await (supabase as any).rpc("record_settlement", {
         _kind: kind,
         _party_id: s.partyId,

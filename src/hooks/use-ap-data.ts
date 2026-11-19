@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
+
+/* Sur site (VITE_QERP_API_URL), chaque accès passe par l'API Java /api/v1/ap (lot 3) ; sinon par Supabase. */
+const AP = "/api/v1/ap";
 
 // ─── Types ───
 export interface Supplier {
@@ -62,6 +66,7 @@ export function useSuppliers() {
   return useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Supplier[]>(`${AP}/suppliers`);
       const { data, error } = await supabase
         .from("suppliers")
         .select("*")
@@ -76,6 +81,7 @@ export function useCreateSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (s: Omit<Supplier, "id" | "tenant_id" | "created_at">) => {
+      if (isApiEnabled()) return apiPost<Supplier>(`${AP}/suppliers`, s);
       const tenant_id = await fetchTenantId();
       const { data, error } = await (supabase as any).from("suppliers").insert({
         ...s,
@@ -96,6 +102,7 @@ export function useUpdateSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Supplier> & { id: string }) => {
+      if (isApiEnabled()) { await apiPatch(`${AP}/suppliers/${id}`, updates); return; }
       const { data, error } = await (supabase as any).from("suppliers").update(updates).eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Modification refusée : réservée à l'administrateur, au comptable et aux acheteurs.");
@@ -113,6 +120,7 @@ export function useVerifySupplierBank() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost(`${AP}/suppliers/${id}/verify-bank`, {}); return; }
       const { error } = await (supabase as any).rpc("verify_supplier_bank_details", { _supplier_id: id });
       if (error) throw error;
     },
@@ -131,6 +139,7 @@ export function useSupplierChangeLog(supplierId?: string) {
     queryKey: ["supplier-change-log", supplierId],
     enabled: !!supplierId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<{ id: number; field: string; old_value: string | null; new_value: string | null; changed_at: string }[]>(`${AP}/suppliers/${supplierId}/change-log`);
       const { data, error } = await (supabase as any).from("supplier_change_log").select("*")
         .eq("supplier_id", supplierId).order("id", { ascending: false }).limit(50);
       if (error) throw error;
@@ -143,6 +152,7 @@ export function useDeleteSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`${AP}/suppliers/${id}`); return; }
       const { data, error } = await (supabase as any).from("suppliers").delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Suppression refusée : réservée à l'administrateur et au comptable (un fournisseur cité par une pièce se désactive).");
@@ -160,6 +170,7 @@ export function useAPInvoices() {
   return useQuery({
     queryKey: ["ap-invoices"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<APInvoice[]>(`${AP}/invoices`);
       const { data, error } = await supabase
         .from("ap_invoices")
         .select("*, supplier:suppliers(id, name, payment_terms, legal_name, address, city, country, tax_id, rccm)")
@@ -184,6 +195,7 @@ export function useCreateAPInvoice() {
       total: number;
       po_id?: string | null;
     }) => {
+      if (isApiEnabled()) return apiPost<APInvoice>(`${AP}/invoices`, inv);
       const tenant_id = await fetchTenantId();
       const { data, error } = await supabase.from("ap_invoices").insert({
         ...inv,
@@ -208,6 +220,7 @@ export function useUpdateAPInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; status?: string; approval_status?: string; amount_paid?: number }) => {
+      if (isApiEnabled()) { await apiPatch(`${AP}/invoices/${id}`, updates); return; }
       const { error } = await supabase.from("ap_invoices").update(updates).eq("id", id);
       if (error) throw error;
     },
@@ -229,6 +242,7 @@ export function useRecordAPPayment() {
       reference: string;
     }) => {
       // DB triggers handle JE posting + invoice recompute. Approval guard enforced server-side.
+      if (isApiEnabled()) { await apiPost(`${AP}/payments`, payment); return; }
       const tenant_id = await fetchTenantId();
       const { error: payError } = await supabase.from("payments").insert({
         ...payment,
@@ -263,6 +277,7 @@ export function useAPGeneralSettings() {
   return useQuery({
     queryKey: ["ap-general-settings"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any>(`${AP}/settings/general`);
       const tenant_id = await ensureAPSeed();
       const { data, error } = await sb.from("ap_general_settings").select("*").eq("tenant_id", tenant_id).maybeSingle();
       if (error) throw error;
@@ -274,6 +289,7 @@ export function useUpdateAPGeneralSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (updates: any) => {
+      if (isApiEnabled()) { await apiPut(`${AP}/settings/general`, updates); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ap_general_settings").update({ ...updates, updated_at: new Date().toISOString() }).eq("tenant_id", tenant_id);
       if (error) throw error;
@@ -288,6 +304,7 @@ export function useAPNumberingSeries() {
   return useQuery({
     queryKey: ["ap-numbering-series"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/settings/numbering`);
       await ensureAPSeed();
       const { data, error } = await sb.from("ap_numbering_series").select("*").order("doc_type");
       if (error) throw error;
@@ -299,6 +316,7 @@ export function useUpdateAPNumberingSeries() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: any) => {
+      if (isApiEnabled()) { await apiPatch(`${AP}/settings/numbering/${id}`, updates); return; }
       const { error } = await sb.from("ap_numbering_series").update(updates).eq("id", id);
       if (error) throw error;
     },
@@ -312,6 +330,7 @@ export function useAPPaymentMethods() {
   return useQuery({
     queryKey: ["ap-payment-methods"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/settings/payment-methods`);
       await ensureAPSeed();
       const { data, error } = await sb.from("ap_payment_methods").select("*").order("code");
       if (error) throw error;
@@ -323,6 +342,7 @@ export function useUpsertAPPaymentMethod() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (m: any) => {
+      if (isApiEnabled()) { await apiPut(`${AP}/settings/payment-methods`, m); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ap_payment_methods").upsert({ ...m, tenant_id }, { onConflict: "tenant_id,code" });
       if (error) throw error;
@@ -337,6 +357,7 @@ export function useAPWithholdingRates() {
   return useQuery({
     queryKey: ["ap-withholding-rates"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/settings/withholding-rates`);
       await ensureAPSeed();
       const { data, error } = await sb.from("ap_withholding_rates").select("*").order("category");
       if (error) throw error;
@@ -348,6 +369,7 @@ export function useUpsertAPWithholdingRate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (r: any) => {
+      if (isApiEnabled()) { await (r.id ? apiPatch(`${AP}/settings/withholding-rates/${r.id}`, r) : apiPost(`${AP}/settings/withholding-rates`, r)); return; }
       const tenant_id = await fetchTenantId();
       const { error } = r.id
         ? await sb.from("ap_withholding_rates").update(r).eq("id", r.id)
@@ -364,6 +386,7 @@ export function useAPNotificationRules() {
   return useQuery({
     queryKey: ["ap-notification-rules"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/settings/notification-rules`);
       await ensureAPSeed();
       const { data, error } = await sb.from("ap_notification_rules").select("*").order("created_at");
       if (error) throw error;
@@ -377,6 +400,7 @@ export function useAPApprovalThresholds() {
   return useQuery({
     queryKey: ["ap-approval-thresholds"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/settings/approval-thresholds`);
       await ensureAPSeed();
       const { data, error } = await sb.from("ap_approval_thresholds").select("*").order("sla_hours");
       if (error) throw error;
@@ -389,6 +413,7 @@ export function useAPAuditTrail(limit = 100) {
   return useQuery({
     queryKey: ["ap-audit-trail", limit],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`${AP}/audit-trail?limit=${limit}`);
       const { data, error } = await sb
         .from("gl_audit_logs")
         .select("*")
@@ -416,6 +441,7 @@ export function useAPAging() {
   return useQuery({
     queryKey: ["ap-aging"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<APAgingRow[]>(`${AP}/aging`);
       const { data, error } = await sb.from("ap_aging_view").select("*").order("days_overdue", { ascending: false });
       if (error) throw error;
       return (data || []) as APAgingRow[];
@@ -445,6 +471,7 @@ export function useAPInvoiceApprovals() {
   return useQuery({
     queryKey: ["ap-invoice-approvals"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<APInvoiceApproval[]>(`${AP}/invoice-approvals`);
       const { data, error } = await (supabase as any).from("ap_invoice_approvals").select("*").order("level_order");
       if (error) throw error;
       return (data ?? []) as APInvoiceApproval[];
@@ -456,6 +483,7 @@ export function useSubmitAPInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) return apiPost<number>(`${AP}/invoices/${id}/submit`, {});
       const { data, error } = await (supabase as any).rpc("ap_invoice_submit", { _id: id });
       if (error) throw error;
       return data as number;
@@ -469,6 +497,7 @@ export function useDecideAPInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ approvalId, approve, comment }: { approvalId: string; approve: boolean; comment?: string }) => {
+      if (isApiEnabled()) { await apiPost(`${AP}/invoice-approvals/${approvalId}/decision`, { approve, comment: comment ?? null }); return approve; }
       const { error } = await (supabase as any).rpc("ap_invoice_decide", {
         _approval_id: approvalId, _approve: approve, _comment: comment ?? null,
       });
@@ -485,6 +514,7 @@ export function useDeleteAPInvoiceDraft() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`${AP}/invoices/${id}`); return; }
       const { data, error } = await (supabase as any).from("ap_invoices").delete().eq("id", id).select("id");
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("Facture introuvable ou non supprimable.");

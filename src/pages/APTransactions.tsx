@@ -42,6 +42,7 @@ import {
 } from "@/hooks/use-ap-data";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { apiDelete, apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 const fmtCurrency = (n: number) => `${fmt(n)} XOF`;
@@ -287,12 +288,14 @@ function APBulkBar({ sel, approvals }: { sel: Selection<APInvoice>; approvals: A
       ], "factures-fournisseurs-selection", "Factures fournisseurs")}>Exporter</ExportMenu>
       <BulkButton count={editables.length} label="Soumettre" disabled={bulk.isPending}
         onClick={() => go(editables, `Soumettre ${editables.length} facture(s) à l'approbation ? (contrôles commande / réception appliqués à chacune)`, "facture(s) soumise(s)",
-          async (id) => check(await db.rpc("ap_invoice_submit", { _id: id })))} />
+          async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/ap/invoices/${id}/submit`, {}); return; } check(await db.rpc("ap_invoice_submit", { _id: id })); })} />
       <BulkButton count={aDecider.length} label="Approuver le niveau en cours" disabled={bulk.isPending}
         onClick={() => go(aDecider, `Approuver le niveau en cours de ${aDecider.length} facture(s) ? (refusé pour vos propres factures et sans le droit du niveau)`, "approbation(s) enregistrée(s)",
-          async (id) => check(await db.rpc("ap_invoice_decide", { _approval_id: pendingOf(id)!.id, _approve: true, _comment: "Approbation groupée" })))} />
+          async (id) => { if (isApiEnabled()) { await apiPost(`/api/v1/ap/invoice-approvals/${pendingOf(id)!.id}/decision`, { approve: true, comment: "Approbation groupée" }); return; }
+            check(await db.rpc("ap_invoice_decide", { _approval_id: pendingOf(id)!.id, _approve: true, _comment: "Approbation groupée" })); })} />
       <BulkButton count={editables.length} label="Supprimer" danger disabled={bulk.isPending}
         onClick={() => go(editables, `Supprimer ${editables.length} facture(s) non soumise(s) ?`, "facture(s) supprimée(s)", async (id) => {
+          if (isApiEnabled()) { await apiDelete(`/api/v1/ap/invoices/${id}`); return; }
           const { data, error } = await db.from("ap_invoices").delete().eq("id", id).select("id");
           if (error) throw new Error(error.message);
           if (!data?.length) throw new Error("Facture introuvable ou non supprimable.");
@@ -378,6 +381,7 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["ap-payments", "all"],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/ap/payments");
       const { data, error } = await (supabase as any).from("payments")
         .select("id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, ap_invoice_id, invoice:ap_invoices(invoice_number, supplier:suppliers(name))")
         .eq("payment_type", "ap_payment").order("payment_date", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
@@ -388,6 +392,7 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
   // Annulation d'un paiement : contre-passation motivée (V42, droit ap.reverse_payment).
   const reverse = useMutation({
     mutationFn: async ({ id, motif }: { id: string; motif: string }) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/ap/payments/${id}/reversal`, { reason: motif, reversal_date: new Date().toISOString().split("T")[0] }); return; }
       const { error } = await (supabase as any).rpc("reverse_settlement", { _payment_id: id, _reason: motif, _reversal_date: new Date().toISOString().split("T")[0] });
       if (error) throw error;
     },
