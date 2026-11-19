@@ -40,10 +40,11 @@ function useMovements(customerId: string) {
           out.push({ date: p.paymentDate, piece: p.reference || "—", label: amount < 0 ? `Annulation d'encaissement (${byId.get(p.invoiceId)})` : `Encaissement (${byId.get(p.invoiceId)})`,
             debit: amount < 0 ? -amount : 0, credit: amount > 0 ? amount : 0 });
         }
-        const notes = await apiGet<ApiSchemas["ArCreditNoteView"][]>("/api/v1/ar/invoices/credit-notes");
-        for (const n of notes.filter((n) => n.customerId === customerId)) {
-          out.push({ date: n.creditDate, piece: n.creditNoteNumber, label: `Avoir sur ${n.invoiceNumber} — ${n.reason}`, debit: 0, credit: Number(n.total) });
+        const src = await apiGet<{ creditNotes: any[]; advances: any[]; refunds: any[] }>(`/api/v1/ar/customers/${customerId}/statement-sources`);
+        for (const n of src.creditNotes) {
+          out.push({ date: n.credit_date, piece: n.credit_note_number, label: `Avoir sur ${n.invoice?.invoice_number ?? ""} — ${n.reason}`, debit: 0, credit: Number(n.total) });
         }
+        statementExtras(out, src.advances, src.refunds);
         return out;
       }
       if (mine.length > 0) {
@@ -70,16 +71,21 @@ function useMovements(customerId: string) {
       ]);
       if (ae) throw ae;
       if (re) throw re;
-      for (const a of adv ?? []) {
-        out.push({ date: a.received_date, piece: a.advance_number, label: `Acompte reçu${a.reference ? ` (${a.reference})` : ""}`, debit: 0, credit: Number(a.amount) });
-      }
-      for (const r of refunds ?? []) {
-        out.push({ date: r.refund_date, piece: r.reference || "—", label: r.source_type === "advance" ? "Remboursement d'acompte" : "Remboursement d'avoir",
-          debit: Number(r.amount), credit: 0 });
-      }
+      statementExtras(out, adv ?? [], refunds ?? []);
       return out;
     },
   });
+}
+
+/** V49 : acomptes reçus (crédit du client) et remboursements (débit), communs aux deux chemins. */
+function statementExtras(out: StatementMovement[], adv: any[], refunds: any[]) {
+  for (const a of adv) {
+    out.push({ date: a.received_date, piece: a.advance_number, label: `Acompte reçu${a.reference ? ` (${a.reference})` : ""}`, debit: 0, credit: Number(a.amount) });
+  }
+  for (const r of refunds) {
+    out.push({ date: r.refund_date, piece: r.reference || "—", label: r.source_type === "advance" ? "Remboursement d'acompte" : "Remboursement d'avoir",
+      debit: Number(r.amount), credit: 0 });
+  }
 }
 
 export function CustomerStatementDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

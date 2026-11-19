@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 /*
  * Qui détient quels rôles système d'un module, dans la société courante — lu dans la matrice
@@ -21,6 +22,14 @@ export async function fetchRoleMembers(tenantId: string, codes: readonly string[
   const map = new Map<string, string[]>();
   if (codes.length === 0) return map;
   // Toutes les pages : une liste tronquée ferait disparaître des membres sans le dire.
+  if (isApiEnabled()) {
+    for (const r of await apiGet<{ user_id: string; code: string }[]>(`/api/v1/role-members?codes=${codes.join(",")}`)) {
+      const list = map.get(r.user_id) ?? [];
+      if (!list.includes(r.code)) list.push(r.code);
+      map.set(r.user_id, list);
+    }
+    return map;
+  }
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db
       .from("user_role_assignments")

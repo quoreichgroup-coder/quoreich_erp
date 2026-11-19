@@ -29,6 +29,7 @@ import { useReverseLastDepreciation } from "@/hooks/use-asset-accounting";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToCSV } from "@/lib/csv-export";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
@@ -37,7 +38,7 @@ function useDepreciationEntries() {
   return useQuery({
     queryKey: ["depreciation-entries"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/depreciation-entries"), error: null } : await supabase
         .from("depreciation_entries")
         .select("*, asset:assets(name, asset_code)")
         .order("period_date", { ascending: false });

@@ -25,6 +25,8 @@ export class ApiHttpError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** SQLSTATE du refus de la base, quand l'API le transmet (ex. « QG007 », « 23505 »). */
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiHttpError";
@@ -54,8 +56,10 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
     // Message par défaut quand le serveur n'en donne pas (401 et 403 de la couche sécurité
     // arrivent sans corps) : dire à l'utilisateur quoi faire, pas seulement le code.
     let message = defaultMessage(response.status);
+    let code: string | undefined;
     try {
-      const body = (await response.json()) as { error?: string; status?: number; path?: string };
+      const body = (await response.json()) as { error?: string; status?: number; path?: string; code?: string };
+      code = body.code;
       // Seuls les refus rédigés par l'API ({"error": "…"}) sont affichés tels quels. Le corps
       // d'erreur par défaut de Spring ({"status", "error": "Not Found", "path"}) n'est qu'un
       // libellé HTTP en anglais : on garde le message par défaut, qui dit quoi faire.
@@ -68,7 +72,7 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
     } catch {
       /* corps absent ou non JSON : on garde le message par défaut */
     }
-    throw new ApiHttpError(response.status, message);
+    throw new ApiHttpError(response.status, message, code);
   }
   return response;
 }

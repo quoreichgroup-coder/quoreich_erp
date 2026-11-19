@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId, fetchTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 /* Immobilisations (V75) : amortissements, cessions, catégories et paramètres. Écritures par fonctions. */
 const db = supabase as any;
 const KEYS = ["assets", "asset-kpis", "assets-register", "depreciation-entries", "depreciation-runs", "asset-disposals", "asset-categories", "asset-settings", "journal-entries"];
 const invalidate = (qc: ReturnType<typeof useQueryClient>) => { for (const k of KEYS) qc.invalidateQueries({ queryKey: [k] }); };
 const rpc = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/assets/actions/${name}`, args);
   const { data, error } = await db.rpc(name, args);
   if (error) throw error;
   return data;
@@ -55,7 +57,7 @@ export function useDepreciationRuns() {
     queryKey: ["depreciation-runs", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await db.from("depreciation_runs").select("*").eq("tenant_id", tenantId).order("period", { ascending: false }).limit(24);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/depreciation-runs"), error: null } : await db.from("depreciation_runs").select("*").eq("tenant_id", tenantId).order("period", { ascending: false }).limit(24);
       if (error) throw error;
       return (data ?? []) as { id: string; period: string; assets_count: number; total: number; status: string; reversal_reason: string | null }[];
     },
@@ -71,7 +73,7 @@ export function useAssetCategoriesV75() {
     queryKey: ["asset-categories", "v75", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await db.from("asset_categories").select("*").eq("tenant_id", tenantId).order("name");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/categories"), error: null } : await db.from("asset_categories").select("*").eq("tenant_id", tenantId).order("name");
       if (error) throw error;
       return (data ?? []) as AssetCategory[];
     },
@@ -82,6 +84,7 @@ export function useSaveAssetCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: Omit<AssetCategory, "id"> & { id?: string }) => {
+      if (isApiEnabled()) { const { id, ...row } = v; await (id ? apiPatch(`/api/v1/assets/categories/${id}`, row) : apiPost("/api/v1/assets/categories", row)); return; }
       const tenantId = await fetchTenantId();
       const { id, ...row } = v;
       const q = id ? db.from("asset_categories").update(row).eq("id", id) : db.from("asset_categories").insert({ ...row, tenant_id: tenantId });
@@ -101,7 +104,7 @@ export function useAssetSettings() {
     queryKey: ["asset-settings", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await db.from("asset_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/assets/settings"), error: null } : await db.from("asset_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return (data ?? { declining_coef_short: 1.5, declining_coef_mid: 2, declining_coef_long: 2.5, first_month_prorata: true }) as AssetSettings;
     },
@@ -111,6 +114,7 @@ export function useSaveAssetSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: AssetSettings) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/assets/settings", v); return; }
       const tenantId = await fetchTenantId();
       const { data, error } = await db.from("asset_settings").upsert({ tenant_id: tenantId, ...v, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;

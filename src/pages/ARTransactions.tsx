@@ -35,7 +35,7 @@ import { CreditNoteDialog, CreditNotesList } from "@/components/ARCreditNotes";
 import { CustomerStatementDialog } from "@/components/CustomerStatement";
 import { AdvanceDialog, CustomerCreditsList, InvoiceCredits } from "@/components/ARCustomerCredits";
 import { useARLetterings } from "@/hooks/use-ar-credits";
-import { apiDownloadCsv, isApiEnabled } from "@/api/client";
+import { apiDownloadCsv, apiGet, isApiEnabled } from "@/api/client";
 import { exportToCSV } from "@/lib/csv-export";
 import { AnalyticSelectors } from "@/components/AnalyticSelectors";
 import { useAnalyticsSetup, useCustomerAnalyticDefaults } from "@/hooks/use-analytics-setup";
@@ -351,9 +351,9 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
               ["Reste à payer", fmtCurrency(outstanding), true],
             ]}
           />
-          {inv.status === "draft" && isWriter && !isApiEnabled() && <DraftActions inv={inv} onDone={onClose} />}
+          {inv.status === "draft" && isWriter && <DraftActions inv={inv} onDone={onClose} />}
           <InvoicePayments inv={inv} canReverse={perms.has("ar.reverse_receipt")} />
-          {!isApiEnabled() && <InvoiceCredits inv={inv} canApply={perms.has("ar.receipt")} />}
+          {<InvoiceCredits inv={inv} canApply={perms.has("ar.receipt")} />}
           <CreditNotesList invoiceId={inv.id} />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
         </div>
@@ -380,8 +380,8 @@ function ReceiptsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
   const [search, setSearch] = useState("");
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["ar-payments", "all-receipts"],
-    enabled: !isApiEnabled(),
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/ar/receipts");
       const { data, error } = await (supabase as any).from("payments")
         .select("id, payment_date, amount, payment_method, reference, reversal_of, reversal_reason, ar_invoice_id, invoice:ar_invoices(invoice_number, customer:customers(name))")
         .eq("payment_type", "ar_receipt").order("payment_date", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
@@ -389,9 +389,6 @@ function ReceiptsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
       return (data ?? []) as any[];
     },
   });
-  if (isApiEnabled()) {
-    return <p className="text-xs text-muted-foreground p-4">Sur site, les encaissements se consultent dans le panneau de chaque facture (liste globale par l'API à venir).</p>;
-  }
   const reversed = new Set(rows.filter((r) => r.reversal_of).map((r) => r.reversal_of));
   const q = search.trim().toLowerCase();
   const shown = rows.filter((r) => !q || `${r.reference ?? ""} ${r.invoice?.invoice_number ?? ""} ${r.invoice?.customer?.name ?? ""}`.toLowerCase().includes(q));
@@ -534,7 +531,7 @@ export default function ARTransactions() {
         <div className="flex items-center gap-2">
           {isWriter && <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Créer facture</Button>}
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
-          {canReceive && !isApiEnabled() && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}><Receipt className="w-3.5 h-3.5" /> Acompte client</Button>}
+          {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}><Receipt className="w-3.5 h-3.5" /> Acompte client</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setStatementOpen(true)}><BookOpen className="w-3.5 h-3.5" /> Relevé de compte</Button>
           <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => void handleExport(f)}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
         </div>
@@ -546,7 +543,7 @@ export default function ARTransactions() {
           <TabsTrigger value="invoices">Factures ({invoices.length})</TabsTrigger>
           <TabsTrigger value="receipts">Encaissements</TabsTrigger>
           <TabsTrigger value="credit-notes">Avoirs</TabsTrigger>
-          {!isApiEnabled() && <TabsTrigger value="credits">Acomptes et crédits</TabsTrigger>}
+          {<TabsTrigger value="credits">Acomptes et crédits</TabsTrigger>}
           <TabsTrigger value="posting">Comptabilisation</TabsTrigger>
         </TabsList>
 
@@ -584,7 +581,7 @@ export default function ARTransactions() {
               { key: "regle", header: "Réglé" }, { key: "reste", header: "Reste dû" }, { key: "statut", header: "Statut" }], "factures-clients-selection")}>
               Exporter la sélection
             </ExportMenu>
-            {isWriter && !isApiEnabled() && brouillons.length > 0 && (
+            {isWriter && brouillons.length > 0 && (
               <>
                 <Button size="sm" variant="outline" className="h-7 text-xs" disabled={bulk.isPending}
                   onClick={() => { if (window.confirm(`Émettre ${brouillons.length} brouillon(s) ? Le numéro légal et l'écriture seront attribués.`)) bulk.mutate({ ids: brouillons, action: "emit" }, { onSuccess: () => setSelectedIds(new Set()) }); }}>
@@ -665,13 +662,11 @@ export default function ARTransactions() {
           </div>
         </TabsContent>
 
-        {!isApiEnabled() && (
-          <TabsContent value="credits">
-            <div className="rounded-md border border-border bg-card p-4">
-              <CustomerCreditsList canRefund={(access?.permissions ?? []).includes("ar.refund")} />
-            </div>
-          </TabsContent>
-        )}
+        <TabsContent value="credits">
+          <div className="rounded-md border border-border bg-card p-4">
+            <CustomerCreditsList canRefund={(access?.permissions ?? []).includes("ar.refund")} />
+          </div>
+        </TabsContent>
 
         <TabsContent value="posting" className="space-y-4">
           <div className="flex items-center gap-2">

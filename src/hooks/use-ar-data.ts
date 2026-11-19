@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
-import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
+import { ApiHttpError, apiDelete, apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 import type { ApiSchemas } from "@/api";
 import { toARInvoice } from "@/lib/ar-api-mapping";
 
@@ -28,7 +28,7 @@ export function useARPaymentTerms() {
   return useQuery({
     queryKey: ["ar-payment-terms"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_payment_terms").select("*").order("days");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/settings/payment-terms"), error: null } : await sb.from("ar_payment_terms").select("*").order("days");
       if (error) throw error;
       return (data || []) as ARPaymentTerm[];
     },
@@ -39,6 +39,7 @@ export function useUpsertARPaymentTerm() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (term: Partial<ARPaymentTerm> & { code: string; label: string; days: number }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/ar/settings/payment-terms", term); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ar_payment_terms").upsert({ ...term, tenant_id }, { onConflict: "tenant_id,code" });
       if (error) throw error;
@@ -53,6 +54,11 @@ function useDeleteARSetting(table: string, key: string, label: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) {
+        const kind = table === "ar_payment_terms" ? "payment-terms" : table === "ar_dunning_rules" ? "dunning-rules" : "notification-rules";
+        try { await apiDelete(`/api/v1/ar/settings/${kind}/${id}`); } catch (e) { if (e instanceof ApiHttpError && e.code === "23503") throw new Error(`${label} est utilisé par des pièces : désactivez-le plutôt.`); throw e; }
+        return;
+      }
       const { data, error } = await sb.from(table).delete().eq("id", id).select("id");
       if (error) {
         if (error.code === "23503") throw new Error(`${label} est utilisé par des pièces : désactivez-le plutôt.`);
@@ -83,7 +89,7 @@ export function useARNumberingSeries() {
   return useQuery({
     queryKey: ["ar-numbering-series"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_numbering_series").select("*").order("doc_type");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/numbering"), error: null } : await sb.from("ar_numbering_series").select("*").order("doc_type");
       if (error) throw error;
       return (data || []) as ARNumberingSeries[];
     },
@@ -94,6 +100,7 @@ export function useUpdateARNumberingSeries() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ARNumberingSeries> & { id: string }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/ar/numbering/${id}`, updates); return; }
       const { error } = await sb.from("ar_numbering_series").update(updates).eq("id", id);
       if (error) throw error;
     },
@@ -118,7 +125,7 @@ export function useARDunningRules() {
   return useQuery({
     queryKey: ["ar-dunning-rules"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_dunning_rules").select("*").order("level");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/settings/dunning-rules"), error: null } : await sb.from("ar_dunning_rules").select("*").order("level");
       if (error) throw error;
       return (data || []) as ARDunningRule[];
     },
@@ -129,6 +136,7 @@ export function useUpsertARDunningRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (rule: Partial<ARDunningRule> & { level: number; days_overdue: number; action: string }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/ar/settings/dunning-rules", rule); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ar_dunning_rules").upsert({ ...rule, tenant_id }, { onConflict: "tenant_id,level" });
       if (error) throw error;
@@ -154,7 +162,7 @@ export function useARNotificationRules() {
   return useQuery({
     queryKey: ["ar-notification-rules"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_notification_rules").select("*").order("created_at", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/settings/notification-rules"), error: null } : await sb.from("ar_notification_rules").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as ARNotificationRule[];
     },
@@ -165,6 +173,7 @@ export function useUpsertARNotificationRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (rule: Partial<ARNotificationRule> & { trigger_condition: string; channel: string; recipients: string }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/ar/settings/notification-rules", rule); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ar_notification_rules").upsert({ ...rule, tenant_id });
       if (error) throw error;
@@ -178,6 +187,7 @@ export function useToggleARNotificationRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/ar/settings/notification-rules", { id, is_active }); return; }
       const { error } = await sb.from("ar_notification_rules").update({ is_active }).eq("id", id);
       if (error) throw error;
     },
@@ -203,7 +213,7 @@ export function useARNotificationLog(limit = 50) {
   return useQuery({
     queryKey: ["ar-notification-log", limit],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_notification_log").select("*").order("sent_at", { ascending: false }).limit(limit);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/ar/notification-log?limit=${limit}`), error: null } : await sb.from("ar_notification_log").select("*").order("sent_at", { ascending: false }).limit(limit);
       if (error) throw error;
       return (data || []) as ARNotificationLogEntry[];
     },
@@ -225,6 +235,7 @@ export function usePeriodLocks(module?: string) {
   return useQuery({
     queryKey: ["period-locks", module],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<PeriodLock[]>(`/api/v1/period-locks${module ? `?module=${module}` : ""}`);
       let q = sb.from("period_locks").select("*").order("period", { ascending: false });
       if (module) q = q.eq("module", module);
       const { data, error } = await q;
@@ -244,6 +255,7 @@ export function useTogglePeriodLock() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ period, module, close, reason }: { period: string; module: string; close: boolean; reason?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/fiscal-calendar/period-status", { period, module, status: close ? "closed" : "open", reason: reason ?? null }); return; }
       const { error } = await sb.rpc("set_period_status", {
         _period: period, _module: module, _status: close ? "closed" : "open", _reason: reason ?? null,
       });
@@ -273,7 +285,7 @@ export function useARGeneralSettings() {
   return useQuery({
     queryKey: ["ar-general-settings"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_general_settings").select("*").maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/ar/general-settings"), error: null } : await sb.from("ar_general_settings").select("*").maybeSingle();
       if (error) throw error;
       return data as ARGeneralSettings | null;
     },
@@ -284,6 +296,7 @@ export function useUpdateARGeneralSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (updates: Partial<ARGeneralSettings>) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/ar/general-settings", updates); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("ar_general_settings").upsert({ tenant_id, ...updates });
       if (error) throw error;
@@ -309,7 +322,7 @@ export function useARCreditExposure() {
   return useQuery({
     queryKey: ["ar-credit-exposure"],
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_credit_exposure_view").select("*").order("outstanding", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/credit-exposure"), error: null } : await sb.from("ar_credit_exposure_view").select("*").order("outstanding", { ascending: false });
       if (error) throw error;
       return (data || []) as ARCreditExposureRow[];
     },
@@ -336,7 +349,7 @@ export function useReportTemplates(module: string) {
   return useQuery({
     queryKey: ["report-templates", module],
     queryFn: async () => {
-      const { data, error } = await sb.from("report_templates").select("*").eq("module", module).order("created_at", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/report-templates?module=${module}`), error: null } : await sb.from("report_templates").select("*").eq("module", module).order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as ReportTemplate[];
     },
@@ -348,6 +361,7 @@ export function useSaveReportTemplate() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (tpl: Partial<ReportTemplate> & { module: string; name: string; data_source: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/report-templates", tpl); return; }
       const tenant_id = await fetchTenantId();
       const { error } = await sb.from("report_templates").insert({ ...tpl, tenant_id, created_by: user?.id });
       if (error) throw error;
@@ -361,6 +375,7 @@ export function useDeleteReportTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/report-templates/${id}`); return; }
       const { error } = await sb.from("report_templates").delete().eq("id", id);
       if (error) throw error;
     },
@@ -546,6 +561,7 @@ export function useEmitARInvoice() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/ar/drafts/${id}/emit`, {}); return; }
       const { error } = await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", id).eq("status", "draft");
       if (error) throw error;
     },
@@ -562,6 +578,7 @@ export function useDeleteARDraft() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/ar/drafts/${id}`); return; }
       const { error } = await supabase.from("ar_invoices").delete().eq("id", id).eq("status", "draft");
       if (error) throw error;
     },
@@ -584,6 +601,11 @@ export function useBulkARDrafts() {
       const echecs: string[] = [];
       let ok = 0;
       for (const id of ids) {
+        if (isApiEnabled()) {
+          try { await (action === "emit" ? apiPost(`/api/v1/ar/drafts/${id}/emit`, {}) : apiDelete(`/api/v1/ar/drafts/${id}`)); ok++; }
+          catch (e) { echecs.push(e instanceof Error ? e.message : String(e)); }
+          continue;
+        }
         const { data, error } = action === "emit"
           ? await supabase.from("ar_invoices").update({ status: "sent" }).eq("id", id).eq("status", "draft").select("invoice_number")
           : await supabase.from("ar_invoices").delete().eq("id", id).eq("status", "draft").select("invoice_number");
@@ -607,6 +629,7 @@ export function useSetARDraftLineTax() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ lineId, taxCodeId }: { lineId: string; taxCodeId: string | null }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/ar/draft-lines/${lineId}/tax`, { tax_code_id: taxCodeId }); return; }
       const { error } = await (supabase as any).from("ar_invoice_lines").update({ tax_code_id: taxCodeId }).eq("id", lineId);
       if (error) throw error;
     },
@@ -623,6 +646,7 @@ export function useARPayments(invoiceId?: string) {
   return useQuery({
     queryKey: ["ar-payments", invoiceId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Payment[]>(`/api/v1/ar/payments${invoiceId ? `?invoiceId=${invoiceId}` : ""}`);
       let q = supabase.from("payments").select("*").eq("payment_type", "ar_receipt");
       if (invoiceId) q = q.eq("ar_invoice_id", invoiceId);
       const { data, error } = await q.order("created_at", { ascending: false });
@@ -814,8 +838,10 @@ export function useCustomers() {
     queryKey: ["customers", source],
     queryFn: async () => {
       if (source === "api") {
-        const rows = await apiGet<ApiSchemas["CustomerView"][]>("/api/v1/customers");
-        return rows.map(customerFromApi);
+        const [rows, sets] = await Promise.all([apiGet<ApiSchemas["CustomerView"][]>("/api/v1/customers"),
+          apiGet<{ id: string; account_set_id: string | null }[]>("/api/v1/customers/account-sets")]);
+        const setOf = new Map(sets.map((r) => [r.id, r.account_set_id]));
+        return rows.map((c) => ({ ...customerFromApi(c), account_set_id: setOf.get(c.id) ?? null }));
       }
       const { data, error } = await supabase
         .from("customers")
@@ -846,7 +872,11 @@ export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (c: Omit<Customer, "id" | "tenant_id" | "created_at">) => {
-      if (isApiEnabled()) return apiPost("/api/v1/customers", customerToApi(c));
+      if (isApiEnabled()) {
+        const created = await apiPost<{ id: string }>("/api/v1/customers", customerToApi(c));
+        if (c.account_set_id) await apiPatch(`/api/v1/customers/${created.id}/account-set`, { account_set_id: c.account_set_id });
+        return created;
+      }
       const tenant_id = await fetchTenantId();
       const { data, error } = await (supabase as any).from("customers").insert({
         ...c,
@@ -867,7 +897,11 @@ export function useUpdateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Customer> & { id: string }) => {
-      if (isApiEnabled()) { await apiPut(`/api/v1/customers/${id}`, customerToApi(updates)); return; }
+      if (isApiEnabled()) {
+        if (updates.name !== undefined) await apiPut(`/api/v1/customers/${id}`, customerToApi(updates));
+        if (updates.account_set_id !== undefined) await apiPatch(`/api/v1/customers/${id}/account-set`, { account_set_id: updates.account_set_id || null });
+        return;
+      }
       const { data, error } = await (supabase as any).from("customers").update(updates).eq("id", id).select("id");
       if (error) throw error;
       // RLS (V48) : une modification sans droit ne touche aucune ligne, sans erreur.
@@ -886,7 +920,7 @@ export function useSetCustomersStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: "active" | "inactive" }) => {
-      if (isApiEnabled()) throw new Error("Sur site, le statut d'une fiche client se change fiche par fiche (API à venir).");
+      if (isApiEnabled()) return ((await apiPost<any>("/api/v1/customers/status", { ids, status })) as unknown[] | object, ids.length);
       const { data, error } = await supabase.from("customers").update({ status }).in("id", ids).select("id");
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("Droit insuffisant : modification des fiches clients refusée.");
@@ -904,7 +938,13 @@ export function useDeleteCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      if (isApiEnabled()) throw new Error("Sur site, un client ne se supprime pas : ses pièces y restent rattachées.");
+      if (isApiEnabled()) {
+        try { await apiDelete(`/api/v1/customers/${id}`); } catch (e) {
+          if (e instanceof ApiHttpError && e.code === "23503") throw new Error("Ce client a des pièces (devis, commandes, factures) : désactivez-le au lieu de le supprimer.");
+          throw e;
+        }
+        return;
+      }
       const { data, error } = await supabase.from("customers").delete().eq("id", id).select("id");
       if (error) {
         if (error.code === "23503") throw new Error("Ce client a des pièces (devis, commandes, factures) : désactivez-le au lieu de le supprimer.");
@@ -941,7 +981,7 @@ export function useARAging() {
   return useQuery({
     queryKey: ["ar-aging"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/aging"), error: null } : await (supabase as any)
         .from("ar_aging_view")
         .select("*")
         .order("days_overdue", { ascending: false });

@@ -28,6 +28,7 @@ import { useMyFixedAssetRoles } from "@/hooks/use-fixed-assets-data";
 import { actionTooltip, canDo, maskAmount } from "@/lib/fixed-assets-roles";
 import { exportToCSV } from "@/lib/csv-export";
 import { toast } from "sonner";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
 
@@ -43,7 +44,7 @@ function AssetSheetPrint({ asset }: { asset: any }) {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["asset-depreciation-entries", asset.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("depreciation_entries")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/assets/depreciation-entries?assetId=${asset.id}`), error: null } : await (supabase as any).from("depreciation_entries")
         .select("period_date, amount, accumulated, net_book_value, kind, entry:journal_entries(piece_number)")
         .eq("asset_id", asset.id).order("period_date");
       if (error) throw error;

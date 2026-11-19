@@ -16,7 +16,7 @@ async function choisirDepot(depot: Locator) {
 
 test("S3 connecté : catalogue des campagnes", async ({ page }) => {
   const [response] = await Promise.all([
-    page.waitForResponse((r) => new URL(r.url()).pathname.endsWith("/rpc/inventory_campaign_catalog"), { timeout: 75_000 }),
+    page.waitForResponse((r) => /\/(rpc|actions)\/inventory_campaign_catalog$/.test(new URL(r.url()).pathname), { timeout: 75_000 }),
     ouvrir(page, "/inventory/transactions?tab=campaign-catalog"),
   ]);
   await expect(page.getByRole("heading", { name: "Catalogue des campagnes" })).toBeVisible();

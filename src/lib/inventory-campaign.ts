@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { invAudit, invRpc } from "@/lib/inventory-api";
 
 export type InventoryCampaignItem = { item_id: string; code: string; name: string; unit: string };
 export type InventoryCampaignPolicy = { percent: number | null; value: number | null };
@@ -87,7 +88,7 @@ export async function inventoryCampaignControl<Result>(
   id: string,
   count?: { item: string; quantity: number },
 ): Promise<Result> {
-  const { data, error } = await supabase.rpc("inventory_campaign_control" as never, {
+  const { data, error } = await invRpc("inventory_campaign_control", {
     _action: action, _id: id, ...(count ? { _item: count.item, _quantity: count.quantity } : {}),
   } as never);
   if (error) throw new Error(error.message);
@@ -95,7 +96,7 @@ export async function inventoryCampaignControl<Result>(
 }
 
 export async function inventoryCampaignPolicy(tenantId: string, policy?: InventoryCampaignPolicy): Promise<InventoryCampaignPolicy> {
-  const { data, error } = await supabase.rpc("inventory_campaign_policy" as never, (policy
+  const { data, error } = await invRpc("inventory_campaign_policy", (policy
     ? { _action: "save", _percent: policy.percent, _value: policy.value, _expected_tenant: tenantId }
     : { _action: "read", _expected_tenant: tenantId }) as never);
   if (error) throw new Error(error.message);
@@ -103,7 +104,7 @@ export async function inventoryCampaignPolicy(tenantId: string, policy?: Invento
 }
 
 export async function inventoryCampaignNumbering(tenantId: string, series?: CampaignNumbering): Promise<CampaignNumbering> {
-  const { data, error } = await supabase.rpc("inventory_campaign_numbering" as never, (series
+  const { data, error } = await invRpc("inventory_campaign_numbering", (series
     ? { _action: "save", _prefix: series.prefix, _width: series.width, _next: series.next, _expected_tenant: tenantId }
     : { _action: "read", _expected_tenant: tenantId }) as never);
   if (error) throw new Error(error.message);
@@ -113,7 +114,7 @@ export async function inventoryCampaignNumbering(tenantId: string, series?: Camp
 export async function fetchCampaignCatalog(
   tenantId: string, filters: CampaignCatalogFilters, cursor: CampaignCatalogCursor | null = null, forExport = false,
 ): Promise<CampaignCatalogPage> {
-  const { data, error } = await supabase.rpc("inventory_campaign_catalog" as never, {
+  const { data, error } = await invRpc("inventory_campaign_catalog", {
     _warehouse: filters.warehouse || null, _state: filters.state || null, _search: filters.search.trim() || null,
     _before: cursor?.opened_at ?? null, _before_id: cursor?.id ?? null, _export: forExport, _expected_tenant: tenantId,
   } as never);
@@ -122,7 +123,7 @@ export async function fetchCampaignCatalog(
 }
 
 export async function previewCampaignScope(tenantId: string, warehouse: string): Promise<{ item_scope: CampaignItemScope; articles: number }> {
-  const { data, error } = await supabase.rpc("inventory_campaign_preview" as never, {
+  const { data, error } = await invRpc("inventory_campaign_preview", {
     _warehouse: warehouse, _expected_tenant: tenantId,
   } as never);
   if (error) throw new Error(error.message);
@@ -130,7 +131,7 @@ export async function previewCampaignScope(tenantId: string, warehouse: string):
 }
 
 export async function fetchCampaignTimeline(tenantId: string, campaign: string): Promise<CampaignEvent[]> {
-  const { data, error } = await supabase.rpc("inventory_campaign_timeline" as never, {
+  const { data, error } = await invRpc("inventory_campaign_timeline", {
     _campaign: campaign, _expected_tenant: tenantId,
   } as never);
   if (error) throw new Error(error.message);
@@ -138,7 +139,7 @@ export async function fetchCampaignTimeline(tenantId: string, campaign: string):
 }
 
 export async function saveInventoryCampaignCounts<Result>(campaign: string, stage: CampaignStage, entries: CampaignCountEntry[]) {
-  const { data, error } = await supabase.rpc("inventory_campaign_save_counts" as never, {
+  const { data, error } = await invRpc("inventory_campaign_save_counts", {
     _campaign: campaign, _stage: stage, _entries: entries,
   } as never);
   if (error) throw new Error(error.message);

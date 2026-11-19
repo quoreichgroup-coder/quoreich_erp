@@ -17,7 +17,7 @@ async function seConnecter(page: Page, ids: NonNullable<typeof auteur>) {
 
 async function droits(page: Page, route: string) {
   const [response] = await Promise.all([
-    page.waitForResponse((r) => new URL(r.url()).pathname.endsWith("/rpc/my_access"), { timeout: 70_000 }),
+    page.waitForResponse((r) => /\/rpc\/my_access$|\/authorizations\/me$/.test(new URL(r.url()).pathname), { timeout: 70_000 }),
     page.goto(route),
   ]);
   await verifierSocieteE2E(page, 60_000);
@@ -71,7 +71,7 @@ test("Trésorerie : audit en lecture seule, filtre Attribution et export", async
   const permissions = await droits(page, "/treasury/settings");
   expect(permissions.has("treasury.export")).toBe(true);
   const [response] = await Promise.all([
-    page.waitForResponse((r) => new URL(r.url()).pathname.endsWith("/rest/v1/treasury_role_audit")),
+    page.waitForResponse((r) => /\/rest\/v1\/treasury_role_audit$|\/treasury\/role-audit$/.test(new URL(r.url()).pathname)),
     page.getByRole("button", { name: "Rôles RBAC", exact: true }).click(),
   ]);
   expect(response.ok(), "La lecture du journal d’audit doit réussir").toBe(true);

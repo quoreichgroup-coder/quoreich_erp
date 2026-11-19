@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
 
 export function useAssetCategories() {
   return useQuery({
     queryKey: ["asset-categories"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("asset_categories").select("*").order("name");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/categories"), error: null } : await supabase.from("asset_categories").select("*").order("name");
       if (error) throw error;
       return data || [];
     },
@@ -19,7 +20,7 @@ export function useAssets() {
   return useQuery({
     queryKey: ["assets"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("assets").select("*, category:asset_categories(name)").order("asset_code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets"), error: null } : await supabase.from("assets").select("*, category:asset_categories(name)").order("asset_code");
       if (error) throw error;
       return data || [];
     },
@@ -32,6 +33,7 @@ export function useCreateAsset() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: { asset_code: string; name: string; category_id?: string; acquisition_date: string; acquisition_cost: number; salvage_value?: number; useful_life_months?: number; depreciation_method?: string; location?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/assets", input); return; }
       const nbv = input.acquisition_cost - (input.salvage_value || 0);
       const { error } = await supabase.from("assets").insert({ ...input, tenant_id: tenantId!, created_by: user!.id, net_book_value: input.acquisition_cost });
       if (error) throw error;
@@ -46,6 +48,7 @@ export function useCreateAssetCategory() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: { name: string; depreciation_method?: string; useful_life_years?: number }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/assets/categories", input); return; }
       const { error } = await supabase.from("asset_categories").insert({ ...input, tenant_id: tenantId! });
       if (error) throw error;
     },

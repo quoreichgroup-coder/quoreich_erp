@@ -298,7 +298,10 @@ public class Sql {
       for (int k = 0; k < fn.required(); k++) if (!given.contains(fn.names().get(k))) ok = false;
       if (ok && (best == null || fn.names().size() < best.names().size())) best = fn;
     }
-    if (best == null) throw new IllegalStateException("Aucune fonction " + function + " pour les arguments " + given);
+    if (best == null) {
+      if (candidates.isEmpty()) throw new IllegalStateException("Fonction inconnue : " + function);
+      throw new ApiRefusal(400, "Arguments inattendus pour " + function + " : " + given + " (attendus : " + candidates.getFirst().names() + ")");
+    }
     return best;
   }
 

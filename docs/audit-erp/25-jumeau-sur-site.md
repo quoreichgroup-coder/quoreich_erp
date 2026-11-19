@@ -84,8 +84,8 @@ c'est ce qui a imposé de porter la coquille avec les premiers modules.
 `playwright.sur-site.config.ts`, `npm run test:e2e:sur-site`) : société locale, sessions locales, et
 tout accès aux données de Supabase (hors connexion) compté comme incident par `surveiller()` (type
 `acces-nuage`). La liste des parcours rejoués (`PARCOURS_PORTES`) s'étend à chaque module porté ;
-`E2E_PARCOURS_SUR_SITE=<regex>` la remplace pour un essai. État au 19 novembre 2026 : 21 parcours du
-nuage verts sur site (10, 20, 30, 50, 80, 90, 92, 93, 94), plus les 4 parcours propres au sur site.
+`E2E_PARCOURS_SUR_SITE=<regex>` la remplace pour un essai. État au 19 novembre 2026 : 35 parcours du
+nuage verts sur site (10, 20, 30, 40, 50, 60, 61, 70, 71, 80, 81, 90–94), plus les 4 parcours propres au sur site.
 
 Les refus de l'API portent leur code SQLSTATE (`{"code": "QG007", "error": "…"}`), comme les réponses
 de Supabase : les refus métier annoncés par les parcours (`refusAttendu(/QG007.*/)`) sont reconnus
@@ -103,16 +103,16 @@ Fin du chantier :
 |---|---|---|---|---|
 | Socle (`Sql`, refus, analytique des pièces, seuils d'approbation) | ✅ | ✅ | `PayableApiIT` | — |
 | Comptes fournisseurs (fournisseurs, factures à lignes, approbations, paiements, règlements, avoirs, retours, paramètres AP) | ✅ | ✅ | `PayableApiIT` | ✅ `20-fournisseurs-sur-site` |
-| Clients, facturation client, avoirs clients (lot 2) | ✅ | ✅ | existants | ✅ `10-clients-sur-site` |
+| Clients, facturation client, avoirs clients (lot 2) ; complément : paramètres AR, brouillons, encaissements, acomptes et crédits, lettrage, relevé, jeux de comptes des fiches, identité de la société, modèles de rapports | ✅ | ✅ | existants, `StocksCrmAssetsApiIT` | ✅ `10-clients-sur-site`, nuage 40 rejoué |
 | Approvisionnement (demandes, commandes, réceptions en une transaction, approbations, conversion, suivi des livraisons, rapprochement, réapprovisionnement, rapports, paramètres) | ✅ | ✅ | `ProcurementApiIT` | ✅ `30-achats-sur-site` (avec le second membre) |
 | Grand livre (comptes, écritures en une transaction, balance, grand livre, périodes, lots, audit, contrôles, états), plans comptables (référentiels, qualité, import, correspondances, migration, audit, jeux de comptes) | ✅ | ✅ | `LedgerApiIT` | ✅ nuage 50 rejoué |
-| Ventes (devis, commandes, livraisons, retours, vues, paramètres, numérotation) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | à rejouer avec le CRM (nuage 60) |
-| Stocks (articles, entrepôts, mouvements, inventaires, campagnes) | à faire | | | |
+| Ventes (devis, commandes, livraisons, retours, vues, paramètres, numérotation) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | ✅ nuage 60 rejoué |
+| Stocks (articles, entrepôts, mouvements, inventaires, campagnes, cycles, clôtures, vues, paramètres) | ✅ | ✅ | `StocksCrmAssetsApiIT` | ✅ nuage 70, 71 rejoués |
 | Trésorerie (comptes, mouvements, virements, relevés, rapprochement, prévisions, clôture, limites, audit) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | ✅ nuage 80 rejoué |
-| Immobilisations | à faire | | | |
+| Immobilisations (catégories, fiches, amortissements, cessions, paramètres) | ✅ | ✅ | `StocksCrmAssetsApiIT` | ✅ nuage 91 rejoué |
 | Budget (budgets, lignes, cycle, révisions, scénarios, contrôle, prévisions, paramètres) | ✅ | ✅ | `TreasuryBudgetSalesApiIT` | ✅ nuage 90, 92, 93, 94 rejoués |
 | Notes de frais, projets | à faire | | | |
-| CRM | à faire | | | |
+| CRM (contacts, import, actions groupées, opportunités, activités, conversion en devis) | ✅ | ✅ | `StocksCrmAssetsApiIT` | ✅ nuage 60, 61 rejoués |
 | RH et paie (reste) | partiel | | | |
 | Conformité, risques | à faire | | | |
 | Coquille : profil et société (`/me`), société courante, modules actifs, alertes, préférences de notification, calendrier fiscal | ✅ | ✅ | `ProcurementApiIT` (`/me`) | via tous les parcours sur site |

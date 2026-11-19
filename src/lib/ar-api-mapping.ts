@@ -9,6 +9,8 @@ type CustomerView = ApiSchemas["CustomerView"];
 
 export interface MappedARInvoice {
   id: string;
+  /** Écriture de la facture émise (aperçu comptable du panneau). */
+  journal_entry_id?: string | null;
   tenant_id: string;
   invoice_number: string;
   customer_id: string;
@@ -45,6 +47,7 @@ export function toARInvoice(view: ArInvoiceView, customers: ReadonlyMap<string, 
     status: view.status,
     created_by: "",
     created_at: "",
+    journal_entry_id: view.journalEntryId ?? null,
     customer: customer
       ? { id: customer.id, name: customer.name, credit_limit: 0, payment_terms: 0 }
       : undefined,

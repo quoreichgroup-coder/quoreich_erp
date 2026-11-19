@@ -54,13 +54,13 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   await crmDialog.getByRole("combobox").nth(1).click();
   await page.getByRole("option", { name: "Gagné" }).click();
   await crmDialog.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(crmDialog.getByText("Gagné", { exact: true })).toBeVisible();
+  await expect(crmDialog.getByText("Gagné", { exact: true }).first()).toBeVisible();
   await crmDialog.getByRole("tab", { name: "Conversion" }).click();
   await crmDialog.getByRole("combobox").click();
   await page.getByRole("option", { name: crmClient }).click();
   await crmDialog.getByRole("button", { name: "Convertir en devis" }).click();
   await expect(crmDialog.getByText(/Devis créé/)).toBeVisible();
-  const convertQuoteResponse = page.waitForResponse((response) => response.url().includes("/rpc/convert_quote_to_so"));
+  const convertQuoteResponse = page.waitForResponse((response) => /\/(rpc|actions)\/convert_quote_to_so$/.test(new URL(response.url()).pathname));
   await crmDialog.getByRole("button", { name: "Convertir en bon de commande" }).click();
   const convertedOrder = await convertQuoteResponse;
   expect(convertedOrder.ok(), await convertedOrder.text()).toBeTruthy();
@@ -137,7 +137,7 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
   const orderRow = page.getByRole("row").filter({ hasText: client });
   await expect(orderRow).toContainText(/SO-(?:\d{4}-)?\d{4,5}/);
   obs.etape("confirmer la commande de vente");
-  const confirmResponse = page.waitForResponse((response) => response.url().includes("/rpc/confirm_so"));
+  const confirmResponse = page.waitForResponse((response) => /\/(rpc|actions)\/confirm_so$/.test(new URL(response.url()).pathname));
   await orderRow.getByRole("button", { name: "Confirmer" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Confirmer", exact: true }).click();
   const confirmResult = await confirmResponse;

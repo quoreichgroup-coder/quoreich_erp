@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { FixedAssetPerms, FixedAssetRole } from "@/lib/fixed-assets-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 const FA_ROLES: FixedAssetRole[] = ["asset_clerk", "asset_accountant", "asset_controller", "asset_admin"];
 
@@ -13,7 +15,7 @@ export function useAssetCategories() {
   return useQuery({
     queryKey: ["asset-categories"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("asset_categories").select("*").order("name");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/categories"), error: null } : await supabase.from("asset_categories").select("*").order("name");
       if (error) throw error;
       return data ?? [];
     },
@@ -24,7 +26,7 @@ export function useAssets() {
   return useQuery({
     queryKey: ["assets"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets"), error: null } : await supabase
         .from("assets")
         .select("*, category:asset_categories(name)")
         .order("acquisition_date", { ascending: false });
@@ -38,7 +40,7 @@ export function useAssetRegister() {
   return useQuery({
     queryKey: ["assets-register"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/register"), error: null } : await supabase
         .from("fixed_assets_register_view" as never)
         .select("*")
         .order("acquisition_date", { ascending: false });
@@ -57,7 +59,7 @@ export function useAssetKpis() {
   return useQuery({
     queryKey: ["asset-kpis"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/assets/kpis"), error: null } : await supabase
         .from("asset_kpis_view" as never)
         .select("*")
         .maybeSingle();
@@ -77,7 +79,7 @@ export function useAssetDisposals() {
   return useQuery({
     queryKey: ["asset-disposals"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/disposals"), error: null } : await supabase
         .from("asset_disposals" as never)
         .select("*")
         .order("disposal_date", { ascending: false });
@@ -124,7 +126,7 @@ export function useAssignFixedAssetRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: FixedAssetRole; action: "assign" | "revoke"; comment?: string }) => {
-      const { error } = await supabase.rpc("assign_fixed_asset_role" as never, {
+      const { error } = await moduleRpc("assets", "assign_fixed_asset_role", {
         p_target_user: input.target_user,
         p_role: input.role,
         p_action: input.action,
@@ -148,7 +150,7 @@ export function useFixedAssetRoleAudit() {
   return useQuery({
     queryKey: ["fa-role-audit"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/assets/role-audit"), error: null } : await supabase
         .from("fixed_asset_role_audit" as never)
         .select("*")
         .order("created_at", { ascending: false })

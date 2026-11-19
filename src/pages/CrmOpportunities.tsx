@@ -30,6 +30,7 @@ import { assertBulkAllowed, type CrmBulkAction } from "@/lib/crm-bulk-actions";
 import { toast } from "sonner";
 import OpportunityDetailDialog from "@/components/OpportunityDetailDialog";
 import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export default function CrmOpportunities() {
   const { data: tenantId } = useTenantId();
@@ -74,7 +75,7 @@ export default function CrmOpportunities() {
     queryKey: ["crm-opp-so-ids", tenantId, quoteIds.sort().join(",")],
     enabled: Boolean(tenantId && quoteIds.length > 0),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<{ quotation_id: string }[]>("/api/v1/crm/converted-quotations"), error: null } : await supabase
         .from("sales_orders")
         .select("quotation_id")
         .eq("tenant_id", tenantId!)

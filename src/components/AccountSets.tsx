@@ -12,7 +12,6 @@ import {
   useSetAccountSetLine, useSetPostingLock, useUpdateAccountSet, type AccountSet,
 } from "@/hooks/use-account-sets";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { isApiEnabled } from "@/api/client";
 import { KIND_LABELS, normalizeSetCode, type AccountSetKind } from "@/lib/account-sets";
 
 /*
@@ -44,9 +43,6 @@ export function AccountSetsPanel({ kind }: { kind: AccountSetKind }) {
   const codeId = useId();
   const nameId = useId();
 
-  if (isApiEnabled()) {
-    return <p className="text-xs text-muted-foreground" data-testid={`account-sets-${kind}`}>Les jeux de comptes se paramètrent depuis le nuage pour l'instant ; sur site, le compte par défaut de chaque rôle s'applique.</p>;
-  }
   const roles = (kinds.data ?? []).filter((k) => k.kind === kind);
   const labelOf = new Map((setup.data?.roles ?? []).map((r) => [r.roleCode, r]));
   const options = (accounts.data ?? []).filter((a) => a.active);
@@ -136,7 +132,6 @@ export function AccountSetSelect({ kind, value, onChange, disabled, id }: {
 }) {
   const sets = useAccountSets(kind);
   const own = useId();
-  if (isApiEnabled()) return null;
   const actifs = (sets.data ?? []).filter((s) => s.is_active || s.id === value);
   return (
     <div className="space-y-1">
@@ -156,7 +151,6 @@ export function PostingLockSetting() {
   const save = useSetPostingLock();
   const canManage = useCanManage();
   const id = useId();
-  if (isApiEnabled()) return null;
   return (
     <div className="bg-card border border-border rounded-lg p-4 flex items-start gap-3" data-testid="posting-lock-setting">
       <Switch id={id} checked={lock.data ?? true} disabled={!canManage || lock.isLoading || save.isPending} onCheckedChange={(v) => save.mutate(v)} />

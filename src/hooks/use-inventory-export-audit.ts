@@ -5,6 +5,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export type ExportAuditAction =
   | "export_csv"
@@ -71,7 +72,7 @@ export function useInventoryExportAudit(limit = 25) {
   return useQuery({
     queryKey: ["inventory-export-audit", limit],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/inventory/role-audit?actions=export_csv,export_pdf,export_aborted,export_failed&limit=${limit}`), error: null } : await supabase
         .from("inventory_role_audit" as never)
         .select("id, action, performed_by, comment, created_at")
         .in("action", ["export_csv", "export_pdf", "export_aborted", "export_failed"])

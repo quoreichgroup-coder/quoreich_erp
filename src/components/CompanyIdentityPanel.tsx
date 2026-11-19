@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { isApiEnabled } from "@/api/client";
+import { apiGet, apiPut, isApiEnabled } from "@/api/client";
 
 /*
  * Identité légale de la société (V47), imprimée en tête de chaque pièce : raison sociale, adresse,
@@ -35,9 +35,9 @@ export function CompanyIdentityPanel() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["company-identity", tenantId],
-    enabled: !!tenantId && !isApiEnabled(),
+    enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("tenants")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/company/identity"), error: null } : await (supabase as any).from("tenants")
         .select("name, legal_name, address, phone, email, rccm, tax_id, tax_regime, tax_office, bank_details").eq("id", tenantId).single();
       if (error) throw error;
       return data as Record<string, string | null>;
@@ -49,14 +49,13 @@ export function CompanyIdentityPanel() {
   }, [data]);
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).rpc("set_company_identity", { _identity: form });
+      const { error } = isApiEnabled() ? (await apiPut("/api/v1/company/identity", form), { error: null }) : await (supabase as any).rpc("set_company_identity", { _identity: form });
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["company-identity"] }); toast.success("Identité de la société enregistrée"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isApiEnabled()) return <p className="text-sm text-muted-foreground">Sur site, l'identité de la société se renseigne dans la base locale (API à venir).</p>;
   if (isLoading) return <Loader2 className="w-4 h-4 animate-spin" />;
   return (
     <div className="space-y-4 max-w-3xl" data-testid="company-identity">

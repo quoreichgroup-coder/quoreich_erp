@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { InventoryCampaignItem } from "@/lib/inventory-campaign";
+import { invAudit, invRpc } from "@/lib/inventory-api";
 
 export type CycleBasis = "stock_value" | "outflow_value";
 export const CYCLE_BASIS_LABEL: Record<CycleBasis, string> = {
@@ -34,7 +35,7 @@ export type CycleAnalysis = { configured: false } | {
 };
 
 export async function inventoryCyclePolicy(tenantId: string, policy?: CyclePolicy): Promise<SavedCyclePolicy> {
-  const { data, error } = await supabase.rpc("inventory_cycle_policy" as never, {
+  const { data, error } = await invRpc("inventory_cycle_policy", {
     _action: policy ? "save" : "read", _expected_tenant: tenantId, ...(policy ? { _policy: policy } : {}),
   } as never);
   if (error) throw new Error(error.message);
@@ -42,7 +43,7 @@ export async function inventoryCyclePolicy(tenantId: string, policy?: CyclePolic
 }
 
 export async function inventoryCyclePreview(tenantId: string, warehouse: string): Promise<CyclePlan> {
-  const { data, error } = await supabase.rpc("inventory_cycle_prepare" as never, {
+  const { data, error } = await invRpc("inventory_cycle_prepare", {
     _action: "preview", _warehouse: warehouse, _expected_tenant: tenantId,
   } as never);
   if (error) throw new Error(error.message);
@@ -50,7 +51,7 @@ export async function inventoryCyclePreview(tenantId: string, warehouse: string)
 }
 
 export async function inventoryCycleOpen(tenantId: string, warehouse: string, signature: string): Promise<{ id: string }> {
-  const { data, error } = await supabase.rpc("inventory_cycle_prepare" as never, {
+  const { data, error } = await invRpc("inventory_cycle_prepare", {
     _action: "open", _warehouse: warehouse, _expected_tenant: tenantId, _signature: signature,
   } as never);
   if (error) throw new Error(error.message);
@@ -58,7 +59,7 @@ export async function inventoryCycleOpen(tenantId: string, warehouse: string, si
 }
 
 export async function inventoryCycleAnalysis(tenantId: string, warehouse: string): Promise<CycleAnalysis> {
-  const { data, error } = await supabase.rpc("inventory_cycle_analysis" as never, {
+  const { data, error } = await invRpc("inventory_cycle_analysis", {
     _warehouse: warehouse, _expected_tenant: tenantId,
   } as never);
   if (error) throw new Error(error.message);

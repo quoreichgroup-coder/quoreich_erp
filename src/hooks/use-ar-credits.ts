@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
-import { isApiEnabled } from "@/api/client";
+import { apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 /*
  * Crédits clients (V49) : acomptes reçus (compte 4191) et surplus d'avoirs non imputés ; imputation
@@ -27,14 +27,16 @@ export function useCustomerCredits(customerId?: string) {
   const { data: tenantId } = useTenantId();
   return useQuery({
     queryKey: ["customer-credits", tenantId, customerId ?? "all"],
-    enabled: !!tenantId && !isApiEnabled(),
+    enabled: !!tenantId,
     queryFn: async (): Promise<CustomerCredit[]> => {
       let qa = sb.from("ar_customer_advances").select("id, advance_number, customer_id, received_date, amount, amount_applied, amount_refunded, reference, customer:customers(name)")
         .eq("tenant_id", tenantId).order("received_date");
       let qc = sb.from("ar_credit_notes").select("id, credit_note_number, customer_id, credit_date, total, amount_allocated, amount_refunded, reason, customer:customers(name)")
         .eq("tenant_id", tenantId).order("credit_date");
       if (customerId) { qa = qa.eq("customer_id", customerId); qc = qc.eq("customer_id", customerId); }
-      const [{ data: adv, error: ea }, { data: cns, error: ec }] = await Promise.all([qa, qc]);
+      const viaApi = async () => { const r = await apiGet<{ advances: any[]; creditNotes: any[] }>(`/api/v1/ar/customer-credits${customerId ? `?customerId=${customerId}` : ""}`);
+        return [{ data: r.advances, error: null }, { data: r.creditNotes, error: null }] as const; };
+      const [{ data: adv, error: ea }, { data: cns, error: ec }] = isApiEnabled() ? await viaApi() : await Promise.all([qa, qc]);
       if (ea) throw ea;
       if (ec) throw ec;
       const out: CustomerCredit[] = [];
@@ -62,9 +64,9 @@ export function useARLetterings(paidKey = "") {
   const { data: tenantId } = useTenantId();
   return useQuery({
     queryKey: ["ar-letterings", tenantId, paidKey],
-    enabled: !!tenantId && !isApiEnabled(),
+    enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await sb.from("ar_letterings").select("invoice_id, code, gl_lettered").eq("tenant_id", tenantId);
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/ar/letterings"), error: null } : await sb.from("ar_letterings").select("invoice_id, code, gl_lettered").eq("tenant_id", tenantId);
       if (error) throw error;
       return new Map<string, { code: string; gl: boolean }>((data ?? []).map((l: any) => [l.invoice_id, { code: l.code, gl: l.gl_lettered }]));
     },
@@ -86,6 +88,7 @@ function useCreditMutation<T>(fn: (i: T) => Promise<unknown>, success: string) {
 }
 
 const rpc = async (name: string, args: Record<string, unknown>) => {
+  if (isApiEnabled()) return apiPost<any>(`/api/v1/ar/actions/${name}`, args);
   const { data, error } = await sb.rpc(name, args);
   if (error) throw error;
   return data;

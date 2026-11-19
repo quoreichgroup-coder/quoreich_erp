@@ -6,6 +6,8 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { toast } from "sonner";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
 import type { Tables } from "@/integrations/supabase/types";
+import { apiGet, apiPatch, apiPost, apiPut, isApiEnabled } from "@/api/client";
+import { invAudit, invRpc } from "@/lib/inventory-api";
 
 type DatabaseInventoryItem = Tables<"items">;
 
@@ -16,7 +18,7 @@ export function useItems() {
   return useQuery({
     queryKey: ["items"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("items").select("*").order("code");
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/items"), error: null } : await supabase.from("items").select("*").order("code");
       if (error) throw error;
       return data || [];
     },
@@ -31,6 +33,7 @@ export function useInventoryItemCatalog() {
     enabled: Boolean(tenantId),
     retry: false,
     queryFn: async ({ signal }) => {
+      if (isApiEnabled()) return (await apiGet<DatabaseInventoryItem[]>("/api/v1/inventory/items")).sort((a, b) => a.code.localeCompare(b.code, "fr") || a.id.localeCompare(b.id));
       const rows: DatabaseInventoryItem[] = [];
       let cursor: string | undefined;
       for (;;) {
@@ -59,6 +62,7 @@ export function useCreateItem() {
       safety_stock?: number; max_stock?: number; default_warehouse_id?: string;
       valuation_method?: string;
     }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/inventory/items", input); return; }
       const { error } = await supabase.from("items").insert({ ...input, tenant_id: tenantId! } as never);
       if (error) throw error;
     },
@@ -71,6 +75,7 @@ export function useUpdateItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; [key: string]: unknown }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/inventory/items/${id}`, updates); return; }
       const { data, error } = await (supabase as any).from("items").update(updates).eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Modification refusée : droit « Mouvements de stock » requis.");
@@ -89,7 +94,7 @@ export function useWarehouses() {
     queryKey: ["warehouses", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase.from("warehouses").select("id,code,name,is_default,status,address")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/warehouses"), error: null } : await supabase.from("warehouses").select("id,code,name,is_default,status,address")
         .eq("tenant_id", tenantId!).order("code");
       if (error) throw error;
       return data ?? [];
@@ -102,6 +107,7 @@ export function useCreateWarehouse() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: { code: string; name: string; address?: string; is_default?: boolean }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/inventory/warehouses", input); return; }
       const { error } = await supabase.from("warehouses" as never).insert({ ...input, tenant_id: tenantId! } as never);
       if (error) throw error;
     },
@@ -114,6 +120,7 @@ export function useUpdateWarehouse() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; code?: string; name?: string; address?: string | null; status?: string }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/inventory/warehouses/${id}`, updates); return; }
       const { data, error } = await (supabase as any).from("warehouses").update(updates).eq("id", id).select("id");
       if (error) throw error;
       if (!data?.length) throw new Error("Modification refusée : droit « Mouvements de stock » requis.");
@@ -128,7 +135,7 @@ export function useItemLocations(itemId?: string) {
     queryKey: ["item-locations", itemId],
     enabled: !!itemId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/inventory/items/${itemId}/locations`), error: null } : await supabase
         .from("item_locations" as never)
         .select("*, warehouse:warehouses(code, name)")
         .eq("item_id", itemId!);
@@ -145,6 +152,7 @@ export function useStockMovements(filters?: { from?: string; to?: string; itemId
   return useQuery({
     queryKey: ["stock-movements", filters],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>(`/api/v1/inventory/movements?${new URLSearchParams(Object.fromEntries(Object.entries(filters ?? {}).filter(([, v]) => v)) as Record<string, string>)}`);
       let q = supabase
         .from("stock_movements")
         .select("*, item:items(name, code), warehouse:warehouses(code, name)")
@@ -165,6 +173,7 @@ export function useStockMovementsAudit(filters?: { from?: string; to?: string; i
   return useQuery({
     queryKey: ["stock-movements-audit", filters],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<Array<Record<string, unknown>>>(`/api/v1/inventory/movements/audit?${new URLSearchParams(Object.fromEntries(Object.entries(filters ?? {}).filter(([, v]) => v)) as Record<string, string>)}`);
       let q = supabase.from("stock_movements_audit_view" as never).select("*").order("movement_date", { ascending: false }).limit(500);
       if (filters?.from) q = q.gte("movement_date", filters.from);
       if (filters?.to) q = q.lte("movement_date", filters.to);
@@ -183,6 +192,7 @@ export function useAllStockMovements() {
     queryKey: ["stock-movements", "all", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/inventory/movements?all=true");
       const rows: any[] = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await (supabase as any).from("stock_movements")
@@ -210,7 +220,7 @@ export function useCreateStockAdjustment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { item_id: string; warehouse_id: string | null; quantity: number; unit_cost: number; date: string; reason: string }) => {
-      const { error } = await (supabase as any).rpc("create_stock_adjustment", {
+      const { error } = await invRpc("create_stock_adjustment", {
         _item_id: input.item_id, _warehouse_id: input.warehouse_id, _quantity: input.quantity, _unit_cost: input.unit_cost,
         _movement_date: input.date, _reason: input.reason,
       });
@@ -228,7 +238,7 @@ export function useTransferStock() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { item_id: string; from_wh: string; to_wh: string; qty: number; notes?: string }) => {
-      const { error } = await supabase.rpc("transfer_stock" as never, {
+      const { error } = await invRpc("transfer_stock", {
         _item_id: input.item_id, _from_wh: input.from_wh, _to_wh: input.to_wh, _qty: input.qty, _notes: input.notes ?? null,
       } as never);
       if (error) throw error;
@@ -248,7 +258,7 @@ export function useInventoryCounts() {
   return useQuery({
     queryKey: ["inventory-counts"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/counts"), error: null } : await supabase
         .from("inventory_counts" as never)
         .select("*, warehouse:warehouses(code, name)")
         .order("count_date", { ascending: false });
@@ -263,7 +273,7 @@ export function useInventoryCountLines(countId?: string) {
     queryKey: ["inventory-count-lines", countId],
     enabled: !!countId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/inventory/counts/${countId}/lines`), error: null } : await supabase
         .from("inventory_count_lines" as never)
         .select("*, item:items(code, name, unit)")
         .eq("count_id", countId!);
@@ -279,6 +289,7 @@ export function useCreateInventoryCount() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: { count_number: string; warehouse_id?: string; count_date?: string; notes?: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/inventory/counts", input); return; }
       const { error } = await supabase.from("inventory_counts" as never).insert({
         ...input, tenant_id: tenantId!, created_by: user?.id, status: "draft",
       } as never);
@@ -293,7 +304,7 @@ export function usePostInventoryCount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (countId: string) => {
-      const { error } = await supabase.rpc("post_inventory_count" as never, { _count_id: countId } as never);
+      const { error } = await invRpc("post_inventory_count", { _count_id: countId } as never);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -313,7 +324,7 @@ export function useStockValuation() {
   return useQuery({
     queryKey: ["stock-valuation"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("stock_valuation_view" as never).select("*").order("stock_value", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/valuation"), error: null } : await supabase.from("stock_valuation_view" as never).select("*").order("stock_value", { ascending: false });
       if (error) throw error;
       return (data as unknown as Array<{ item_id: string; code: string; name: string; quantity_on_hand: number; average_cost: number; stock_value: number; warehouse_code: string | null; warehouse_name: string | null }>) || [];
     },
@@ -324,7 +335,7 @@ export function useLowStockAlerts() {
   return useQuery({
     queryKey: ["low-stock"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("low_stock_alerts_view" as never).select("*").order("gap", { ascending: false });
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/low-stock"), error: null } : await supabase.from("low_stock_alerts_view" as never).select("*").order("gap", { ascending: false });
       if (error) throw error;
       return (data as unknown as Array<{ item_id: string; code: string; name: string; quantity_on_hand: number; threshold: number; gap: number }>) || [];
     },
@@ -335,7 +346,7 @@ export function useInventoryKpisView() {
   return useQuery({
     queryKey: ["inventory-kpis-view"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("inventory_kpis_view" as never).select("*").maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/kpis"), error: null } : await supabase.from("inventory_kpis_view" as never).select("*").maybeSingle();
       if (error) throw error;
       return data as unknown as { active_items: number; low_stock_items: number; out_of_stock_items: number; total_stock_value: number } | null;
     },
@@ -347,7 +358,7 @@ export function useSlowMovingItems() {
   return useQuery({
     queryKey: ["inventory-slow-moving"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/slow-moving"), error: null } : await supabase
         .from("inventory_slow_moving_view" as never)
         .select("*")
         .order("stock_value", { ascending: false });
@@ -362,7 +373,7 @@ export function useInventoryVariance() {
   return useQuery({
     queryKey: ["inventory-variance"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/variance"), error: null } : await supabase
         .from("inventory_variance_view" as never)
         .select("*")
         .order("count_date", { ascending: false })
@@ -387,7 +398,7 @@ export function useInventoryPeriodCloses() {
   return useQuery({
     queryKey: ["inventory-period-closes"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/period-closes"), error: null } : await supabase
         .from("inventory_period_closes" as never)
         .select("id, period, closed_at, closed_by, total_value, total_qty, items_count, snapshot")
         .order("period", { ascending: false });
@@ -411,6 +422,11 @@ export function useInventoryPeriodClosesPaged(p: PagedClosesParams) {
   return useQuery({
     queryKey: ["inventory-period-closes-paged", p],
     queryFn: async () => {
+      if (isApiEnabled()) {
+        const all = await apiGet<InventoryPeriodClose[]>(`/api/v1/inventory/period-closes?${new URLSearchParams({ sortKey: p.sortKey, sortDir: p.sortDir, ...(p.from ? { from: p.from } : {}), ...(p.to ? { to: p.to } : {}), ...(p.periodSearch?.trim() ? { periodSearch: p.periodSearch.trim() } : {}) })}`);
+        const start = (Math.max(1, p.page) - 1) * p.pageSize;
+        return { rows: all.slice(start, start + p.pageSize), count: all.length };
+      }
       let q = supabase
         .from("inventory_period_closes" as never)
         .select("id, period, closed_at, closed_by, total_value, total_qty, items_count, snapshot", { count: "exact" })
@@ -444,6 +460,11 @@ export async function fetchAllInventoryCloses(
   opts: FetchAllOpts = {},
 ): Promise<InventoryPeriodClose[]> {
   const chunkSize = Math.max(100, Math.min(1000, opts.chunkSize ?? 500));
+  if (isApiEnabled()) {
+    const all = await apiGet<InventoryPeriodClose[]>(`/api/v1/inventory/period-closes?${new URLSearchParams({ sortKey: p.sortKey, sortDir: p.sortDir, ...(p.from ? { from: p.from } : {}), ...(p.to ? { to: p.to } : {}), ...(p.periodSearch?.trim() ? { periodSearch: p.periodSearch.trim() } : {}) })}`);
+    opts.onProgress?.(all.length, all.length);
+    return all;
+  }
   const build = (withCount: boolean) => {
     let q = supabase
       .from("inventory_period_closes" as never)
@@ -507,7 +528,7 @@ export async function logInventoryExportAudit(input: InventoryExportAuditInput):
   };
   const comment = `historique-clotures — ${JSON.stringify(payload)}`.slice(0, 500);
   try {
-    await supabase.from("inventory_role_audit" as never).insert({
+    await invAudit({
       tenant_id: input.tenantId,
       target_user_id: input.userId,
       role: "inventory_controller",
@@ -528,7 +549,7 @@ export function useCloseInventoryPeriod() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (period: string) => {
-      const { data, error } = await supabase.rpc("close_inventory_period" as never, { _period: period } as never);
+      const { data, error } = await invRpc("close_inventory_period", { _period: period } as never);
       if (error) throw error;
       return data as unknown as InventoryPeriodClose | null;
     },
@@ -536,7 +557,7 @@ export function useCloseInventoryPeriod() {
       const toastId = toast.loading(`Clôture de la période ${period} en cours…`);
       // Best-effort audit trail: record the launch attempt (RLS-checked).
       if (tenantId && user?.id) {
-        await supabase.from("inventory_role_audit" as never).insert({
+        await invAudit({
           tenant_id: tenantId,
           target_user_id: user.id,
           role: "inventory_controller",
@@ -560,7 +581,7 @@ export function useCloseInventoryPeriod() {
     onError: async (e: Error, period, ctx) => {
       toast.error(`Échec clôture ${period} — ${e.message}`, { id: ctx?.toastId });
       if (tenantId && user?.id) {
-        await supabase.from("inventory_role_audit" as never).insert({
+        await invAudit({
           tenant_id: tenantId,
           target_user_id: user.id,
           role: "inventory_controller",
@@ -585,7 +606,7 @@ export function useInventoryPeriodLocks() {
   return useQuery({
     queryKey: ["inventory-period-locks"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/period-locks"), error: null } : await supabase
         .from("period_locks" as never)
         .select("id, period, module, locked_at:closed_at, locked_by:closed_by")
         .eq("module", "INVENTORY")
@@ -603,7 +624,7 @@ export function useInventoryCloseAudit() {
   return useQuery({
     queryKey: ["inventory-close-audit"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/role-audit?actions=period_close,period_close_idempotent,period_close_attempt,period_close_failed&limit=50"), error: null } : await supabase
         .from("inventory_role_audit" as never)
         .select("id, action, performed_by, comment, created_at")
           .in("action", ["period_close", "period_close_idempotent", "period_close_attempt", "period_close_failed"])
@@ -620,7 +641,7 @@ export function useValuationByCategory() {
   return useQuery({
     queryKey: ["inventory-valuation-by-category"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/valuation-by-category"), error: null } : await supabase
         .from("inventory_valuation_by_category_view" as never)
         .select("*")
         .order("avg_cost_value", { ascending: false });
@@ -634,7 +655,7 @@ export function useInventoryTurnover() {
   return useQuery({
     queryKey: ["inventory-turnover"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/turnover"), error: null } : await supabase
         .from("inventory_turnover_view" as never)
         .select("*")
         .order("turnover_ratio", { ascending: false });
@@ -648,7 +669,7 @@ export function useStockAging() {
   return useQuery({
     queryKey: ["stock-aging"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/views/aging"), error: null } : await supabase
         .from("stock_aging_view" as never)
         .select("*");
       if (error) throw error;
@@ -666,7 +687,7 @@ export function useInventorySettings() {
     queryKey: ["inventory-settings", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = await supabase.from("inventory_settings").select("*").eq("tenant_id", tenantId!).maybeSingle();
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any>("/api/v1/inventory/settings"), error: null } : await supabase.from("inventory_settings").select("*").eq("tenant_id", tenantId!).maybeSingle();
       if (error) throw error;
       return data as unknown as Record<string, unknown> | null;
     },
@@ -678,6 +699,7 @@ export function useUpdateInventorySettings() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
+      if (isApiEnabled()) { await apiPut("/api/v1/inventory/settings", updates); return; }
       const { error } = await supabase
         .from("inventory_settings" as never)
         .upsert({ tenant_id: tenantId!, ...updates } as never, { onConflict: "tenant_id" });
@@ -735,7 +757,7 @@ export function useInventoryRoleAudit() {
   return useQuery({
     queryKey: ["inventory-role-audit"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/role-audit"), error: null } : await supabase
         .from("inventory_role_audit" as never)
         .select("*")
         .order("created_at", { ascending: false })
@@ -750,7 +772,7 @@ export function useAssignInventoryRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: InventoryRole; action: "assign" | "revoke"; comment?: string }) => {
-      const { error } = await supabase.rpc("assign_inventory_role" as never, {
+      const { error } = await invRpc("assign_inventory_role", {
         _target_user: input.target_user, _role: input.role, _action: input.action, _comment: input.comment ?? null,
       } as never);
       if (error) throw error;

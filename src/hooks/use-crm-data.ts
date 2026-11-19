@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import type { CrmPerms, CrmRole, CrmStage } from "@/lib/crm-roles";
 import { ALL_CRM_ROLES } from "@/lib/crm-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
+import { apiDelete, apiGet, apiPatch, apiPost, isApiEnabled } from "@/api/client";
+import { moduleRpc } from "@/api/rpc";
 
 export type CrmContact = {
   id: string;
@@ -78,6 +80,7 @@ export function useCrmContacts(search = "") {
     queryKey: ["crm-contacts", tenantId, search],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<CrmContact[]>(`/api/v1/crm/contacts?search=${encodeURIComponent(search.trim())}`);
       const rows: unknown[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -103,6 +106,7 @@ export function useUpsertContact() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: Partial<CrmContact> & { full_name: string }) => {
+      if (isApiEnabled()) { const { id, ...row } = input; await (id ? apiPatch(`/api/v1/crm/contacts/${id}`, row) : apiPost("/api/v1/crm/contacts", row)); return; }
       const payload = {
         ...input,
         tenant_id: tenantId!,
@@ -123,6 +127,7 @@ export function useDeleteContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/crm/contacts/${id}`); return; }
       const { error } = await supabase.from("crm_contacts" as never).delete().eq("id", id);
       if (error) throw error;
     },
@@ -139,6 +144,7 @@ export function useBulkUpdateContacts() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (input: { ids: string[]; patch: Pick<CrmContact, "status"> }) => {
+      if (isApiEnabled()) { if (input.ids.length) await apiPost("/api/v1/crm/contacts/bulk-update", input); return; }
       if (!tenantId) throw new Error("Société active introuvable");
       if (input.ids.length === 0) return;
       const { error } = await supabase.from("crm_contacts" as never).update(input.patch as never).eq("tenant_id", tenantId).in("id", input.ids);
@@ -157,6 +163,7 @@ export function useBulkDeleteContacts() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      if (isApiEnabled()) { if (ids.length) await apiPost("/api/v1/crm/contacts/bulk-delete", { ids }); return; }
       if (!tenantId) throw new Error("Société active introuvable");
       if (ids.length === 0) return;
       const { error } = await supabase.from("crm_contacts" as never).delete().eq("tenant_id", tenantId).in("id", ids);
@@ -177,6 +184,7 @@ export function useCrmOpportunities() {
     queryKey: ["crm-opportunities", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<CrmOpportunity[]>("/api/v1/crm/opportunities");
       const rows: unknown[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -202,6 +210,7 @@ export function useUpsertOpportunity() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: Partial<CrmOpportunity> & { name: string }) => {
+      if (isApiEnabled()) { const { id, ...row } = input; await (id ? apiPatch(`/api/v1/crm/opportunities/${id}`, row) : apiPost("/api/v1/crm/opportunities", row)); return; }
       const payload = {
         ...input,
         tenant_id: tenantId!,
@@ -223,6 +232,7 @@ export function useUpdateOpportunityStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; stage: CrmStage; probability?: number }) => {
+      if (isApiEnabled()) { await apiPatch(`/api/v1/crm/opportunities/${input.id}`, { stage: input.stage, probability: input.probability ?? null }); return; }
       const { error } = await supabase
         .from("crm_opportunities" as never)
         .update({ stage: input.stage, probability: input.probability ?? null } as never)
@@ -241,6 +251,7 @@ export function useDeleteOpportunity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiDelete(`/api/v1/crm/opportunities/${id}`); return; }
       const { error } = await supabase.from("crm_opportunities" as never).delete().eq("id", id);
       if (error) throw error;
     },
@@ -259,7 +270,7 @@ export function useCrmActivities(opportunityId: string | null) {
     queryKey: ["crm-activities", tenantId, opportunityId],
     enabled: Boolean(tenantId && opportunityId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>(`/api/v1/crm/activities?opportunityId=${opportunityId}`), error: null } : await supabase
         .from("crm_activities" as never)
         .select("*")
         .eq("tenant_id", tenantId!)
@@ -277,6 +288,7 @@ export function useCreateActivity() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: Partial<CrmActivity> & { subject: string }) => {
+      if (isApiEnabled()) { await apiPost("/api/v1/crm/activities", { ...input, assigned_to: input.assigned_to ?? user?.id ?? null }); return; }
       const payload = {
         ...input,
         tenant_id: tenantId!,
@@ -303,6 +315,7 @@ export function useBulkUpdateOpportunities() {
       ids: string[];
       patch: Partial<Pick<CrmOpportunity, "stage" | "owner_id" | "status" | "probability">>;
     }) => {
+      if (isApiEnabled()) { if (input.ids.length) await apiPost("/api/v1/crm/opportunities/bulk-update", input); return; }
       if (!tenantId) throw new Error("Société active introuvable");
       if (input.ids.length === 0) return;
       const { error } = await supabase
@@ -327,6 +340,7 @@ export function useBulkInsertContacts() {
   const { data: tenantId } = useTenantId();
   return useMutation({
     mutationFn: async (rows: Array<Partial<CrmContact> & { full_name: string }>) => {
+      if (isApiEnabled()) return rows.length ? apiPost<{ inserted: number }>("/api/v1/crm/contacts/import", { rows }) : { inserted: 0 };
       if (rows.length === 0) return { inserted: 0 };
       const payload = rows.map((r) => ({ ...r, tenant_id: tenantId! })) as unknown as never;
       const { error } = await supabase.from("crm_contacts" as never).insert(payload);
@@ -348,6 +362,7 @@ export function useCrmReminders() {
     queryKey: ["crm-reminders", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/crm/activities?kind=reminders");
       const rows: unknown[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -373,6 +388,7 @@ export function useCompleteActivity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isApiEnabled()) { await apiPost(`/api/v1/crm/activities/${id}/complete`, {}); return; }
       const { error } = await supabase
         .from("crm_activities" as never)
         .update({ completed_at: new Date().toISOString() } as never)
@@ -396,6 +412,7 @@ export function useCrmStageAudit() {
     queryKey: ["crm-stage-audit", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/crm/activities?kind=stage-changes");
       const rows: unknown[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -445,7 +462,7 @@ export function useAssignCrmRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { target_user: string; role: CrmRole; action: "grant" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_crm_role" as never, {
+      const { error } = await moduleRpc("crm", "assign_crm_role", {
         p_target_user: input.target_user,
         p_role: input.role,
         p_action: input.action,
@@ -478,6 +495,7 @@ export function useCrmRoleAudit() {
     queryKey: ["crm-role-audit", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any[]>("/api/v1/crm/role-audit");
       const rows: unknown[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -502,7 +520,7 @@ export function useConvertOpportunityToQuote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { opportunityId: string; customerId?: string | null; validUntil?: string | null }) => {
-      const { data, error } = await supabase.rpc("convert_opportunity_to_quote" as never, {
+      const { data, error } = await moduleRpc("crm", "convert_opportunity_to_quote", {
         _opp_id: input.opportunityId,
         _customer_id: input.customerId ?? null,
         _valid_until: input.validUntil ?? null,
@@ -535,7 +553,7 @@ export function useConvertQuoteToSo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (quoteId: string) => {
-      const { data, error } = await supabase.rpc("convert_quote_to_so" as never, { _quote_id: quoteId } as never);
+      const { data, error } = await moduleRpc("crm", "convert_quote_to_so", { _quote_id: quoteId } as never);
       if (error) throw error;
       return data as unknown as string;
     },
@@ -564,7 +582,7 @@ export function useLogCrmExport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { opportunityId: string | null; format: "csv" | "pdf"; kind: string; recordId?: string | null }) => {
-      const { error } = await supabase.rpc("log_crm_export" as never, {
+      const { error } = await moduleRpc("crm", "log_crm_export", {
         _opportunity_id: input.opportunityId,
         _format: input.format,
         _kind: input.kind,
@@ -586,6 +604,7 @@ export function useQuoteForOpportunity(opportunityId: string | null) {
     enabled: Boolean(tenantId && opportunityId),
     queryKey: ["crm-opp-quote", tenantId, opportunityId],
     queryFn: async () => {
+      if (isApiEnabled()) return apiGet<any>(`/api/v1/crm/opportunities/${opportunityId}/quote`);
       const { data: opp, error: e1 } = await supabase
         .from("crm_opportunities" as never)
         .select("converted_quotation_id")

@@ -11,6 +11,7 @@ import { CAMPAIGN_SCOPE_LABEL, parseInventoryCount, previewCampaignScope, saveIn
   type CampaignCountEntry, type CampaignItemScope, type InventoryCampaignItem } from "@/lib/inventory-campaign";
 import { InventoryCampaignRecount } from "@/components/InventoryCampaignRecount";
 import { InventoryCampaignSheet } from "@/components/InventoryCampaignSheet";
+import { invAudit, invRpc } from "@/lib/inventory-api";
 
 type Campaign = {
   id: string;
@@ -23,7 +24,7 @@ type Campaign = {
 type Action = "active" | "open" | "count" | "submit" | "cancel";
 
 async function campaignAction(action: Action, id: string, item?: string, quantity?: number, reason?: string) {
-  const { data, error } = await supabase.rpc("inventory_campaign" as never, {
+  const { data, error } = await invRpc("inventory_campaign", {
     _action: action, _id: id, ...(item ? { _item: item, _quantity: quantity } : {}), ...(reason ? { _reason: reason } : {}),
   } as never);
   if (action === "open" && error?.code === "23505" && error.message.includes("inventory_campaign_active_depot")) {

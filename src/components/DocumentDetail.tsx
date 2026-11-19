@@ -5,7 +5,7 @@ import { exportToCSV } from "@/lib/csv-export";
 import { exportDocumentXLSX, printDocumentPDF, type DocumentPdf, type CompanyIdentity } from "@/lib/document-pdf";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTenantId } from "@/hooks/use-tenant";
-import { isApiEnabled } from "@/api/client";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 export type DetailColumn = { label: string; align?: "left" | "right" };
 
@@ -66,8 +66,8 @@ function exporter(kind: "csv" | "pdf" | "xlsx", title: string, fileName: string,
 
 /** Identité légale de la société (V47) pour l'en-tête imprimé ; sans elle, mentions « à renseigner ». */
 async function companyIdentity(): Promise<CompanyIdentity | null> {
-  if (isApiEnabled()) return null;
   try {
+    if (isApiEnabled()) return await apiGet<CompanyIdentity | null>("/api/v1/company/identity");
     const tenantId = await fetchTenantId();
     const { data } = await (supabase as any).from("tenants")
       .select("name, legal_name, address, phone, email, rccm, tax_id, tax_regime, tax_office, bank_details").eq("id", tenantId).single();

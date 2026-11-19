@@ -27,7 +27,7 @@ process.env.E2E_API_URL = API;
 process.env.E2E_SUR_SITE = "1";
 process.env.E2E_AUTH_DIR = "test-results-sur-site/.auth";
 /** Parcours du nuage dont tous les modules sont portés sur l'API (étendu module par module). */
-const PARCOURS_PORTES = process.env.E2E_PARCOURS_SUR_SITE ? new RegExp(process.env.E2E_PARCOURS_SUR_SITE) : /(10-tiers|20-achats|30-fournisseurs|50-comptabilite|80-tresorerie|90-budget|92-budget|93-budget|94-budget)/;
+const PARCOURS_PORTES = process.env.E2E_PARCOURS_SUR_SITE ? new RegExp(process.env.E2E_PARCOURS_SUR_SITE) : /(10-tiers|20-achats|30-fournisseurs|40-clients|50-comptabilite|60-crm|61-crm|70-stocks|71-inventaires|80-tresorerie|81-tresorerie|90-budget|91-immobilisations|92-budget|93-budget|94-budget)/;
 
 export default defineConfig({
   testDir: "tests/e2e/sur-site",

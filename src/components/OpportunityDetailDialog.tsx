@@ -25,6 +25,7 @@ import {
   actionTooltip, maskAmount, type CrmStage,
 } from "@/lib/crm-roles";
 import { exportQuotePdf, exportQuoteCsv, type QuoteExportData } from "@/lib/crm-quote-export";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 
 
@@ -53,7 +54,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
   const { data: customers = [] } = useQuery({
     queryKey: ["crm-conversion-customers", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = isApiEnabled() ? { data: await apiGet<{ id: string; name: string }[]>("/api/v1/crm/customers"), error: null } : await supabase
         .from("customers")
         .select("id,name")
         .eq("tenant_id", tenantId!)

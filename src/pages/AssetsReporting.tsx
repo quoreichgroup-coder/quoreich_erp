@@ -18,6 +18,7 @@ import { actionTooltip, canDo, maskAmount } from "@/lib/fixed-assets-roles";
 import { exportToCSV } from "@/lib/csv-export";
 import { exportToPDF } from "@/lib/pdf-export";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { apiGet, isApiEnabled } from "@/api/client";
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
@@ -26,6 +27,7 @@ function useDepreciationSeries(from: string, to: string) {
   return useQuery({
     queryKey: ["assets-dep-series", from, to],
     queryFn: async () => {
+      if (isApiEnabled()) return (await apiGet<any[]>(`/api/v1/assets/depreciation-entries?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`)).sort((a, b) => a.period_date.localeCompare(b.period_date));
       let q = supabase.from("depreciation_entries").select("period_date, amount, asset:assets(depreciation_method)");
       if (from) q = q.gte("period_date", from);
       if (to) q = q.lte("period_date", to);
