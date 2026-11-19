@@ -32,13 +32,13 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
 
   obs.etape("fiche client par l'API");
   await page.goto("/customers");
-  await page.getByRole("button", { name: /Add Customer/i }).click();
+  await page.getByRole("button", { name: /Ajouter un client/i }).click();
   let d = page.getByRole("dialog");
-  await d.getByPlaceholder("Company or individual name").fill(client);
+  await d.getByPlaceholder("Raison sociale ou nom").fill(client);
   await d.getByPlaceholder("email@example.com").fill("client.sursite@exemple.invalid");
   await d.getByRole("button", { name: "Create" }).click();
   await expect(d).toBeHidden();
-  await page.getByPlaceholder("Search customers...").fill(RUN);
+  await page.getByPlaceholder("Rechercher un client...").fill(RUN);
   await expect(ligne(page, client)).toBeVisible();
 
   obs.etape("facture à deux lignes par l'API");
@@ -79,7 +79,7 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   const m = await dernierToast(page);
   testInfo.annotations.push({ type: "encaissement", description: m });
   await expect(p, `encaissement : ${m}`).toBeHidden();
-  await panneau.getByRole("button", { name: "Fermer" }).click().catch(() => undefined);
+  await panneau.getByRole("button", { name: "Fermer", exact: true }).click().catch(() => undefined);
   await expect(ligne(page, numero)).toContainText("Réglée");
 
   // V42 : annulation par contre-passation, par l'API sur site.
@@ -93,7 +93,7 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   testInfo.annotations.push({ type: "annulation", description: await dernierToast(page) });
   await expect(a).toBeHidden();
   await expect(detail.getByRole("region", { name: "Règlements" })).toContainText("Virement rejeté");
-  await detail.getByRole("button", { name: "Fermer" }).click();
+  await detail.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(ligne(page, numero)).toContainText("Émise");
 
   // V45 : avoir total par l'API sur site → facture entièrement créditée.
@@ -108,7 +108,7 @@ test("client → facture à lignes → encaissement → export, tout par l'API s
   await av.getByRole("button", { name: "Émettre l'avoir" }).click();
   testInfo.annotations.push({ type: "avoir", description: await dernierToast(page) });
   await expect(av).toBeHidden();
-  await panneauAvoir.getByRole("button", { name: "Fermer" }).click();
+  await panneauAvoir.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(ligne(page, numero)).toContainText("Réglée");
 
   obs.etape("export par l'API");

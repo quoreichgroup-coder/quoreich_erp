@@ -121,7 +121,7 @@ export default function AssetsMasterData() {
       [
         { key: "Code", header: "Code" }, { key: "Nom", header: "Nom" },
         { key: "Catégorie", header: "Catégorie" }, { key: "Localisation", header: "Localisation" },
-        { key: "Méthode", header: "Méthode" }, { key: "Acquisition", header: "Date acquisition" },
+        { key: "Méthode", header: "Méthode" }, { key: "Acquisition", header: "Date d'acquisition" },
         { key: "Coût", header: "Coût (XOF)" }, { key: "VNC", header: "VNC (XOF)" },
         { key: "Cumul", header: "Amort. cumulé" }, { key: "Statut", header: "Statut" },
       ],
@@ -155,7 +155,7 @@ export default function AssetsMasterData() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Master Data" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Données de base" }]} />
       <GuidanceBanner title="Registre des Immobilisations" description="Fiches actifs SYSCOHADA — catégorie, méthode, durée d'usage, VNC live." />
 
       <div className="flex items-center justify-between mb-4">
@@ -184,7 +184,7 @@ export default function AssetsMasterData() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label className="text-xs" htmlFor="as-date">Date acquisition</Label><Input id="as-date" type="date" value={form.acquisition_date} onChange={(e) => setForm({ ...form, acquisition_date: e.target.value })} /></div>
+                <div><Label className="text-xs" htmlFor="as-date">Date d'acquisition</Label><Input id="as-date" type="date" value={form.acquisition_date} onChange={(e) => setForm({ ...form, acquisition_date: e.target.value })} /></div>
                 <div><Label className="text-xs" htmlFor="as-cost">Coût (XOF) *</Label><Input id="as-cost" type="number" value={form.acquisition_cost} onChange={(e) => setForm({ ...form, acquisition_cost: e.target.value })} /></div>
                 <div><Label className="text-xs" htmlFor="as-salvage">Valeur résiduelle</Label><Input id="as-salvage" type="number" value={form.salvage_value} onChange={(e) => setForm({ ...form, salvage_value: e.target.value })} /></div>
                 <div><Label className="text-xs" htmlFor="as-life">Durée (mois)</Label><Input id="as-life" type="number" value={form.useful_life_months} onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} /></div>

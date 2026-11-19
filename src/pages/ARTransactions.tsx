@@ -407,7 +407,7 @@ function ReceiptsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
           etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
         })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "client", header: "Client" },
           { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "encaissements-clients")}>
-          <Download className="w-3.5 h-3.5" /> Export
+          <Download className="w-3.5 h-3.5" /> Exporter
         </ExportMenu>
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} encaissements · Net : {fmtCurrency(total)}</span>
       </div>
@@ -533,7 +533,7 @@ export default function ARTransactions() {
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Encaissement client</Button>}
           {canReceive && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}><Receipt className="w-3.5 h-3.5" /> Acompte client</Button>}
           <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setStatementOpen(true)}><BookOpen className="w-3.5 h-3.5" /> Relevé de compte</Button>
-          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => void handleExport(f)}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
+          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => void handleExport(f)}><Download className="w-3.5 h-3.5" /> Exporter</ExportMenu>
         </div>
       </div>
 

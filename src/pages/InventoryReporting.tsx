@@ -413,9 +413,9 @@ export default function InventoryReporting() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Stock", href: "/inventory" }, { label: "Reporting" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Stock", href: "/inventory" }, { label: "Rapports" }]} />
       <GuidanceBanner
-        title="Reporting Stock"
+        title="Rapports de stock"
         description="Consultez la valorisation, la rotation, le classement ABC et l’historique des clôtures et des exports."
       />
 

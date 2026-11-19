@@ -14,7 +14,7 @@ const allPages = [
   { title: "Tableau de bord CFO", url: "/", icon: LayoutDashboard, group: "Navigation" },
   // AR
   { title: "Comptes clients (AR)", url: "/receivables", icon: ArrowDownLeft, group: "Finance" },
-  { title: "AR — Transactions", url: "/receivables/transactions", icon: ArrowDownLeft, group: "Finance" },
+  { title: "Comptes clients — Transactions", url: "/receivables/transactions", icon: ArrowDownLeft, group: "Finance" },
   { title: "AR — Analyse d'âge", url: "/receivables/aging", icon: ArrowDownLeft, group: "Finance" },
   { title: "Clients", url: "/customers", icon: Users, group: "Finance" },
   // AP
@@ -24,7 +24,7 @@ const allPages = [
   { title: "Fournisseurs", url: "/suppliers", icon: Users, group: "Finance" },
   // GL
   { title: "Grand Livre (GL)", url: "/journal", icon: BookOpen, group: "Finance" },
-  { title: "GL — Transactions", url: "/journal/transactions", icon: BookOpen, group: "Finance" },
+  { title: "Grand livre — Transactions", url: "/journal/transactions", icon: BookOpen, group: "Finance" },
   { title: "GL — Plan comptable", url: "/journal/master-data", icon: BookOpen, group: "Finance" },
   // Treasury
   { title: "Trésorerie", url: "/treasury", icon: Wallet, group: "Finance" },

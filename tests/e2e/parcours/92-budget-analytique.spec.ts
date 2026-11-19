@@ -77,7 +77,7 @@ async function ajouterLigne(page: Page, montant: string, section?: string) {
 
 async function demande(page: Page, objet: string, date: string, montant: string) {
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New Requisition/i }).click();
+  await page.getByRole("button", { name: /Nouvelle demande/i }).click();
   const d = page.getByRole("dialog");
   await d.getByLabel("Objet de la demande").fill(objet);
   await d.getByLabel("Date de la demande").fill(date);
@@ -90,7 +90,7 @@ async function demande(page: Page, objet: string, date: string, montant: string)
   await expect(axe, "section choisie").not.toHaveValue("");
   await d.getByRole("button", { name: "Créer la demande" }).click();
   await expect(d).toBeHidden();
-  await page.getByRole("tab", { name: /Requisitions/ }).click();
+  await page.getByRole("tab", { name: /Demandes d'achat/ }).click();
   return ligne(page, objet);
 }
 

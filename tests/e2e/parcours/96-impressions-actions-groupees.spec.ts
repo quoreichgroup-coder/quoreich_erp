@@ -37,7 +37,7 @@ test("impression des pièces et actions groupées dans les modules", async ({ pa
   await expect(barreDA).toBeHidden();
 
   obs.etape("achats : commande imprimée (PDF) et en Excel depuis « Voir »");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await page.getByRole("button", { name: "Voir" }).first().click();
   const vue = page.getByRole("dialog");
   expect(await signature(await telecharger(page, vue.getByTestId("btn-document-pdf"), /\.pdf$/))).toBe("%PDF");

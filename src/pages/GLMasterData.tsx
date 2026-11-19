@@ -58,7 +58,7 @@ function TreeItem({ account, depth = 0, selectedId, onSelect }: {
         {hasChildren ? (open ? <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />) : <span className="w-3 shrink-0" />}
         <span className="font-mono text-[10px] text-muted-foreground shrink-0">{account.code}</span>
         <span className="truncate">{account.name}</span>
-        {!account.is_active && <span className="ml-auto text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">Inactive</span>}
+        {!account.is_active && <span className="ml-auto text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">Inactif</span>}
       </button>
       {open && hasChildren && account.children.map(child => (
         <TreeItem key={child.id} account={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
@@ -120,7 +120,7 @@ export default function GLMasterData() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "General Ledger", href: "/journal" }, { label: "Plan Comptable" }]} />
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Grand livre", href: "/journal" }, { label: "Plan Comptable" }]} />
       <GuidanceBanner message="Gérez le plan comptable hiérarchique. Créez, modifiez et désactivez des comptes. Les soldes sont calculés à partir des écritures comptables validées." />
 
       <div className="flex items-center justify-between">

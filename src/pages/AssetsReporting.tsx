@@ -114,7 +114,7 @@ export default function AssetsReporting() {
     if (!canDo(perms, "export")) return;
     exportToPDF({
       filename: `assets-depreciation-${from}_${to}.pdf`,
-      title: "Reporting Immobilisations — Dotations mensuelles",
+      title: "Rapports des immobilisations — dotations mensuelles",
       subtitle: `Période : ${from} → ${to}`,
       columns: [
         { key: "month", header: "Mois" },
@@ -130,11 +130,11 @@ export default function AssetsReporting() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Reporting" }]} />
-      <GuidanceBanner title="Reporting Immobilisations" description="Dotations SYSCOHADA, VNC, amortissements cumulés par catégorie et localisation." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Rapports" }]} />
+      <GuidanceBanner title="Rapports des immobilisations" description="Dotations SYSCOHADA, VNC, amortissements cumulés par catégorie et localisation." />
 
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-        <h1 className="text-lg font-semibold text-foreground">Reporting</h1>
+        <h1 className="text-lg font-semibold text-foreground">Rapports</h1>
         <div className="flex items-center gap-2">
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 w-[140px] text-xs" />
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 w-[140px] text-xs" />

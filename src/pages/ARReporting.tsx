@@ -104,7 +104,7 @@ const groupingOptions = [
 const navSections = [
   { id: "builder", label: "Constructeur de rapport", icon: Layers },
   { id: "templates", label: "Templates sauvegardés", icon: FolderOpen },
-  { id: "permissions", label: "Permissions", icon: Shield },
+  { id: "permissions", label: "Droits", icon: Shield },
 ];
 
 /* ──────── COMPONENT ──────── */
@@ -143,7 +143,13 @@ export default function ARReporting() {
   const previewRows = useMemo(() => {
     return invoices
       .filter((inv: any) => {
-        if (filterStatus !== "Tous" && inv.status !== filterStatus.toLowerCase()) return false;
+        if (filterStatus !== "Tous") {
+          const ouvert = !["draft", "paid", "cancelled"].includes(inv.status);
+          const echu = ouvert && !!inv.due_date && inv.due_date < new Date().toISOString().slice(0, 10);
+          if (filterStatus === "open" && !ouvert) return false;
+          if (filterStatus === "overdue" && !echu) return false;
+          if ((filterStatus === "paid" || filterStatus === "draft") && inv.status !== filterStatus) return false;
+        }
         if (filterClient !== "Tous" && inv.customer?.name !== filterClient) return false;
         if (filterPeriodFrom && inv.invoice_date < filterPeriodFrom) return false;
         if (filterPeriodTo && inv.invoice_date > filterPeriodTo) return false;
@@ -256,7 +262,7 @@ export default function ARReporting() {
         items={[
           { label: "Finance", href: "/" },
           { label: "AR", href: "/receivables" },
-          { label: "Reporting" },
+          { label: "Rapports" },
         ]}
       />
       <GuidanceBanner message="Moteur de reporting dynamique AR — construisez des rapports personnalisés avec sélection de colonnes, filtres avancés, groupement dynamique et export PDF/Excel. Sauvegardez vos configurations en modèles réutilisables." />
@@ -381,11 +387,11 @@ export default function ARReporting() {
                       onChange={(e) => setFilterStatus(e.target.value)}
                       className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
                     >
-                      <option>Tous</option>
-                      <option>Ouvert</option>
-                      <option>Soldé</option>
-                      <option>Overdue</option>
-                      <option>Draft</option>
+                      <option value="Tous">Tous</option>
+                      <option value="open">Ouvert</option>
+                      <option value="paid">Soldé</option>
+                      <option value="overdue">Échu</option>
+                      <option value="draft">Brouillon</option>
                     </select>
                   </div>
                   <div>
@@ -489,13 +495,13 @@ export default function ARReporting() {
                   <Save className="w-3.5 h-3.5" /> Sauvegarder modèle
                 </button>
                 <button onClick={() => exportPreview("pdf")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export PDF
+                  <Download className="w-3.5 h-3.5" /> Exporter (PDF)
                 </button>
                 <button onClick={() => exportPreview("xlsx")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export Excel
+                  <Download className="w-3.5 h-3.5" /> Exporter (Excel)
                 </button>
                 <button onClick={() => exportPreview("csv")} disabled={previewRows.length === 0} className="btn-outline h-8 px-3 text-xs flex items-center gap-1.5">
-                  <Printer className="w-3.5 h-3.5" /> Export CSV
+                  <Printer className="w-3.5 h-3.5" /> Exporter (CSV)
                 </button>
               </div>
 
@@ -674,7 +680,7 @@ export default function ARReporting() {
                       <th>Créé par</th>
                       <th>Date</th>
                       <th>Statut</th>
-                      <th>Permission</th>
+                      <th>Droit</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>

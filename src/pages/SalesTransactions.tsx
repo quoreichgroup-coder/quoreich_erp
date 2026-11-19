@@ -873,10 +873,10 @@ export default function SalesTransactions() {
     filterConfigs: [
       {
         key: "status",
-        label: "Status",
+        label: "Statut",
         options: ["draft", "sent", "accepted", "expired", "converted"],
       },
-      { key: "customer", label: "Customer", options: customerOptions },
+      { key: "customer", label: "Client", options: customerOptions },
     ],
   });
   const soTable = useTableFeatures({
@@ -886,10 +886,10 @@ export default function SalesTransactions() {
     filterConfigs: [
       {
         key: "status",
-        label: "Status",
+        label: "Statut",
         options: ["draft", "confirmed", "partially_delivered", "delivered", "cancelled"],
       },
-      { key: "customer", label: "Customer", options: customerOptions },
+      { key: "customer", label: "Client", options: customerOptions },
     ],
   });
   const dnTable = useTableFeatures({
@@ -897,8 +897,8 @@ export default function SalesTransactions() {
     pageSize: 10,
     searchableKeys: ["id", "customer", "soRef"],
     filterConfigs: [
-      { key: "status", label: "Status", options: ["draft", "completed", "cancelled"] },
-      { key: "customer", label: "Customer", options: customerOptions },
+      { key: "status", label: "Statut", options: ["draft", "completed", "cancelled"] },
+      { key: "customer", label: "Client", options: customerOptions },
     ],
   });
 
@@ -1017,10 +1017,10 @@ export default function SalesTransactions() {
   return (
     <PageShell>
       <Breadcrumb
-        items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Transactions" }]}
+        items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Transactions" }]}
       />
       <GuidanceBanner
-        title="Sales Transactions"
+        title="Transactions de vente"
         description="Cycle Quote → SO → Delivery → Facture avec actions sécurisées par rôle."
       />
 
@@ -1030,24 +1030,24 @@ export default function SalesTransactions() {
             <Lock className="w-4 h-4 text-amber-700 mt-0.5" />
             <p className="text-xs text-muted-foreground">
               Lecture seule — aucun rôle Sales attribué. Demandez à un administrateur dans{" "}
-              <strong>Settings → Users</strong>.
+              <strong>Paramètres → Utilisateurs</strong>.
             </p>
           </CardContent>
         </Card>
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold text-foreground">Sales Transactions</h1>
+        <h1 className="text-lg font-semibold text-foreground">Transactions de vente</h1>
         <div className="flex gap-2">
           {perms?.canCreate && (
             <>
               <Button size="sm" className="gap-1.5" onClick={() => setShowNewQuote(true)}>
                 <Plus className="w-3.5 h-3.5" />
-                New Quote
+                Nouveau devis
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowNewOrder(true)}>
                 <ShoppingBag className="w-3.5 h-3.5" />
-                New Order
+                Nouvelle commande
               </Button>
             </>
           )}
@@ -1085,7 +1085,7 @@ export default function SalesTransactions() {
             aria-label="Exporter l'onglet actif en PDF"
           >
             <Download className="w-3.5 h-3.5" aria-hidden="true" />
-            Export PDF
+            Exporter (PDF)
           </Button>
           {!perms?.canExport && (
             <span id={EXPORT_HINT_ID} className="sr-only">
@@ -1230,12 +1230,12 @@ export default function SalesTransactions() {
                       <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner tous les devis" className="rounded border-input"
                         checked={qtTable.pagedData.length > 0 && qtTable.pagedData.every((q) => selQt.has(q.quoteId))}
                         onChange={(e) => setSelQt(e.target.checked ? new Set(qtTable.pagedData.map((q) => q.quoteId)) : new Set())} /></TableCell>
-                      <SortableHead label="Quote #" sortKey="id" sort={qtTable.sort} onSort={qtTable.toggleSort} />
+                      <SortableHead label="N° de devis" sortKey="id" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={qtTable.sort} onSort={qtTable.toggleSort} />
-                      <SortableHead label="Customer" sortKey="customer" sort={qtTable.sort} onSort={qtTable.toggleSort} />
+                      <SortableHead label="Client" sortKey="customer" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <SortableHead label="Total TTC (XOF)" sortKey="total" sort={qtTable.sort} onSort={qtTable.toggleSort} className="text-right" />
                       <SortableHead label="Valid Until" sortKey="validUntil" sort={qtTable.sort} onSort={qtTable.toggleSort} />
-                      <SortableHead label="Status" sortKey="status" sort={qtTable.sort} onSort={qtTable.toggleSort} />
+                      <SortableHead label="Statut" sortKey="status" sort={qtTable.sort} onSort={qtTable.toggleSort} />
                       <TableCell className="text-[11px] font-medium text-muted-foreground">Actions</TableCell>
                     </TableRow>
                   </TableHeader>
@@ -1368,10 +1368,10 @@ export default function SalesTransactions() {
                         onChange={(e) => setSelSo(e.target.checked ? new Set(soTable.pagedData.map((o) => o.soId)) : new Set())} /></TableCell>
                       <SortableHead label="SO #" sortKey="id" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={soTable.sort} onSort={soTable.toggleSort} />
-                      <SortableHead label="Customer" sortKey="customer" sort={soTable.sort} onSort={soTable.toggleSort} />
-                      <SortableHead label="Quote Ref" sortKey="qtRef" sort={soTable.sort} onSort={soTable.toggleSort} />
+                      <SortableHead label="Client" sortKey="customer" sort={soTable.sort} onSort={soTable.toggleSort} />
+                      <SortableHead label="Réf. devis" sortKey="qtRef" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <SortableHead label="Total TTC (XOF)" sortKey="total" sort={soTable.sort} onSort={soTable.toggleSort} className="text-right" />
-                      <SortableHead label="Status" sortKey="status" sort={soTable.sort} onSort={soTable.toggleSort} />
+                      <SortableHead label="Statut" sortKey="status" sort={soTable.sort} onSort={soTable.toggleSort} />
                       <TableCell className="text-[11px] font-medium text-muted-foreground">Actions</TableCell>
                     </TableRow>
                   </TableHeader>
@@ -1517,8 +1517,8 @@ export default function SalesTransactions() {
                       <SortableHead label="DN #" sortKey="id" sort={dnTable.sort} onSort={dnTable.toggleSort} />
                       <SortableHead label="SO Ref" sortKey="soRef" sort={dnTable.sort} onSort={dnTable.toggleSort} />
                       <SortableHead label="Date" sortKey="date" sort={dnTable.sort} onSort={dnTable.toggleSort} />
-                      <SortableHead label="Customer" sortKey="customer" sort={dnTable.sort} onSort={dnTable.toggleSort} />
-                      <SortableHead label="Status" sortKey="status" sort={dnTable.sort} onSort={dnTable.toggleSort} />
+                      <SortableHead label="Client" sortKey="customer" sort={dnTable.sort} onSort={dnTable.toggleSort} />
+                      <SortableHead label="Statut" sortKey="status" sort={dnTable.sort} onSort={dnTable.toggleSort} />
                       <TableCell className="text-[11px] font-medium text-muted-foreground">Actions</TableCell>
                     </TableRow>
                   </TableHeader>
@@ -1590,7 +1590,7 @@ export default function SalesTransactions() {
       <div className="space-y-4 mt-6">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Sales</h2>
+          <h2 className="text-sm font-semibold text-foreground">Comptabilisation — ventes</h2>
         </div>
         <GLPostingKPIsLive module="Sales" />
         <GLBatchHistoryLive module="Sales" />

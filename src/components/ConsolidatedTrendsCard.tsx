@@ -75,10 +75,10 @@ export function ConsolidatedTrendsCard({ tenantIds, months, onMonthsChange }: Pr
                 formatter={(v: number) => new Intl.NumberFormat("fr-FR").format(v)}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="revenue" name="Total Revenue" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="revenue" name="Chiffre d'affaires" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="expenses" name="Total Expenses" stroke="hsl(0, 72%, 51%)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="netProfit" name="Net Profit" stroke="hsl(220, 50%, 22%)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="cashBalance" name="Cash Balance" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+              <Line type="monotone" dataKey="cashBalance" name="Solde de trésorerie" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         )}

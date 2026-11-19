@@ -66,16 +66,16 @@ export default function SalesMasterData() {
       <Breadcrumb
         items={[
           { label: "Finance" },
-          { label: "Sales", href: "/sales" },
-          { label: "Master Data" },
+          { label: "Ventes", href: "/sales" },
+          { label: "Données de base" },
         ]}
       />
       <GuidanceBanner
-        title="Sales Master Data"
+        title="Données de base des ventes"
         description="Clients, catalogue vendable et conditions de paiement — données live."
       />
 
-      <h1 className="text-lg font-semibold text-foreground">Sales Master Data</h1>
+      <h1 className="text-lg font-semibold text-foreground">Données de base des ventes</h1>
 
       <Tabs defaultValue="customers">
         <TabsList className="mb-4">

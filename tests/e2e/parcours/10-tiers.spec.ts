@@ -68,9 +68,9 @@ test("client : créer, retrouver, modifier", async ({ page }, testInfo) => {
 
   obs.etape("création");
   await page.goto("/customers");
-  await page.getByRole("button", { name: /Add Customer/i }).click();
+  await page.getByRole("button", { name: /Ajouter un client/i }).click();
   const d = page.getByRole("dialog");
-  await d.getByPlaceholder("Company or individual name").fill(nom);
+  await d.getByPlaceholder("Raison sociale ou nom").fill(nom);
   await d.getByPlaceholder("email@example.com").fill("client.beta@exemple.invalid");
   await d.getByPlaceholder("XX-2024-000").fill(`IFU-C-${RUN}`);
   await d.getByRole("button", { name: "Create" }).click();
@@ -78,7 +78,7 @@ test("client : créer, retrouver, modifier", async ({ page }, testInfo) => {
   testInfo.annotations.push({ type: "message", description: await dernierToast(page) });
 
   obs.etape("recherche");
-  await page.getByPlaceholder("Search customers...").fill(RUN);
+  await page.getByPlaceholder("Rechercher un client...").fill(RUN);
   await expect(ligne(page, nom)).toBeVisible();
 
   obs.etape("modification");

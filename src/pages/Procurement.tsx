@@ -87,48 +87,48 @@ export default function Procurement() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Procurement", href: "/procurement" }]} />
-      <GuidanceBanner title="Procurement" description="Purchase requisitions, PO tracking, multi-level approvals, supplier performance, and spend analytics — all from live data." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Approvisionnement", href: "/procurement" }]} />
+      <GuidanceBanner title="Approvisionnement" description="Purchase requisitions, PO tracking, multi-level approvals, supplier performance, and spend analytics — all from live data." />
 
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Procurement</h1>
+        <h1 className="text-lg font-semibold text-foreground">Approvisionnement</h1>
         <div className="flex gap-2">
-          <Button size="sm" className="gap-1.5" onClick={() => navigate("/procurement/transactions")}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate("/procurement/transactions")}><Plus className="w-3.5 h-3.5" />Nouvelle demande</Button>
           <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => exportTable(f, 
             (purchaseOrders ?? []).map((p: any) => ({ numero: p.po_number, fournisseur: p.supplier?.name ?? "", date: p.order_date, total: p.total, statut: p.status })),
-            [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }], "commandes")}><Download className="w-3.5 h-3.5" />Export</ExportMenu>
+            [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }], "commandes")}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingCart className="w-3.5 h-3.5" />Requisitions</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingCart className="w-3.5 h-3.5" />Demandes d'achat</div>
           <div className="text-xl font-bold text-foreground">{prs.length}</div>
           <div className="text-[11px] text-muted-foreground mt-1">{draftPRs} draft</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><FileText className="w-3.5 h-3.5" />PR Value</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><FileText className="w-3.5 h-3.5" />Valeur de la demande</div>
           <div className="text-xl font-bold text-foreground">{fmt(totalPRValue)}</div>
           <div className="text-[11px] text-muted-foreground mt-1">XOF</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Package className="w-3.5 h-3.5" />Purchase Orders</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Package className="w-3.5 h-3.5" />Commandes fournisseurs</div>
           <div className="text-xl font-bold text-foreground">{pos.length}</div>
           <div className="text-[11px] text-muted-foreground mt-1">{fmt(totalPOValue)} XOF</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Truck className="w-3.5 h-3.5" />Goods Receipts</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Truck className="w-3.5 h-3.5" />Réceptions</div>
           <div className="text-xl font-bold text-foreground">{grs.length}</div>
           <div className="text-[11px] text-muted-foreground mt-1">{completedGRs} completed</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Users className="w-3.5 h-3.5" />Suppliers</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Users className="w-3.5 h-3.5" />Fournisseurs</div>
           <div className="text-xl font-bold text-foreground">{supps.length}</div>
-          <div className="text-[11px] text-muted-foreground mt-1">active</div>
+          <div className="text-[11px] text-muted-foreground mt-1">actif</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle className="w-3.5 h-3.5" />Pending Approval</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle className="w-3.5 h-3.5" />En approbation</div>
           <div className={cn("text-xl font-bold", (draftPRs + draftPOs) > 0 ? "text-amber-600" : "text-foreground")}>{draftPRs + draftPOs}</div>
           <div className="text-[11px] text-muted-foreground mt-1">across PR & PO</div>
         </CardContent></Card>
@@ -139,10 +139,10 @@ export default function Procurement() {
       ) : (
         <Tabs defaultValue="requisitions">
           <TabsList className="mb-4">
-            <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Requisitions ({prs.length})</TabsTrigger>
-            <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Purchase Orders ({pos.length})</TabsTrigger>
-            <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Approval Workflow</TabsTrigger>
-            <TabsTrigger value="reporting" className="gap-1.5"><BarChart3 className="w-3.5 h-3.5" />Reporting</TabsTrigger>
+            <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Demandes d'achat ({prs.length})</TabsTrigger>
+            <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Commandes fournisseurs ({pos.length})</TabsTrigger>
+            <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Circuit d'approbation</TabsTrigger>
+            <TabsTrigger value="reporting" className="gap-1.5"><BarChart3 className="w-3.5 h-3.5" />Rapports</TabsTrigger>
           </TabsList>
 
           {/* Requisitions */}
@@ -152,14 +152,14 @@ export default function Procurement() {
                 <TableHead className="text-xs">PR #</TableHead>
                 <TableHead className="text-xs">Description</TableHead>
                 <TableHead className="text-xs text-right">Est. Total</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Statut</TableHead>
                 <TableHead className="text-xs">PO Ref</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {prs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No requisitions yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">Aucune demande d'achat</TableCell></TableRow>
                 ) : prs.map((pr: any) => (
                   <TableRow key={pr.id} className="text-xs cursor-pointer hover:bg-muted/20" onClick={() => setSelectedPR(pr)}>
                     <TableCell className="font-mono text-primary">{pr.pr_number}</TableCell>
@@ -184,16 +184,16 @@ export default function Procurement() {
             <Card className="border-border"><CardContent className="p-0">
               <Table><TableHeader><TableRow className="bg-muted/30">
                 <TableHead className="text-xs">PO #</TableHead>
-                <TableHead className="text-xs">Supplier</TableHead>
+                <TableHead className="text-xs">Fournisseur</TableHead>
                 <TableHead className="text-xs text-right">Total</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Lines</TableHead>
+                <TableHead className="text-xs">Statut</TableHead>
+                <TableHead className="text-xs">Lignes</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {pos.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No purchase orders yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">Aucune commande fournisseur</TableCell></TableRow>
                 ) : pos.map((po: any) => (
                   <TableRow key={po.id} className="text-xs">
                     <TableCell className="font-mono text-primary">{po.po_number}</TableCell>
@@ -313,14 +313,14 @@ export default function Procurement() {
               <div className="mt-4 space-y-4">
                 <div><div className="text-xs text-muted-foreground">Description</div><div className="text-sm font-medium">{selectedPR.description}</div></div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div><span className="text-muted-foreground">Status:</span> <Badge className={`text-[10px] ${statusBadge(selectedPR.status)}`} variant="outline">{selectedPR.status}</Badge></div>
+                  <div><span className="text-muted-foreground">Statut :</span> <Badge className={`text-[10px] ${statusBadge(selectedPR.status)}`} variant="outline">{selectedPR.status}</Badge></div>
                   <div><span className="text-muted-foreground">Total:</span> {fmt(selectedPR.estimated_total)} XOF</div>
                   <div><span className="text-muted-foreground">Date:</span> {selectedPR.request_date}</div>
-                  <div><span className="text-muted-foreground">Lines:</span> {selectedPR.lines?.length || 0}</div>
+                  <div><span className="text-muted-foreground">Lignes :</span> {selectedPR.lines?.length || 0}</div>
                 </div>
                 {selectedPR.lines && selectedPR.lines.length > 0 && (
                   <div>
-                    <div className="text-xs font-medium mb-2">Lines</div>
+                    <div className="text-xs font-medium mb-2">Lignes</div>
                     <div className="space-y-1.5">
                       {selectedPR.lines.map((l: any) => (
                         <div key={l.id} className="flex justify-between text-xs p-2 bg-muted/30 rounded">

@@ -190,7 +190,7 @@ function RuleDialog({ row, onClose }: { row: any | null | undefined; onClose: ()
           ))}
           {row && (
             <div className="space-y-1.5"><Label className="text-xs" htmlFor="rule-active">Statut</Label>
-              <select id="rule-active" className={sel} value={f.active} onChange={s("active")}><option value="true">Active</option><option value="false">Suspendue</option></select></div>
+              <select id="rule-active" className={sel} value={f.active} onChange={s("active")}><option value="true">Actif</option><option value="false">Suspendue</option></select></div>
           )}
         </div>
         {error && f.item_id && <p className="text-xs text-destructive" role="alert">{error}</p>}

@@ -194,7 +194,7 @@ export default function FixedAssets() {
   if (isLoading) {
     return (
       <PageShell>
-        <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets" }]} />
+        <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations" }]} />
         <div className="grid grid-cols-5 gap-3 mb-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
         <Skeleton className="h-96" />
       </PageShell>
@@ -203,20 +203,20 @@ export default function FixedAssets() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: activeTab === "register" ? "Asset Register" : activeTab === "depreciation" ? "Depreciation" : activeTab === "alerts" ? "Alerts" : activeTab === "analytics" ? "Analytics" : "GL Integration" }]} />
-      <GuidanceBanner title="Fixed Assets Management" description="Manage fixed assets, depreciation (linear, declining), maintenance tracking, and automatic GL postings." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: activeTab === "register" ? "Asset Register" : activeTab === "depreciation" ? "Depreciation" : activeTab === "alerts" ? "Alerts" : activeTab === "analytics" ? "Analytics" : "GL Integration" }]} />
+      <GuidanceBanner title="Gestion des immobilisations" description="Manage fixed assets, depreciation (linear, declining), maintenance tracking, and automatic GL postings." />
 
       <HeaderActions />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-5 gap-3 mb-4">
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Building2 className="w-3.5 h-3.5" />Total Acquisition</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Building2 className="w-3.5 h-3.5" />Total des acquisitions</div>
           <div className="text-xl font-bold text-foreground">{fmt(totalCost)} <span className="text-xs font-normal text-muted-foreground">XOF</span></div>
           <div className="text-[11px] text-muted-foreground mt-1">{assets.length} assets</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><TrendingDown className="w-3.5 h-3.5" />Net Book Value</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><TrendingDown className="w-3.5 h-3.5" />Valeur nette comptable</div>
           <div className="text-xl font-bold text-foreground">{fmt(totalNBV)} <span className="text-xs font-normal text-muted-foreground">XOF</span></div>
           <Progress value={totalCost > 0 ? (totalNBV / totalCost) * 100 : 0} className="mt-2 h-1.5" />
         </CardContent></Card>
@@ -225,11 +225,11 @@ export default function FixedAssets() {
           <div className="text-xl font-bold text-foreground">{fmt(totalDepreciation)} <span className="text-xs font-normal text-muted-foreground">XOF</span></div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><CheckCircle2 className="w-3.5 h-3.5" />Active</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><CheckCircle2 className="w-3.5 h-3.5" />Actif</div>
           <div className="text-xl font-bold text-foreground">{activeAssets}</div>
         </CardContent></Card>
         <Card className="border-border"><CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle className="w-3.5 h-3.5" />Alerts</div>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertTriangle className="w-3.5 h-3.5" />Alertes</div>
           <div className="text-xl font-bold text-destructive">{alerts.filter((a: any) => a.severity === "critical").length}</div>
           <div className="text-[11px] text-amber-600 mt-1">{alerts.filter((a: any) => a.severity === "warning").length} warnings</div>
         </CardContent></Card>
@@ -237,9 +237,9 @@ export default function FixedAssets() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
-          <TabsTrigger value="register" className="gap-1.5"><FileText className="w-3.5 h-3.5" />Asset Register</TabsTrigger>
-          <TabsTrigger value="depreciation" className="gap-1.5"><TrendingDown className="w-3.5 h-3.5" />Depreciation</TabsTrigger>
-          <TabsTrigger value="alerts" className="gap-1.5"><AlertTriangle className="w-3.5 h-3.5" />Alerts ({alerts.length})</TabsTrigger>
+          <TabsTrigger value="register" className="gap-1.5"><FileText className="w-3.5 h-3.5" />Registre des immobilisations</TabsTrigger>
+          <TabsTrigger value="depreciation" className="gap-1.5"><TrendingDown className="w-3.5 h-3.5" />Amortissements</TabsTrigger>
+          <TabsTrigger value="alerts" className="gap-1.5"><AlertTriangle className="w-3.5 h-3.5" />Alertes ({alerts.length})</TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5"><Calculator className="w-3.5 h-3.5" />Analytics</TabsTrigger>
         </TabsList>
 
@@ -251,22 +251,22 @@ export default function FixedAssets() {
                 <CardHeader className="p-3 pb-2"><CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filters</CardTitle></CardHeader>
                 <CardContent className="p-3 pt-0 space-y-3">
                   <div>
-                    <label className="text-[11px] text-muted-foreground mb-1 block">Category</label>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Catégorie</label>
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="all">Toutes les catégories</SelectItem>
                         {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground mb-1 block">Status</label>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Statut</label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="all">Tous les statuts</SelectItem>
+                        <SelectItem value="active">Actif</SelectItem>
                         <SelectItem value="fully_depreciated">Fully Depreciated</SelectItem>
                         <SelectItem value="disposed">Disposed</SelectItem>
                         <SelectItem value="under_maintenance">Under Maintenance</SelectItem>
@@ -274,13 +274,13 @@ export default function FixedAssets() {
                     </Select>
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted-foreground mb-1 block">Method</label>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Méthode</label>
                     <Select value={methodFilter} onValueChange={setMethodFilter}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Methods</SelectItem>
-                        <SelectItem value="straight_line">Straight Line</SelectItem>
-                        <SelectItem value="declining_balance">Declining Balance</SelectItem>
+                        <SelectItem value="all">Toutes les méthodes</SelectItem>
+                        <SelectItem value="straight_line">Linéaire</SelectItem>
+                        <SelectItem value="declining_balance">Dégressif</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -295,7 +295,7 @@ export default function FixedAssets() {
               <div className="mb-3">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input placeholder="Search assets…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-xs" />
+                  <Input placeholder="Rechercher une immobilisation…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-xs" />
                 </div>
               </div>
               <Card className="border-border">
@@ -304,17 +304,17 @@ export default function FixedAssets() {
                     <TableHeader>
                       <TableRow className="bg-muted/30">
                         <TableHead className="text-[11px] font-semibold">Code</TableHead>
-                        <TableHead className="text-[11px] font-semibold">Asset Name</TableHead>
-                        <TableHead className="text-[11px] font-semibold">Category</TableHead>
-                        <TableHead className="text-[11px] font-semibold">Method</TableHead>
-                        <TableHead className="text-[11px] font-semibold text-right">Acq. Cost</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Désignation</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Catégorie</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Méthode</TableHead>
+                        <TableHead className="text-[11px] font-semibold text-right">Coût d'acquisition</TableHead>
                         <TableHead className="text-[11px] font-semibold text-right">NBV</TableHead>
-                        <TableHead className="text-[11px] font-semibold">Status</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Statut</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filtered.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No assets found. Click "New Asset" to add one.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Aucune immobilisation.</TableCell></TableRow>
                       ) : filtered.map((asset: any) => (
                         <TableRow key={asset.id} className="cursor-pointer hover:bg-muted/20 text-xs" onClick={() => { setSelectedAsset(asset); setDetailTab("summary"); }}>
                           <TableCell className="font-mono text-[11px] text-primary">{asset.asset_code}</TableCell>
@@ -346,7 +346,7 @@ export default function FixedAssets() {
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2 space-y-4">
               <Card className="border-border">
-                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Asset Distribution by Category</CardTitle></CardHeader>
+                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Répartition par catégorie</CardTitle></CardHeader>
                 <CardContent className="p-4 pt-0">
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={categoryBreakdown}>
@@ -354,21 +354,21 @@ export default function FixedAssets() {
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip formatter={(v: number) => fmt(v) + " XOF"} contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }} />
-                      <Bar dataKey="value" name="Acquisition Cost" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="value" name="Coût d'acquisition" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card className="border-border">
-                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Asset Depreciation Comparison</CardTitle></CardHeader>
+                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Comparaison des amortissements</CardTitle></CardHeader>
                 <CardContent className="p-4 pt-0">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/30">
-                        <TableHead className="text-[11px] font-semibold">Asset</TableHead>
-                        <TableHead className="text-[11px] font-semibold">Method</TableHead>
-                        <TableHead className="text-[11px] font-semibold text-right">Cost</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Immobilisation</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Méthode</TableHead>
+                        <TableHead className="text-[11px] font-semibold text-right">Coût</TableHead>
                         <TableHead className="text-[11px] font-semibold text-right">NBV</TableHead>
                         <TableHead className="text-[11px] font-semibold">Progress</TableHead>
                       </TableRow>
@@ -400,7 +400,7 @@ export default function FixedAssets() {
 
             <div className="space-y-4">
               <Card className="border-border">
-                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Asset Distribution</CardTitle></CardHeader>
+                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Répartition des immobilisations</CardTitle></CardHeader>
                 <CardContent className="p-4 pt-0">
                   {categoryBreakdown.length > 0 ? (
                     <>
@@ -425,16 +425,16 @@ export default function FixedAssets() {
                       </div>
                     </>
                   ) : (
-                    <div className="text-center text-sm text-muted-foreground py-8">No data</div>
+                    <div className="text-center text-sm text-muted-foreground py-8">Aucune donnée</div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="border-border">
-                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 text-destructive" />Depreciation Alerts</CardTitle></CardHeader>
+                <CardHeader className="p-4 pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 text-destructive" />Alertes d'amortissement</CardTitle></CardHeader>
                 <CardContent className="p-4 pt-0 space-y-2">
                   {assets.filter((a: any) => a.status === "fully_depreciated").length === 0 ? (
-                    <div className="text-xs text-muted-foreground">No fully depreciated assets</div>
+                    <div className="text-xs text-muted-foreground">Aucune immobilisation totalement amortie</div>
                   ) : assets.filter((a: any) => a.status === "fully_depreciated").map((a: any) => (
                     <div key={a.id} className="flex items-start gap-2 p-2 bg-destructive/5 border border-destructive/20 rounded text-xs">
                       <AlertTriangle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
@@ -451,7 +451,7 @@ export default function FixedAssets() {
         <TabsContent value="alerts">
           <div className="space-y-2">
             {alerts.length === 0 ? (
-              <Card className="border-border"><CardContent className="p-8 text-center text-sm text-muted-foreground">No alerts at this time.</CardContent></Card>
+              <Card className="border-border"><CardContent className="p-8 text-center text-sm text-muted-foreground">Aucune alerte pour le moment.</CardContent></Card>
             ) : alerts.map((alert: any, i: number) => {
               const Icon = alert.type === "maintenance" ? Wrench : alert.type === "warranty" ? ShieldCheck : alert.type === "end_of_life" ? FileWarning : AlertTriangle;
               const bg = alert.severity === "critical" ? "bg-destructive/5 border-destructive/20" : alert.severity === "warning" ? "bg-amber-500/5 border-amber-500/20" : "bg-muted/30 border-border";
@@ -478,7 +478,7 @@ export default function FixedAssets() {
         <TabsContent value="analytics">
           <div className="grid grid-cols-2 gap-4">
             <Card className="border-border">
-              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">By Category</CardTitle></CardHeader>
+              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Par catégorie</CardTitle></CardHeader>
               <CardContent className="p-4 pt-0">
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={categoryBreakdown} layout="vertical">
@@ -486,21 +486,21 @@ export default function FixedAssets() {
                     <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={120} />
                     <Tooltip formatter={(v: number) => fmt(v) + " XOF"} contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }} />
-                    <Bar dataKey="value" name="Acquisition Cost" fill="hsl(var(--chart-1))" radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="value" name="Coût d'acquisition" fill="hsl(var(--chart-1))" radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
             <Card className="border-border">
-              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Asset Summary</CardTitle></CardHeader>
+              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Synthèse des immobilisations</CardTitle></CardHeader>
               <CardContent className="p-4 pt-0">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead className="text-[11px] font-semibold">Category</TableHead>
-                      <TableHead className="text-[11px] font-semibold text-right">Assets</TableHead>
-                      <TableHead className="text-[11px] font-semibold text-right">Cost</TableHead>
+                      <TableHead className="text-[11px] font-semibold">Catégorie</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-right">Immobilisations</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-right">Coût</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -520,12 +520,12 @@ export default function FixedAssets() {
             </Card>
 
             <Card className="border-border col-span-2">
-              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">GL Posting Rules</CardTitle></CardHeader>
+              <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Règles de comptabilisation</CardTitle></CardHeader>
               <CardContent className="p-4 pt-0 space-y-2 text-xs text-muted-foreground">
-                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Acquisition: Debit Asset, Credit Bank/Vendor</div>
-                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Depreciation: Debit Expense, Credit Acc. Dep.</div>
-                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Disposal: Debit Acc. Dep. + Bank, Credit Asset ± Gain/Loss</div>
-                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Revaluation: Debit Asset, Credit Revaluation Reserve</div>
+                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Acquisition : débit immobilisation, crédit banque ou fournisseur</div>
+                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Amortissement : débit dotation, crédit amortissements cumulés</div>
+                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Cession : débit amortissements cumulés et banque, crédit immobilisation, plus ou moins-value</div>
+                <div className="flex items-start gap-2"><ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />Réévaluation : débit immobilisation, crédit écart de réévaluation</div>
               </CardContent>
             </Card>
           </div>
@@ -546,8 +546,8 @@ export default function FixedAssets() {
 
               <Tabs value={detailTab} onValueChange={setDetailTab} className="mt-4">
                 <TabsList className="w-full">
-                  <TabsTrigger value="summary" className="flex-1 text-xs">Summary</TabsTrigger>
-                  <TabsTrigger value="schedule" className="flex-1 text-xs">Depreciation</TabsTrigger>
+                  <TabsTrigger value="summary" className="flex-1 text-xs">Synthèse</TabsTrigger>
+                  <TabsTrigger value="schedule" className="flex-1 text-xs">Amortissements</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="summary" className="mt-4 space-y-4">
@@ -573,10 +573,10 @@ export default function FixedAssets() {
 
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div><div className="text-muted-foreground">Acquisition Cost</div><div className="font-mono font-bold text-foreground">{fmt(Number(selectedAsset.acquisition_cost))} XOF</div></div>
-                      <div><div className="text-muted-foreground">Salvage Value</div><div className="font-mono font-medium text-foreground">{fmt(Number(selectedAsset.salvage_value))} XOF</div></div>
-                      <div><div className="text-muted-foreground">Acc. Depreciation</div><div className="font-mono font-medium text-foreground">{fmt(Number(selectedAsset.accumulated_depreciation))} XOF</div></div>
-                      <div><div className="text-muted-foreground">Net Book Value</div><div className="font-mono font-bold text-primary">{fmt(Number(selectedAsset.net_book_value))} XOF</div></div>
+                      <div><div className="text-muted-foreground">Coût d'acquisition</div><div className="font-mono font-bold text-foreground">{fmt(Number(selectedAsset.acquisition_cost))} XOF</div></div>
+                      <div><div className="text-muted-foreground">Valeur résiduelle</div><div className="font-mono font-medium text-foreground">{fmt(Number(selectedAsset.salvage_value))} XOF</div></div>
+                      <div><div className="text-muted-foreground">Amortissements cumulés</div><div className="font-mono font-medium text-foreground">{fmt(Number(selectedAsset.accumulated_depreciation))} XOF</div></div>
+                      <div><div className="text-muted-foreground">Valeur nette comptable</div><div className="font-mono font-bold text-primary">{fmt(Number(selectedAsset.net_book_value))} XOF</div></div>
                     </div>
                     {(() => {
                       const depBase = Number(selectedAsset.acquisition_cost) - Number(selectedAsset.salvage_value);
@@ -595,7 +595,7 @@ export default function FixedAssets() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/30">
-                        <TableHead className="text-[11px] font-semibold">Period</TableHead>
+                        <TableHead className="text-[11px] font-semibold">Période</TableHead>
                         <TableHead className="text-[11px] font-semibold text-right">Opening NBV</TableHead>
                         <TableHead className="text-[11px] font-semibold text-right">Charge</TableHead>
                         <TableHead className="text-[11px] font-semibold text-right">Acc. Dep.</TableHead>

@@ -82,13 +82,13 @@ export default function SalesControl() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Control" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Contrôle" }]} />
       <GuidanceBanner
-        title="Sales Control"
+        title="Contrôle des ventes"
         description="Pipeline temps réel, SLA cycle Quote → SO → DN → Facture, et journal d'audit des changements de rôles."
       />
 
-      <h1 className="text-lg font-semibold text-foreground">Sales Control</h1>
+      <h1 className="text-lg font-semibold text-foreground">Contrôle des ventes</h1>
 
       <Tabs defaultValue="pipeline">
         <TabsList className="mb-3">
@@ -158,7 +158,7 @@ export default function SalesControl() {
                   disabled={!sla || sla.length === 0}
                 >
                   <Download className="w-3 h-3 mr-1" />
-                  Export CSV
+                  Exporter (CSV)
                 </Button>
               </div>
             </CardHeader>
@@ -177,7 +177,7 @@ export default function SalesControl() {
                     <TableRow className="bg-muted/30 text-[11px]">
                       <TableHead>SO #</TableHead>
                       <TableHead>Date commande</TableHead>
-                      <TableHead className="text-right">Quote→SO (h)</TableHead>
+                      <TableHead className="text-right">Devis → commande (h)</TableHead>
                       <TableHead className="text-right">SO→DN (j)</TableHead>
                       <TableHead className="text-right">DN→Facture (j)</TableHead>
                       <TableHead>Statut</TableHead>
@@ -245,7 +245,7 @@ export default function SalesControl() {
         <TabsContent value="audit">
           <Card className="border-border">
             <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm">Audit trail Sales</CardTitle>
+              <CardTitle className="text-sm">Piste d'audit des ventes</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {la ? (

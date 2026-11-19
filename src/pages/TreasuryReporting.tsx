@@ -50,7 +50,7 @@ export default function TreasuryReporting() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Trésorerie", href: "/treasury" }, { label: "Reporting" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Trésorerie", href: "/treasury" }, { label: "Rapports" }]} />
       <GuidanceBanner title="Reporting trésorerie" description="Soldes réels des comptes bancaires et flux issus des transactions enregistrées." />
 
       <div className="flex gap-1 border-b border-border">

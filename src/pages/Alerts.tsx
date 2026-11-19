@@ -268,7 +268,7 @@ export default function Alerts() {
                           Résolue
                         </Badge>
                       ) : (
-                        <Badge variant="secondary">Active</Badge>
+                        <Badge variant="secondary">Actif</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

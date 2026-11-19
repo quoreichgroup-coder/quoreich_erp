@@ -55,13 +55,13 @@ export default function SalesSettings() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Settings" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Paramètres" }]} />
       <GuidanceBanner
-        title="Sales Settings"
+        title="Paramètres des ventes"
         description="Workflow d'auto-facturation, seuils SLA, mapping GL et règles de posting."
       />
 
-      <h1 className="text-lg font-semibold text-foreground">Sales Settings</h1>
+      <h1 className="text-lg font-semibold text-foreground">Paramètres des ventes</h1>
 
       <Tabs defaultValue="general">
         <TabsList className="mb-3">
@@ -86,7 +86,7 @@ export default function SalesSettings() {
         <TabsContent value="general">
           <Card className="border-border">
             <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm">Workflow Ventes</CardTitle>
+              <CardTitle className="text-sm">Circuit des ventes</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-2 space-y-4 max-w-xl">
               {isLoading ? (
@@ -154,13 +154,13 @@ export default function SalesSettings() {
             <CardContent className="p-4 pt-2 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Field
-                  label="Quote (h)"
+                  label="Devis (h)"
                   value={form.sla_quote_hours}
                   onChange={(v) => setForm((f) => ({ ...f, sla_quote_hours: v }))}
                   disabled={!canManage}
                 />
                 <Field
-                  label="Quote → SO (h)"
+                  label="Devis → commande (h)"
                   value={form.sla_quote_to_so_hours}
                   onChange={(v) => setForm((f) => ({ ...f, sla_quote_to_so_hours: v }))}
                   disabled={!canManage}

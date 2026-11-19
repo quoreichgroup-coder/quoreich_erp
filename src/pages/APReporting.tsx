@@ -103,8 +103,8 @@ export default function APReporting() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Comptes Fournisseurs", href: "/payables" }, { label: "Reporting" }]} />
-      <GuidanceBanner title="Reporting AP" description="Balance âgée, performance fournisseurs, analyse par poste, prévision de paiements — données live depuis la base." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Comptes Fournisseurs", href: "/payables" }, { label: "Rapports" }]} />
+      <GuidanceBanner title="Rapports fournisseurs" description="Balance âgée, performance fournisseurs, analyse par poste, prévision de paiements — données live depuis la base." />
 
       <div className="flex gap-1 border-b border-border overflow-x-auto">
         {tabs.map((t) => (
@@ -177,7 +177,7 @@ export default function APReporting() {
             <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={supplierStats.length === 0}
               onPick={(f) => exportTable(f, supplierStats as any[], [{ key: "supplier", header: "Fournisseur" }, { key: "total", header: "Total à payer (XOF)" },
                 { key: "invoices", header: "Factures" }, { key: "avgDays", header: "Délai moyen (jours)" }, { key: "onTimeRate", header: "% à temps" }],
-                "performance-fournisseurs", "Performance fournisseurs")}><Download className="w-3 h-3" />Export</ExportMenu>
+                "performance-fournisseurs", "Performance fournisseurs")}><Download className="w-3 h-3" />Exporter</ExportMenu>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">

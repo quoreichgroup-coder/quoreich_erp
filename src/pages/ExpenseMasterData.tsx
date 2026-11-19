@@ -58,7 +58,7 @@ function CategoryDialog({ category, onClose }: { category: ExpenseCategory | nul
             <Input id="cat-receipt" inputMode="decimal" className="h-8 text-xs" value={f.receipt} placeholder="vide = paramètre général" onChange={(e) => setF({ ...f, receipt: e.target.value })} /></div>
           <div className="space-y-1"><label htmlFor="cat-max" className="text-xs font-medium">Plafond par dépense</label>
             <Input id="cat-max" inputMode="decimal" className="h-8 text-xs" value={f.max} placeholder="vide = aucun" onChange={(e) => setF({ ...f, max: e.target.value })} /></div>
-          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> Active</label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> Actif</label>
         </div>
         {f.code && !code && <p className="text-xs text-destructive">Code : lettres, chiffres, « _ » ou « - », 20 caractères au plus.</p>}
         <DialogFooter>
@@ -149,7 +149,7 @@ export default function ExpenseMasterData() {
           <ExportButtons label="Exporter les catégories" rows={categories.map((c) => ({ code: c.code, libelle: c.name, compte: acc.get(c.gl_account_id)?.code ?? "", tva: c.default_tax_code_id ? tax.get(c.default_tax_code_id)?.code ?? "" : "",
             justificatif: c.receipt_required_above ?? "", plafond: c.max_amount_per_line ?? "", active: c.is_active ? "oui" : "non" }))}
             columns={[{ key: "code", header: "Code" }, { key: "libelle", header: "Libellé" }, { key: "compte", header: "Compte" }, { key: "tva", header: "Code TVA" },
-              { key: "justificatif", header: "Justificatif à partir de" }, { key: "plafond", header: "Plafond par dépense" }, { key: "active", header: "Active" }]} filename="categories-de-frais" />
+              { key: "justificatif", header: "Justificatif à partir de" }, { key: "plafond", header: "Plafond par dépense" }, { key: "active", header: "Actif" }]} filename="categories-de-frais" />
           {can && <Button size="sm" className="gap-1.5" onClick={() => setOpen("new")}><Plus className="w-3.5 h-3.5" /> Nouvelle catégorie</Button>}
         </div>
       </div>

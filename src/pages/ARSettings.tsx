@@ -18,10 +18,10 @@ import {
 const tabs = [
   { id: "general", label: "General", icon: Settings },
   { id: "glposting", label: "Comptabilisation", icon: BookOpen },
-  { id: "payment", label: "Payment Terms", icon: CreditCard },
+  { id: "payment", label: "Conditions de paiement", icon: CreditCard },
   { id: "numbering", label: "Numbering", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "dunning", label: "Dunning Rules", icon: Calculator },
+  { id: "dunning", label: "Règles de relance", icon: Calculator },
   { id: "currency", label: "Currency", icon: Globe },
 ];
 
@@ -35,10 +35,10 @@ function GeneralTab() {
   if (isLoading) return <Loader2 className="w-5 h-5 animate-spin" />;
   return (
     <div className="bg-card border border-border rounded-lg p-5 space-y-5 max-w-2xl">
-      <h3 className="text-sm font-semibold text-foreground">General Settings</h3>
+      <h3 className="text-sm font-semibold text-foreground">Paramètres généraux</h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label className="text-xs">Default Payment Term Code</Label>
+          <Label className="text-xs">Condition de paiement par défaut</Label>
           <Input className="h-9 text-xs" value={form.default_payment_term_code || ""} onChange={e => setForm((f: any) => ({ ...f, default_payment_term_code: e.target.value }))} />
         </div>
         <div className="space-y-1.5">
@@ -46,13 +46,13 @@ function GeneralTab() {
           <Input className="h-9 text-xs" value={form.default_currency || ""} onChange={e => setForm((f: any) => ({ ...f, default_currency: e.target.value }))} />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Credit Limit Default (XOF)</Label>
+          <Label className="text-xs">Limite de crédit par défaut (XOF)</Label>
           <Input type="number" className="h-9 text-xs" value={form.default_credit_limit ?? ""} onChange={e => setForm((f: any) => ({ ...f, default_credit_limit: parseFloat(e.target.value) || 0 }))} />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Auto-numbering</Label>
           <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs" value={form.auto_numbering ? "1" : "0"} onChange={e => setForm((f: any) => ({ ...f, auto_numbering: e.target.value === "1" }))}>
-            <option value="1">Enabled</option><option value="0">Disabled</option>
+            <option value="1">Activé</option><option value="0">Désactivé</option>
           </select>
         </div>
         <div className="space-y-1.5">
@@ -62,11 +62,11 @@ function GeneralTab() {
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Late Payment Interest (%)</Label>
+          <Label className="text-xs">Intérêts de retard (%)</Label>
           <Input type="number" step="0.1" className="h-9 text-xs" value={form.late_payment_interest_pct ?? ""} onChange={e => setForm((f: any) => ({ ...f, late_payment_interest_pct: parseFloat(e.target.value) || 0 }))} />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Grace Period (days)</Label>
+          <Label className="text-xs">Délai de grâce (jours)</Label>
           <Input type="number" className="h-9 text-xs" value={form.grace_period_days ?? ""} onChange={e => setForm((f: any) => ({ ...f, grace_period_days: parseInt(e.target.value) || 0 }))} />
         </div>
       </div>
@@ -85,7 +85,7 @@ export function PaymentTermsTab() {
   return (
     <div className="bg-card border border-border rounded-lg">
       <div className="p-3 border-b border-border flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-foreground">Payment Terms</h3>
+        <h3 className="text-sm font-semibold text-foreground">Conditions de paiement</h3>
         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing({ code: "", label: "", days: 30, discount_percent: 0, is_active: true })}>+ Add Term</Button>
       </div>
       {isLoading ? <div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
@@ -113,11 +113,11 @@ export function PaymentTermsTab() {
         <div className="p-4 border-t border-border bg-muted/10 grid grid-cols-5 gap-2 items-end">
           <div><Label className="text-[10px]">Code</Label><Input className="h-8 text-xs" value={editing.code} onChange={e => setEditing({ ...editing, code: e.target.value })} /></div>
           <div><Label className="text-[10px]">Label</Label><Input className="h-8 text-xs" value={editing.label} onChange={e => setEditing({ ...editing, label: e.target.value })} /></div>
-          <div><Label className="text-[10px]">Days</Label><Input type="number" className="h-8 text-xs" value={editing.days} onChange={e => setEditing({ ...editing, days: parseInt(e.target.value) || 0 })} /></div>
-          <div><Label className="text-[10px]">Discount %</Label><Input type="number" step="0.1" className="h-8 text-xs" value={editing.discount_percent} onChange={e => setEditing({ ...editing, discount_percent: parseFloat(e.target.value) || 0 })} /></div>
+          <div><Label className="text-[10px]">Jours</Label><Input type="number" className="h-8 text-xs" value={editing.days} onChange={e => setEditing({ ...editing, days: parseInt(e.target.value) || 0 })} /></div>
+          <div><Label className="text-[10px]">Remise %</Label><Input type="number" step="0.1" className="h-8 text-xs" value={editing.discount_percent} onChange={e => setEditing({ ...editing, discount_percent: parseFloat(e.target.value) || 0 })} /></div>
           <div className="flex gap-1">
-            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Save</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Enregistrer</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Annuler</Button>
           </div>
         </div>
       )}
@@ -147,12 +147,12 @@ function NumberingTab() {
                 <td className="px-3 py-2"><Input type="number" className="h-7 text-xs" value={draft.next_number} onChange={e => setDraft({ ...draft, next_number: parseInt(e.target.value) || 0 })} /></td>
                 <td className="px-3 py-2">
                   <select className="h-7 text-xs border border-input rounded px-2 bg-background" value={draft.reset_frequency} onChange={e => setDraft({ ...draft, reset_frequency: e.target.value })}>
-                    <option value="yearly">Yearly</option><option value="monthly">Monthly</option><option value="never">Never</option>
+                    <option value="yearly">Yearly</option><option value="monthly">Mensuel</option><option value="never">Never</option>
                   </select>
                 </td>
                 <td className="px-3 py-2 flex gap-1">
-                  <Button size="sm" className="h-6 text-[10px]" onClick={async () => { await update.mutateAsync({ id: n.id, ...draft }); setEditId(null); }}>Save</Button>
-                  <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditId(null)}>Cancel</Button>
+                  <Button size="sm" className="h-6 text-[10px]" onClick={async () => { await update.mutateAsync({ id: n.id, ...draft }); setEditId(null); }}>Enregistrer</Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setEditId(null)}>Annuler</Button>
                 </td>
               </tr>
             ) : (
@@ -162,7 +162,7 @@ function NumberingTab() {
                 <td className="px-3 py-2 font-mono text-muted-foreground">{n.format}</td>
                 <td className="px-3 py-2 font-mono">{n.next_number}</td>
                 <td className="px-3 py-2">{n.reset_frequency}</td>
-                <td className="px-3 py-2"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => { setEditId(n.id); setDraft(n); }}>Edit</Button></td>
+                <td className="px-3 py-2"><Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => { setEditId(n.id); setDraft(n); }}>Modifier</Button></td>
               </tr>
             ))}
           </tbody>
@@ -206,14 +206,14 @@ function DunningTab() {
       )}
       {editing && (
         <div className="p-4 border-t border-border bg-muted/10 grid grid-cols-6 gap-2 items-end">
-          <div><Label className="text-[10px]">Level</Label><Input type="number" className="h-8 text-xs" value={editing.level} onChange={e => setEditing({ ...editing, level: parseInt(e.target.value) || 1 })} /></div>
-          <div><Label className="text-[10px]">Days Overdue</Label><Input type="number" className="h-8 text-xs" value={editing.days_overdue} onChange={e => setEditing({ ...editing, days_overdue: parseInt(e.target.value) || 0 })} /></div>
+          <div><Label className="text-[10px]">Niveau</Label><Input type="number" className="h-8 text-xs" value={editing.level} onChange={e => setEditing({ ...editing, level: parseInt(e.target.value) || 1 })} /></div>
+          <div><Label className="text-[10px]">Jours de retard</Label><Input type="number" className="h-8 text-xs" value={editing.days_overdue} onChange={e => setEditing({ ...editing, days_overdue: parseInt(e.target.value) || 0 })} /></div>
           <div><Label className="text-[10px]">Action</Label><Input className="h-8 text-xs" value={editing.action} onChange={e => setEditing({ ...editing, action: e.target.value })} /></div>
           <div><Label className="text-[10px]">Fee (XOF)</Label><Input type="number" className="h-8 text-xs" value={editing.fee_amount} onChange={e => setEditing({ ...editing, fee_amount: parseFloat(e.target.value) || 0 })} /></div>
           <div><Label className="text-[10px]">Template</Label><Input className="h-8 text-xs" value={editing.template || ""} onChange={e => setEditing({ ...editing, template: e.target.value })} /></div>
           <div className="flex gap-1">
-            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Save</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Enregistrer</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Annuler</Button>
           </div>
         </div>
       )}
@@ -230,7 +230,7 @@ function NotificationsTab() {
   return (
     <div className="bg-card border border-border rounded-lg">
       <div className="p-3 border-b border-border flex justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Notification Rules</h3>
+        <h3 className="text-sm font-semibold text-foreground">Règles de notification</h3>
         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing({ trigger_condition: "", channel: "email", recipients: "", is_active: true })}>+ New Rule</Button>
       </div>
       {isLoading ? <div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
@@ -262,8 +262,8 @@ function NotificationsTab() {
           </div>
           <div><Label className="text-[10px]">Recipients</Label><Input className="h-8 text-xs" value={editing.recipients} onChange={e => setEditing({ ...editing, recipients: e.target.value })} /></div>
           <div className="col-span-4 flex gap-1">
-            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Save</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={async () => { await upsert.mutateAsync(editing); setEditing(null); }}>Enregistrer</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>Annuler</Button>
           </div>
         </div>
       )}
@@ -275,8 +275,8 @@ export default function ARSettings() {
   const [activeTab, setActiveTab] = useState("general");
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Accounts Receivable", href: "/receivables" }, { label: "Settings" }]} />
-      <GuidanceBanner title="AR Module Settings" description="Configure payment terms, document numbering, dunning rules, notifications and currency settings for the Accounts Receivable module." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Comptes clients", href: "/receivables" }, { label: "Paramètres" }]} />
+      <GuidanceBanner title="Paramètres des comptes clients" description="Configure payment terms, document numbering, dunning rules, notifications and currency settings for the Accounts Receivable module." />
       <div className="flex gap-1 border-b border-border overflow-x-auto">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}

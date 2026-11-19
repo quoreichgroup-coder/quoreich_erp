@@ -80,7 +80,7 @@ async function exigerDemande(page: Page, actif: boolean): Promise<boolean> {
 /** Commande directe approuvée par un tiers puis réceptionnée en partie (6 sur 10 à 10 000 XOF). */
 async function commandeReceptionnee(page: Page, browser: Browser, base: string | undefined, fournisseur: string) {
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New PO/i }).click();
+  await page.getByRole("button", { name: /Nouvelle commande/i }).click();
   const d = page.getByRole("dialog");
   await d.getByLabel("Libellé ligne 1").fill("Pièces détachées");
   await d.getByLabel("Quantité ligne 1").fill("10");
@@ -92,14 +92,14 @@ async function commandeReceptionnee(page: Page, browser: Browser, base: string |
   // La société exige une demande avant commande : assoupli le temps de cette commande directe.
   const exigeait = await exigerDemande(page, false);
   await page.goto("/procurement/transactions");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   const bc = ligne(page, fournisseur);
   const numero = (await bc.locator("td").nth(1).innerText()).trim();
   await bc.getByRole("button", { name: "Soumettre" }).click();
   await expect(bc).toContainText("En approbation");
   const { ctx, page: pa } = await pageApprobateur(browser, base);
   await pa.goto("/procurement/transactions");
-  await pa.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await pa.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await ligne(pa, fournisseur).getByRole("button", { name: "Approuver" }).click();
   await expect(ligne(pa, fournisseur)).toContainText("Approuvée");
   await ctx.close();
@@ -175,7 +175,7 @@ test("chaîne complète : commande → réception → facture hors tolérance re
     await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText(/AVF-\d{4}-\d{4}/);
     await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText("11 800");
     await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("59 000");
-    await panneau.getByRole("button", { name: "Fermer" }).click();
+    await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
     await page.getByRole("tab", { name: /^Avoirs/ }).click();
     await expect(page.getByTestId("ap-credit-note-row").filter({ hasText: numero })).toContainText(`AVF-EXT-${RUN}`);
     await page.getByRole("tab", { name: /^Factures/ }).click();
@@ -245,7 +245,7 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
     await ligne(page, ff1).locator("td").nth(1).click();
     const panneau = page.getByRole("dialog", { name: `Facture ${ff1}` });
     await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Reste à payer");
-    await panneau.getByRole("button", { name: "Fermer" }).click();
+    await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
     const telechargement = page.waitForEvent("download");
     await page.getByTestId("btn-export-csv").click();
     expect((await telechargement).suggestedFilename()).toMatch(/^factures-fournisseurs.*\.csv$/);

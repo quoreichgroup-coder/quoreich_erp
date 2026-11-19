@@ -69,7 +69,7 @@ test("demande à lignes → soumise → rejetée → modifiée → approuvée pa
 
   obs.etape("demande d'achat : en-tête, deux lignes, pied calculé");
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New Requisition/i }).click();
+  await page.getByRole("button", { name: /Nouvelle demande/i }).click();
   const d = await saisirLignes(page, "Coût estimé", [["Ordinateur portable", "3", "450000"], ["Écran 24 pouces", "3", "95000"]]);
   await d.getByLabel("Objet de la demande").fill(objet);
   await expect(d.getByTestId("doc-footer-total"), "pied = 3 × 450 000 + 3 × 95 000").toHaveText("1 635 000");
@@ -87,10 +87,10 @@ test("demande à lignes → soumise → rejetée → modifiée → approuvée pa
   await page.keyboard.press("Escape");
 
   obs.etape("soumission : l'auteur ne peut pas approuver");
-  await soumettre(page, /Requisitions/, objet);
+  await soumettre(page, /Demandes d'achat/, objet);
 
   obs.etape("rejet motivé par l'approbateur");
-  await decider(browser, base, /Requisitions/, objet, "Rejeter", "Quantités à revoir");
+  await decider(browser, base, /Demandes d'achat/, objet, "Rejeter", "Quantités à revoir");
   await page.reload();
   await expect(da).toContainText("Rejetée");
 
@@ -102,10 +102,10 @@ test("demande à lignes → soumise → rejetée → modifiée → approuvée pa
   await m.getByRole("button", { name: "Enregistrer" }).click();
   await expect(m).toBeHidden();
   await expect(da).toContainText("1 540 000");
-  await soumettre(page, /Requisitions/, objet);
+  await soumettre(page, /Demandes d'achat/, objet);
 
   obs.etape("approbation par un tiers, puis conversion");
-  await decider(browser, base, /Requisitions/, objet, "Approuver");
+  await decider(browser, base, /Demandes d'achat/, objet, "Approuver");
   await page.reload();
   await expect(da).toContainText("Approuvée");
   await da.getByRole("button", { name: /Convertir/ }).click();
@@ -118,7 +118,7 @@ test("demande à lignes → soumise → rejetée → modifiée → approuvée pa
   await expect(da).toContainText(/Convertie/);
 
   obs.etape("commande issue de la demande : lignes reprises");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   const bc = ligne(page, fournisseur);
   await expect(bc).toContainText("1 540 000");
   await expect(bc).toContainText("2 ligne(s)");
@@ -127,15 +127,15 @@ test("demande à lignes → soumise → rejetée → modifiée → approuvée pa
   await expect(v.getByRole("region", { name: "Lignes" })).toContainText("Ordinateur portable");
   await expect(v.getByRole("region", { name: "Pied" })).toContainText("Reste à recevoir");
   await page.keyboard.press("Escape");
-  await soumettre(page, /Purchase Orders/, fournisseur);
-  await decider(browser, base, /Purchase Orders/, fournisseur, "Approuver");
+  await soumettre(page, /Commandes fournisseurs/, fournisseur);
+  await decider(browser, base, /Commandes fournisseurs/, fournisseur, "Approuver");
   await page.reload();
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(bc).toContainText("Approuvée");
 
   obs.etape("exports des onglets");
   testInfo.annotations.push({ type: "export", description: await exporter(page, /^commandes.*\.csv$/) });
-  await page.getByRole("tab", { name: /Requisitions/ }).click();
+  await page.getByRole("tab", { name: /Demandes d'achat/ }).click();
   testInfo.annotations.push({ type: "export", description: await exporter(page, /^demandes-achat.*\.csv$/) });
 
   await obs.joindre(testInfo);
@@ -152,7 +152,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
 
   obs.etape("commande : en-tête, deux lignes, pied calculé");
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New PO/i }).click();
+  await page.getByRole("button", { name: /Nouvelle commande/i }).click();
   const d = await saisirLignes(page, "Prix unitaire", [["Ramettes de papier", "10", "3500"], ["Cartouches d'encre", "4", "25000"]]);
   await d.getByLabel("Fournisseur").selectOption({ label: fournisseur });
   await expect(d.getByTestId("doc-footer-total")).toHaveText("135 000");
@@ -160,7 +160,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(d).toBeHidden();
   testInfo.annotations.push({ type: "message", description: await dernierToast(page) });
 
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   const bc = ligne(page, fournisseur);
   await expect(bc).toContainText("135 000");
 
@@ -168,7 +168,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   obs.refusAttendu(/QG007.*exige une demande d'achat/);
   await demandeObligatoire(page, true);
   await page.goto("/procurement/transactions");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await ligne(page, fournisseur).getByRole("button", { name: "Soumettre" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "exige une demande d'achat" })).toBeVisible();
   await expect(ligne(page, fournisseur)).toContainText("Brouillon");
@@ -176,14 +176,14 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   obs.etape("paramètre assoupli par l'écran, soumission, approbation par un tiers");
   await demandeObligatoire(page, false);
   await page.goto("/procurement/transactions");
-  await soumettre(page, /Purchase Orders/, fournisseur);
-  await decider(browser, base, /Purchase Orders/, fournisseur, "Approuver");
+  await soumettre(page, /Commandes fournisseurs/, fournisseur);
+  await decider(browser, base, /Commandes fournisseurs/, fournisseur, "Approuver");
   await page.reload();
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(bc).toContainText(/Approuvée/);
   await demandeObligatoire(page, true);
   await page.goto("/procurement/transactions");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   const poNumero = (await bc.locator("td").nth(1).innerText()).trim();
 
   // V56 : suivi des livraisons — commande approuvée « à confirmer », accusé de réception du fournisseur.
@@ -201,7 +201,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(suivi).toContainText("Dans les délais");
   await expect(suivi).toContainText(`AR-${RUN}`);
   await expect(suivi).toContainText(`${dans7} (confirmée)`);
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(bc.locator("td").nth(4), "accusé de réception : commande « commandée »").toHaveText("Commandée");
 
   obs.etape("réception partielle : fournisseur d'abord, sur-réception refusée");
@@ -223,7 +223,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   const m1 = await dernierToast(page);
   testInfo.annotations.push({ type: "réception 1", description: m1 });
   await expect(r, `réception partielle : ${m1}`).toBeHidden();
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText("Reçue partiellement");
 
   obs.etape("réception du solde");
@@ -238,7 +238,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(ligne(page, fournisseur).locator("td").nth(4), "commande entièrement reçue").toHaveText("Reçue");
 
   obs.etape("détail d'une réception et export");
-  await page.getByRole("tab", { name: /Goods Receipt/ }).click();
+  await page.getByRole("tab", { name: /Réceptions/ }).click();
   const gr = ligne(page, poNumero);
   await expect(gr).toContainText("completed");
   await gr.getByRole("button", { name: "Voir" }).click();
@@ -255,7 +255,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
 
   // V52 : retour fournisseur sur la dernière réception (4 reçus en ligne 1), remplacement attendu.
   obs.etape("retour fournisseur avec remplacement attendu");
-  await page.getByRole("tab", { name: /Goods Receipt/ }).click();
+  await page.getByRole("tab", { name: /Réceptions/ }).click();
   await ligne(page, poNumero).getByRole("button", { name: "Retour" }).click();
   const rt = page.getByRole("dialog");
   await expect(rt.getByLabel("Quantité à retourner ligne 2"), "ligne 2 non reçue sur cette réception").toHaveCount(0);
@@ -276,7 +276,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await rl.click();
   await expect(page.getByRole("dialog").getByRole("region", { name: "Pied" })).toContainText("3 500");
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(ligne(page, fournisseur).locator("td").nth(4), "remplacement attendu : la commande se réceptionne de nouveau").toHaveText("Reçue partiellement");
 
   obs.etape("réception du remplacement");

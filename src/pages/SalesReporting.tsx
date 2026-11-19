@@ -67,7 +67,7 @@ export default function SalesReporting() {
     return (
       <PageShell>
         <Breadcrumb
-          items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Reporting" }]}
+          items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Rapports" }]}
         />
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-6 flex items-start gap-3">
@@ -76,7 +76,7 @@ export default function SalesReporting() {
               <p className="text-sm font-semibold text-foreground">Accès restreint</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Le module Reporting Ventes nécessite un rôle Sales (rep, manager ou controller).
-                Demandez à un administrateur de vous l'attribuer dans <strong>Settings → Users</strong>.
+                Demandez à un administrateur de vous l'attribuer dans <strong>Paramètres → Utilisateurs</strong>.
               </p>
             </div>
           </CardContent>
@@ -109,10 +109,10 @@ export default function SalesReporting() {
   return (
     <PageShell>
       <Breadcrumb
-        items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Reporting" }]}
+        items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Rapports" }]}
       />
       <GuidanceBanner
-        title="Sales Reporting"
+        title="Rapports de ventes"
         description="CA par client/période, carnet de commandes, taux de conversion et marge brute — données live."
       />
 
@@ -172,7 +172,7 @@ export default function SalesReporting() {
         </CardContent>
       </Card>
 
-      <h1 className="text-lg font-semibold text-foreground mb-3">Sales Reports</h1>
+      <h1 className="text-lg font-semibold text-foreground mb-3">Rapports de ventes</h1>
 
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">

@@ -106,10 +106,10 @@ export default function ProcurementSettings() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Procurement", href: "/procurement" }, { label: "Settings" }]} />
-      <GuidanceBanner title="Procurement Settings" description="Tolérances 3-Way Match, niveaux d'approbation PR/PO, catégories de dépenses." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Approvisionnement", href: "/procurement" }, { label: "Paramètres" }]} />
+      <GuidanceBanner title="Paramètres des achats" description="Tolérances 3-Way Match, niveaux d'approbation PR/PO, catégories de dépenses." />
 
-      <h1 className="text-lg font-semibold text-foreground mb-4">Procurement Settings</h1>
+      <h1 className="text-lg font-semibold text-foreground mb-4">Paramètres des achats</h1>
 
       <div className="flex gap-1 border-b border-border mb-4">
         {tabs.map(t => (
@@ -166,7 +166,7 @@ export default function ProcurementSettings() {
 
       {activeTab === "sla" && (
         <Card className="border-border max-w-3xl">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Seuils SLA Procurement</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Délais de traitement des achats</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0 space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>

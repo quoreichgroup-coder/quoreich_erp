@@ -41,7 +41,7 @@ test.describe("Treasury realtime", () => {
 
     // 2. Va sur Treasury
     await page.goto(`${BASE_URL}/treasury`);
-    await expect(page.getByText("Treasury Overview")).toBeVisible();
+    await expect(page.getByText("Vue d'ensemble de la trésorerie")).toBeVisible();
 
     // 3. Mutation directe via Supabase (simule import/écriture côté DB)
     const sb = createClient(SB_URL, SB_KEY);

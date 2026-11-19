@@ -290,7 +290,7 @@ export default function OpportunityDetailDialog({ opportunityId, open, onClose }
                   Disponible au stade <strong>Gagnée</strong>. Actuel : {STAGE_LABELS[opp.stage as CrmStage]}.
                 </p>
               ) : !perms.canConvert ? (
-                <p className="text-[11px] text-amber-600">Permission CRM `convert` requise.</p>
+                <p className="text-[11px] text-amber-600">Droit CRM « convertir » requis.</p>
               ) : (
                 <>
                   <Field label="Client cible">

@@ -22,10 +22,10 @@ import {
 import { useGLAuditLogs } from "@/hooks/use-gl-audit";
 
 const tabs = [
-  { id: "credit", label: "Credit Control", icon: CreditCard },
+  { id: "credit", label: "Contrôle du crédit", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "audit", label: "Audit Trail", icon: Eye },
-  { id: "locks", label: "Period Locks", icon: Lock },
+  { id: "audit", label: "Piste d'audit", icon: Eye },
+  { id: "locks", label: "Verrouillage des périodes", icon: Lock },
 ];
 
 const PIE_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--destructive))"];
@@ -70,16 +70,16 @@ export default function ARControl() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Accounts Receivable", href: "/receivables" }, { label: "Control & Validation" }]} />
-      <GuidanceBanner title="AR Control & Validation" description="Contrôle crédit, gestion des notifications, journal d'audit et verrouillage des périodes." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Comptes clients", href: "/receivables" }, { label: "Contrôle et validation" }]} />
+      <GuidanceBanner title="Contrôle et validation des comptes clients" description="Contrôle crédit, gestion des notifications, journal d'audit et verrouillage des périodes." />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Credit Breaches", value: String(breachedCount), icon: AlertTriangle, color: "text-destructive" },
           { label: "High Risk Clients", value: String(highRiskCount), icon: ShieldCheck, color: "text-destructive" },
-          { label: "Total Exposure (XOF)", value: fmt(totalExposure), icon: CreditCard, color: "text-primary" },
-          { label: "Active Notif Rules", value: String(notifRules.filter(r => r.is_active).length), icon: Bell, color: "text-primary" },
+          { label: "Encours total (XOF)", value: fmt(totalExposure), icon: CreditCard, color: "text-primary" },
+          { label: "Règles de notification actives", value: String(notifRules.filter(r => r.is_active).length), icon: Bell, color: "text-primary" },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-card border border-border rounded-lg p-3 flex items-center gap-2.5">
             <kpi.icon className={cn("w-4 h-4", kpi.color)} />
@@ -183,12 +183,12 @@ export default function ARControl() {
       {activeTab === "notifications" && (
         <div className="space-y-4">
           <div className="flex gap-2">
-            <Button size="sm" variant={notifView === "rules" ? "default" : "outline"} className="h-7 text-xs" onClick={() => setNotifView("rules")}>Notification Rules</Button>
+            <Button size="sm" variant={notifView === "rules" ? "default" : "outline"} className="h-7 text-xs" onClick={() => setNotifView("rules")}>Règles de notification</Button>
             <Button size="sm" variant={notifView === "log" ? "default" : "outline"} className="h-7 text-xs" onClick={() => setNotifView("log")}>Notification Log</Button>
           </div>
           {notifView === "rules" && (
             <div className="bg-card border border-border rounded-lg">
-              <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Automated Notification Rules</h3></div>
+              <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Règles de notification automatiques</h3></div>
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-border bg-muted/30">
                   {["Trigger Condition", "Channel", "Recipients", "Status", "Last Triggered", "Count", "Actions"].map(h => (
@@ -223,7 +223,7 @@ export default function ARControl() {
           )}
           {notifView === "log" && (
             <div className="bg-card border border-border rounded-lg">
-              <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Recent Notifications</h3></div>
+              <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Notifications récentes</h3></div>
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-border bg-muted/30">
                   {["Timestamp", "Customer", "Channel", "Detail", "Status"].map(h => (
@@ -257,7 +257,7 @@ export default function ARControl() {
       {/* AUDIT */}
       {activeTab === "audit" && (
         <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">AR Audit Trail</h3></div>
+          <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Piste d'audit clients</h3></div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">
               {["Timestamp", "User", "Action", "Batch", "Detail"].map(h => (

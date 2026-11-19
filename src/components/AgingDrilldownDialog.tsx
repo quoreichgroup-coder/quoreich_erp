@@ -294,7 +294,7 @@ export function AgingDrilldownDialog({
               aria-label="Exporter en CSV"
             >
               <Download className="h-4 w-4 mr-2" aria-hidden="true" />
-              Export CSV
+              Exporter (CSV)
             </Button>
           </div>
         </div>

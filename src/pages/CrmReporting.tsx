@@ -55,7 +55,7 @@ export default function CrmReporting() {
     <PageShell>
       <div className="space-y-3">
         <Breadcrumb items={[{ label: "CRM", href: "/crm" }, { label: "Rapports" }]} />
-        <GuidanceBanner title="Reporting CRM" description="Funnel commercial, prévisions pondérées, exports CSV/PDF gated par RBAC." />
+        <GuidanceBanner title="Rapports CRM" description="Funnel commercial, prévisions pondérées, exports CSV/PDF gated par RBAC." />
 
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="outline" className="h-8 text-xs" disabled={!perms.canExport} title={actionTooltip(perms, "export", "Exporter CSV")} onClick={exportCsv}>

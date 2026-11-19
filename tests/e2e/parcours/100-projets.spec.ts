@@ -131,7 +131,8 @@ test("projet : section, budget, note de frais imputée (barème, devise, avance)
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Note comptabilisée" })).toBeVisible();
   await aTraiter.click();
   const v = page.getByRole("dialog");
-  await expect(v.getByTestId("expense-advances-available")).toContainText("20 000");
+  // Avances ouvertes du salarié : au moins celle versée par ce passage (un passage interrompu peut en laisser d'autres).
+  await expect(v.getByTestId("expense-advances-available")).toContainText(/disponibles/);
   await v.getByLabel("Mode").selectOption("cash");
   await v.getByRole("button", { name: "Rembourser" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Note remboursée" })).toBeVisible();

@@ -71,7 +71,7 @@ function GLPostingOverview() {
 
   const handleRollback = (batchId: string) => {
     toast.success(`Batch ${batchId} rolled back`, {
-      description: "Compensating entries created in GL",
+      description: "Écritures de contrepassation créées",
     });
   };
 
@@ -81,7 +81,7 @@ function GLPostingOverview() {
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-medium text-foreground">GL Posting Engine — Consolidated Overview</h3>
+            <h3 className="text-sm font-medium text-foreground">Comptabilisation — vue d'ensemble</h3>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -122,9 +122,9 @@ function GLPostingOverview() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="text-left px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Module</th>
-                <th className="text-center px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Pending</th>
-                <th className="text-center px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Posted</th>
-                <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Total Posted (XOF)</th>
+                <th className="text-center px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">En attente</th>
+                <th className="text-center px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Comptabilisé</th>
+                <th className="text-right px-4 py-2 font-medium text-muted-foreground uppercase tracking-wider">Total comptabilisé (XOF)</th>
               </tr>
             </thead>
             <tbody>
@@ -176,17 +176,17 @@ function GLPostingOverview() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-sm flex items-center gap-2">
               <Play className="w-4 h-4 text-success" />
-              Post All Pending GL Batches
+              Comptabiliser tous les lots en attente
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs space-y-2">
-              <p>You are about to post <span className="font-medium text-foreground">{pending.length + validated.length} batches</span> to the General Ledger:</p>
+              <p>Vous allez comptabiliser <span className="font-medium text-foreground">{pending.length + validated.length} batches</span> au grand livre :</p>
               <div className="bg-muted/50 rounded p-3 space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Pending batches:</span>
+                  <span className="text-muted-foreground">Lots en attente :</span>
                   <span className="font-medium text-foreground">{pending.length} — {fmt(pendingTotal)} XOF</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Validated batches:</span>
+                  <span className="text-muted-foreground">Lots validés :</span>
                   <span className="font-medium text-foreground">{validated.length} — {fmt(validatedTotal)} XOF</span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
@@ -198,12 +198,12 @@ function GLPostingOverview() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="text-xs">Annuler</AlertDialogCancel>
             <AlertDialogAction 
               className="text-xs bg-success hover:bg-success"
               onClick={handlePostAll}
             >
-              <CheckCircle className="w-3 h-3 mr-1" /> Confirm & Post All
+              <CheckCircle className="w-3 h-3 mr-1" /> Confirmer et tout comptabiliser
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

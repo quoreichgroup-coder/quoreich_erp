@@ -41,11 +41,11 @@ export default function Sales() {
   const avgOrderValue = orders.length > 0 ? Math.round(orders.reduce((s, o) => s + Number(o.total), 0) / orders.length) : 0;
 
   const kpis = [
-    { label: "Open Quotes", value: String(openQuotes.length), icon: FileText, color: "text-primary", change: `${fmt(quotePipeline)} XOF pipeline` },
-    { label: "Pending Orders", value: String(pendingOrders.length), icon: ShoppingBag, color: "text-amber-600", change: `${fmt(orderPipeline)} XOF` },
+    { label: "Devis ouverts", value: String(openQuotes.length), icon: FileText, color: "text-primary", change: `${fmt(quotePipeline)} XOF pipeline` },
+    { label: "Commandes en cours", value: String(pendingOrders.length), icon: ShoppingBag, color: "text-amber-600", change: `${fmt(orderPipeline)} XOF` },
     { label: "Factures émises", value: fmt(totalRevenue), sub: "XOF", icon: TrendingUp, color: "text-success", change: `${issuedInvoices.length} factures` },
-    { label: "Fulfillment Rate", value: `${fulfillmentRate}%`, icon: Truck, color: "text-primary", change: `${deliveredOrders}/${orders.length} delivered` },
-    { label: "Avg Order Value", value: fmt(avgOrderValue), sub: "XOF", icon: CreditCard, color: "text-success", change: `${orders.length} orders total` },
+    { label: "Taux de livraison", value: `${fulfillmentRate}%`, icon: Truck, color: "text-primary", change: `${deliveredOrders}/${orders.length} delivered` },
+    { label: "Panier moyen", value: fmt(avgOrderValue), sub: "XOF", icon: CreditCard, color: "text-success", change: `${orders.length} orders total` },
     { label: "Total Quotes", value: String(quotes.length), icon: Clock, color: "text-amber-600", change: `${quotes.filter(q => q.status === "accepted" || q.status === "converted").length} accepted` },
   ];
 
@@ -86,7 +86,7 @@ export default function Sales() {
   if (isLoading) {
     return (
       <PageShell>
-        <Breadcrumb items={[{ label: "Finance" }, { label: "Sales" }, { label: "Dashboard" }]} />
+        <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes" }, { label: "Tableau de bord" }]} />
         <Skeleton className="h-96" />
       </PageShell>
     );
@@ -94,10 +94,10 @@ export default function Sales() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Sales", href: "/sales" }, { label: "Dashboard" }]} />
-      <GuidanceBanner title="Sales Order Management" description="Quote-to-cash pipeline, order tracking, and revenue analytics from live data." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Tableau de bord" }]} />
+      <GuidanceBanner title="Gestion des commandes de vente" description="Du devis à l'encaissement : suivi des commandes et du chiffre d'affaires." />
 
-      <h1 className="text-lg font-semibold text-foreground">Sales Dashboard</h1>
+      <h1 className="text-lg font-semibold text-foreground">Tableau de bord des ventes</h1>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpis.map(k => (
@@ -132,16 +132,16 @@ export default function Sales() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No revenue data yet</div>
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Pas encore de chiffre d'affaires</div>
             )}
           </div>
         </div>
 
         <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Top Customers by Revenue</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Meilleurs clients (chiffre d'affaires)</CardTitle></CardHeader>
           <CardContent className="p-4 pt-2 space-y-2.5">
             {topCustomers.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-4">No customer data yet</div>
+              <div className="text-sm text-muted-foreground text-center py-4">Pas encore de clients</div>
             ) : topCustomers.map((c, i) => (
               <div key={c.name} className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{i + 1}</div>

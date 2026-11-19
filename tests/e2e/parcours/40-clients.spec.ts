@@ -28,7 +28,7 @@ async function facturer(page: Page, client: string, lignes: [string, string, str
 
 async function fermerPanneau(page: Page) {
   const panneau = page.getByRole("dialog", { name: /^Facture / });
-  if (await panneau.count()) await panneau.getByRole("button", { name: "Fermer" }).click();
+  if (await panneau.count()) await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(panneau).toHaveCount(0);
 }
 
@@ -44,7 +44,7 @@ test("facture client à lignes → émission → encaissements par client", asyn
 
   obs.etape("fiches clients : sélection groupée et export de la sélection");
   await page.goto("/customers");
-  await page.getByPlaceholder("Search customers...").fill(RUN);
+  await page.getByPlaceholder("Rechercher un client...").fill(RUN);
   await page.getByLabel(`Sélectionner ${client}`).check();
   await page.getByLabel(`Sélectionner ${autre}`).check();
   const barre = page.getByTestId("customers-bulk-bar");

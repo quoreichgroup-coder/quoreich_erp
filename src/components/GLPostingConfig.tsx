@@ -87,7 +87,7 @@ export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: 
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary" />
-            GL Posting Batches
+            Lots comptables
           </CardTitle>
           <div className="flex items-center gap-2">
             <select
@@ -95,11 +95,11 @@ export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: 
               value={filter}
               onChange={e => setFilter(e.target.value)}
             >
-              <option value="all">All Statuses</option>
-              <option value="Pending">Pending</option>
+              <option value="all">Tous les statuts</option>
+              <option value="Pending">En attente</option>
               <option value="Validated">Validated</option>
-              <option value="Posted">Posted</option>
-              <option value="Rejected">Rejected</option>
+              <option value="Posted">Comptabilisé</option>
+              <option value="Rejected">Rejeté</option>
               <option value="Cancelled">Cancelled</option>
             </select>
             <Badge variant="outline" className="text-[10px]">{filtered.length} batches</Badge>
@@ -134,12 +134,12 @@ export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: 
                     <div className="flex items-center gap-1">
                       {b.status === "Validated" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={() => onPost?.(b.id)}>
-                          <Play className="w-3 h-3" /> Post
+                          <Play className="w-3 h-3" /> Comptabiliser
                         </Button>
                       )}
                       {(b.status === "Pending" || b.status === "Validated") && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive gap-1" onClick={() => onCancel?.(b.id)}>
-                          <XCircle className="w-3 h-3" /> Cancel
+                          <XCircle className="w-3 h-3" /> Annuler
                         </Button>
                       )}
                     </div>
@@ -148,7 +148,7 @@ export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: 
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={11} className="text-center py-6 text-muted-foreground">No batches found</td></tr>
+                <tr><td colSpan={11} className="text-center py-6 text-muted-foreground">Aucun lot</td></tr>
               )}
             </tbody>
           </table>
@@ -206,7 +206,7 @@ export function GLAuditHistory({
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
               <History className="w-4 h-4 text-primary" />
-              GL Batch Audit Trail
+              Piste d'audit des lots comptables
             </CardTitle>
             <div className="flex items-center gap-2">
               <select
@@ -214,7 +214,7 @@ export function GLAuditHistory({
                 value={selectedBatch || ""}
                 onChange={e => setSelectedBatch(e.target.value || null)}
               >
-                <option value="">All Recent Activity</option>
+                <option value="">Toute l'activité récente</option>
                 {batches.map(b => (
                   <option key={b.id} value={b.id}>{b.id} — {b.type}</option>
                 ))}
@@ -279,7 +279,7 @@ export function GLAuditHistory({
                   </tr>
                 ))}
                 {batchAudit.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-6 text-muted-foreground">No audit entries found</td></tr>
+                  <tr><td colSpan={7} className="text-center py-6 text-muted-foreground">Aucune entrée d'audit</td></tr>
                 )}
               </tbody>
             </table>
@@ -293,21 +293,21 @@ export function GLAuditHistory({
           <DialogHeader>
             <DialogTitle className="text-sm flex items-center gap-2">
               <History className="w-4 h-4" />
-              Audit Entry Detail
+              Détail de l'entrée d'audit
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Immutable audit record secured by hash chain
+              Enregistrement d'audit inaltérable, chaîné par empreinte
             </DialogDescription>
           </DialogHeader>
           {viewDetail && (
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Entry ID</Label>
+                  <Label className="text-[10px] text-muted-foreground">Identifiant</Label>
                   <div className="font-mono">{viewDetail.id}</div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Batch ID</Label>
+                  <Label className="text-[10px] text-muted-foreground">N° de lot</Label>
                   <div className="font-mono text-primary">{viewDetail.batchId}</div>
                 </div>
                 <div className="space-y-1">
@@ -322,12 +322,12 @@ export function GLAuditHistory({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">User</Label>
+                  <Label className="text-[10px] text-muted-foreground">Utilisateur</Label>
                   <div>{viewDetail.user}</div>
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Details</Label>
+                <Label className="text-[10px] text-muted-foreground">Détails</Label>
                 <div className="p-2 bg-muted/30 rounded text-foreground">{viewDetail.details}</div>
               </div>
               <div className="space-y-1 pt-2 border-t border-border">
@@ -340,7 +340,7 @@ export function GLAuditHistory({
                     <div className="font-mono text-[10px]">{viewDetail.hash}</div>
                   </div>
                   <div className="p-2 bg-muted/30 rounded">
-                    <div className="text-[9px] text-muted-foreground mb-0.5">Previous Hash</div>
+                    <div className="text-[9px] text-muted-foreground mb-0.5">Empreinte précédente</div>
                     <div className="font-mono text-[10px]">{viewDetail.prevHash}</div>
                   </div>
                 </div>
@@ -348,7 +348,7 @@ export function GLAuditHistory({
             </div>
           )}
           <DialogFooter>
-            <Button size="sm" variant="outline" onClick={() => setViewDetail(null)}>Close</Button>
+            <Button size="sm" variant="outline" onClick={() => setViewDetail(null)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -359,20 +359,20 @@ export function GLAuditHistory({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-sm flex items-center gap-2">
               <Undo2 className="w-4 h-4 text-amber-600" />
-              Confirm Batch Rollback
+              Confirmer l'annulation du lot
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs">
-              This will reverse all GL entries from batch <span className="font-mono font-medium text-foreground">{rollbackConfirm}</span> and 
+              Cette action contrepasse toutes les écritures du lot <span className="font-mono font-medium text-foreground">{rollbackConfirm}</span> and 
               create compensating entries. This action is audited and cannot be undone without a new posting.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="text-xs">Annuler</AlertDialogCancel>
             <AlertDialogAction 
               className="text-xs bg-amber-600 hover:bg-amber-700"
               onClick={() => rollbackConfirm && handleRollback(rollbackConfirm)}
             >
-              <RotateCcw className="w-3 h-3 mr-1" /> Confirm Rollback
+              <RotateCcw className="w-3 h-3 mr-1" /> Confirmer l'annulation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -392,11 +392,11 @@ export function GLPostingKPIs({ batches }: { batches: GLBatch[] }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       {[
-        { label: "Pending Batches", value: pending, icon: Clock, color: "text-amber-600" },
+        { label: "Lots en attente", value: pending, icon: Clock, color: "text-amber-600" },
         { label: "Validated", value: validated, icon: CheckCircle, color: "text-primary" },
-        { label: "Posted to GL", value: posted, icon: BookOpen, color: "text-success" },
-        { label: "Rejected", value: rejected, icon: XCircle, color: "text-destructive" },
-        { label: "Total Posted (XOF)", value: fmt(totalPosted), icon: BookOpen, color: "text-foreground" },
+        { label: "Comptabilisés", value: posted, icon: BookOpen, color: "text-success" },
+        { label: "Rejeté", value: rejected, icon: XCircle, color: "text-destructive" },
+        { label: "Total comptabilisé (XOF)", value: fmt(totalPosted), icon: BookOpen, color: "text-foreground" },
       ].map(kpi => (
         <div key={kpi.label} className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center justify-between mb-1">

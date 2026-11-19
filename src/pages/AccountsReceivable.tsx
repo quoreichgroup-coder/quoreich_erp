@@ -167,7 +167,7 @@ export default function AccountsReceivable() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "AR", href: "/receivables" }, { label: "Dashboard" }]} />
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "AR", href: "/receivables" }, { label: "Tableau de bord" }]} />
       <GuidanceBanner message="Tableau de bord du module Comptes Clients — suivez les créances ouvertes, l'analyse d'antériorité et les actions prioritaires pour optimiser le recouvrement." />
 
       {/* ── Global Filters ── */}

@@ -65,7 +65,7 @@ test("immobilisations : catégorie, fiche, amortissement du mois, cession compta
   await d.getByLabel("Nom *").fill(`Ordinateurs ${RUN}`);
   await d.getByLabel("Catégorie").click();
   await page.getByRole("option", { name: CATEGORIE }).click();
-  await d.getByLabel("Date acquisition").fill(`${periode}-01`);
+  await d.getByLabel("Date d'acquisition").fill(`${periode}-01`);
   await d.getByLabel("Mise en service").fill(`${periode}-01`);
   await d.getByLabel("Coût (XOF) *").fill("1200000");
   await d.getByLabel("Durée (mois)").fill("60");

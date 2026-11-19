@@ -102,7 +102,7 @@ export default function AssetsControl() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Control" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Contrôle" }]} />
       <GuidanceBanner title="Contrôle & Validation Immobilisations" description="Alertes maintenance / garantie, contrôles d'intégrité et piste d'audit RBAC." />
 
       <div className="flex items-center justify-between mb-4">

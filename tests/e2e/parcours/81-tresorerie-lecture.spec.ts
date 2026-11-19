@@ -55,7 +55,7 @@ test("Trésorerie : montants et export masqués pour l’approbateur sans droit"
   const permissions = await droits(page, "/treasury");
   expect(permissions.has("treasury.view_sensitive")).toBe(false);
   expect(permissions.has("treasury.export")).toBe(false);
-  await expect(page.getByText("Total Cash", { exact: true }).locator("..")).toContainText("•••••");
+  await expect(page.getByText("Trésorerie totale", { exact: true }).locator("..")).toContainText("•••••");
 
   await droits(page, "/treasury/transactions");
   const table = page.getByTestId("treasury-movements");

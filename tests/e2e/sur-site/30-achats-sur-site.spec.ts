@@ -68,7 +68,7 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
 
   obs.etape("demande à deux lignes, pied calculé");
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New Requisition/i }).click();
+  await page.getByRole("button", { name: /Nouvelle demande/i }).click();
   const d = await saisirLignes(page, "Coût estimé", [["Ramettes", "10", "3500"], ["Cartouches", "4", "25000"]]);
   await d.getByLabel("Objet de la demande").fill(objet);
   await expect(d.getByTestId("doc-footer-total")).toHaveText("135 000");
@@ -77,8 +77,8 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
   await expect(ligne(page, objet)).toContainText("135 000");
 
   obs.etape("soumission, approbation par le second membre, conversion");
-  await soumettre(page, /Requisitions/, objet);
-  await approuver(browser, base, /Requisitions/, objet);
+  await soumettre(page, /Demandes d'achat/, objet);
+  await approuver(browser, base, /Demandes d'achat/, objet);
   await page.reload();
   const da = ligne(page, objet);
   await expect(da).toContainText("Approuvée");
@@ -91,13 +91,13 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
   await expect(da).toContainText(/Convertie/);
 
   obs.etape("commande : soumise, approuvée par un tiers, accusé de réception");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   const bc = ligne(page, fournisseur);
   await expect(bc).toContainText("135 000");
-  await soumettre(page, /Purchase Orders/, fournisseur);
-  await approuver(browser, base, /Purchase Orders/, fournisseur);
+  await soumettre(page, /Commandes fournisseurs/, fournisseur);
+  await approuver(browser, base, /Commandes fournisseurs/, fournisseur);
   await page.reload();
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(bc).toContainText(/Approuvée/);
   const poNumero = (await bc.locator("td").nth(1).innerText()).trim();
   await page.getByRole("tab", { name: "Suivi des livraisons" }).click();
@@ -111,7 +111,7 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
   await expect(suivi).toContainText(`AR-${RUN}`);
 
   obs.etape("réception : sur-réception refusée, puis partielle validée");
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
   const r = page.getByRole("dialog");
   await r.getByLabel("Fournisseur").selectOption({ label: fournisseur });
@@ -124,7 +124,7 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
   await r.getByRole("button", { name: "Enregistrer et valider" }).click();
   const m = await dernierToast(page);
   await expect(r, `réception : ${m}`).toBeHidden();
-  await page.getByRole("tab", { name: /Purchase Orders/ }).click();
+  await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
   await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText("Reçue partiellement");
 
   expect(nuage, `accès du périmètre partis vers Supabase : ${nuage.join(", ")}`).toEqual([]);

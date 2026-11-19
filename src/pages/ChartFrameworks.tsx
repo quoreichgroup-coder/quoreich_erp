@@ -107,7 +107,7 @@ function RulesTab() {
       <div className="card-elevated overflow-x-auto">
         <table className="w-full text-xs" data-testid="quality-rules">
           <thead><tr className="bg-muted/30 text-muted-foreground">
-            <th className="text-left p-2">Règle</th><th className="text-left">Gravité du référentiel</th><th className="text-left">Active</th>
+            <th className="text-left p-2">Règle</th><th className="text-left">Gravité du référentiel</th><th className="text-left">Actif</th>
             <th className="text-left">Gravité pour la société</th><th />
           </tr></thead>
           <tbody>

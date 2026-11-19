@@ -58,8 +58,8 @@ const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 const approvalWorkflow = [
   { level: "L1", label: "Manager Direct", threshold: "< 10 000 000 XOF", sla: "24h" },
-  { level: "L2", label: "Head of Department", threshold: "10M – 50M XOF", sla: "48h" },
-  { level: "L3", label: "CFO / Finance Director", threshold: "50M – 200M XOF", sla: "72h" },
+  { level: "L2", label: "Responsable de service", threshold: "10M – 50M XOF", sla: "48h" },
+  { level: "L3", label: "Directeur financier", threshold: "50M – 200M XOF", sla: "72h" },
   { level: "L4", label: "CEO / Board", threshold: "> 200M XOF", sla: "5 jours" },
 ];
 
@@ -557,26 +557,26 @@ export default function ProcurementTransactions() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Procurement", href: "/procurement" }, { label: "Transactions" }]} />
-      <GuidanceBanner title="Procurement Transactions" description="Full procurement cycle: Requisition → PO → Goods Receipt → Invoice Matching. All data is live from the database." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Approvisionnement", href: "/procurement" }, { label: "Transactions" }]} />
+      <GuidanceBanner title="Transactions d'achat" description="Full procurement cycle: Requisition → PO → Goods Receipt → Invoice Matching. All data is live from the database." />
 
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Procurement Transactions</h1>
+        <h1 className="text-lg font-semibold text-foreground">Transactions d'achat</h1>
         <div className="flex gap-2">
-          <Button size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
+          <Button size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />Nouvelle demande</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />Nouvelle commande</Button>
           <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canReceive} title={perms && !perms.canReceive ? "Droit requis : procurement.receive" : undefined} onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
-          <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Export</ExportMenu>
+          <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "Requisitions", value: prs.length, sub: `${prs.filter((r: any) => r.status === "draft").length} draft` },
-          { label: "Purchase Orders", value: pos.length, sub: `${fmt(pos.reduce((s: number, p: any) => s + p.total, 0))} XOF` },
-          { label: "Goods Receipts", value: grs.length, sub: `${grs.filter((g: any) => g.status === "completed").length} completed` },
-          { label: "Pending Approval", value: prs.filter((r: any) => r.status === "pending_approval").length + pos.filter((p: any) => p.status === "pending_approval").length, sub: "demandes et commandes soumises" },
+          { label: "Demandes d'achat", value: prs.length, sub: `${prs.filter((r: any) => r.status === "draft").length} draft` },
+          { label: "Commandes fournisseurs", value: pos.length, sub: `${fmt(pos.reduce((s: number, p: any) => s + p.total, 0))} XOF` },
+          { label: "Réceptions", value: grs.length, sub: `${grs.filter((g: any) => g.status === "completed").length} completed` },
+          { label: "En approbation", value: prs.filter((r: any) => r.status === "pending_approval").length + pos.filter((p: any) => p.status === "pending_approval").length, sub: "demandes et commandes soumises" },
         ].map(k => (
           <div key={k.label} className="bg-card rounded-lg border border-border p-3">
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{k.label}</span>
@@ -588,13 +588,13 @@ export default function ProcurementTransactions() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
-          <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Requisitions ({prs.length})</TabsTrigger>
-          <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Purchase Orders ({pos.length})</TabsTrigger>
-          <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Goods Receipt ({grs.length})</TabsTrigger>
+          <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Demandes d'achat ({prs.length})</TabsTrigger>
+          <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Commandes fournisseurs ({pos.length})</TabsTrigger>
+          <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Réceptions ({grs.length})</TabsTrigger>
           <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
           <TabsTrigger value="replenishment">Réapprovisionnement</TabsTrigger>
           <TabsTrigger value="followup">Suivi des livraisons</TabsTrigger>
-          <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Approval Workflow</TabsTrigger>
+          <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Circuit d'approbation</TabsTrigger>
         </TabsList>
 
         {/* Requisitions Tab */}
@@ -704,15 +704,15 @@ export default function ProcurementTransactions() {
               <Table><TableHeader><TableRow className="bg-muted/30">
                 <TableHead className="text-xs">GR #</TableHead>
                 <TableHead className="text-xs">PO Ref</TableHead>
-                <TableHead className="text-xs">Supplier</TableHead>
+                <TableHead className="text-xs">Fournisseur</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
-                <TableHead className="text-xs">Lines</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Lignes</TableHead>
+                <TableHead className="text-xs">Statut</TableHead>
                 <TableHead className="text-xs">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {grs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No goods receipts yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">Aucune réception</TableCell></TableRow>
                 ) : grs.map((gr: any) => (
                   <TableRow key={gr.id} className="text-xs">
                     <TableCell className="font-mono text-primary">{gr.gr_number}</TableCell>
@@ -776,7 +776,7 @@ export default function ProcurementTransactions() {
       <div className="space-y-4 mt-6">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">GL Posting — Procurement</h2>
+          <h2 className="text-sm font-semibold text-foreground">Comptabilisation — achats</h2>
         </div>
         <GLPostingKPIsLive module="Procurement" />
         <GLBatchHistoryLive module="Procurement" />

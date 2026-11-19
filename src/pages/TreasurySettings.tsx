@@ -27,8 +27,8 @@ export default function TreasurySettings() {
     <PageShell>
       <Breadcrumb items={[
         { label: "Finance" },
-        { label: "Treasury", href: "/treasury" },
-        { label: "Settings" },
+        { label: "Trésorerie", href: "/treasury" },
+        { label: "Paramètres" },
       ]} />
 
       <GuidanceBanner title="Paramètres de trésorerie" description="Règlements, comptabilisation, rapprochement bancaire et alertes. Les limites (solde minimum, maximum, découvert) se fixent par compte dans Trésorerie → Données de base." />

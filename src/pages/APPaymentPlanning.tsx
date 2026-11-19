@@ -74,14 +74,14 @@ export default function APPaymentPlanning() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Payables", href: "/payables" }, { label: "Payment Planning" }]} />
-      <h1 className="text-xl font-semibold text-foreground">Payment Planning</h1>
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Comptes fournisseurs", href: "/payables" }, { label: "Planification des paiements" }]} />
+      <h1 className="text-xl font-semibold text-foreground">Planification des paiements</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Payable This Week", value: fmtCurrency(thisWeekTotal), icon: Calendar, color: "text-destructive" },
-          { label: "Payable This Month", value: fmtCurrency(thisMonthTotal), icon: TrendingDown, color: "text-amber-600" },
-          { label: "Available Cash", value: fmtCurrency(availableCash), icon: Wallet, color: "text-success" },
+          { label: "À payer cette semaine", value: fmtCurrency(thisWeekTotal), icon: Calendar, color: "text-destructive" },
+          { label: "À payer ce mois", value: fmtCurrency(thisMonthTotal), icon: TrendingDown, color: "text-amber-600" },
+          { label: "Trésorerie disponible", value: fmtCurrency(availableCash), icon: Wallet, color: "text-success" },
           { label: "Liquidity Buffer", value: fmtCurrency(liquidityBuffer), icon: Shield, color: liquidityBuffer > 0 ? "text-success" : "text-destructive" },
         ].map(card => (
           <div key={card.label} className="card-elevated p-4">
@@ -100,7 +100,7 @@ export default function APPaymentPlanning() {
         <>
           <div className="card-elevated overflow-hidden">
             <div className="p-3 border-b border-border">
-              <p className="text-xs font-medium text-foreground">Payment Schedule</p>
+              <p className="text-xs font-medium text-foreground">Échéancier de paiement</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">{payments.length} factures en attente de paiement</p>
             </div>
             <div className="overflow-x-auto">
@@ -108,12 +108,12 @@ export default function APPaymentPlanning() {
                 <thead>
                   <tr>
                     <th className="w-8"></th>
-                    <th>Supplier</th>
-                    <th>Invoice</th>
-                    <th>Due Date</th>
-                    <th className="text-right">Amount</th>
+                    <th>Fournisseur</th>
+                    <th>Facture</th>
+                    <th>Échéance</th>
+                    <th className="text-right">Montant</th>
                     <th>Priority</th>
-                    <th>Method</th>
+                    <th>Méthode</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,7 +137,7 @@ export default function APPaymentPlanning() {
 
           {cashTimeline.length > 0 && (
             <div className="card-elevated p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-4">Cash Outflow Timeline</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-4">Calendrier des décaissements</p>
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={cashTimeline}>

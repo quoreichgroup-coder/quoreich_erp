@@ -101,30 +101,30 @@ const Customers = () => {
           <main className="flex-1 p-4 lg:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Customers</h1>
-                <p className="text-sm text-muted-foreground">Manage your customer relationships</p>
+                <h1 className="text-2xl font-bold text-foreground">Clients</h1>
+                <p className="text-sm text-muted-foreground">Fiches clients, limites de crédit et conditions</p>
               </div>
               <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
-                <Plus className="w-4 h-4 mr-2" /> Add Customer
+                <Plus className="w-4 h-4 mr-2" /> Ajouter un client
               </Button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <Card className="border border-border">
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Total Customers</p>
+                  <p className="text-sm text-muted-foreground">Nombre de clients</p>
                   <p className="text-2xl font-bold text-foreground">{customers.length}</p>
                 </CardContent>
               </Card>
               <Card className="border border-border">
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Active</p>
+                  <p className="text-sm text-muted-foreground">Actif</p>
                   <p className="text-2xl font-bold text-success">{customers.filter(c => c.status === "active").length}</p>
                 </CardContent>
               </Card>
               <Card className="border border-border">
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Total Credit Limit</p>
+                  <p className="text-sm text-muted-foreground">Total des limites de crédit</p>
                   <p className="text-2xl font-bold text-primary">{formatCurrency(customers.reduce((s, c) => s + (c.credit_limit || 0), 0))}</p>
                 </CardContent>
               </Card>
@@ -134,11 +134,11 @@ const Customers = () => {
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="w-5 h-5 text-primary" /> Customer Directory
+                    <Users className="w-5 h-5 text-primary" /> Annuaire des clients
                   </CardTitle>
                   <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input placeholder="Search customers..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+                    <Input placeholder="Rechercher un client..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
                   </div>
                 </div>
               </CardHeader>
@@ -170,12 +170,12 @@ const Customers = () => {
                             checked={filtered.length > 0 && filtered.every((c) => selected.has(c.id))}
                             onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((c) => c.id)) : new Set())} />
                         </TableHead>
-                        <TableHead>Name</TableHead>
+                        <TableHead>Nom</TableHead>
                         <TableHead className="hidden md:table-cell">Email</TableHead>
                         <TableHead className="hidden lg:table-cell">Phone</TableHead>
                         <TableHead className="hidden lg:table-cell">Tax ID</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Credit Limit</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="text-right">Limite de crédit</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -188,7 +188,7 @@ const Customers = () => {
                         </TableRow>
                       ) : filtered.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No customers found.</TableCell>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Aucun client.</TableCell>
                         </TableRow>
                       ) : (
                         filtered.map(customer => (
@@ -237,8 +237,8 @@ const Customers = () => {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-1.5">
-              <Label>Customer Name *</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or individual name" />
+              <Label>Nom du client *</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Raison sociale ou nom" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-1.5">
@@ -260,7 +260,7 @@ const Customers = () => {
                 <Input value={form.tax_id} onChange={e => setForm(f => ({ ...f, tax_id: e.target.value }))} placeholder="XX-2024-000" />
               </div>
               <div className="grid gap-1.5">
-                <Label>Credit Limit (XOF)</Label>
+                <Label>Limite de crédit (XOF)</Label>
                 <Input type="number" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: Number(e.target.value) }))} />
               </div>
             </div>
@@ -269,7 +269,7 @@ const Customers = () => {
             {editingCustomer && <CustomerAnalyticDefaults customerId={editingCustomer.id} />}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button onClick={handleSave} disabled={!form.name.trim() || createCustomer.isPending || updateCustomer.isPending} className="bg-primary hover:bg-primary/90">
               {(createCustomer.isPending || updateCustomer.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : editingCustomer ? "Update" : "Create"}
             </Button>
@@ -281,13 +281,13 @@ const Customers = () => {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Customer</DialogTitle>
+            <DialogTitle>Supprimer le client</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete <span className="font-medium text-foreground">{deletingCustomer?.name}</span>? This action cannot be undone.
+            Confirmez-vous la suppression de <span className="font-medium text-foreground">{deletingCustomer?.name}</span>? This action cannot be undone.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleteCustomer.isPending}>
               {deleteCustomer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
             </Button>

@@ -150,7 +150,7 @@ export default function AccountsPayable() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "AP", href: "/payables" }, { label: "Dashboard" }]} />
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "AP", href: "/payables" }, { label: "Tableau de bord" }]} />
       <GuidanceBanner message="Tableau de bord du module Comptes Fournisseurs — suivez les dettes ouvertes, les échéances de paiement et la prévision de décaissement pour optimiser la trésorerie." />
 
       {/* Global Filters */}

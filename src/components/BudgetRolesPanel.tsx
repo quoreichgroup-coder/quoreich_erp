@@ -300,7 +300,7 @@ export function BudgetRolesPanel() {
                 );
               }}
             >
-              {canExport ? <Download className="w-3 h-3" /> : <Lock className="w-3 h-3" />} Export CSV
+              {canExport ? <Download className="w-3 h-3" /> : <Lock className="w-3 h-3" />} Exporter (CSV)
             </Button>
             <Button
               variant="outline" size="sm" className="h-8 text-xs gap-1"

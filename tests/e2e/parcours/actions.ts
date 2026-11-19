@@ -13,9 +13,9 @@ export async function creerFournisseur(page: Page, nom: string) {
 
 export async function creerClient(page: Page, nom: string) {
   await page.goto("/customers");
-  await page.getByRole("button", { name: /Add Customer/i }).click();
+  await page.getByRole("button", { name: /Ajouter un client/i }).click();
   const d = page.getByRole("dialog");
-  await d.getByPlaceholder("Company or individual name").fill(nom);
+  await d.getByPlaceholder("Raison sociale ou nom").fill(nom);
   await d.getByRole("button", { name: "Create" }).click();
   await expect(d).toBeHidden();
 }

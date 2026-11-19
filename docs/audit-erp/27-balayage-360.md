@@ -36,8 +36,9 @@
   (valeurs initiales de paramètres documentés, modifiables avec le droit correspondant). À faire valider par l'expert-comptable.
 - **Fonctions absentes, désormais non simulées** : connexion bancaire directe (les relevés s'importent par fichier),
   politique de change et réévaluation (lot achats internationaux), rapports planifiés par e-mail (avec la messagerie).
-- **Libellés anglais** dans quelques écrans (titres « Procurement Transactions », boutons « New PO », fils d'Ariane
-  « Finance »…) : traduction à prévoir ; sans effet sur les données.
+- **Libellés anglais** : traduits le 19 nov. 2026 (environ 390 libellés dans 70 fichiers, un dictionnaire unique appliqué
+  aux écrans et aux sélecteurs des tests ; composants de base : « Fermer la fenêtre », pagination). Restent des mots
+  identiques dans les deux langues (« Transactions », « Contact », « Pipeline », « Export CSV »).
 - Les comptes 4471 à 4474 déjà créés sur la société de test restent (données de la société).
 
 ## 4. Vérification
@@ -45,3 +46,13 @@
 Vitest 613 / 613, contrôle de types, lint sans erreur ; tests Java concernés (`ParametresParDefautIT`, `SchemaMigrationIT`,
 `CycleDeVieFacturesFournisseursIT`, `PayableApiIT`, `ParametresProtegesIT`) ; parcours sur site et nuage, dont le
 parcours 102 qui vérifie l'absence des entités et du score inventés et la présence des écrans réels.
+
+## 5. Défauts trouvés pendant la traduction
+
+- Rapports clients : le filtre de statut comparait le libellé affiché (« Ouvert ») au statut enregistré (`sent`,
+  `partially_paid`) : choisir un statut vidait toujours la liste. Valeurs explicites et filtre « ouvert / échu » calculé.
+- Nouveau risque : le code proposé était calculé à l'ouverture de la fenêtre ; ouverte avant le chargement de la liste,
+  elle proposait « R-001 », déjà pris, et l'enregistrement échouait. Recalculé quand la liste arrive.
+- Export consolidé CFO : les colonnes s'appellent « Encaissements clients », « Décaissements fournisseurs », « Flux de
+  trésorerie net », « Solde de trésorerie » (ce sont des flux de trésorerie, pas un chiffre d'affaires comptable).
+

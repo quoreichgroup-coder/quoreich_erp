@@ -421,7 +421,7 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
           etat: r.reversal_of ? "Annulation" : reversed.has(r.id) ? "Annulé" : "Enregistré",
         })), [{ key: "date", header: "Date" }, { key: "reference", header: "Référence" }, { key: "fournisseur", header: "Fournisseur" },
           { key: "facture", header: "Facture" }, { key: "montant", header: "Montant" }, { key: "mode", header: "Mode" }, { key: "etat", header: "État" }], "paiements-fournisseurs")}>
-          <Download className="w-3.5 h-3.5" /> Export
+          <Download className="w-3.5 h-3.5" /> Exporter
         </ExportMenu>
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">{shown.length} paiements · Net : {fmtCurrency(total)}</span>
       </div>
@@ -581,7 +581,7 @@ export default function APTransactions() {
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
             [{ key: "numero", header: "N° facture" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "echeance", header: "Échéance" },
              { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" }, { key: "paye", header: "Payé" }, { key: "reste", header: "Reste" },
-             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
+             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Exporter</ExportMenu>
         </div>
       </div>
 
@@ -615,7 +615,7 @@ export default function APTransactions() {
       <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Search by invoice or supplier..." className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="text" placeholder="Rechercher par facture ou fournisseur..." className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button onClick={() => setShowFilters(!showFilters)} className={cn("btn-outline text-xs flex items-center gap-1.5 px-3 py-2 rounded-md border border-input hover:bg-muted", showFilters && "bg-muted")}>
           <Filter className="w-3.5 h-3.5" /> Filters
@@ -626,13 +626,13 @@ export default function APTransactions() {
       {showFilters && (
         <div className="card-elevated p-3 flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Status</label>
+            <label className="text-xs text-muted-foreground">Statut</label>
             <select className="h-8 px-2 rounded border border-input bg-background text-xs" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
               {statusOptions.map(s => <option key={s} value={s}>{s === "all" ? "Tous" : statusLabel(s)}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Approval</label>
+            <label className="text-xs text-muted-foreground">Approbation</label>
             <select className="h-8 px-2 rounded border border-input bg-background text-xs" value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)}>
               {approvalOptions.map(s => <option key={s} value={s}>{s === "all" ? "Tous" : approvalLabel(s)}</option>)}
             </select>

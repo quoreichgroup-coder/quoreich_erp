@@ -68,7 +68,7 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
 
   obs.etape("créer un devis numéroté par la base");
   await page.goto("/sales/transactions");
-  await page.getByRole("button", { name: "New Quote" }).click();
+  await page.getByRole("button", { name: "Nouveau devis" }).click();
   let dialog = page.getByRole("dialog");
   await dialog.locator("select").first().selectOption({ label: client });
   // V43 : devis à lignes, remise par ligne, pied HT / TVA / TTC calculé.
@@ -121,7 +121,7 @@ test("CRM et ventes : opportunité, devis, commande, références et exports", a
 
   // V44 : client → SES devis ouverts → lignes à commander (comme fournisseur → ses commandes → lignes).
   obs.etape("commande depuis les lignes du devis du client");
-  await page.getByRole("button", { name: "New Order" }).click();
+  await page.getByRole("button", { name: "Nouvelle commande" }).click();
   dialog = page.getByRole("dialog");
   await dialog.locator("select").first().selectOption({ label: client });
   await expect(dialog.getByTestId("customer-exposure"), "encours du client affiché").toContainText("Encours");

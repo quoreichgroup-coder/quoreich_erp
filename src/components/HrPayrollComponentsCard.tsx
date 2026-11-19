@@ -58,7 +58,7 @@ export function HrPayrollComponentsCard() {
       <Field label="Compte comptable (facultatif)" value={form.gl_account_code ?? ""} disabled={isError} onChange={(v) => set("gl_account_code", v || null)} />
       <Field label="Ordre d’affichage" value={String(form.sort_order)} type="number" disabled={isError} onChange={(v) => set("sort_order", Number(v))} />
       <div className="flex items-center gap-2 pt-5"><Switch checked={form.printable} onCheckedChange={(v) => set("printable", v)} disabled={isError} /><Label className="text-xs">Afficher sur bulletin</Label></div>
-      <div className="flex items-center gap-2 pt-5"><Switch checked={form.active} onCheckedChange={(v) => set("active", v)} disabled={isError} /><Label className="text-xs">Active</Label></div>
+      <div className="flex items-center gap-2 pt-5"><Switch checked={form.active} onCheckedChange={(v) => set("active", v)} disabled={isError} /><Label className="text-xs">Actif</Label></div>
       <div className="flex items-center gap-2"><Switch checked={form.taxable} onCheckedChange={(v) => set("taxable", v)} disabled={isError} /><Label className="text-xs">Inclus dans la base imposable</Label></div>
       <div className="flex items-center gap-2"><Switch checked={form.subject_employee_social} onCheckedChange={(v) => set("subject_employee_social", v)} disabled={isError} /><Label className="text-xs">Soumis à cotisation salariale</Label></div>
       <div className="flex items-center gap-2"><Switch checked={form.subject_employer_social} onCheckedChange={(v) => set("subject_employer_social", v)} disabled={isError} /><Label className="text-xs">Soumis à cotisation employeur</Label></div>

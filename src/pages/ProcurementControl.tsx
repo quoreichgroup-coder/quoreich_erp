@@ -150,11 +150,11 @@ export default function ProcurementControl() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Procurement", href: "/procurement" }, { label: "Control" }]} />
-      <GuidanceBanner title="Procurement Control"
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Approvisionnement", href: "/procurement" }, { label: "Contrôle" }]} />
+      <GuidanceBanner title="Contrôle des achats"
         description="3-Way Match, file d'approbation PR/PO multi-niveaux, SLA cycle PR→PO→GR→AP." />
 
-      <h1 className="text-lg font-semibold text-foreground mb-4">Procurement Control</h1>
+      <h1 className="text-lg font-semibold text-foreground mb-4">Contrôle des achats</h1>
 
       <div className="grid grid-cols-4 gap-3 mb-4">
         <Card className="border-border"><CardContent className="p-4">
@@ -323,7 +323,7 @@ export default function ProcurementControl() {
                   <a href="/procurement/settings">Configurer SLA…</a>
                 </Button>
                 <Button size="sm" variant="outline" onClick={exportSLA} disabled={!sla || sla.length === 0}>
-                  <Download className="w-3 h-3 mr-1" />Export CSV
+                  <Download className="w-3 h-3 mr-1" />Exporter (CSV)
                 </Button>
               </div>
 
@@ -383,7 +383,7 @@ export default function ProcurementControl() {
           <Card className="border-border">
             <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-sm">Journal d'audit — actions procurement</CardTitle>
+                <CardTitle className="text-sm">Journal d'audit — actions d'achat</CardTitle>
                 <p className="text-[11px] text-muted-foreground">Approbations, rejets, conversions PR→PO, décisions 3-Way Match.</p>
               </div>
               <div className="flex gap-2 items-end">

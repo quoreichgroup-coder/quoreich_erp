@@ -118,7 +118,7 @@ export default function AssetsTransactions() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Transactions" }]} />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Transactions" }]} />
       <GuidanceBanner title="Transactions Immobilisations" description="Acquisitions, dotations et cessions live, avec filtres et contrôles RBAC SYSCOHADA." />
 
       {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}

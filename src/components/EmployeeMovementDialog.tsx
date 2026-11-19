@@ -73,7 +73,7 @@ export function EmployeeMovementDialog({ employee, open, onOpenChange, canCreate
               <Field label="Nouveau poste" value={jobTitle} onChange={setJobTitle} />
               <Field label="Nouveau département" value={department} onChange={setDepartment} />
               <Field label="Nouveau contrat" value={contractType} onChange={setContractType} />
-              <Field label="Nouveau statut (facultatif)" value={status} onChange={setStatus} placeholder="active, suspended…" />
+              <Field label="Nouveau statut (facultatif)" value={status} onChange={setStatus} placeholder="actif, suspendu…" />
             </div>
             <div className="flex justify-end">
               <Button size="sm" disabled={create.isPending || !movementType.trim() || !effectiveDate || !reasonCode.trim() || reason.trim().length < 3 || (!salary.trim() && !department.trim() && !jobTitle.trim() && !contractType.trim() && !status.trim())}

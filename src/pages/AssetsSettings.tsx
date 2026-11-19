@@ -27,10 +27,10 @@ export default function AssetsSettings() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Fixed Assets", href: "/assets" }, { label: "Settings" }]} />
-      <GuidanceBanner title="Fixed Assets Settings" description="Configure depreciation methods, GL account mapping, posting rules, and maintenance cycles." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Paramètres" }]} />
+      <GuidanceBanner title="Paramètres des immobilisations" description="Catégories, comptes, méthodes d'amortissement et règles de comptabilisation." />
 
-      <h1 className="text-lg font-semibold text-foreground mb-4">Asset Settings</h1>
+      <h1 className="text-lg font-semibold text-foreground mb-4">Paramètres des immobilisations</h1>
 
       <div className="flex gap-1 border-b border-border mb-4">
         {tabs.map(t => (

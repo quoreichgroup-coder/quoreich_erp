@@ -63,11 +63,11 @@ export default function Treasury() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Treasury" }]} />
-      <GuidanceBanner title="Treasury Dashboard" description="Position cash, rapprochements et prévision 13 semaines — données live." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Trésorerie" }]} />
+      <GuidanceBanner title="Tableau de bord de la trésorerie" description="Position cash, rapprochements et prévision 13 semaines — données live." />
 
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Treasury Overview</h1>
+        <h1 className="text-lg font-semibold text-foreground">Vue d'ensemble de la trésorerie</h1>
         <div className="flex items-center gap-2">
           <Select value={acctFilter} onValueChange={setAcctFilter}>
             <SelectTrigger className="h-8 text-xs w-[200px]"><SelectValue /></SelectTrigger>
@@ -89,7 +89,7 @@ export default function Treasury() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
         {[
-          { label: "Total Cash", value: maskAmount(perms, totalCash), suffix: "XOF", hint: `${activeAccounts} comptes` },
+          { label: "Trésorerie totale", value: maskAmount(perms, totalCash), suffix: "XOF", hint: `${activeAccounts} comptes` },
           { label: "Transactions", value: filteredTxns.length, hint: "filtre actif" },
           { label: "Non rapprochés", value: unreconciledCount, hint: "à traiter" },
           { label: "Net 7j", value: maskAmount(perms, net7d), suffix: "XOF" },

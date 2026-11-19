@@ -67,8 +67,8 @@ export default function GLReporting() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "General Ledger", href: "/journal" }, { label: "Reporting" }]} />
-      <GuidanceBanner title="GL Reporting" description="États financiers calculés à partir des écritures postées : Balance, Compte de Résultat, Bilan et SIG (SYSCOHADA). Filtrez par période (YYYY-MM) pour le SIG." />
+      <Breadcrumb items={[{ label: "Finance" }, { label: "Grand livre", href: "/journal" }, { label: "Rapports" }]} />
+      <GuidanceBanner title="Rapports du grand livre" description="États financiers calculés à partir des écritures postées : Balance, Compte de Résultat, Bilan et SIG (SYSCOHADA). Filtrez par période (YYYY-MM) pour le SIG." />
 
       <div className="flex flex-wrap items-end gap-3 bg-card border border-border rounded-lg p-3">
         <div className="space-y-1">
@@ -100,7 +100,7 @@ export default function GLReporting() {
         <div className="bg-card border border-border rounded-lg">
           <div className="p-3 border-b border-border flex justify-between">
             <h3 className="text-sm font-semibold text-foreground">Balance de Vérification</h3>
-            <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-0" onPick={(f) => exportTable(f, rows.filter(r => r.debit > 0 || r.credit > 0).map(r => ({ ...r })), [{ key: "code", header: "Compte" }, { key: "name", header: "Nom" }, { key: "debit", header: "Débit (XOF)" }, { key: "credit", header: "Crédit (XOF)" }], "balance-de-verification")}><Download className="w-3 h-3" />Export</ExportMenu>
+            <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-0" onPick={(f) => exportTable(f, rows.filter(r => r.debit > 0 || r.credit > 0).map(r => ({ ...r })), [{ key: "code", header: "Compte" }, { key: "name", header: "Nom" }, { key: "debit", header: "Débit (XOF)" }, { key: "credit", header: "Crédit (XOF)" }], "balance-de-verification")}><Download className="w-3 h-3" />Exporter</ExportMenu>
           </div>
           <table className="w-full text-xs">
             <thead><tr className="border-b border-border bg-muted/30">
@@ -153,7 +153,7 @@ export default function GLReporting() {
           <div className="bg-card border border-border rounded-lg">
             <div className="p-3 border-b border-border flex justify-between">
               <h3 className="text-sm font-semibold text-foreground">Compte de Résultat</h3>
-              <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-1" onPick={(f) => exportTable(f, [...revenueRows.filter(r => r.credit - r.debit !== 0).map(r => ({ section: "Produits", code: r.code, name: r.name, montant: r.credit - r.debit })), ...expenseRows.filter(r => r.debit - r.credit !== 0).map(r => ({ section: "Charges", code: r.code, name: r.name, montant: r.debit - r.credit })), { section: "Résultat net", code: "", name: "", montant: netIncome }], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "montant", header: "Montant (XOF)" }], "compte-de-resultat")}><Download className="w-3 h-3" />Export</ExportMenu>
+              <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-1" onPick={(f) => exportTable(f, [...revenueRows.filter(r => r.credit - r.debit !== 0).map(r => ({ section: "Produits", code: r.code, name: r.name, montant: r.credit - r.debit })), ...expenseRows.filter(r => r.debit - r.credit !== 0).map(r => ({ section: "Charges", code: r.code, name: r.name, montant: r.debit - r.credit })), { section: "Résultat net", code: "", name: "", montant: netIncome }], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "montant", header: "Montant (XOF)" }], "compte-de-resultat")}><Download className="w-3 h-3" />Exporter</ExportMenu>
             </div>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border bg-muted/30">
@@ -216,7 +216,7 @@ export default function GLReporting() {
           <div className="bg-card border border-border rounded-lg">
             <div className="p-3 border-b border-border flex justify-between">
               <h3 className="text-sm font-semibold text-foreground">Bilan</h3>
-              <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-2" onPick={(f) => exportTable(f, [...assetRows.filter(r => r.balance !== 0).map(r => ({ section: "Actif", code: r.code, name: r.name, solde: r.debit - r.credit })), ...liabilityRows.filter(r => r.balance !== 0).map(r => ({ section: "Passif", code: r.code, name: r.name, solde: r.credit - r.debit })), ...equityRows.filter(r => r.balance !== 0).map(r => ({ section: "Capitaux propres", code: r.code, name: r.name, solde: r.credit - r.debit }))], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "solde", header: "Solde (XOF)" }], "bilan")}><Download className="w-3 h-3" />Export</ExportMenu>
+              <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-2" onPick={(f) => exportTable(f, [...assetRows.filter(r => r.balance !== 0).map(r => ({ section: "Actif", code: r.code, name: r.name, solde: r.debit - r.credit })), ...liabilityRows.filter(r => r.balance !== 0).map(r => ({ section: "Passif", code: r.code, name: r.name, solde: r.credit - r.debit })), ...equityRows.filter(r => r.balance !== 0).map(r => ({ section: "Capitaux propres", code: r.code, name: r.name, solde: r.credit - r.debit }))], [{ key: "section", header: "Rubrique" }, { key: "code", header: "Compte" }, { key: "name", header: "Libellé" }, { key: "solde", header: "Solde (XOF)" }], "bilan")}><Download className="w-3 h-3" />Exporter</ExportMenu>
             </div>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border bg-muted/30">
@@ -330,7 +330,7 @@ export default function GLReporting() {
                     <h3 className="text-sm font-semibold text-foreground">
                       Soldes Intermédiaires de Gestion {fromPeriod || toPeriod ? `(${fromPeriod || "—"} → ${toPeriod || "—"})` : "(toutes périodes)"}
                     </h3>
-                    <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-3" onPick={(f) => exportTable(f, sigRows.map(r => ({ ...r })), [{ key: "period", header: "Période" }, { key: "chiffre_affaires", header: "CA" }, { key: "marge_commerciale", header: "Marge" }, { key: "valeur_ajoutee", header: "VA" }, { key: "ebe", header: "EBE" }, { key: "resultat_exploitation", header: "Résultat Expl." }, { key: "resultat_net", header: "Résultat Net" }], "soldes-intermediaires-de-gestion")}><Download className="w-3 h-3" />Export</ExportMenu>
+                    <ExportMenu size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-export-gl-3" onPick={(f) => exportTable(f, sigRows.map(r => ({ ...r })), [{ key: "period", header: "Période" }, { key: "chiffre_affaires", header: "CA" }, { key: "marge_commerciale", header: "Marge" }, { key: "valeur_ajoutee", header: "VA" }, { key: "ebe", header: "EBE" }, { key: "resultat_exploitation", header: "Résultat Expl." }, { key: "resultat_net", header: "Résultat Net" }], "soldes-intermediaires-de-gestion")}><Download className="w-3 h-3" />Exporter</ExportMenu>
                   </div>
                   <table className="w-full text-xs">
                     <tbody>

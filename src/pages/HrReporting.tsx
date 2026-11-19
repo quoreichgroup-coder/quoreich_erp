@@ -196,7 +196,7 @@ export default function HrReporting() {
         </table>
       </section>
       <div className="space-y-3 print:hidden">
-        <Breadcrumb items={[{ label: "RH / Paie", href: "/hr" }, { label: "Reporting" }]} />
+        <Breadcrumb items={[{ label: "RH / Paie", href: "/hr" }, { label: "Rapports" }]} />
         <GuidanceBanner
           title="Reporting paie"
           description="Cycles comptabilisés et lignes réelles par période et devise; l’affectation analytique est figée lors du calcul."

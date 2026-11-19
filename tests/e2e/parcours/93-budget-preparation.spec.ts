@@ -135,7 +135,7 @@ test("budget préparé par fichier, révision validée par un tiers, sections pa
 
   obs.etape("demande d'achat ventilée par ligne");
   await page.goto("/procurement/transactions");
-  await page.getByRole("button", { name: /New Requisition/i }).click();
+  await page.getByRole("button", { name: /Nouvelle demande/i }).click();
   const d = page.getByRole("dialog");
   await d.getByLabel("Objet de la demande").fill(`${RUN} Demande ventilée`);
   await d.getByLabel("Date de la demande").fill(`${annee}-02-03`);
@@ -151,7 +151,7 @@ test("budget préparé par fichier, révision validée par un tiers, sections pa
   await choisir(d.getByLabel("E2E Centre budgétaire ligne 2"), /^ADM /);
   await d.getByRole("button", { name: "Créer la demande" }).click();
   await expect(d).toBeHidden();
-  await page.getByRole("tab", { name: /Requisitions/ }).click();
+  await page.getByRole("tab", { name: /Demandes d'achat/ }).click();
   const dem = ligne(page, `${RUN} Demande ventilée`);
   await dem.getByRole("button", { name: "Soumettre" }).click();
   await expect(dem).toContainText("En approbation");

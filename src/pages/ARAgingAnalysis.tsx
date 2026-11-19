@@ -67,11 +67,11 @@ export default function ARAgingAnalysis() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Receivables", href: "/receivables" }, { label: "Aging Analysis" }]} />
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "Comptes clients", href: "/receivables" }, { label: "Balance âgée" }]} />
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">AR Aging Analysis</h1>
+          <h1 className="text-xl font-semibold text-foreground">Balance âgée clients</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Balance âgée client (calcul DB en temps réel)</p>
         </div>
       </div>

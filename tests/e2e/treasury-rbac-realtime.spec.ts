@@ -83,7 +83,7 @@ test.describe("Colonnes sensibles — masquage selon rôle", () => {
     await login(page, ADMIN_EMAIL, ADMIN_PASS);
 
     await lireEcran(page, `${BASE_URL}/treasury`, "auteur");
-    const totalCard = page.getByText("Total Cash", { exact: true }).locator("..");
+    const totalCard = page.getByText("Trésorerie totale", { exact: true }).locator("..");
     await expect(totalCard).toBeVisible();
     await expect(totalCard).not.toContainText("•••••");
 
@@ -97,7 +97,7 @@ test.describe("Colonnes sensibles — masquage selon rôle", () => {
     await login(page, NOROLE_EMAIL, NOROLE_PASS);
 
     await lireEcran(page, `${BASE_URL}/treasury`, "approbateur");
-    const totalCard = page.getByText("Total Cash", { exact: true }).locator("..");
+    const totalCard = page.getByText("Trésorerie totale", { exact: true }).locator("..");
     await expect(totalCard).toContainText("•••••");
 
     await lireEcran(page, `${BASE_URL}/treasury/transactions`, "approbateur");

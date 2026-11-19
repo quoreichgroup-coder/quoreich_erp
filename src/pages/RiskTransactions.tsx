@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -31,6 +31,13 @@ function RiskDialog({ risk, risks, onClose }: { risk: Risk | null; risks: Risk[]
   const save = useSaveRisk();
   const [f, setF] = useState({ risk_code: risk?.risk_code ?? nextCode(risks), title: risk?.title ?? "", description: risk?.description ?? "", category_id: risk?.category_id ?? "",
     owner: risk?.owner ?? "", mitigation_plan: risk?.mitigation_plan ?? "", review_date: risk?.review_date ?? "", project_id: risk?.project_id ?? "" });
+  // Code proposé : recalculé quand la liste des risques arrive (ouverte avant le chargement, la boîte proposait
+  // « R-001 », déjà pris), tant que l'utilisateur ne l'a pas saisi lui-même.
+  const [codeTouched, setCodeTouched] = useState(false);
+  useEffect(() => {
+    if (!risk && !codeTouched) setF((prev) => ({ ...prev, risk_code: nextCode(risks) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [risks]);
   const cat = categories.find((c) => c.id === f.category_id);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -39,7 +46,7 @@ function RiskDialog({ risk, risks, onClose }: { risk: Risk | null; risks: Risk[]
           <DialogDescription className="text-xs">La cotation se fait ensuite par « Évaluer » (historique daté) sur l'échelle de la société.</DialogDescription></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1"><label htmlFor="risk-code" className="text-xs font-medium">Code *</label>
-            <Input id="risk-code" className="h-8 text-xs" disabled={Boolean(risk)} value={f.risk_code} onChange={(e) => setF({ ...f, risk_code: e.target.value.toUpperCase() })} /></div>
+            <Input id="risk-code" className="h-8 text-xs" disabled={Boolean(risk)} value={f.risk_code} onChange={(e) => { setCodeTouched(true); setF({ ...f, risk_code: e.target.value.toUpperCase() }); }} /></div>
           <div className="space-y-1"><label htmlFor="risk-cat" className="text-xs font-medium">Catégorie</label>
             <select id="risk-cat" className={`${sel} w-full`} value={f.category_id} onChange={(e) => setF({ ...f, category_id: e.target.value })}>
               <option value="">—</option>{categories.filter((c) => c.is_active || c.id === f.category_id).map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}</select></div>

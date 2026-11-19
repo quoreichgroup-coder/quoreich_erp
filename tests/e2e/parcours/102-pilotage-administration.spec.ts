@@ -46,7 +46,7 @@ test("pilotage et administration : tableaux de bord, cockpits, modules, import d
   await page.goto("/settings?tab=workflow");
   await expect(page.getByTestId("settings-workflow-hub")).toBeVisible();
   await page.goto("/admin/modules");
-  await expect(page.getByRole("heading", { name: "Module Management" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gestion des modules" })).toBeVisible();
   await page.goto("/ai/history");
   await verifierSocieteE2E(page);
 
@@ -64,7 +64,7 @@ test("pilotage et administration : tableaux de bord, cockpits, modules, import d
 
   obs.etape("client importé retrouvé");
   await page.goto("/customers");
-  await page.getByPlaceholder("Search customers...").fill(RUN);
+  await page.getByPlaceholder("Rechercher un client...").fill(RUN);
   await expect(page.getByText(nom).first()).toBeVisible({ timeout: 30_000 });
 
   await obs.joindre(testInfo);

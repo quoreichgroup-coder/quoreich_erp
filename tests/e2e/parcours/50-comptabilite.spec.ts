@@ -85,7 +85,7 @@ test("plan comptable : attributs de compte, historique ; bilan SYSCOHADA équili
   await at.getByLabel("Valeurs (liste, séparées par des virgules)").fill("siege, usine");
   await at.getByRole("button", { name: "Ajouter l'attribut" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Attribut enregistré" })).toBeVisible();
-  await at.getByRole("button", { name: "Fermer" }).click();
+  await at.getByRole("button", { name: "Fermer", exact: true }).click();
 
   obs.etape("compte avec attributs, puis modification historisée");
   await page.getByRole("button", { name: "Ajouter un compte" }).click();

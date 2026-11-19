@@ -48,10 +48,10 @@ function getIcon(iconName: string) { return ICON_MAP[iconName] || Blocks; }
 
 function statusBadge(status: ModuleStatus) {
   switch (status) {
-    case "active": return <Badge className="bg-success/15 text-success border-success/20 text-[10px]">Active</Badge>;
-    case "inactive": return <Badge variant="secondary" className="text-[10px]">Inactive</Badge>;
+    case "active": return <Badge className="bg-success/15 text-success border-success/20 text-[10px]">Actif</Badge>;
+    case "inactive": return <Badge variant="secondary" className="text-[10px]">Inactif</Badge>;
     case "license_expired": return <Badge variant="destructive" className="text-[10px]">Expired</Badge>;
-    case "pending_approval": return <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">Pending</Badge>;
+    case "pending_approval": return <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">En attente</Badge>;
   }
 }
 
@@ -239,11 +239,11 @@ export default function ModuleManagement() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Module Management", href: "/admin/modules" }]} />
-      <GuidanceBanner title="Module & License Management" description="Manage ERP modules, licenses, workflows, and cross-module alerts." />
+      <Breadcrumb items={[{ label: "Administration" }, { label: "Gestion des modules", href: "/admin/modules" }]} />
+      <GuidanceBanner title="Modules et licences" description="Modules activés, licences, circuits et alertes inter-modules." />
 
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Module Management</h1>
+        <h1 className="text-lg font-semibold text-foreground">Gestion des modules</h1>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-md">
             <Building2 className="w-3.5 h-3.5 text-muted-foreground" />

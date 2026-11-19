@@ -97,11 +97,11 @@ export default function TreasuryControl() {
     <PageShell>
       <Breadcrumb items={[
         { label: "Finance" },
-        { label: "Treasury", href: "/treasury" },
-        { label: "Control" },
+        { label: "Trésorerie", href: "/treasury" },
+        { label: "Contrôle" },
       ]} />
 
-      <GuidanceBanner title="Treasury Control" description="Bank reconciliation, limit monitoring and audit trail for treasury operations." />
+      <GuidanceBanner title="Contrôle de la trésorerie" description="Rapprochement bancaire, suivi des limites et piste d'audit de la trésorerie." />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[

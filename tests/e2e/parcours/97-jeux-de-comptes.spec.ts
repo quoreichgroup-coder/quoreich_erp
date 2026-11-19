@@ -45,9 +45,9 @@ test("jeu de comptes client : facture sur le compte du jeu, changement refusé t
 
   obs.etape("client rattaché au jeu");
   await page.goto("/customers");
-  await page.getByRole("button", { name: /Add Customer/i }).click();
+  await page.getByRole("button", { name: /Ajouter un client/i }).click();
   const d = page.getByRole("dialog");
-  await d.getByPlaceholder("Company or individual name").fill(client);
+  await d.getByPlaceholder("Raison sociale ou nom").fill(client);
   const select = d.getByLabel("Jeu de comptes");
   await expect(select.locator("option", { hasText: code })).toHaveCount(1);
   await select.selectOption({ label: `${code} — Clients du groupe ${n}` });
@@ -72,12 +72,12 @@ test("jeu de comptes client : facture sur le compte du jeu, changement refusé t
   const ecriture = detail.getByTestId("journal-entry-preview");
   await expect(ecriture, "créance au compte du jeu").toContainText(compte);
   await expect(ecriture).not.toContainText(/\b411\b/);
-  await detail.getByRole("button", { name: "Fermer" }).click();
+  await detail.getByRole("button", { name: "Fermer", exact: true }).click();
 
   obs.etape("jeu du client verrouillé tant que la facture est ouverte");
   obs.refusAttendu(/postes ouverts/);
   await page.goto("/customers");
-  await page.getByPlaceholder("Search customers...").fill(client);
+  await page.getByPlaceholder("Rechercher un client...").fill(client);
   await page.getByRole("button", { name: `Modifier ${client}` }).click();
   const e = page.getByRole("dialog");
   await e.getByLabel("Jeu de comptes").selectOption({ label: "Comptes par défaut de la société" });

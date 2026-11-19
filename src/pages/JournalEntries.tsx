@@ -172,15 +172,15 @@ const JournalEntries = () => {
   if (showNewEntry) {
     return (
       <PageShell>
-        <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "GL", href: "/journal" }, { label: "Journal Entries", href: "/journal" }, { label: "New Entry" }]} />
+        <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "GL", href: "/journal" }, { label: "Écritures", href: "/journal" }, { label: "Nouvelle écriture" }]} />
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">New Journal Entry</h1>
-            <p className="text-xs text-muted-foreground">Create a balanced double-entry journal entry</p>
+            <h1 className="text-lg font-semibold text-foreground">Nouvelle écriture</h1>
+            <p className="text-xs text-muted-foreground">Saisir une écriture équilibrée (débit = crédit)</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowNewEntry(false)} className="gap-1.5 text-xs">
-            <X className="w-3.5 h-3.5" /> Cancel
+            <X className="w-3.5 h-3.5" /> Annuler
           </Button>
         </div>
 
@@ -203,22 +203,22 @@ const JournalEntries = () => {
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5 uppercase tracking-wider">Journal</label>
               <Select value={entryJournal} onValueChange={setEntryJournal}>
-                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select journal" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Choisir le journal" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="sales">Ventes</SelectItem>
                   <SelectItem value="purchases">Purchases</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Banque</SelectItem>
+                  <SelectItem value="cash">Caisse</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5 uppercase tracking-wider">Reference</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5 uppercase tracking-wider">Référence</label>
               <Input className="h-9 text-xs" value={entryRef} onChange={(e) => setEntryRef(e.target.value)} placeholder="Auto-generated if empty" />
             </div>
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5 uppercase tracking-wider">Description</label>
-              <Input className="h-9 text-xs" placeholder="Entry description…" value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} />
+              <Input className="h-9 text-xs" placeholder="Libellé de l'écriture…" value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} />
             </div>
           </div>
         </div>
@@ -228,7 +228,7 @@ const JournalEntries = () => {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
-                  <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Account</th>
+                  <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Compte</th>
                   <th className="text-left py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Description</th>
                   <th className="text-right py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Debit</th>
                   <th className="text-right py-2.5 px-3 font-medium text-muted-foreground uppercase tracking-wider">Credit</th>
@@ -243,7 +243,7 @@ const JournalEntries = () => {
                   <tr key={line.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-1.5 px-3">
                       <Select value={line.account_id} onValueChange={(v) => updateLine(line.id, "account_id", v)}>
-                        <SelectTrigger className="border-0 bg-transparent shadow-none h-8 text-xs"><SelectValue placeholder="Account" /></SelectTrigger>
+                        <SelectTrigger className="border-0 bg-transparent shadow-none h-8 text-xs"><SelectValue placeholder="Compte" /></SelectTrigger>
                         <SelectContent>{glAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.code} – {a.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </td>
@@ -276,7 +276,7 @@ const JournalEntries = () => {
             </table>
           </div>
           <div className="p-3 border-t border-border">
-            <Button variant="outline" size="sm" onClick={addRow} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> Add Line</Button>
+            <Button variant="outline" size="sm" onClick={addRow} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> Ajouter une ligne</Button>
           </div>
         </div>
 
@@ -295,7 +295,7 @@ const JournalEntries = () => {
                 ) : totalDebit > 0 || totalCredit > 0 ? (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-destructive/10 border border-destructive/20">
                     <AlertCircle className="w-4 h-4 text-destructive" />
-                    <span className="text-sm font-medium text-destructive">Unbalanced ({fmt(Math.abs(totalDebit - totalCredit))})</span>
+                    <span className="text-sm font-medium text-destructive">Déséquilibrées ({fmt(Math.abs(totalDebit - totalCredit))})</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted border border-border">
@@ -306,7 +306,7 @@ const JournalEntries = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="text-xs" disabled={createEntry.isPending} onClick={() => handleSave("draft")}>Save as Draft</Button>
+              <Button variant="outline" size="sm" className="text-xs" disabled={createEntry.isPending} onClick={() => handleSave("draft")}>Enregistrer en brouillon</Button>
               <Button size="sm" disabled={!isBalanced || createEntry.isPending} className="text-xs gap-1.5" onClick={() => handleSave("posted")}>
                 {createEntry.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Post Entry
               </Button>
@@ -319,40 +319,40 @@ const JournalEntries = () => {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "GL", href: "/journal" }, { label: "Journal Entries" }]} />
+      <Breadcrumb items={[{ label: "Finance", href: "/" }, { label: "GL", href: "/journal" }, { label: "Écritures" }]} />
       <GuidanceBanner message="Post, review, and reverse journal entries. Each entry must be balanced (Total Debit = Total Credit) before posting." />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Journal Entries</h1>
+          <h1 className="text-lg font-semibold text-foreground">Écritures</h1>
           <FiscalYearLabel prefix="Grand livre" />
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu variant="outline" size="sm" className="gap-1.5 text-xs h-8" data-testid="btn-export-csv" onPick={(f) => exportTable(f, 
             filtered.map((e: any) => ({ piece: e.piece_number ?? "", journal: e.journal_code ?? "", numero: e.entry_number, date: e.entry_date, libelle: e.description ?? "", source: e.source, statut: e.status, debit: e.debitTotal, credit: e.creditTotal })),
             [{ key: "piece", header: "N° pièce" }, { key: "journal", header: "Journal" }, { key: "numero", header: "Référence interne" }, { key: "date", header: "Date" }, { key: "libelle", header: "Libellé" }, { key: "source", header: "Source" },
-             { key: "statut", header: "Statut" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" }], "ecritures-comptables")}><Download className="w-3.5 h-3.5" /> Export</ExportMenu>
-          <Button size="sm" onClick={() => setShowNewEntry(true)} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> New Journal Entry</Button>
+             { key: "statut", header: "Statut" }, { key: "debit", header: "Débit" }, { key: "credit", header: "Crédit" }], "ecritures-comptables")}><Download className="w-3.5 h-3.5" /> Exporter</ExportMenu>
+          <Button size="sm" onClick={() => setShowNewEntry(true)} className="gap-1.5 text-xs h-8"><Plus className="w-3.5 h-3.5" /> Nouvelle écriture</Button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card-elevated p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Posted Entries</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Écritures comptabilisées</p>
           <p className="text-xl font-semibold tabular-nums mt-1">{totalPosted}</p>
         </div>
         <div className="card-elevated p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Draft Entries</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Écritures en brouillon</p>
           <p className="text-xl font-semibold tabular-nums mt-1 text-amber-600">{totalDraft}</p>
         </div>
         <div className="card-elevated p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Debits (Period)</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total débit (période)</p>
           <p className="text-xl font-semibold tabular-nums mt-1">{fmt(periodDebits)} <span className="text-xs font-normal text-muted-foreground">XOF</span></p>
         </div>
         <div className="card-elevated p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Credits (Period)</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total crédit (période)</p>
           <p className="text-xl font-semibold tabular-nums mt-1">{fmt(periodCredits)} <span className="text-xs font-normal text-muted-foreground">XOF</span></p>
         </div>
       </div>
@@ -365,7 +365,7 @@ const JournalEntries = () => {
             <div className="p-3 border-b border-border flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <input type="text" placeholder="Search by journal ID, description, source…" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                <input type="text" placeholder="Rechercher par pièce, libellé, origine…" value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                   className="w-full h-8 pl-8 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
               <div className="flex items-center gap-1.5">
@@ -398,7 +398,7 @@ const JournalEntries = () => {
                   <thead>
                     <tr>
                       <th className="cursor-pointer" onClick={() => toggleSort("id")}>
-                        <span className="flex items-center gap-1">Entry # <ArrowUpDown className="w-3 h-3" /></span>
+                        <span className="flex items-center gap-1">N° de pièce <ArrowUpDown className="w-3 h-3" /></span>
                       </th>
                       <th className="cursor-pointer" onClick={() => toggleSort("date")}>
                         <span className="flex items-center gap-1">Date <ArrowUpDown className="w-3 h-3" /></span>
@@ -409,12 +409,12 @@ const JournalEntries = () => {
                         <span className="flex items-center justify-end gap-1">Debit Total <ArrowUpDown className="w-3 h-3" /></span>
                       </th>
                       <th className="text-right">Credit Total</th>
-                      <th>Status</th>
+                      <th>Statut</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paged.length === 0 ? (
-                      <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No journal entries found</td></tr>
+                      <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Aucune écriture</td></tr>
                     ) : paged.map(e => (
                       <tr key={e.id} onClick={() => setSelectedEntry(e)}
                         className={cn("cursor-pointer", selectedEntry?.id === e.id && "bg-muted/40")}>
@@ -451,7 +451,7 @@ const JournalEntries = () => {
         {selectedEntry && (
           <div className="card-elevated lg:col-span-1">
             <div className="p-3 border-b border-border flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Entry Details</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Détail de l'écriture</p>
               <div className="flex items-center gap-1">
                 {selectedEntry.status === "posted" && (
                   <AlertDialog>
@@ -483,7 +483,7 @@ const JournalEntries = () => {
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">N° pièce · journal</p><p className="text-sm font-medium tabular-nums">{selectedEntry.piece_number ?? selectedEntry.entry_number} · {selectedEntry.journal_code ?? "—"}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</p><p className="text-sm tabular-nums">{selectedEntry.entry_date}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Source</p><p className="text-sm"><span className={cn("text-[10px] px-2 py-0.5 rounded font-medium", sourceColors[selectedEntry.source])}>{sourceLabel(selectedEntry.source)}</span></p></div>
-                <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p><StatusBadge status={statusLabel(selectedEntry.status)} /></div>
+                <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Statut</p><StatusBadge status={statusLabel(selectedEntry.status)} /></div>
                 <div className="col-span-2"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Description</p><p className="text-sm">{selectedEntry.description || "—"}</p></div>
               </div>
 
@@ -501,7 +501,7 @@ const JournalEntries = () => {
 
               {/* Ledger detail */}
               <div className="border-t border-border pt-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Ledger Lines</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Lignes de l'écriture</p>
                 <div className="space-y-2">
                   {(selectedEntry.lines || []).map((l, i) => (
                     <div key={i} className="p-2.5 rounded-md border border-border bg-muted/20 space-y-1.5">

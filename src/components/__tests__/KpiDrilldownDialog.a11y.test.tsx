@@ -49,7 +49,7 @@ async function openDialog(key = "Enter") {
   trigger.focus();
   await user.keyboard(key === "Enter" ? "{Enter}" : " ");
   const dialog = screen.getByRole("dialog");
-  const close = within(dialog).getByRole("button", { name: "Close" });
+  const close = within(dialog).getByRole("button", { name: "Fermer la fenêtre" });
   await waitFor(() => expect(close).toHaveFocus());
   return { user, trigger, dialog, close };
 }
@@ -117,8 +117,8 @@ describe("/cockpit/consolidated — CSV principal", () => {
       ...point, section: "Tendance consolidée", scope: "Acme", currency: "XOF",
     })));
     expect(columns).toEqual(expect.arrayContaining([
-      { key: "revenue", header: "Total Revenue" }, { key: "expenses", header: "Total Expenses" },
-      { key: "netProfit", header: "Net Profit" }, { key: "cashBalance", header: "Cash Balance" },
+      { key: "revenue", header: "Encaissements clients" }, { key: "expenses", header: "Décaissements fournisseurs" },
+      { key: "netProfit", header: "Flux de trésorerie net" }, { key: "cashBalance", header: "Solde de trésorerie" },
     ]));
     expect(exported[1].months).toBe(months);
   });
