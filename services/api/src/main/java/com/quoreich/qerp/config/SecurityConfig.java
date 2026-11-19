@@ -65,6 +65,9 @@ public class SecurityConfig {
                   .permitAll();
               // Connexion sur site (identité locale) : ouvertes, protégées par le verrouillage après échecs.
               auth.requestMatchers(HttpMethod.POST, "/auth/v1/token", "/auth/v1/signup", "/auth/v1/recover").permitAll();
+              // Temps réel (V118) : la poignée de main WebSocket ne porte pas de jeton ; il arrive dans le premier
+              // message et y est vérifié (RealtimeSocketHandler), faute de quoi la connexion est fermée.
+              auth.requestMatchers(HttpMethod.GET, "/api/v1/realtime").permitAll();
               if (posteDeDeveloppement) {
                 auth.requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll();

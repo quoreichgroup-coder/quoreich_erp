@@ -14,6 +14,9 @@ test("connexion et API sur site joignable", async ({ page }) => {
 
   const nuage: string[] = [];
   page.on("request", (r) => { if (/supabase\.co\//.test(r.url())) nuage.push(r.url()); });
+  // Temps réel sur site (V118) : WebSocket de l'API, authentifiée par le premier message.
+  const tempsReel = page.waitForEvent("websocket", { predicate: (w) => w.url().endsWith("/api/v1/realtime"), timeout: 60_000 })
+    .then((w) => w.waitForEvent("framereceived", { predicate: (f) => String(f.payload).includes('"ready"'), timeout: 30_000 }));
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(ids!.email);
   await page.getByPlaceholder("••••••••").fill(ids!.password);
@@ -30,6 +33,7 @@ test("connexion et API sur site joignable", async ({ page }) => {
   const r = await moi;
   expect(r.status(), "l'API sur site reconnaît le compte de test").toBe(200);
 
+  await tempsReel;
   expect(nuage, "aucune requête vers Supabase sur site").toEqual([]);
   mkdirSync("test-results-sur-site/.auth", { recursive: true });
   await page.context().storageState({ path: "test-results-sur-site/.auth/session.json" });

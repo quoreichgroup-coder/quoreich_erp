@@ -2,159 +2,50 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isApiEnabled } from "@/api/client";
+import { subscribeRealtime } from "@/api/realtime";
 
 /**
- * Subscribes to Supabase Realtime changes on key financial tables
- * and invalidates the relevant React Query caches so the UI updates instantly.
+ * Tables suivies en temps réel et caches React Query à invalider. Nuage : Supabase Realtime ; sur site : la
+ * WebSocket de l'API (V118, mêmes tables — toute table ajoutée ici doit l'être aussi dans la migration de
+ * notification et dans la publication supabase_realtime).
  */
+export const REALTIME_TABLES: Record<string, string[]> = {
+  ar_invoices: ["dashboard-kpis", "recent-transactions", "treasury-13w-forecast"],
+  ap_invoices: ["dashboard-kpis", "recent-transactions", "treasury-13w-forecast"],
+  payments: ["dashboard-kpis", "cash-trend", "treasury-cash-position", "treasury-recon-status"],
+  journal_entries: ["gl-batches", "gl-audit-logs"],
+  bank_accounts: ["dashboard-kpis", "bank-accounts", "treasury-accounts", "treasury-cash-position"],
+  bank_transactions: ["bank-transactions", "treasury-accounts", "treasury-recon-status", "treasury-cash-position"],
+  bank_statements: ["bank-statements"],
+  bank_statement_lines: ["statement-lines", "treasury-recon-status"],
+  bank_reconciliations: ["bank-reconciliations", "treasury-recon-status"],
+  cashflow_forecasts: ["cashflow-forecasts", "treasury-13w-forecast"],
+  treasury_role_audit: ["treasury-role-audit", "tenant-treasury-roles"],
+  quotations: ["quotations", "sales-pipeline", "sales-kpis"],
+  sales_orders: ["sales-orders", "sales-pipeline", "sales-sla", "sales-kpis"],
+  delivery_notes: ["delivery-notes", "sales-sla", "sales-kpis"],
+  sales_role_audit: ["sales-role-audit", "tenant-sales-roles"],
+  erp_alerts: ["erp-alerts", "erp-alerts-unread-count"],
+  ai_analysis_history: ["ai-history", "ai-history-infinite"],
+};
+
+/** Invalide les caches d'une table modifiée. */
+export function invalidateForTable(queryClient: ReturnType<typeof useQueryClient>, table: string) {
+  for (const key of REALTIME_TABLES[table] ?? []) queryClient.invalidateQueries({ queryKey: [key] });
+}
+
+/** Rafraîchit les écrans quand les tables financières clés changent (autre utilisateur, autre onglet). */
 export function useRealtimeInvalidation() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Sur site, pas de temps réel Supabase : les écrans se rafraîchissent par React Query.
-    if (isApiEnabled()) return;
-    const channel = supabase
-      .channel("cfo-dashboard-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ar_invoices" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
-          queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-13w-forecast"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ap_invoices" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
-          queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-13w-forecast"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
-          queryClient.invalidateQueries({ queryKey: ["cash-trend"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-cash-position"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-recon-status"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "journal_entries" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["gl-batches"] });
-          queryClient.invalidateQueries({ queryKey: ["gl-audit-logs"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bank_accounts" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
-          queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-accounts"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-cash-position"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bank_transactions" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-accounts"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-recon-status"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-cash-position"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bank_statements" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["bank-statements"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bank_statement_lines" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["statement-lines"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-recon-status"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bank_reconciliations" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-recon-status"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "cashflow_forecasts" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["cashflow-forecasts"] });
-          queryClient.invalidateQueries({ queryKey: ["treasury-13w-forecast"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "treasury_role_audit" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["treasury-role-audit"] });
-          queryClient.invalidateQueries({ queryKey: ["tenant-treasury-roles"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "quotations" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["quotations"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-pipeline"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-kpis"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "sales_orders" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-pipeline"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-sla"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-kpis"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "delivery_notes" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-sla"] });
-          queryClient.invalidateQueries({ queryKey: ["sales-kpis"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "sales_role_audit" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["sales-role-audit"] });
-          queryClient.invalidateQueries({ queryKey: ["tenant-sales-roles"] });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "erp_alerts" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["erp-alerts"] });
-        }
-      )
-      .subscribe();
-
+    if (isApiEnabled()) return subscribeRealtime((table) => invalidateForTable(queryClient, table));
+    let channel = supabase.channel("cfo-dashboard-realtime");
+    for (const table of Object.keys(REALTIME_TABLES)) {
+      if (table === "ai_analysis_history") continue; // suivi par son propre écran, filtré par société
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => invalidateForTable(queryClient, table));
+    }
+    channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };

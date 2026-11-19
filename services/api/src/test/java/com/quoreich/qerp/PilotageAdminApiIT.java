@@ -42,6 +42,7 @@ class PilotageAdminApiIT {
 
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper json;
+  @Autowired private com.quoreich.qerp.modules.ai.AiScheduler scheduler;
 
   @BeforeEach
   void preparer() {
@@ -103,5 +104,20 @@ class PilotageAdminApiIT {
         .andExpect(jsonPath("$[0].status").value("error")).andExpect(jsonPath("$[0].inputs.buckets.30j").exists());
     envoyer("PUT", "/api/v1/ai/schedules", "{\"analysis_type\":\"gl_anomaly_detection\",\"frequency\":\"weekly\",\"enabled\":true,\"params\":{\"days\":14}}", 200);
     mvc.perform(get("/api/v1/ai/schedules").with(as(ADMIN))).andExpect(status().isOk()).andExpect(jsonPath("$[0].frequency").value("weekly"));
+  }
+
+  @Test
+  @DisplayName("analyse planifiée échue : réservée, exécutée au nom de son auteur dans sa société, tracée, reprogrammée")
+  void analysePlanifiee() throws Exception {
+    PostgresFixture.execute(PostgresFixture.urlOf(DATABASE), "INSERT INTO ai_analysis_schedules (tenant_id, analysis_type, frequency, enabled, params, next_run_at, created_by)"
+        + " VALUES ('" + A + "', 'cashflow_forecast', 'weekly', true, '{\"horizons\":[45]}', now() - interval '1 hour', '" + ADMIN + "')"
+        + " ON CONFLICT (tenant_id, analysis_type) DO UPDATE SET enabled = true, frequency = 'weekly', next_run_at = now() - interval '1 hour', created_by = EXCLUDED.created_by");
+    assertThat(scheduler.runDue()).isGreaterThanOrEqualTo(1);
+    assertThat(PostgresFixture.textAsAdmin(DATABASE, "SELECT created_by::text || ' ' || status || ' ' || (inputs -> 'buckets' ? '45j')::text FROM ai_analysis_history"
+        + " WHERE tenant_id = '" + A + "' AND trigger_source = 'scheduled' ORDER BY created_at DESC LIMIT 1"))
+        .as("au nom de l'auteur, fournisseur absent = erreur tracée, paramètres de la planification").isEqualTo(ADMIN + " error true");
+    assertThat(PostgresFixture.textAsAdmin(DATABASE, "SELECT (next_run_at > now() + interval '6 days')::text FROM ai_analysis_schedules WHERE tenant_id = '" + A
+        + "' AND analysis_type = 'cashflow_forecast'")).isEqualTo("true");
+    assertThat(scheduler.runDue()).as("rien d'échu au second passage").isZero();
   }
 }

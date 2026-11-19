@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeRealtime } from "@/api/realtime";
 import { apiGet, apiPost, apiPut, isApiEnabled } from "@/api/client";
 import { useTenantId } from "./use-tenant";
 
@@ -110,7 +111,8 @@ export function useAiHistory(filter?: { type?: AiHistoryRow["analysis_type"]; li
   const queryKey = ["ai-history", tenantId, filter?.type ?? "all", filter?.limit ?? 50];
 
   useEffect(() => {
-    if (!tenantId || isApiEnabled()) return;
+    if (!tenantId) return;
+    if (isApiEnabled()) return subscribeRealtime((t) => { if (t === "ai_analysis_history") qc.invalidateQueries({ queryKey: ["ai-history", tenantId] }); });
     const ch = supabase
       .channel(`ai-history-${tenantId}-${instance}`)
       .on("postgres_changes", {
@@ -164,7 +166,8 @@ export function useAiHistoryInfinite(filter?: {
   ];
 
   useEffect(() => {
-    if (!tenantId || isApiEnabled()) return;
+    if (!tenantId) return;
+    if (isApiEnabled()) return subscribeRealtime((t) => { if (t === "ai_analysis_history") qc.invalidateQueries({ queryKey: ["ai-history-infinite", tenantId] }); });
     const ch = supabase
       .channel(`ai-history-inf-${tenantId}-${instance}`)
       .on("postgres_changes", {

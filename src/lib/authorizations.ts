@@ -34,6 +34,8 @@ export const MODULE_LABELS: Record<string, string> = {
   expenses: "Notes de frais",
   compliance: "Conformité",
   risk: "Risques",
+  reports: "Rapports",
+  workflow: "Circuits de validation",
 };
 
 export function buildAuthorizations(input: {

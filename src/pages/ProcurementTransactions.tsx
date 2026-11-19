@@ -563,9 +563,9 @@ export default function ProcurementTransactions() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold text-foreground">Procurement Transactions</h1>
         <div className="flex gap-2">
-          <Button size="sm" className="gap-1.5" onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
+          <Button size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />New Requisition</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />New PO</Button>
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canReceive} title={perms && !perms.canReceive ? "Droit requis : procurement.receive" : undefined} onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
           <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Export</ExportMenu>
         </div>
       </div>

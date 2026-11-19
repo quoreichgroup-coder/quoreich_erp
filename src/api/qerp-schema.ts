@@ -6506,25 +6506,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
+            valueNode?: boolean;
+            missingNode?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             integralNumber?: boolean;
-            missingNode?: boolean;
-            bigInteger?: boolean;
-            floatingPointNumber?: boolean;
-            bigDecimal?: boolean;
-            valueNode?: boolean;
-            number?: boolean;
             pojo?: boolean;
-            double?: boolean;
+            number?: boolean;
             string?: boolean;
             boolean?: boolean;
-            int?: boolean;
-            long?: boolean;
-            short?: boolean;
             /** @deprecated */
             textual?: boolean;
+            long?: boolean;
+            int?: boolean;
+            double?: boolean;
+            short?: boolean;
             binary?: boolean;
+            floatingPointNumber?: boolean;
+            bigInteger?: boolean;
+            bigDecimal?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {

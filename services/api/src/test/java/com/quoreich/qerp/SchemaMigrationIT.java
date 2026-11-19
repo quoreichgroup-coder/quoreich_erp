@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "115";
+  private static final String DERNIERE_MIGRATION = "118";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -84,6 +84,11 @@ class SchemaMigrationIT {
           "user_roles/Admins update roles",
           "user_roles/Admins view all roles",
           "user_roles/Users can view own roles",
+          // V116 — écritures ouvertes à tout membre (achats, prévisions, modèles, circuits, ancienne matrice, IA).
+          "purchase_requisitions/Tenant isolation", "requisition_lines/Access via requisition", "purchase_orders/Tenant isolation",
+          "po_lines/Access via PO", "goods_receipts/Tenant isolation", "gr_lines/Access via GR",
+          "cashflow_forecasts/tenant_cashflow_forecasts", "report_templates/Tenant isolation", "workflow_rules/Tenant isolation",
+          "workflow_instances/Tenant isolation", "erp_permissions/Access via role", "ai_analysis_history/Tenant isolation",
           // V113 — FOR ALL à tout membre.
           "risk_register/Tenant isolation", "risk_assessments/Access via risk", "compliance_frameworks/Tenant isolation",
           "compliance_controls/Access via framework", "compliance_test_logs/Access via control",
@@ -293,6 +298,8 @@ class SchemaMigrationIT {
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
+          // V118 — temps réel sur site.
+          "realtime_notify_change",
           "is_tenant_admin",
           "posting_account",
           "posting_roles_label",
@@ -633,6 +640,17 @@ class SchemaMigrationIT {
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
+          // V116 — écritures réservées aux droits du catalogue.
+          "purchase_requisitions/Lecture société", "purchase_requisitions/Saisie habilitée",
+          "requisition_lines/Lecture avec la pièce", "requisition_lines/Saisie habilitée",
+          "purchase_orders/Lecture société", "purchase_orders/Saisie habilitée",
+          "po_lines/Lecture avec la pièce", "po_lines/Saisie habilitée",
+          "goods_receipts/Lecture société", "goods_receipts/Saisie habilitée",
+          "gr_lines/Lecture avec la pièce", "gr_lines/Saisie habilitée",
+          "cashflow_forecasts/Lecture société", "cashflow_forecasts/Saisie habilitée",
+          "report_templates/Lecture société", "report_templates/Paramétrage habilité",
+          "workflow_rules/Lecture société", "workflow_rules/Paramétrage habilité", "workflow_instances/Lecture société",
+          "erp_permissions/Lecture société", "ai_analysis_history/Lecture société", "ai_analysis_history/Ajout par l'auteur",
           "tenant_invitations/Administrateur de la société",
           "accounting_journals/Lecture du référentiel",
           "journal_batches/Tenant isolation",
@@ -909,6 +927,24 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V118 — temps réel sur site.
+          "ar_invoices/trg_zz_realtime_notify",
+          "ap_invoices/trg_zz_realtime_notify",
+          "payments/trg_zz_realtime_notify",
+          "journal_entries/trg_zz_realtime_notify",
+          "bank_accounts/trg_zz_realtime_notify",
+          "bank_transactions/trg_zz_realtime_notify",
+          "bank_statements/trg_zz_realtime_notify",
+          "bank_statement_lines/trg_zz_realtime_notify",
+          "bank_reconciliations/trg_zz_realtime_notify",
+          "cashflow_forecasts/trg_zz_realtime_notify",
+          "treasury_role_audit/trg_zz_realtime_notify",
+          "quotations/trg_zz_realtime_notify",
+          "sales_orders/trg_zz_realtime_notify",
+          "delivery_notes/trg_zz_realtime_notify",
+          "sales_role_audit/trg_zz_realtime_notify",
+          "erp_alerts/trg_zz_realtime_notify",
+          "ai_analysis_history/trg_zz_realtime_notify",
           // V75 — immobilisations.
           "asset_categories/trg_guard_asset_category",
           "assets/trg_guard_asset",

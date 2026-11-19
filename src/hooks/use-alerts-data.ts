@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/use-tenant";
 import { apiGet, apiPost, isApiEnabled } from "@/api/client";
+import { subscribeRealtime } from "@/api/realtime";
 
 export interface ERPAlertRow {
   id: string;
@@ -152,7 +153,9 @@ export function useRealtimeAlerts() {
   const instance = useId();
 
   useEffect(() => {
-    if (!tenantId || isApiEnabled()) return;
+    if (!tenantId) return;
+    // Sur site : la WebSocket de l'API signale le changement (sans contenu) ; on relit les alertes.
+    if (isApiEnabled()) return subscribeRealtime((table) => { if (table === "erp_alerts") invalidateAll(qc); });
     const channel = supabase
       .channel(`erp-alerts-${tenantId}-${instance}`)
       .on(

@@ -515,6 +515,10 @@ export function useMyProcurementRoles() {
       canApproveL3: can("approve_l3"),
       canConvert: can("convert"),
       can3WM: can("3wm"),
+      // Saisie (V116) : demandes, commandes, réceptions.
+      canRequisition: can("requisition"),
+      canOrder: can("order"),
+      canReceive: can("receive"),
     },
   };
 }
