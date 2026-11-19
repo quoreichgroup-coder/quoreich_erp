@@ -964,35 +964,3 @@ export function useTenantHrRoles() {
 }
 
 // ────────── Assign role (SoD enforced server-side) ──────────
-
-export function useAssignHrRole() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { target_user: string; role: HrRole; action: "assign" | "revoke"; reason?: string }) => {
-      const { error } = await supabase.rpc("assign_hr_role" as never, {
-        p_target_user: input.target_user,
-        p_role: input.role,
-        p_action: input.action,
-        p_reason: input.reason ?? null,
-      } as never);
-      if (error) throw error;
-    },
-    onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ["tenant-hr-roles"] });
-      qc.invalidateQueries({ queryKey: ["hr-role-audit"] });
-      // Droits de l'utilisateur (my_access, V27) et matrice de /settings : le rôle y est recopié.
-      qc.invalidateQueries({ queryKey: ["my-access"] });
-      qc.invalidateQueries({ queryKey: ["authorizations"] });
-      toast.success(v.action === "assign" ? "Rôle attribué" : "Rôle révoqué");
-    },
-    onError: (e: Error) => {
-      const msg = e.message?.includes("SoD")
-        ? e.message
-        : e.message?.includes("administrateurs")
-        ? "Seuls les administrateurs peuvent assigner les rôles RH"
-        : e.message || "Erreur lors de l'attribution";
-      toast.error(msg);
-    },
-  });
-}
-

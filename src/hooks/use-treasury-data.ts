@@ -68,21 +68,6 @@ export function useCreateBankAccount() {
   });
 }
 
-export function useCreateBankTransaction() {
-  const qc = useQueryClient();
-  const { data: tenantId } = useTenantId();
-  return useMutation({
-    mutationFn: async (input: { bank_account_id: string; transaction_date?: string; description?: string; amount: number; transaction_type: string; reference?: string }) => {
-      const { error } = await supabase.from("bank_transactions").insert({ ...input, tenant_id: tenantId! });
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["bank-transactions"] }); toast.success("Transaction enregistrée"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-}
-
-/* ============ Treasury 2.0 ============ */
-
 export function useCashPosition() {
   return useQuery({
     queryKey: ["treasury-cash-position"],
