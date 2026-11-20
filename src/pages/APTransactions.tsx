@@ -279,6 +279,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
         <div className="flex-1 overflow-auto p-4 space-y-5">
           <DocumentDetail
             title={`Facture fournisseur ${inv.invoice_number}`}
+            attachments={{ docType: "ap_invoice", docId: inv.id }}
             fileName={documentFileName(`facture-fournisseur-${inv.invoice_number}`)}
             print={{ currency: (inv as any).currency ?? "XOF", amountInWords: false, signatures: ["Vérifié par", "Bon à payer (approbateur)"] }}
             header={[

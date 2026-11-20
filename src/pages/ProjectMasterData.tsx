@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Attachments } from "@/components/Attachments";
 import { Link } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -58,6 +59,7 @@ export function ProjectDialog({ project, onClose }: { project: Project | null; o
             <Input id="pj-desc" className="h-8 text-xs" value={f.description} onChange={(e) => set("description", e.target.value)} /></div>
         </div>
         {f.project_code && !code && <p className="text-xs text-destructive">Code : lettres, chiffres, « _ » ou « - », 20 caractères au plus.</p>}
+        {project && <Attachments docType="project" docId={project.id} compact />}
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
           <Button size="sm" disabled={!code || !f.name.trim() || save.isPending}

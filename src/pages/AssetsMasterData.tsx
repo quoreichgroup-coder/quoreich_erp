@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Attachments } from "@/components/Attachments";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentPrintButtons } from "@/components/DocumentDetail";
@@ -290,6 +291,7 @@ export default function AssetsMasterData() {
                 )}
                 {canDo(perms, "export") && <AssetSheetPrint asset={selected} />}
                 <AssetDisposalForm asset={selected} onDone={() => setSelected(null)} />
+                <Attachments docType="asset" docId={selected.id} compact />
               </div>
               <SheetFooter className="mt-4 text-xs text-muted-foreground">
                 {!canDo(perms, "edit_asset") && <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Édition verrouillée</span>}

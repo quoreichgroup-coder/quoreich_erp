@@ -226,6 +226,7 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
+          attachments={{ docType: kind === "qt" ? "quotation" : kind === "so" ? "sales_order" : "delivery_note", docId: doc.id }}
           emptyLines="Chargement des lignes…"
           print={kind === "dn" ? { amountInWords: false, signatures: ["Livré par", "Reçu par le client (nom, date, cachet)"] }
             : kind === "qt" ? { currency: cur ?? "XOF", notes: doc.valid_until ? `Offre valable jusqu'au ${new Date(doc.valid_until).toLocaleDateString("fr-FR")}.` : null, signatures: ["Bon pour accord du client"] }
@@ -357,6 +358,7 @@ function ReturnsTab() {
           <DialogContent className="max-w-3xl">
             <DialogHeader><DialogTitle className="text-sm">Retour {view.return_number}</DialogTitle></DialogHeader>
             <DocumentDetail title={`Retour client ${view.return_number}`} fileName={documentFileName(`retour-${view.return_number}`)}
+              attachments={{ docType: "customer_return", docId: view.id }}
               header={[["Client", view.customer?.name], ["Livraison", view.delivery?.dn_number], ["Date", view.return_date],
                 ["Motif", view.reason], ["Avoir", view.credit_note?.credit_note_number ?? "—"]]}
               columns={[{ label: "Libellé" }, { label: "Qté retournée", align: "right" }, { label: "P.U. vente", align: "right" },

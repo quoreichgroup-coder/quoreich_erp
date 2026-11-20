@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Attachments } from "@/components/Attachments";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -281,6 +282,7 @@ function ImportFileDetail({ file, canEdit, purchaseOrders, linked }: { file: any
       )}
 
       <ImportFileProcess file={file} editable={canEdit && file.status !== "closed"} />
+      <Attachments docType="import_file" docId={file.id} />
       <ShipmentTracking file={file} canEdit={canEdit && file.status !== "closed"} />
 
       {frozen && (

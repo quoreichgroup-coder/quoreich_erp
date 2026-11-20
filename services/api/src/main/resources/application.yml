@@ -10,6 +10,13 @@ spring:
   application:
     name: qerp-api
 
+  # Fichiers déposés (justificatifs, pièces jointes) : Spring limite à 1 Mo par défaut, ce qui refusait tout scan
+  # ordinaire. La limite métier est celle de la société (attachment_settings.max_size_mb, 50 Mo au plus).
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 51MB
+
   # ---------------------------------------------------------------------------
   # Connexion applicative — rôle NON PRIVILÉGIÉ
   # ---------------------------------------------------------------------------

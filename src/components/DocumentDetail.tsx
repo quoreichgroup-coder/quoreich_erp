@@ -1,4 +1,6 @@
 import { isValidElement, type ReactNode } from "react";
+import { Attachments } from "@/components/Attachments";
+import type { AttachmentDocType } from "@/lib/attachments";
 import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportToCSV } from "@/lib/csv-export";
@@ -77,7 +79,7 @@ async function companyIdentity(): Promise<CompanyIdentity | null> {
   }
 }
 
-export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Aucune ligne.", title, fileName, print = {} }: {
+export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Aucune ligne.", title, fileName, print = {}, attachments }: {
   header: [string, ReactNode][];
   columns: DetailColumn[];
   rows: ReactNode[][];
@@ -88,6 +90,8 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
   fileName?: string;
   /** Devise, mentions, signatures, orientation de la pièce imprimée. */
   print?: DocumentPrintOptions;
+  /** Pièces jointes de la pièce affichée (V138). */
+  attachments?: { docType: AttachmentDocType; docId: string | null | undefined };
 }) {
   return (
     <div className="space-y-4" data-testid="document-detail">
@@ -143,6 +147,7 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
           </div>
         ))}
       </section>
+      {attachments && <Attachments docType={attachments.docType} docId={attachments.docId} />}
     </div>
   );
 }

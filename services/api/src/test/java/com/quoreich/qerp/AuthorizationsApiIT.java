@@ -92,7 +92,7 @@ class AuthorizationsApiIT {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(140));
+        .andExpect(jsonPath("$.catalog.length()").value(143));
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -108,7 +108,7 @@ class AuthorizationsApiIT {
     send(post("/api/v1/authorizations/roles"), ADMIN,
             "{\"name\":\"Caissier\",\"description\":\"Encaissements\",\"copyFromRoleId\":\"" + systemRoleId("treasury_clerk") + "\"}")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.roles[?(@.name == 'Caissier')].permissions.length()").value(6)); // 4 + ar.receipt, ap.pay (V42)
+        .andExpect(jsonPath("$.roles[?(@.name == 'Caissier')].permissions.length()").value(7)); // 4 + ar.receipt, ap.pay (V42), documents.attach (V138)
     send(post("/api/v1/authorizations/roles"), ADMIN, "{\"name\":\"Caissier\"}").andExpect(status().isConflict());
 
     String caissier = roleId("Caissier");
@@ -171,10 +171,10 @@ class AuthorizationsApiIT {
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(caissier2))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.contains("budget_planner")))
-        .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.containsInAnyOrder("budget.manage", "budget.forecast", "treasury.match"))); // budget_planner : budget.manage (V73), budget.forecast (V78)
+        .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.containsInAnyOrder("budget.manage", "budget.forecast", "documents.attach", "treasury.match"))); // budget_planner : budget.manage (V73), budget.forecast (V78), documents.attach (V138)
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(140));
+        .andExpect(jsonPath("$.permissions.length()").value(143));
   }
 
   @Test
@@ -219,12 +219,13 @@ class AuthorizationsApiIT {
         + " FROM erp_authorization_audit WHERE role_id = '" + r + "') x WHERE suite = 'role_created,"
         + "permission_granted,permission_granted,permission_granted,permission_granted,"
         + "permission_granted,permission_granted," // ar.receipt, ap.pay (V42)
-        + "permission_removed,permission_removed,permission_removed,permission_removed,permission_removed'"))
+        + "permission_granted," // documents.attach (V138)
+        + "permission_removed,permission_removed,permission_removed,permission_removed,permission_removed,permission_removed'"))
         .isEqualTo("1");
     mockMvc.perform(get("/api/v1/authorizations/audit").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].action").value("permission_removed"))
-        .andExpect(jsonPath("$[5].action").value("permission_granted"))
-        .andExpect(jsonPath("$[11].action").value("role_created"));
+        .andExpect(jsonPath("$[6].action").value("permission_granted"))
+        .andExpect(jsonPath("$[13].action").value("role_created"));
   }
 }

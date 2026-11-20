@@ -197,7 +197,7 @@ function SupplierReturnView({ ret, onClose }: { ret: SupplierReturn | null; onCl
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
-          title={title} fileName={documentFileName(title)}
+          title={title} fileName={documentFileName(title)} attachments={{ docType: "supplier_return", docId: ret.id }}
           header={[["Fournisseur", ret.supplier_name], ["Réception", ret.gr_number], ["Commande", ret.po_number], ["Date", ret.return_date],
             ["Motif", ret.reason], ["Remplacement attendu", ret.replacement_expected ? "Oui" : "Non"],
             ["Avoir fournisseur", ret.credit_note_number ?? "À recevoir"]]}
@@ -327,7 +327,7 @@ function APCreditNoteView({ note, onClose }: { note: APCreditNote | null; onClos
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
-          title={title} fileName={documentFileName(title)}
+          title={title} fileName={documentFileName(title)} attachments={{ docType: "ap_credit_note", docId: note.id }}
           header={[["Fournisseur", note.supplier_name], ["Facture d'origine", note.invoice_number], ["Date", note.credit_date],
             ["Réf. fournisseur", note.supplier_reference ?? "—"], ["Retour", note.return_number ?? "—"], ["Motif", note.reason]]}
           columns={[{ label: "Libellé" }, { label: "Montant", align: "right" }]}

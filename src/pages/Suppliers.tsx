@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Attachments } from "@/components/Attachments";
 import { AccountSetSelect } from "@/components/AccountSets";
 import { WithholdingSelect } from "@/components/Withholding";
 import { PageShell } from "@/components/PageShell";
@@ -255,6 +256,7 @@ const Suppliers = () => {
               </div>
             )}
             {editing && (canVerify || canDelete) && <ChangeLog supplierId={editing.id} />}
+            {editing && <Attachments docType="supplier" docId={editing.id} compact />}
             {error && form.name && <p className="text-xs text-destructive" role="alert">{error}</p>}
           </div>
           <DialogFooter>

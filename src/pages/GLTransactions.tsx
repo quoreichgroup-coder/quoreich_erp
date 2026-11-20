@@ -122,6 +122,7 @@ function EntryDialog({ entry, onClose }: { entry: Entry | null; onClose: () => v
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
           title={title} fileName={documentFileName(title)} print={{ amountInWords: false, signatures: ["Établi par", "Validé par"] }}
+          attachments={{ docType: "journal_entry", docId: entry.id }}
           header={[
             ["Journal", entry.journal_code ? `${entry.journal_code} — ${JOURNAUX[entry.journal_code] ?? ""}` : "—"],
             ["Date", entry.entry_date], ["Origine", ORIGINES[entry.source] ?? entry.source],

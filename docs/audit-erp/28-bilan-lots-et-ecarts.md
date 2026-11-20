@@ -35,7 +35,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 | G-31 | Retenues à la source appliquées au règlement fournisseur | P2 🧮 | **Fait (V136)** : catégorie par fournisseur, retenue figée à l'approbation, prélevée au paiement (401 / banque nette / 447x), état des retenues ; taux à saisir selon la loi fiscale |
 | G-32 | Relances clients exécutées (envoi, historique) | P2 | Règles saisies, aucun traitement ; dépend de la messagerie |
 | G-34 | Réservation de stock à la commande | P2 | Projection seulement |
-| G-35 | Pièces jointes sur toutes les pièces | P2 | Seuls les justificatifs de notes de frais |
+| G-35 | Pièces jointes sur toutes les pièces | P2 | **Fait (V138)** : pièces jointes sur toutes les pièces, typées, archivées (suppression tracée), exigence paramétrable avant soumission |
 | G-41 | Tests de concurrence et idempotence (double clic, deux onglets) | P3 | |
 | G-46–G-48 | Achats internationaux : en-cours de route (lot I3) | P1 importateurs | Devises et avances (I1, V124–V128), dossier d'import, frais d'approche et douane UEMOA (I2, V129) faits ; reste I3 (compte 38, étapes, alertes) |
 | G-49, G-50 | Lots / séries / péremption ; contrats-cadres et évaluation fournisseurs | P3 | |

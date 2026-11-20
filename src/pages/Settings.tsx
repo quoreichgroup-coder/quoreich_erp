@@ -1,4 +1,5 @@
 import { ExchangeRatesPanel } from "@/components/ExchangeRatesPanel";
+import { AttachmentSettingsPanel } from "@/components/AttachmentSettingsPanel";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
@@ -13,7 +14,7 @@ import {
   CalendarDays, BookOpen, Receipt, CreditCard, GitBranch, Users, ShieldCheck,
   Plus, Pencil, Search, ChevronDown, ChevronRight, Trash2, Check, X,
   Clock, AlertTriangle, ArrowUp, Eye, FileText, Download, Play, UserMinus, RefreshCw,
-  Zap, Shield, Hash, Bot, Landmark, Layers, Building2, Coins } from "lucide-react";
+  Zap, Shield, Hash, Bot, Landmark, Layers, Building2, Coins, Paperclip } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { ModulePostingSettings } from "@/components/AccountSets";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
@@ -36,6 +37,7 @@ const tabs = [
   { id: "analytics", label: "Analytique", icon: Layers },
   { id: "tax", label: "Codes TVA", icon: Receipt },
   { id: "currency", label: "Devises et cours", icon: Coins },
+  { id: "attachments", label: "Pièces jointes", icon: Paperclip },
   { id: "payment", label: "Conditions de paiement", icon: CreditCard },
   { id: "workflow", label: "Circuits d'approbation", icon: GitBranch },
   { id: "roles", label: "Rôles et autorisations", icon: Users },
@@ -89,6 +91,7 @@ const Settings = () => {
           {activeTab === "company" && <CompanyIdentityPanel />}
           {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
           {activeTab === "currency" && <div className="max-w-5xl"><ExchangeRatesPanel /></div>}
+          {activeTab === "attachments" && <div className="max-w-5xl"><AttachmentSettingsPanel /></div>}
 
           {/* ── Chart of Accounts ── */}
           {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}

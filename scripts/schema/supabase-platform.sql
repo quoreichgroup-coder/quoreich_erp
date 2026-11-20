@@ -86,3 +86,34 @@ BEGIN
                         AND r.status IN ('draft', 'rejected')
                         AND (r.created_by = auth.uid() OR public.has_permission(auth.uid(), 'expenses.manage'))));
 END $$;
+
+-- Pièces jointes de toutes les pièces (V138) : compartiment privé « documents », chemin
+-- <société>/<type>/<pièce>/<fichier>. Lecture : fichier enregistré dans document_attachments (lecture sous RLS, donc
+-- société de l'appelant). Dépôt : droit documents.attach et pièce de la société. Aucune modification ni suppression
+-- d'un fichier enregistré (archive : la suppression est tracée dans la table, le fichier reste) ; seul un dépôt orphelin
+-- (enregistrement refusé) peut être retiré par son auteur. Les limites de la société (taille, types) sont appliquées par
+-- register_attachment ; celles du compartiment sont le plafond technique (50 Mo).
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NULL OR to_regclass('public.document_attachments') IS NULL THEN
+    RAISE NOTICE 'storage ou pièces jointes absents : compartiment documents ignoré';
+    RETURN;
+  END IF;
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES ('documents', 'documents', false, 52428800, NULL)
+  ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = NULL;
+
+  DROP POLICY IF EXISTS "Pièces jointes : lecture" ON storage.objects;
+  DROP POLICY IF EXISTS "Pièces jointes : dépôt" ON storage.objects;
+  DROP POLICY IF EXISTS "Pièces jointes : retrait d'un dépôt orphelin" ON storage.objects;
+  CREATE POLICY "Pièces jointes : lecture" ON storage.objects FOR SELECT TO authenticated
+    USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+           AND EXISTS (SELECT 1 FROM public.document_attachments a WHERE a.storage_path = name));
+  CREATE POLICY "Pièces jointes : dépôt" ON storage.objects FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+           AND public.has_permission(auth.uid(), 'documents.attach')
+           AND public.attachment_doc_in_my_tenant((storage.foldername(name))[2], (storage.foldername(name))[3]));
+  CREATE POLICY "Pièces jointes : retrait d'un dépôt orphelin" ON storage.objects FOR DELETE TO authenticated
+    USING (bucket_id = 'documents' AND owner_id = auth.uid()::text
+           AND NOT EXISTS (SELECT 1 FROM public.document_attachments a WHERE a.storage_path = name));
+END $$;

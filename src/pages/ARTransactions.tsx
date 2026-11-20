@@ -363,6 +363,7 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
         <div className="flex-1 overflow-auto p-4 space-y-5">
           <DocumentDetail
             title={inv.status === "draft" ? `Facture (brouillon) ${inv.invoice_number}` : `Facture ${inv.invoice_number}`}
+            attachments={{ docType: "ar_invoice", docId: inv.id }}
             fileName={documentFileName(`facture-${inv.invoice_number}`)}
             print={{ currency: (inv as any).currency ?? "XOF",
               notes: (inv as any).customer?.payment_terms ? `Conditions de paiement : ${(inv as any).customer.payment_terms} jours à compter de la date de facture.` : null }}

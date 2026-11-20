@@ -547,6 +547,7 @@ function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title}
+          attachments={{ docType: kind === "pr" ? "purchase_requisition" : kind === "po" ? "purchase_order" : "goods_receipt", docId: doc.id }}
           fileName={documentFileName(title)} print={{ amountInWords: false,
             signatures: view.kind === "gr" ? ["Réceptionné par", "Contrôlé par"] : view.kind === "pr" ? ["Demandeur", "Approbateur"] : ["Émis par", "Approuvé par"] }} />
       </DialogContent>

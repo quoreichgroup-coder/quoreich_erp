@@ -118,7 +118,7 @@ export function CreditNoteView({ note, onClose }: { note: ARCreditNote | null; o
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
-          title={title} fileName={documentFileName(title)}
+          title={title} fileName={documentFileName(title)} attachments={{ docType: "ar_credit_note", docId: note.id }}
           header={[["Client", note.customer_name], ["Facture d'origine", note.invoice_number], ["Date", note.credit_date], ["Motif", note.reason]]}
           columns={[{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" }, { label: "Remise", align: "right" },
             { label: "TVA", align: "right" }, { label: "Montant HT", align: "right" }]}

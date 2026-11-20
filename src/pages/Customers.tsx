@@ -1,4 +1,5 @@
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
+import { Attachments } from "@/components/Attachments";
 import { useState } from "react";
 import { AccountSetSelect } from "@/components/AccountSets";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -275,6 +276,7 @@ const Customers = () => {
             <AccountSetSelect kind="customer" value={form.account_set_id} onChange={(v) => setForm(f => ({ ...f, account_set_id: v }))} />
             {/* Une section par défaut se rattache à un client existant : visible en modification seulement. */}
             {editingCustomer && <CustomerAnalyticDefaults customerId={editingCustomer.id} />}
+            {editingCustomer && <Attachments docType="customer" docId={editingCustomer.id} compact />}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
