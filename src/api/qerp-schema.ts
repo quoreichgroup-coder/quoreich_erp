@@ -711,6 +711,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ap/settings/withholding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Réglages des retenues à la source de la société (null = valeurs par défaut) */
+        get: operations["getWithholdingSettings"];
+        /** Enregistrer les réglages des retenues (droit ap.settings) */
+        put: operations["saveWithholdingSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ap/settings/payment-methods": {
         parameters: {
             query?: never;
@@ -7350,25 +7368,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
+            string?: boolean;
+            boolean?: boolean;
+            number?: boolean;
+            short?: boolean;
+            double?: boolean;
+            long?: boolean;
+            /** @deprecated */
+            textual?: boolean;
+            int?: boolean;
+            binary?: boolean;
+            pojo?: boolean;
             bigDecimal?: boolean;
-            missingNode?: boolean;
-            valueNode?: boolean;
             floatingPointNumber?: boolean;
+            valueNode?: boolean;
+            missingNode?: boolean;
             bigInteger?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             integralNumber?: boolean;
-            pojo?: boolean;
-            number?: boolean;
-            long?: boolean;
-            double?: boolean;
-            int?: boolean;
-            short?: boolean;
-            /** @deprecated */
-            textual?: boolean;
-            binary?: boolean;
-            boolean?: boolean;
-            string?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -11012,6 +11030,96 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getWithholdingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    saveWithholdingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
             };
             /** @description Jeton absent, expiré ou invalide. */
             401: {

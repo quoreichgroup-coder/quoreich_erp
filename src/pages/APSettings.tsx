@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Settings, CreditCard, FileText, Bell, Globe, Percent, BookOpen, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
-import { WithholdingRatesPanel, WithholdingStatement } from "@/components/Withholding";
+import { WithholdingRatesPanel, WithholdingSettingsCard, WithholdingStatement } from "@/components/Withholding";
 import {
   useAPGeneralSettings,
   useUpdateAPGeneralSettings,
@@ -191,6 +191,7 @@ export default function APSettings() {
 
       {activeTab === "withholding" && (
         <div className="space-y-4">
+          <WithholdingSettingsCard />
           <WithholdingRatesPanel />
           <WithholdingStatement />
         </div>

@@ -315,10 +315,12 @@ test("retenue à la source : catégorie du fournisseur, déduite du décaissemen
   await parametresFournisseurs(page, "optional", false);
   await page.goto("/payables/settings");
   await page.getByRole("button", { name: "Retenue à la source" }).click();
+  // V137 : réglages de la société (retenues actives, arrondi à l'unité par défaut).
+  await expect(page.getByTestId("withholding-settings").getByLabel("Arrondi de la retenue")).toHaveValue("1");
   const taux = page.getByTestId("withholding-rates");
   await taux.getByLabel("Catégorie").fill(categorie);
   await taux.getByLabel("Taux (%)").fill("5");
-  await taux.getByLabel("Base").selectOption("net");
+  await taux.getByLabel("Base", { exact: true }).selectOption("net");
   await taux.getByLabel("Compte (plan de la société)").fill("447");
   await taux.getByTestId("withholding-save").click();
   await expect(taux.getByRole("cell", { name: categorie })).toBeVisible();

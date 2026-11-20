@@ -333,13 +333,18 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
     setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
     setError(null);
   };
-  // Réceptions rechargées pendant que la fenêtre est ouverte (réception précédente tout juste enregistrée) :
-  // le restant à recevoir est recalculé, jamais proposé sur des données périmées.
+  // Réceptions rechargées pendant que la fenêtre est ouverte (réception précédente tout juste enregistrée, ou simple
+  // rechargement en arrière-plan) : le restant est recalculé, mais une quantité déjà saisie est gardée tant qu'elle ne
+  // dépasse pas ce restant (elle était écrasée par le restant complet).
   useEffect(() => {
     if (!poId) return;
     const p = receivable.find((x) => x.id === poId);
     const l = p ? linesToReceive(p.id, p.lines ?? [], grs, returns) : [];
-    setQty(Object.fromEntries(l.map((x) => [x.id, String(x.remaining)])));
+    setQty((prev) => Object.fromEntries(l.map((x) => {
+      const typed = prev[x.id];
+      const n = typed == null || typed === "" ? NaN : Number(String(typed).replace(",", "."));
+      return [x.id, Number.isFinite(n) && n <= Number(x.remaining) ? typed : String(x.remaining)];
+    })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grs]);
 

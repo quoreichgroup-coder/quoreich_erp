@@ -34,7 +34,7 @@ public class PayableController {
 
   static final Set<String> SUPPLIER = Set.of("name", "email", "phone", "address", "tax_id", "payment_terms", "status", "legal_name", "rccm",
       "tax_regime", "category", "contact_name", "city", "country", "currency", "default_incoterm", "lead_time_days", "bank_name", "bank_account",
-      "bank_swift", "notes", "account_set_id", "withholding_rate_id");
+      "bank_swift", "notes", "account_set_id", "withholding_rate_id", "withholding_exempt_until", "withholding_exempt_ref");
   static final Set<String> INVOICE = Set.of("invoice_number", "supplier_id", "invoice_date", "due_date", "subtotal", "tax_amount", "total", "po_id",
       "control_total", "currency", "exchange_rate", "fx_subtotal", "fx_tax_amount", "withholding_rate_id");
   static final Set<String> PAYMENT = Set.of("ap_invoice_id", "amount", "payment_date", "payment_method", "reference", "bank_account_id");
@@ -42,7 +42,8 @@ public class PayableController {
       "early_payment_discount_pct", "discount_window_days");
   static final Set<String> SERIES = Set.of("prefix", "format", "next_number", "reset_frequency");
   static final Set<String> METHOD = Set.of("code", "label", "is_default", "is_active");
-  static final Set<String> WITHHOLDING = Set.of("category", "rate_pct", "gl_account", "is_active", "base");
+  static final Set<String> WITHHOLDING = Set.of("category", "rate_pct", "gl_account", "is_active", "base", "min_base", "valid_from", "valid_to");
+  static final Set<String> WITHHOLDING_SETTINGS = Set.of("enabled", "rounding_step");
 
   private final Sql sql;
   private final PayableInvoices invoices;
@@ -294,6 +295,18 @@ public class PayableController {
   @Operation(operationId = "withholdingStatement", summary = "État des retenues à la source prélevées sur une période (déclaration)")
   public JsonNode withholdingStatement(@RequestParam String from, @RequestParam String to) {
     return sql.list("SELECT * FROM public.withholding_statement(?::date, ?::date)", from, to);
+  }
+
+  @GetMapping("/settings/withholding")
+  @Operation(operationId = "getWithholdingSettings", summary = "Réglages des retenues à la source de la société (null = valeurs par défaut)")
+  public JsonNode withholdingSettings() {
+    return sql.one("SELECT * FROM public.ap_withholding_settings");
+  }
+
+  @PutMapping("/settings/withholding")
+  @Operation(operationId = "saveWithholdingSettings", summary = "Enregistrer les réglages des retenues (droit ap.settings)")
+  public JsonNode saveWithholdingSettings(@RequestBody Map<String, Object> body) {
+    return sql.upsert("ap_withholding_settings", body, WITHHOLDING_SETTINGS, List.of("tenant_id"));
   }
 
   @GetMapping("/settings/withholding-rates")

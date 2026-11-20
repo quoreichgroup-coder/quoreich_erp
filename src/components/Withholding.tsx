@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExportButtons } from "@/components/ExportButtons";
 import { supabase } from "@/integrations/supabase/client";
-import { apiGet, isApiEnabled } from "@/api/client";
-import { useTenantId } from "@/hooks/use-tenant";
+import { apiGet, apiPut, isApiEnabled } from "@/api/client";
+import { fetchTenantId, useTenantId } from "@/hooks/use-tenant";
 import { useAPWithholdingRates, useUpsertAPWithholdingRate } from "@/hooks/use-ap-data";
 
 /*
@@ -28,14 +29,55 @@ export function WithholdingSelect({ id, value, onChange, label = "Retenue à la 
       <Label htmlFor={id} className="text-xs">{label}</Label>
       <select id={id} className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
         <option value="">Aucune</option>
-        {(rates as any[]).filter((r) => r.is_active || r.id === value).map((r) => (
-          <option key={r.id} value={r.id}>{r.category} — {r.rate_pct} % ({r.base === "gross" ? "TTC" : "HT"})</option>))}
+        {(rates as any[]).filter((r) => (r.is_active && (!r.valid_to || r.valid_to >= today())) || r.id === value).map((r) => (
+          <option key={r.id} value={r.id}>{r.category} — {r.rate_pct} % ({r.base === "gross" ? "TTC" : "HT"}){validity(r)}</option>))}
       </select>
     </div>
   );
 }
 
-const blank = { category: "", rate_pct: "", base: "net", gl_account: "" };
+const validity = (r: any) => (r.valid_from || r.valid_to ? ` · ${r.valid_from ? `du ${r.valid_from}` : ""}${r.valid_to ? ` au ${r.valid_to}` : ""}` : "");
+const blank = { category: "", rate_pct: "", base: "net", gl_account: "", min_base: "", valid_from: "", valid_to: "" };
+const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(/\s/g, "").replace(",", ".")));
+
+/** Réglages de la société : retenues actives, pas d'arrondi (V137). */
+export function WithholdingSettingsCard() {
+  const { data: tenantId } = useTenantId();
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["withholding-settings", tenantId],
+    enabled: Boolean(tenantId),
+    queryFn: async (): Promise<any> => {
+      if (isApiEnabled()) return apiGet<any>("/api/v1/ap/settings/withholding");
+      const { data, error } = await (supabase as any).from("ap_withholding_settings").select("*").maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const save = useMutation({
+    mutationFn: async (v: { enabled: boolean; rounding_step: number }) => {
+      if (isApiEnabled()) return apiPut("/api/v1/ap/settings/withholding", v);
+      const { error } = await (supabase as any).from("ap_withholding_settings").upsert({ tenant_id: await fetchTenantId(), ...v, updated_at: new Date().toISOString() });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["withholding-settings"] }); toast.success("Réglages des retenues enregistrés"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const enabled = q.data ? Boolean(q.data.enabled) : true;
+  const step = q.data ? Number(q.data.rounding_step) : 1;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 flex flex-wrap items-end gap-4 text-xs" data-testid="withholding-settings">
+      <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} disabled={save.isPending}
+        onChange={(e) => save.mutate({ enabled: e.target.checked, rounding_step: step })} />Appliquer les retenues à la source aux nouvelles factures</label>
+      <div className="space-y-1"><Label className="text-xs" htmlFor="wh-rounding">Arrondi de la retenue</Label>
+        <select id="wh-rounding" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value={String(step)} disabled={save.isPending}
+          onChange={(e) => save.mutate({ enabled, rounding_step: Number(e.target.value) })}>
+          {[["0.01", "au centime"], ["1", "à l'unité"], ["5", "à 5"], ["10", "à 10"], ["100", "à 100"]].map(([v, l]) => <option key={v} value={String(Number(v))}>{l}</option>)}
+        </select></div>
+      <p className="text-muted-foreground basis-full">Les retenues déjà figées sur des factures approuvées ne changent pas.</p>
+    </div>
+  );
+}
 
 /** Catégories de retenue : création, modification, activation. */
 export function WithholdingRatesPanel() {
@@ -44,7 +86,8 @@ export function WithholdingRatesPanel() {
   const [form, setForm] = useState<Record<string, string>>(blank);
   const [editing, setEditing] = useState<string | null>(null);
   const submit = () => {
-    const row = { category: form.category.trim(), rate_pct: Number(String(form.rate_pct).replace(",", ".")), base: form.base, gl_account: form.gl_account.trim() || null };
+    const row = { category: form.category.trim(), rate_pct: Number(String(form.rate_pct).replace(",", ".")), base: form.base, gl_account: form.gl_account.trim() || null,
+      min_base: num(form.min_base), valid_from: form.valid_from || null, valid_to: form.valid_to || null };
     save.mutate(editing ? { id: editing, ...row } : { ...row, is_active: true }, { onSuccess: () => { setForm(blank); setEditing(null); } });
   };
   return (
@@ -56,7 +99,7 @@ export function WithholdingRatesPanel() {
       </div>
       <table className="w-full text-xs">
         <thead><tr className="border-b border-border bg-muted/30">
-          {["Catégorie", "Taux (%)", "Base", "Compte", "Actif", "Actions"].map((h) => <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
+          {["Catégorie", "Taux (%)", "Base", "Seuil", "Validité", "Compte", "Actif", "Actions"].map((h) => <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>)}
         </tr></thead>
         <tbody>
           {(rates as any[]).map((w) => (
@@ -64,10 +107,13 @@ export function WithholdingRatesPanel() {
               <td className="px-3 py-2 font-medium">{w.category}</td>
               <td className="px-3 py-2">{w.rate_pct} %</td>
               <td className="px-3 py-2">{w.base === "gross" ? "TTC" : "HT"}</td>
+              <td className="px-3 py-2">{w.min_base != null ? fmt(w.min_base) : "—"}</td>
+              <td className="px-3 py-2">{validity(w).replace(" · ", "") || "permanente"}</td>
               <td className="px-3 py-2 font-mono">{w.gl_account}</td>
               <td className="px-3 py-2">{w.is_active ? "Oui" : "Non"}</td>
               <td className="px-3 py-2 space-x-1">
-                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => { setEditing(w.id); setForm({ category: w.category, rate_pct: String(w.rate_pct), base: w.base ?? "net", gl_account: w.gl_account ?? "" }); }}>Modifier</Button>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => { setEditing(w.id); setForm({ category: w.category, rate_pct: String(w.rate_pct), base: w.base ?? "net", gl_account: w.gl_account ?? "",
+                  min_base: w.min_base != null ? String(w.min_base) : "", valid_from: w.valid_from ?? "", valid_to: w.valid_to ?? "" }); }}>Modifier</Button>
                 <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => save.mutate({ id: w.id, is_active: !w.is_active })}>{w.is_active ? "Désactiver" : "Activer"}</Button>
               </td>
             </tr>
@@ -82,6 +128,12 @@ export function WithholdingRatesPanel() {
         <div className="space-y-1"><Label className="text-xs" htmlFor="wh-base">Base</Label>
           <select id="wh-base" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })}>
             <option value="net">Montant HT</option><option value="gross">Montant TTC</option></select></div>
+        <div className="space-y-1"><Label className="text-xs" htmlFor="wh-min">Seuil de base (vide = aucun)</Label>
+          <Input id="wh-min" className="h-8 text-xs w-28" inputMode="decimal" value={form.min_base} onChange={(e) => setForm({ ...form, min_base: e.target.value })} /></div>
+        <div className="space-y-1"><Label className="text-xs" htmlFor="wh-valid-from">Valable du</Label>
+          <Input id="wh-valid-from" type="date" className="h-8 text-xs" value={form.valid_from} onChange={(e) => setForm({ ...form, valid_from: e.target.value })} /></div>
+        <div className="space-y-1"><Label className="text-xs" htmlFor="wh-valid-to">au</Label>
+          <Input id="wh-valid-to" type="date" className="h-8 text-xs" value={form.valid_to} onChange={(e) => setForm({ ...form, valid_to: e.target.value })} /></div>
         <div className="space-y-1"><Label className="text-xs" htmlFor="wh-account">Compte (plan de la société)</Label>
           <Input id="wh-account" className="h-8 text-xs w-24 font-mono" value={form.gl_account} onChange={(e) => setForm({ ...form, gl_account: e.target.value })} /></div>
         <Button size="sm" className="h-8 text-xs" disabled={save.isPending || !form.category.trim() || !(Number(String(form.rate_pct).replace(",", ".")) >= 0)} onClick={submit}

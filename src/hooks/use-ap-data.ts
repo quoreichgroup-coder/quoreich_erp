@@ -368,15 +368,24 @@ export function useAPWithholdingRates() {
 export function useUpsertAPWithholdingRate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (r: any) => {
-      if (isApiEnabled()) { await (r.id ? apiPatch(`${AP}/settings/withholding-rates/${r.id}`, r) : apiPost(`${AP}/settings/withholding-rates`, r)); return; }
+    mutationFn: async (r: any): Promise<any> => {
+      if (isApiEnabled()) return r.id ? apiPatch(`${AP}/settings/withholding-rates/${r.id}`, r) : apiPost(`${AP}/settings/withholding-rates`, r);
       const tenant_id = await fetchTenantId();
-      const { error } = r.id
-        ? await sb.from("ap_withholding_rates").update(r).eq("id", r.id)
-        : await sb.from("ap_withholding_rates").insert({ ...r, tenant_id });
+      const { data, error } = r.id
+        ? await sb.from("ap_withholding_rates").update(r).eq("id", r.id).select("*")
+        : await sb.from("ap_withholding_rates").insert({ ...r, tenant_id }).select("*");
       if (error) throw error;
+      if (!data?.length) throw new Error("Catégorie non enregistrée (droit « Paramètres des comptes fournisseurs » requis)");
+      return data[0];
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ap-withholding-rates"] }); toast.success("Taux enregistré"); },
+    // La ligne enregistrée entre aussitôt dans la liste : un rechargement lancé en même temps peut encore la manquer.
+    onSuccess: (row: any) => {
+      const saved = Array.isArray(row) ? row[0] : row;
+      if (saved?.id) qc.setQueryData<any[]>(["ap-withholding-rates"], (old = []) =>
+        [...old.filter((x) => x.id !== saved.id), saved].sort((x, y) => String(x.category).localeCompare(String(y.category))));
+      qc.invalidateQueries({ queryKey: ["ap-withholding-rates"] });
+      toast.success("Taux enregistré");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 }
