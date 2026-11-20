@@ -33,6 +33,12 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
     await format.selectOption("{YYYY}-{FWD}-{MODE}-{SEQ3}");
     await expect(toast("Paramètres des dossiers enregistrés")).toBeVisible();
   }
+  // Connecteur de suivi (V134) : adresse de réception propre à la société.
+  const connexion = reglages.getByTestId("tracking-connection");
+  await connexion.getByTestId("tracking-connection-save").click();
+  await expect(toast("Connexion de suivi enregistrée")).toBeVisible();
+  const adresse = (await connexion.getByTestId("tracking-webhook-url").locator("code").innerText()).trim();
+  expect(adresse).toMatch(/tracking-webhook/);
   const form = page.getByTestId("import-file-form");
   const options = await form.getByLabel("Fournisseur *").locator("option").allTextContents();
   await form.getByLabel("Fournisseur *").selectOption({ label: disponible && options.includes(fournisseur) ? fournisseur : options[1] });
@@ -45,6 +51,14 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
   const detail = page.getByTestId("import-file-detail");
   await expect(detail).toBeVisible();
   await expect(page.getByTestId("import-file-row").first().locator("td").first()).toHaveText(/^\d{4}-[A-Z]{3}-MER-\d{3}$/);
+
+  if (process.env.E2E_SUR_SITE) {
+    obs.etape("événement DCSA reçu du prestataire");
+    const reponse = await page.request.post(adresse, { data: { events: [{ eventID: `${RUN}-depa`, eventType: "TRANSPORT", transportEventTypeCode: "DEPA",
+      eventClassifierCode: "ACT", eventDateTime: new Date().toISOString(), transportDocumentReference: `BL-${RUN}`,
+      transportCall: { UNLocationCode: "CNNGB", vessel: { vesselName: "MSC ANNA" } } }] } });
+    expect(await reponse.json()).toMatchObject({ added: 1 });
+  }
 
   obs.etape("processus : frais estimés, commande de transport");
   const processus = detail.getByTestId("import-process");
@@ -60,7 +74,7 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
   await ev.getByLabel("Navire / vol").fill("MSC ANNA");
   await suivi.getByTestId("shipment-event-add").click();
   await expect(toast("Événement de suivi ajouté")).toBeVisible();
-  await expect(suivi.getByTestId("timeline-row").filter({ hasText: "Départ" })).toBeVisible();
+  await expect(suivi.getByTestId("timeline-row").filter({ hasText: "Départ" }).first()).toBeVisible();
   const jour = new Date().toISOString().slice(0, 10).split("-").reverse().join("/");
   const csv = `Date;Événement;Lieu;Navire;Conteneur
 ${jour} 08:00;Vessel arrival;CIABJ;MSC ANNA;MSCU1234567

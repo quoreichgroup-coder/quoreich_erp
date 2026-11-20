@@ -294,7 +294,8 @@ test("plan comptable : simulation de migration, application réservée à une au
   obs.etape("annulation");
   await page.getByRole("button", { name: "Annuler la simulation" }).click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Simulation annulée" }).first()).toBeVisible();
-  await expect(page.getByTestId("migration-row").first()).toContainText("Annulée");
+  // Une simulation laissée par un passage interrompu peut précéder la nôtre dans l'historique : on cherche notre annulation.
+  await expect(page.getByTestId("migration-row").filter({ hasText: "Annulée" }).first()).toBeVisible();
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);

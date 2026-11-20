@@ -68,6 +68,8 @@ public class SecurityConfig {
               // Temps réel (V118) : la poignée de main WebSocket ne porte pas de jeton ; il arrive dans le premier
               // message et y est vérifié (RealtimeSocketHandler), faute de quoi la connexion est fermée.
               auth.requestMatchers(HttpMethod.GET, "/api/v1/realtime").permitAll();
+              // Suivi par un prestataire (V134) : adresse propre à la société, le jeton aléatoire est vérifié par la base.
+              auth.requestMatchers(HttpMethod.POST, "/api/v1/tracking-webhook/*").permitAll();
               if (posteDeDeveloppement) {
                 auth.requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll();

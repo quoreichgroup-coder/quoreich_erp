@@ -48,9 +48,9 @@ Excel**. Migrations V129 à V133.
 
 ## 4. Restes et pistes
 
-- **Suivi automatique par un prestataire** (Terminal49, Vizion, ShipsGo… : connaissement ou conteneur → événements par
-  webhook) : service payant, à choisir par le propriétaire ; la table des événements a déjà la source « provider » et la
-  référence externe sans doublon.
+- **Suivi automatique par un prestataire** : connecteur générique prêt (V134) — adresse de réception propre à la société,
+  événements au format DCSA rattachés par connaissement ou conteneur, clé API en écriture seule. Reste à choisir le
+  prestataire (Terminal49, Vizion, ShipsGo, SeaRates : service payant) et, si besoin, son adaptateur d'abonnement.
 - **Réception par expédition** (NetSuite) : une réception unique pour toutes les commandes du dossier.
 - **Lecture automatique des factures du transitaire** (OCR / IA, comme Odoo) pour créer les frais réels.
 - Rapport de coût par voyage (estimé, réel, écart, coût de revient unitaire par article).

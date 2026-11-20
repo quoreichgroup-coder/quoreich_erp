@@ -129,6 +129,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/procurement/tracking-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connexion au prestataire de suivi (sans la clé API, jamais lisible) */
+        get: operations["getTrackingConnection"];
+        /** Enregistrer la connexion au prestataire de suivi (droit procurement.settings) */
+        put: operations["saveTrackingConnection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/procurement/import-settings": {
         parameters: {
             query?: never;
@@ -1001,6 +1019,23 @@ export interface paths {
         put?: never;
         /** Créer un compte de trésorerie (droit treasury.manage_accounts) */
         post: operations["createTreasuryAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tracking-webhook/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Réception des événements d'un prestataire de suivi (format DCSA), adresse propre à la société */
+        post: operations["receiveTrackingEvents"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7264,25 +7299,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            bigInteger?: boolean;
-            valueNode?: boolean;
-            /** @enum {string} */
-            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            integralNumber?: boolean;
             floatingPointNumber?: boolean;
             bigDecimal?: boolean;
+            bigInteger?: boolean;
+            /** @enum {string} */
+            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
+            valueNode?: boolean;
+            integralNumber?: boolean;
             missingNode?: boolean;
-            long?: boolean;
-            pojo?: boolean;
-            short?: boolean;
-            boolean?: boolean;
             int?: boolean;
-            number?: boolean;
-            string?: boolean;
-            binary?: boolean;
-            double?: boolean;
+            pojo?: boolean;
             /** @deprecated */
             textual?: boolean;
+            binary?: boolean;
+            number?: boolean;
+            double?: boolean;
+            boolean?: boolean;
+            short?: boolean;
+            long?: boolean;
+            string?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -8235,6 +8270,96 @@ export interface operations {
         };
     };
     saveProjectSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getTrackingConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    saveTrackingConnection: {
         parameters: {
             query?: never;
             header?: never;
@@ -11942,6 +12067,54 @@ export interface operations {
         responses: {
             /** @description Created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    receiveTrackingEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JsonNode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -130,6 +130,57 @@ export function ConsolidationStock() {
   );
 }
 
+const PROVIDERS: [string, string][] = [["dcsa", "Format DCSA (compagnie ou plateforme compatible)"], ["terminal49", "Terminal49"], ["vizion", "Vizion"],
+  ["shipsgo", "ShipsGo"], ["searates", "SeaRates"]];
+
+/** Suivi automatique par un prestataire (V134) : adresse de réception propre à la société, clé API en écriture seule. */
+function TrackingConnection({ canSettings }: { canSettings: boolean }) {
+  const { data: tenantId } = useTenantId();
+  const invalidate = useQueryClient();
+  const conn = useQuery({
+    queryKey: ["tracking-connection", tenantId],
+    enabled: Boolean(tenantId) && canSettings,
+    queryFn: async (): Promise<any> => isApiEnabled() ? apiGet<any>(`${P}/tracking-connection`)
+      : (await check<any[]>(db.from("tracking_connections").select("provider, enabled, webhook_token, last_received_at, last_result").limit(1)))[0] ?? null,
+  });
+  const [provider, setProvider] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const save = useMutation({
+    mutationFn: async (v: { provider: string; enabled: boolean; api_key: string | null; regenerate?: boolean }) => isApiEnabled()
+      ? apiPut(`${P}/tracking-connection`, v)
+      : check(db.rpc("set_tracking_connection", { _provider: v.provider, _enabled: v.enabled, _api_key: v.api_key, _regenerate: v.regenerate ?? false })),
+    onSuccess: () => { invalidate.invalidateQueries({ queryKey: ["tracking-connection"] }); setApiKey(""); toast.success("Connexion de suivi enregistrée"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!canSettings) return null;
+  const c = conn.data;
+  const current = provider || c?.provider || "dcsa";
+  const base = isApiEnabled() ? String(import.meta.env.VITE_QERP_API_URL ?? "").replace(/\/$/, "") : String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const url = c?.webhook_token ? (isApiEnabled() ? `${base}/api/v1/tracking-webhook/${c.webhook_token}` : `${base}/functions/v1/tracking-webhook?token=${c.webhook_token}`) : null;
+  return (
+    <div className="space-y-2 border-t border-border pt-2" data-testid="tracking-connection">
+      <p className="font-medium">Suivi automatique par un prestataire</p>
+      <p className="text-muted-foreground">Le prestataire envoie les événements (format DCSA) à l'adresse ci-dessous ; ils se rattachent au dossier par le connaissement
+        ou le numéro de conteneur. Service payant, à souscrire auprès du prestataire choisi.</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1"><Label className="text-xs" htmlFor="trk-provider">Prestataire</Label>
+          <select id="trk-provider" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value={current} onChange={(e) => setProvider(e.target.value)}>
+            {PROVIDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+        <div className="space-y-1"><Label className="text-xs" htmlFor="trk-key">Clé API du prestataire</Label>
+          <Input id="trk-key" type="password" autoComplete="off" className="h-8 text-xs w-56" placeholder={c ? "inchangée (jamais affichée)" : "facultative"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} /></div>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={c ? Boolean(c.enabled) : true}
+          onChange={(e) => save.mutate({ provider: current, enabled: e.target.checked, api_key: null })} />Activé</label>
+        <Button size="sm" variant="outline" className="h-8 text-xs" disabled={save.isPending} data-testid="tracking-connection-save"
+          onClick={() => save.mutate({ provider: current, enabled: c ? Boolean(c.enabled) : true, api_key: apiKey || null })}>Enregistrer</Button>
+        {c && <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (window.confirm("Changer l'adresse ? L'ancienne ne recevra plus rien.")) save.mutate({ provider: current, enabled: Boolean(c.enabled), api_key: null, regenerate: true }); }}>Nouvelle adresse</Button>}
+      </div>
+      {url && <p className="break-all" data-testid="tracking-webhook-url">Adresse de réception : <code>{url}</code></p>}
+      {c?.last_received_at && <p className="text-muted-foreground">Dernière réception {new Date(c.last_received_at).toLocaleString("fr-FR")} :
+        {" "}{c.last_result?.added ?? 0} ajouté(s), {c.last_result?.unmatched ?? 0} sans dossier, {c.last_result?.ignored ?? 0} ignoré(s).</p>}
+    </div>
+  );
+}
+
 /** Paramètres des dossiers : format du numéro d'expédition, dépôts par défaut, transferts automatiques, règles de frais. */
 export function ImportSettingsPanel() {
   const access = useMyAccess();
@@ -147,7 +198,7 @@ export function ImportSettingsPanel() {
   const types = useQuery({ queryKey: ["landed-cost-types"], enabled: open,
     queryFn: async (): Promise<any[]> => isApiEnabled() ? apiGet<any[]>(`${P}/landed-cost-types`) : check<any[]>(db.from("landed_cost_types").select("*").order("code")) });
   const rules = useQuery({ queryKey: ["landed-cost-rules", tenantId], enabled: Boolean(tenantId) && open,
-    queryFn: async (): Promise<any[]> => isApiEnabled() ? apiGet<any[]>(`${P}/landed-cost-rules`) : check<any[]>(db.from("landed_cost_rules").select("*").order("created_at" as never)) });
+    queryFn: async (): Promise<any[]> => isApiEnabled() ? apiGet<any[]>(`${P}/landed-cost-rules`) : check<any[]>(db.from("landed_cost_rules").select("*").order("cost_type_id")) });
   const save = useRun(async (v: Record<string, unknown>) => isApiEnabled() ? apiPut(`${P}/import-settings`, v)
     : check(db.from("import_settings").upsert({ ...(settings.data ?? {}), ...v, tenant_id: tenantId, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" }).select("tenant_id")),
     () => "Paramètres des dossiers enregistrés");
@@ -179,6 +230,7 @@ export function ImportSettingsPanel() {
             <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(s.auto_transit_transfers)} disabled={!canSettings}
               onChange={(e) => save.mutate({ auto_transit_transfers: e.target.checked })} />Transferts automatiques au départ et à la livraison (événements réels)</label>
           </div>
+          <TrackingConnection canSettings={canSettings} />
           <div className="space-y-1">
             <p className="font-medium">Règles de frais estimés</p>
             <table className="w-full"><tbody>
