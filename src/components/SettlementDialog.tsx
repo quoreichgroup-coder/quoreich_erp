@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
 import { useRecordSettlement } from "@/hooks/use-settlements";
-import { autoAllocate, checkAllocations, openItems, type OpenItemSource, type SettlementKind } from "@/lib/settlement";
+import { autoAllocate, checkAllocations, itemCurrencies, openItems, type OpenItemSource, type SettlementKind } from "@/lib/settlement";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -39,7 +39,14 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
   const [entered, setEntered] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const items = useMemo(() => openItems(kind, invoices, partyId), [kind, invoices, partyId]);
+  const [currency, setCurrency] = useState<string | null>(null);
+  const [rate, setRate] = useState("");
+  const allItems = useMemo(() => openItems(kind, invoices, partyId), [kind, invoices, partyId]);
+  const currencies = useMemo(() => itemCurrencies(allItems), [allItems]);
+  // Un règlement porte une seule devise : la liste ne montre que les pièces de la devise choisie (V124).
+  const items = useMemo(() => allItems.filter((i) => i.docCurrency === currency), [allItems, currency]);
+  useEffect(() => { if (currencies.length && !currencies.includes(currency)) setCurrency(currencies[0]); }, [currencies, currency]);
+  const unit = currency ?? "XOF";
 
   // Ouverture : tiers (et facture) présélectionnés depuis la ligne ou le panneau d'une facture.
   useEffect(() => {
@@ -50,10 +57,13 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
       ? openItems(kind, invoices, initialPartyId).find((i) => i.id === initialInvoiceId) : undefined;
     setAmount(pre ? String(pre.outstanding) : "");
     setEntered(pre ? { [pre.id]: String(pre.outstanding) } : {});
+    setCurrency(pre ? pre.docCurrency : null); setRate("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialPartyId, initialInvoiceId]);
 
   const choosePartie = (id: string) => { setPartyId(id); setEntered({}); setAmount(""); setError(null); };
+  const chooseCurrency = (c: string | null) => { setCurrency(c); setEntered({}); setAmount(""); setError(null); };
+  const rateN = rate === "" ? null : Number(rate.replace(",", "."));
   const numbers = Object.fromEntries(Object.entries(entered).map(([k, v]) => [k, v === "" ? 0 : Number(v.replace(",", "."))]));
   const amountN = amount === "" ? 0 : Number(amount.replace(",", "."));
   const allocated = Object.values(numbers).reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
@@ -69,8 +79,10 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
     if (!partyId) { setError(`Choisissez d'abord le ${tiers.toLowerCase()}.`); return; }
     const check = checkAllocations(items, numbers, amountN);
     if (check.error) { setError(check.error); return; }
+    if (currency && rateN != null && (!Number.isFinite(rateN) || rateN <= 0)) { setError("Cours du paiement invalide."); return; }
     record.mutate(
-      { partyId, paymentDate: date, paymentMethod: method, reference, allocations: check.allocations, bankAccountId: bankAccount || null },
+      { partyId, paymentDate: date, paymentMethod: method, reference, allocations: check.allocations, bankAccountId: bankAccount || null,
+        exchangeRate: currency ? rateN : null },
       { onSuccess: onClose },
     );
   };
@@ -112,7 +124,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
               placeholder={kind === "ar" ? "ex : VIR-BQ-20261114" : "ex : VIR-OUT-20261114"} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="st-amount">Montant du règlement (XOF)</Label>
+            <Label className="text-xs" htmlFor="st-amount">Montant du règlement ({unit})</Label>
             <div className="flex gap-2">
               <Input id="st-amount" inputMode="decimal" className="h-8 text-xs text-right tabular-nums" value={amount}
                 onChange={(e) => setAmount(e.target.value)} disabled={!partyId} />
@@ -121,6 +133,26 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
             </div>
           </div>
         </div>
+
+        {partyId && (currencies.length > 1 || currency) && (
+          <div className="grid grid-cols-2 gap-3" data-testid="settlement-currency">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="st-currency">Devise du règlement</Label>
+              <select id="st-currency" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+                value={currency ?? ""} onChange={(e) => chooseCurrency(e.target.value || null)}>
+                {currencies.map((c) => <option key={c ?? ""} value={c ?? ""}>{c ?? "XOF (devise de la société)"}</option>)}
+              </select>
+            </div>
+            {currency && (
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="st-rate">Cours du paiement (1 {currency} en XOF)</Label>
+                <Input id="st-rate" inputMode="decimal" className="h-8 text-xs text-right tabular-nums" value={rate} onChange={(e) => setRate(e.target.value)}
+                  placeholder="vide = cours enregistré du jour" />
+              </div>
+            )}
+            {currency && <p className="col-span-2 text-[11px] text-muted-foreground">Montants en {currency}. La dette est soldée au cours de chaque facture ; la différence avec le décaissement au cours du paiement est passée en perte ou gain de change.</p>}
+          </div>
+        )}
 
         {partyId && (
           <div className="border border-border rounded-md overflow-hidden">
@@ -139,7 +171,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
                   <tr key={i.id} className="border-t border-border">
                     <td className="p-2 font-medium tabular-nums">{i.invoice_number}</td>
                     <td className="p-2 tabular-nums text-muted-foreground">{i.due_date}</td>
-                    <td className="p-2 text-right tabular-nums">{fmt(i.total)}</td>
+                    <td className="p-2 text-right tabular-nums">{fmt(i.docTotal)}</td>
                     <td className="p-2 text-right tabular-nums">{fmt(i.outstanding)}</td>
                     <td className="p-2 text-right">
                       <Input aria-label={`Montant imputé ${i.invoice_number}`} inputMode="decimal"

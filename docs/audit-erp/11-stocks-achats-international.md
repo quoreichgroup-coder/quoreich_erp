@@ -193,3 +193,20 @@ transit passés en charges sans lien avec la marchandise.
 - Redevance statistique 1 % applicable aussi aux produits exonérés de droit de douane (cas du Burkina Faso) : [memoireonline — convergence fiscale du Burkina Faso](https://www.memoireonline.com/06/12/5961/m_Lagrobusiness-la-cle-de-la-convergence-du-taux-de-pression-fiscale-du-Burkina-Faso-vers-la-norm15.html) ; contrôle des éléments de taxation d'une déclaration en détail : [memoireonline](https://www.memoireonline.com/01/14/8671/m_Le-contrle-des-elements-de-taxation-dans-une-declaration-en-detail13.html).
 - Écarts de conversion SYSCOHADA (478 actif, 479 passif ; gain latent sans effet sur le résultat ; provision 194 / dotation 697) : [memoireonline — écarts de conversion (1)](https://www.memoireonline.com/02/17/9652/m_Impact-des-ecarts-des-conversion-sur-le-patrimoine-circulant-dettes-et-creances10.html), [(2)](https://www.memoireonline.com/02/17/9652/m_Impact-des-ecarts-des-conversion-sur-le-patrimoine-circulant-dettes-et-creances5.html) ; entrée en vigueur du SYSCOHADA révisé : [ohada.com](https://www.ohada.com/actualite/3896/entree-en-vigueur-du-syscohada-revise-lohada-met-la-derniere-main.html).
 - Non confirmé par la recherche, à valider sur l'Acte uniforme relatif au droit comptable et par l'expert-comptable : traitement exact du compte 38 et de l'incorporation des frais accessoires dans le coût d'entrée. Les taux douaniers en vigueur seront confirmés auprès de la douane nationale ou du transitaire avant mise en service (ils sont paramétrés en données, jamais en code).
+
+## 9. Réalisation — lot I1, première tranche (V124, 20 nov. 2026)
+
+- **Cours datés** `exchange_rates` : lignes de référence sans société (EUR = 655,957 XOF, parité fixe BCEAO ; idem XAF
+  / BEAC), cours de la société (cours BCEAO du jour, cours de la banque ; droit `currency.rates`) ; `exchange_rate_at`
+  = dernier cours connu à la date, société d'abord. Écran : Paramètres → « Devises et cours ».
+- **Factures fournisseurs en devise** : devise (par défaut celle du fournisseur), cours (vide = cours du jour de la
+  facture, figé à l'approbation), prix saisis en devise et chaque ligne convertie au cours ; le montant TTC de
+  contrôle se compare au total en devise. Tous les montants existants restent en XOF : encours, échéancier, budgets,
+  écritures (601 / 4452 / 401 au cours de la facture) inchangés.
+- **Paiements en devise** : un règlement porte une devise ; montant en devise, cours du paiement (vide = cours du
+  jour) ; la dette est soldée au cours de la facture, la trésorerie à la contre-valeur décaissée, l'écart en perte
+  (676, rôle `FX_LOSS`) ou gain de change (776, `FX_GAIN`) ; l'annulation inverse devise et contre-valeur.
+- Tests : `DevisesAchatsIT` ; parcours `102-devises`.
+- **Restent pour I1** : clients et ventes en devise, avance fournisseur (409), réévaluation de clôture des dettes et
+  créances en devise (478 / 479, provision 194 / 697), devise sur les commandes et import des cours BCEAO.
+

@@ -2204,6 +2204,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exchange-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cours de change : référence (BCEAO / BEAC) et cours de la société (V124) */
+        get: operations["listExchangeRates"];
+        put?: never;
+        /** Enregistrer un cours de la société (droit currency.rates) */
+        post: operations["createExchangeRate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -6561,6 +6579,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exchange-rates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer un cours de la société (droit currency.rates) */
+        delete: operations["deleteExchangeRate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/budget/forecasts/{id}": {
         parameters: {
             query?: never;
@@ -6643,25 +6678,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            long?: boolean;
-            /** @deprecated */
-            textual?: boolean;
-            double?: boolean;
-            binary?: boolean;
-            boolean?: boolean;
-            short?: boolean;
-            int?: boolean;
-            string?: boolean;
-            pojo?: boolean;
-            number?: boolean;
+            bigInteger?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            integralNumber?: boolean;
             valueNode?: boolean;
-            bigDecimal?: boolean;
-            bigInteger?: boolean;
+            integralNumber?: boolean;
             floatingPointNumber?: boolean;
+            bigDecimal?: boolean;
             missingNode?: boolean;
+            short?: boolean;
+            double?: boolean;
+            /** @deprecated */
+            textual?: boolean;
+            binary?: boolean;
+            boolean?: boolean;
+            pojo?: boolean;
+            int?: boolean;
+            long?: boolean;
+            number?: boolean;
+            string?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -15692,6 +15727,96 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listExchangeRates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createExchangeRate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
             content: {
                 "application/json": {
                     [key: string]: unknown;
@@ -28242,6 +28367,48 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteExchangeRate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

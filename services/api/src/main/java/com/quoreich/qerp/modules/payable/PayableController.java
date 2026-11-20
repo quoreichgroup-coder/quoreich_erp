@@ -36,7 +36,7 @@ public class PayableController {
       "tax_regime", "category", "contact_name", "city", "country", "currency", "default_incoterm", "lead_time_days", "bank_name", "bank_account",
       "bank_swift", "notes", "account_set_id");
   static final Set<String> INVOICE = Set.of("invoice_number", "supplier_id", "invoice_date", "due_date", "subtotal", "tax_amount", "total", "po_id",
-      "control_total");
+      "control_total", "currency", "exchange_rate", "fx_subtotal", "fx_tax_amount");
   static final Set<String> PAYMENT = Set.of("ap_invoice_id", "amount", "payment_date", "payment_method", "reference", "bank_account_id");
   static final Set<String> GENERAL = Set.of("default_currency", "default_payment_method", "po_required", "three_way_match",
       "early_payment_discount_pct", "discount_window_days");
@@ -187,6 +187,7 @@ public class PayableController {
     java.util.Map<String, Object> a = args("_kind", "ap", "_party_id", body.get("party_id"), "_payment_date", body.get("payment_date"),
         "_payment_method", body.get("payment_method"), "_reference", body.get("reference"), "_allocations", body.get("allocations"));
     if (body.get("bank_account_id") != null) a.put("_bank_account_id", body.get("bank_account_id"));
+    if (body.get("exchange_rate") != null) a.put("_exchange_rate", body.get("exchange_rate"));
     return sql.call("record_settlement", a);
   }
 

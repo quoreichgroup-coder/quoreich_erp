@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -187,6 +188,29 @@ public class ShellController {
   @Operation(operationId = "closeFiscalYear", summary = "Clôturer définitivement un exercice")
   public JsonNode closeYear(@PathVariable UUID id) {
     return sql.call("close_fiscal_year", args("_id", id));
+  }
+
+  @GetMapping("/exchange-rates")
+  @Operation(operationId = "listExchangeRates", summary = "Cours de change : référence (BCEAO / BEAC) et cours de la société (V124)")
+  public JsonNode exchangeRates() {
+    return sql.list("SELECT id, tenant_id, base_currency, currency, rate_date, rate, source, created_at FROM public.exchange_rates"
+        + " WHERE base_currency = (SELECT t.currency FROM public.tenants t WHERE t.id = public.get_user_tenant_id(auth.uid()))"
+        + " ORDER BY currency, rate_date DESC");
+  }
+
+  @PostMapping("/exchange-rates")
+  @Operation(operationId = "createExchangeRate", summary = "Enregistrer un cours de la société (droit currency.rates)")
+  public JsonNode createExchangeRate(@RequestBody Map<String, Object> b) {
+    return sql.insert("exchange_rates", Map.of("currency", b.get("currency"), "rate_date", b.get("rate_date"), "rate", b.get("rate"),
+            "source", b.getOrDefault("source", "Saisie")),
+        Set.of("currency", "rate_date", "rate", "source", "base_currency", "created_by"),
+        Map.of("base_currency", "(SELECT t.currency FROM public.tenants t WHERE t.id = public.get_user_tenant_id(auth.uid()))", "created_by", "auth.uid()"));
+  }
+
+  @DeleteMapping("/exchange-rates/{id}")
+  @Operation(operationId = "deleteExchangeRate", summary = "Supprimer un cours de la société (droit currency.rates)")
+  public void deleteExchangeRate(@PathVariable UUID id) {
+    sql.delete("exchange_rates", id);
   }
 
   @GetMapping("/fiscal-calendar/years/{id}/close-preview")

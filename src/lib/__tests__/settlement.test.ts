@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoAllocate, checkAllocations, openItems } from "../settlement";
+import { autoAllocate, checkAllocations, itemCurrencies, openItems } from "../settlement";
 
 const base = { invoice_date: "2026-10-01", amount_paid: 0, status: "sent" };
 const factures = [
@@ -33,5 +33,27 @@ describe("règlements par tiers", () => {
     expect(checkAllocations(items, { b: 700 }, 700).error).toMatch(/au-delà du restant/);
     expect(checkAllocations(items, { b: 100 }, 150).error).toMatch(/différent du total imputé/);
     expect(checkAllocations(items, {}, 0).error).toMatch(/au moins une facture/);
+  });
+});
+
+describe("règlement en devise (V124)", () => {
+  const ap = { invoice_date: "2031-03-01", status: "open", approval_status: "approved", supplier_id: "s1", due_date: "2031-04-30" };
+  const pieces = [
+    { ...ap, id: "u", invoice_number: "FU-1", total: 305305, amount_paid: 122000, currency: "USD", exchange_rate: 610, fx_total: 500.5 },
+    { ...ap, id: "x", invoice_number: "FX-1", total: 5000, amount_paid: 0 },
+  ];
+  it("donne le restant dû et le total dans la devise de la pièce, et sépare les devises", () => {
+    const items = openItems("ap", pieces, "s1");
+    const usd = items.find((i) => i.id === "u")!;
+    expect(usd).toMatchObject({ docCurrency: "USD", docTotal: 500.5, outstanding: 300.5 });
+    expect(items.find((i) => i.id === "x")).toMatchObject({ docCurrency: null, docTotal: 5000, outstanding: 5000 });
+    expect(itemCurrencies(items)).toEqual(["USD", null]);
+  });
+  it("impute en devise sur une facture en devise", () => {
+    const items = openItems("ap", pieces, "s1").filter((i) => i.docCurrency === "USD");
+    const r = checkAllocations(items, { u: 300.5 }, 300.5);
+    expect(r.error).toBeNull();
+    expect(r.allocations).toEqual([{ invoice_id: "u", fx_amount: 300.5 }]);
+    expect(checkAllocations(items, { u: 300.51 }, 300.51).error).toMatch(/au-delà du restant/);
   });
 });

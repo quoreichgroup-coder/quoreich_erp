@@ -1,3 +1,4 @@
+import { ExchangeRatesPanel } from "@/components/ExchangeRatesPanel";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
@@ -12,7 +13,7 @@ import {
   CalendarDays, BookOpen, Receipt, CreditCard, GitBranch, Users, ShieldCheck,
   Plus, Pencil, Search, ChevronDown, ChevronRight, Trash2, Check, X,
   Clock, AlertTriangle, ArrowUp, Eye, FileText, Download, Play, UserMinus, RefreshCw,
-  Zap, Shield, Hash, Bot, Landmark, Layers, Building2 } from "lucide-react";
+  Zap, Shield, Hash, Bot, Landmark, Layers, Building2, Coins } from "lucide-react";
 import { PostingAccountsPanel } from "@/components/PostingAccountsPanel";
 import { ModulePostingSettings } from "@/components/AccountSets";
 import { AnalyticAxesPanel } from "@/components/AnalyticAxesPanel";
@@ -34,6 +35,7 @@ const tabs = [
   { id: "posting", label: "Comptabilisation", icon: Landmark },
   { id: "analytics", label: "Analytique", icon: Layers },
   { id: "tax", label: "Codes TVA", icon: Receipt },
+  { id: "currency", label: "Devises et cours", icon: Coins },
   { id: "payment", label: "Conditions de paiement", icon: CreditCard },
   { id: "workflow", label: "Circuits d'approbation", icon: GitBranch },
   { id: "roles", label: "Rôles et autorisations", icon: Users },
@@ -86,6 +88,7 @@ const Settings = () => {
           {/* ── Exercices et périodes (calendrier fiscal central, V33) ── */}
           {activeTab === "company" && <CompanyIdentityPanel />}
           {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
+          {activeTab === "currency" && <div className="max-w-5xl"><ExchangeRatesPanel /></div>}
 
           {/* ── Chart of Accounts ── */}
           {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}

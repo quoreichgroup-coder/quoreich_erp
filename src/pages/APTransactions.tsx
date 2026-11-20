@@ -1,3 +1,4 @@
+import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -74,7 +75,11 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   const { data: taxCodes = [] } = useTaxCodes();
   const { data: editLines = [], isFetched: linesLoaded } = useAPInvoiceLines(edit?.id ?? null);
   const save = useSaveAPInvoiceWithLines();
+  const baseCurrency = useBaseCurrency();
+  const { data: rates = [] } = useExchangeRates();
   const [form, setForm] = useState({
+    currency: (edit as any)?.currency ?? "",
+    exchange_rate: (edit as any)?.currency && (edit as any)?.exchange_rate != null ? String((edit as any).exchange_rate) : "",
     supplier_id: edit?.supplier_id ?? "",
     po_id: (edit as any)?.po_id ?? "",
     invoice_number: edit?.invoice_number ?? `BILL-${Date.now().toString(36).toUpperCase()}`,
@@ -97,7 +102,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   }, [savedLineAnalytics, loaded]);
   useEffect(() => {
     if (!edit || loaded || !linesLoaded) return;
-    setLines(editLines.length ? editLines.map((l) => ({ description: l.description, quantity: String(l.quantity), unitPrice: String(l.unit_price),
+    setLines(editLines.length ? editLines.map((l) => ({ description: l.description, quantity: String(l.quantity), unitPrice: String((l as any).fx_unit_price ?? l.unit_price),
       discountPct: l.discount_pct ? String(l.discount_pct) : "", taxCodeId: l.tax_code_id ?? "", poLineId: l.po_line_id }))
       // Facture saisie en en-tête seul avant V72 : reprise en une ligne.
       : [{ description: "Montant facturé", quantity: "1", unitPrice: String(edit.subtotal), discountPct: "", taxCodeId: "", poLineId: null }]);
@@ -105,6 +110,11 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   }, [edit, linesLoaded, editLines, loaded]);
   const { data: toInvoice = [], isFetching: loadingPO } = usePOLinesToInvoice(form.po_id || null, edit?.id ?? null);
   const totals = invoiceTotals(lines, taxCodes);
+  // Facture en devise (V124) : lignes et montant de contrôle dans la devise ; la base convertit au cours.
+  const foreign = Boolean(form.currency) && form.currency !== baseCurrency;
+  const rateN = form.exchange_rate === "" ? null : Number(form.exchange_rate.replace(",", "."));
+  const supplierCurrency = (suppliers as any[]).find((s) => s.id === form.supplier_id)?.currency ?? null;
+  const currencies = currencyChoices(baseCurrency, rates, supplierCurrency);
   const control = form.control_total === "" ? null : Number(form.control_total.replace(",", "."));
   const controlOk = control == null || Math.round(control * 100) === Math.round(totals.total * 100);
 
@@ -120,12 +130,14 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   const handleCreate = async () => {
     if (!form.supplier_id) { toast.error("Choisissez le fournisseur"); return; }
     if (!totals.allValid) { toast.error("Chaque ligne a un libellé, une quantité positive et un prix"); return; }
+    if (foreign && rateN != null && (!Number.isFinite(rateN) || rateN <= 0)) { toast.error("Cours de la facture invalide"); return; }
     try {
       await save.mutateAsync({
         id: edit?.id,
         header: { supplier_id: form.supplier_id, po_id: form.po_id || null, invoice_number: form.invoice_number, invoice_date: form.invoice_date,
-          due_date: form.due_date, control_total: control },
+          due_date: form.due_date, control_total: control, currency: foreign ? form.currency : null, exchange_rate: foreign ? rateN : null },
         lines: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity.replace(",", ".")), unit_price: Number(l.unitPrice.replace(",", ".")),
+          fx_unit_price: foreign ? Number(l.unitPrice.replace(",", ".")) : null,
           discount_pct: l.discountPct === "" ? 0 : Number(l.discountPct.replace(",", ".")), tax_code_id: l.taxCodeId || null,
           po_line_id: form.po_id ? l.poLineId : null, analytics: l.analytics })),
         analytics: analyticsTouched ? analytics : undefined,
@@ -146,7 +158,10 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Fournisseur *</Label>
-              <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "" }))}>
+              <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => {
+                const cur = (suppliers as any[]).find((s) => s.id === e.target.value)?.currency ?? "";
+                setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "", currency: edit ? f.currency : (cur && cur !== baseCurrency ? cur : "") }));
+              }}>
                 <option value="">— Sélectionner —</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -178,6 +193,26 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
               <Input id="ap-control" inputMode="decimal" className="h-8 text-xs text-right" placeholder="contrôle" value={form.control_total} onChange={e => setForm(f => ({ ...f, control_total: e.target.value }))} />
             </div>
           </div>
+          <div className="grid grid-cols-4 gap-3" data-testid="ap-invoice-currency">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="ap-currency">Devise</Label>
+              <select id="ap-currency" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+                value={form.currency || baseCurrency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value === baseCurrency ? "" : e.target.value }))}>
+                {currencies.map((c) => <option key={c} value={c}>{c === baseCurrency ? `${c} (devise de la société)` : c}</option>)}
+              </select>
+            </div>
+            {foreign && (
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="ap-rate">Cours (1 {form.currency} en {baseCurrency})</Label>
+                <Input id="ap-rate" inputMode="decimal" className="h-8 text-xs text-right" placeholder="vide = cours du jour de la facture"
+                  value={form.exchange_rate} onChange={(e) => setForm((f) => ({ ...f, exchange_rate: e.target.value }))} />
+              </div>
+            )}
+            {foreign && (
+              <p className="col-span-2 text-[11px] text-muted-foreground self-end">Prix et montant TTC saisis en {form.currency}. Chaque ligne est convertie
+                en {baseCurrency} au cours de la facture, figé à l'approbation{rateN ? ` (≈ ${fmt(Math.round(totals.total * rateN))} ${baseCurrency})` : ""}.</p>
+            )}
+          </div>
           {form.po_id && (
             <div className="flex items-center justify-between gap-2 text-xs bg-muted/30 rounded p-2">
               <span className="text-muted-foreground">Commande : {toInvoice.map((l) => `${l.description} ${fmt(l.remaining)} à facturer`).join(" · ") || "—"}</span>
@@ -191,7 +226,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
             onChange={(axis, value) => { setAnalyticsTouched(true); setAnalytics((a) => ({ ...a, [axis]: value })); }} />
           {form.po_id && !analyticsTouched && !edit && <p className="text-[11px] text-muted-foreground">Sans choix, les sections analytiques de la commande (en-tête et lignes) sont reprises.</p>}
           <LineAnalyticsEditor lines={lines} onChange={setLines} date={form.invoice_date} idPrefix="ap-invoice" />
-          {!controlOk && <p className="text-xs text-destructive" role="alert">Le total des lignes ({fmtCurrency(totals.total)}) diffère du montant TTC de la facture ({fmtCurrency(control ?? 0)}).</p>}
+          {!controlOk && <p className="text-xs text-destructive" role="alert">Le total des lignes ({fmt(totals.total)} {foreign ? form.currency : baseCurrency}) diffère du montant TTC de la facture ({fmt(control ?? 0)} {foreign ? form.currency : baseCurrency}).</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
@@ -237,13 +272,21 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
               ["Adresse", [(inv.supplier as any)?.address, (inv.supplier as any)?.city, (inv.supplier as any)?.country].filter(Boolean).join(", ") || "—"],
               ["IFU / NIF · RCCM", [(inv.supplier as any)?.tax_id, (inv.supplier as any)?.rccm].filter(Boolean).join(" · ") || "—"],
               ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
+              ...((inv as any).currency ? [["Devise et cours", `${(inv as any).currency} · 1 ${(inv as any).currency} = ${Number((inv as any).exchange_rate).toLocaleString("fr-FR", { maximumFractionDigits: 6 })} XOF`] as [string, string]] : []),
             ]}
-            columns={[{ label: "Libellé" }, { label: "Quantité", align: "right" }, { label: "Prix unitaire", align: "right" }, { label: "Montant HT", align: "right" }, { label: "TVA", align: "right" }]}
-            rows={panelLines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)), fmtCurrency(Number(l.net_amount)), fmtCurrency(Number(l.tax_amount))])}
+            columns={(inv as any).currency
+              ? [{ label: "Libellé" }, { label: "Quantité", align: "right" }, { label: `Prix unitaire (${(inv as any).currency})`, align: "right" }, { label: `Montant HT (${(inv as any).currency})`, align: "right" }, { label: "Montant HT (XOF)", align: "right" }, { label: "TVA (XOF)", align: "right" }]
+              : [{ label: "Libellé" }, { label: "Quantité", align: "right" }, { label: "Prix unitaire", align: "right" }, { label: "Montant HT", align: "right" }, { label: "TVA", align: "right" }]}
+            rows={panelLines.map((l) => (inv as any).currency
+              ? [l.description, fmt(Number(l.quantity)), fmt(Number((l as any).fx_unit_price)), fmt(Number((l as any).fx_net_amount)), fmtCurrency(Number(l.net_amount)), fmtCurrency(Number(l.tax_amount))]
+              : [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)), fmtCurrency(Number(l.net_amount)), fmtCurrency(Number(l.tax_amount))])}
             emptyLines="Facture saisie en en-tête seul (avant les factures à lignes)."
             footer={[
               ["Total HT", fmtCurrency(inv.subtotal)], ["TVA déductible", fmtCurrency(inv.tax_amount)],
-              ["Total TTC", fmtCurrency(inv.total), true], ["Déjà payé", fmtCurrency(inv.amount_paid)],
+              ["Total TTC", fmtCurrency(inv.total), true],
+              ...((inv as any).currency ? [[`Total TTC en ${(inv as any).currency}`, `${fmt(Number((inv as any).fx_total))} ${(inv as any).currency}`, true] as [string, string, boolean],
+                [`Reste à payer en ${(inv as any).currency}`, `${fmt(Math.round(outstanding / Number((inv as any).exchange_rate) * 100) / 100)} ${(inv as any).currency}`] as [string, string]] : []),
+              ["Déjà payé", fmtCurrency(inv.amount_paid)],
               ["Reste à payer", fmtCurrency(outstanding), true],
             ]}
           />

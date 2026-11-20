@@ -12,6 +12,8 @@ export type SettlementInput = {
   bankAccountId?: string | null;
   reference: string;
   allocations: Allocation[];
+  /** Cours du paiement pour un règlement en devise (V124) ; vide = cours enregistré du jour. */
+  exchangeRate?: number | null;
 };
 
 /**
@@ -41,7 +43,7 @@ export function useRecordSettlement(kind: SettlementKind) {
       }
       if (kind === "ap" && isApiEnabled()) {
         await apiPost("/api/v1/ap/settlements", { party_id: s.partyId, payment_date: s.paymentDate, payment_method: s.paymentMethod, reference: s.reference,
-          allocations: s.allocations, bank_account_id: s.bankAccountId ?? null });
+          allocations: s.allocations, bank_account_id: s.bankAccountId ?? null, exchange_rate: s.exchangeRate ?? null });
         return;
       }
       const { error } = await (supabase as any).rpc("record_settlement", {
@@ -52,6 +54,7 @@ export function useRecordSettlement(kind: SettlementKind) {
         _reference: s.reference,
         _allocations: s.allocations,
         ...(s.bankAccountId ? { _bank_account_id: s.bankAccountId } : {}),
+        ...(s.exchangeRate ? { _exchange_rate: s.exchangeRate } : {}),
       });
       if (error) throw error;
     },

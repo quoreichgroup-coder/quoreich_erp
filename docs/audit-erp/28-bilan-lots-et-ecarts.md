@@ -27,7 +27,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 
 | # | Écart | Prio | Note |
 |---|---|---|---|
-| G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Aucune colonne de devise sur les factures |
+| G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Achats faits (V124 : cours datés, factures et paiements fournisseurs en devise, écarts 676 / 776) ; restent ventes, commandes, avance, réévaluation de clôture |
 | G-27 | ROXGOLD SANGO : reclassement 4000 → 70x, 4310 → 443x | P1 🧮 | Décision de l'expert-comptable (D4) |
 | G-28 | Paie : validation métier / fiscale par pays | P1 🧮 | Taux et comptes par pays (D5) |
 | G-29 | Demandes de prix et comparatif fournisseurs | P2 | |

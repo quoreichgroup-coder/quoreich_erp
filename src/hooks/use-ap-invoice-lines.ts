@@ -15,9 +15,13 @@ const db = supabase as any;
 export type APLineInput = {
   description: string; quantity: number; unit_price: number; discount_pct: number; tax_code_id: string | null;
   po_line_id: string | null; expense_account_id?: string | null; analytics?: LineAnalytics;
+  /** Facture en devise (V124) : prix unitaire en devise ; la base calcule la contre-valeur au cours de la facture. */
+  fx_unit_price?: number | null;
 };
 export type APInvoiceHeader = {
   supplier_id: string; po_id: string | null; invoice_number: string; invoice_date: string; due_date: string; control_total: number | null;
+  /** Devise de la facture (vide = devise de la société) et cours (vide = cours enregistré à la date de la facture). */
+  currency?: string | null; exchange_rate?: number | null;
 };
 export type APInvoiceLine = Omit<APLineInput, "analytics"> & { id: string; line_no: number; net_amount: number; tax_amount: number; grni_cleared: number };
 export type POLineToInvoice = { po_line_id: string; description: string; unit_cost: number; ordered: number; received: number; invoiced: number; remaining: number };
@@ -28,6 +32,7 @@ const lineIds = (data: { id: string; line_no: number }[] | null) => [...(data ??
 const rows = (invoiceId: string, tenantId: string, lines: APLineInput[]) => lines.map((l, i) => ({
   tenant_id: tenantId, invoice_id: invoiceId, line_no: i + 1, description: l.description.trim(), quantity: l.quantity, unit_price: l.unit_price,
   discount_pct: l.discount_pct || 0, tax_code_id: l.tax_code_id || null, po_line_id: l.po_line_id || null, expense_account_id: l.expense_account_id || null,
+  fx_unit_price: l.fx_unit_price ?? null,
 }));
 
 export function useAPInvoiceLines(invoiceId: string | null) {
@@ -68,7 +73,7 @@ export function useSaveAPInvoiceWithLines() {
         // Sur site : en-tête, lignes et sections en une transaction (un refus n'en laisse rien).
         const body = { header: v.header, analytics: v.analytics ?? null, lines: v.lines.map((l) => ({ description: l.description.trim(), quantity: l.quantity,
           unit_price: l.unit_price, discount_pct: l.discount_pct || 0, tax_code_id: l.tax_code_id || null, po_line_id: l.po_line_id || null,
-          expense_account_id: l.expense_account_id || null, analytics: l.analytics ?? null })) };
+          expense_account_id: l.expense_account_id || null, fx_unit_price: l.fx_unit_price ?? null, analytics: l.analytics ?? null })) };
         const r = v.id ? await apiPut<{ id: string }>(`/api/v1/ap/invoices/${v.id}/with-lines`, body) : await apiPost<{ id: string }>("/api/v1/ap/invoices/with-lines", body);
         return r.id;
       }
