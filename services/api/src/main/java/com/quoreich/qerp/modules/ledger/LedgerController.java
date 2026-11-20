@@ -192,6 +192,12 @@ public class LedgerController {
     return sql.call("financial_statement", args("_layout", layout, "_from", from, "_to", to));
   }
 
+  @GetMapping("/cash-flow-details")
+  @Operation(operationId = "listCashFlowDetails", summary = "Détail du tableau des flux : mouvements sans effet de trésorerie ou non classés, par compte et par sens (V122)")
+  public JsonNode cashFlowDetails(@RequestParam String layout, @RequestParam String from, @RequestParam String to) {
+    return sql.list("SELECT * FROM public.cash_flow_details(?, ?::date, ?::date) WHERE line_code IN ('ZN', 'ZU')", layout, from, to);
+  }
+
   @GetMapping("/company")
   @Operation(operationId = "getGlCompany", summary = "Devise et début d'exercice de la société")
   public JsonNode company() {

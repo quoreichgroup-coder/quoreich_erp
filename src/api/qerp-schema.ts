@@ -5180,6 +5180,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gl/cash-flow-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Détail du tableau des flux : mouvements sans effet de trésorerie ou non classés, par compte et par sens (V122) */
+        get: operations["listCashFlowDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gl/batches": {
         parameters: {
             query?: never;
@@ -6557,26 +6574,26 @@ export interface components {
             null?: boolean;
             object?: boolean;
             float?: boolean;
-            container?: boolean;
-            string?: boolean;
+            integralNumber?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
+            valueNode?: boolean;
+            missingNode?: boolean;
+            bigInteger?: boolean;
             bigDecimal?: boolean;
             floatingPointNumber?: boolean;
-            missingNode?: boolean;
-            valueNode?: boolean;
-            bigInteger?: boolean;
-            integralNumber?: boolean;
-            number?: boolean;
-            short?: boolean;
-            long?: boolean;
-            double?: boolean;
-            pojo?: boolean;
-            int?: boolean;
             /** @deprecated */
             textual?: boolean;
-            boolean?: boolean;
+            number?: boolean;
+            string?: boolean;
+            pojo?: boolean;
+            double?: boolean;
+            int?: boolean;
+            long?: boolean;
             binary?: boolean;
+            short?: boolean;
+            boolean?: boolean;
+            container?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -24675,6 +24692,52 @@ export interface operations {
     listPostingRoleSetKinds: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listCashFlowDetails: {
+        parameters: {
+            query: {
+                layout: string;
+                from: string;
+                to: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

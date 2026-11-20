@@ -21290,6 +21290,73 @@
         }
       }
     },
+    "/api/v1/gl/cash-flow-details" : {
+      "get" : {
+        "tags" : [ "Grand livre" ],
+        "summary" : "Détail du tableau des flux : mouvements sans effet de trésorerie ou non classés, par compte et par sens (V122)",
+        "operationId" : "listCashFlowDetails",
+        "parameters" : [ {
+          "name" : "layout",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/gl/batches" : {
       "get" : {
         "tags" : [ "Grand livre" ],
@@ -25406,15 +25473,21 @@
           "float" : {
             "type" : "boolean"
           },
-          "container" : {
-            "type" : "boolean"
-          },
-          "string" : {
+          "integralNumber" : {
             "type" : "boolean"
           },
           "nodeType" : {
             "type" : "string",
             "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
           },
           "bigDecimal" : {
             "type" : "boolean"
@@ -25422,44 +25495,38 @@
           "floatingPointNumber" : {
             "type" : "boolean"
           },
-          "missingNode" : {
-            "type" : "boolean"
-          },
-          "valueNode" : {
-            "type" : "boolean"
-          },
-          "bigInteger" : {
-            "type" : "boolean"
-          },
-          "integralNumber" : {
-            "type" : "boolean"
+          "textual" : {
+            "type" : "boolean",
+            "deprecated" : true
           },
           "number" : {
             "type" : "boolean"
           },
-          "short" : {
-            "type" : "boolean"
-          },
-          "long" : {
-            "type" : "boolean"
-          },
-          "double" : {
+          "string" : {
             "type" : "boolean"
           },
           "pojo" : {
             "type" : "boolean"
           },
+          "double" : {
+            "type" : "boolean"
+          },
           "int" : {
             "type" : "boolean"
           },
-          "textual" : {
-            "type" : "boolean",
-            "deprecated" : true
+          "long" : {
+            "type" : "boolean"
+          },
+          "binary" : {
+            "type" : "boolean"
+          },
+          "short" : {
+            "type" : "boolean"
           },
           "boolean" : {
             "type" : "boolean"
           },
-          "binary" : {
+          "container" : {
             "type" : "boolean"
           },
           "embeddedValue" : {

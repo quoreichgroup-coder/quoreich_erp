@@ -27,7 +27,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 
 | # | Écart | Prio | Note |
 |---|---|---|---|
-| G-21 | États financiers complets : tableau des flux de trésorerie (TFT) et notes annexes | P1 🧮 | Bilan et compte de résultat par rubriques faits (V63) ; TFT cadré (17) |
+| G-21 | États financiers complets : notes annexes | P1 🧮 | Bilan et compte de résultat (V63), tableau des flux de trésorerie (V122, doc 17) faits ; restent les notes annexes |
 | G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Aucune colonne de devise sur les factures |
 | G-27 | ROXGOLD SANGO : reclassement 4000 → 70x, 4310 → 443x | P1 🧮 | Décision de l'expert-comptable (D4) |
 | G-28 | Paie : validation métier / fiscale par pays | P1 🧮 | Taux et comptes par pays (D5) |

@@ -109,6 +109,11 @@ test("plan comptable : attributs de compte, historique ; bilan SYSCOHADA équili
   expect(actif, "total actif = total passif").toBe(passif);
   await page.getByLabel("État", { exact: true }).selectOption("CR_SYSCOHADA");
   await expect(page.getByTestId("statement-line").filter({ hasText: /^XI/ })).toBeVisible();
+  // V122 : tableau des flux de trésorerie, trésorerie calculée rapprochée de celle du bilan.
+  await page.getByLabel("État", { exact: true }).selectOption("TFT_SYSCOHADA");
+  await expect(page.getByTestId("statement-line").filter({ hasText: /^ZH/ })).toBeVisible();
+  await expect(page.getByTestId("cash-flow-balanced").or(page.getByTestId("cash-flow-controls"))).toBeVisible();
+  testInfo.annotations.push({ type: "tft", description: `ZH ${await montant("ZH")} / bilan ${await montant("ZK")} / écart ${await montant("ZX")}` });
 
   // Nettoyage : l'attribut de test est désactivé pour ne pas peser sur les autres parcours.
   await page.goto("/journal/master-data");
