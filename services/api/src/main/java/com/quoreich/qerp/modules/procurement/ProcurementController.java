@@ -266,6 +266,111 @@ public class ProcurementController {
 
   // ─── Réapprovisionnement ───
 
+  // ─── Dossiers d'importation, frais d'approche, douane (V129) ───
+  static final Set<String> IMPORT_FILE = Set.of("supplier_id", "forwarder_id", "incoterm", "transport_mode", "bill_of_lading", "containers",
+      "origin_country", "destination_country", "tec_category", "customs_office", "customs_declaration", "customs_date", "eta", "arrival_date",
+      "status", "notes");
+  static final Set<String> IMPORT_COST = Set.of("import_file_id", "cost_type_id", "description", "amount", "allocation_basis", "ap_invoice_id");
+  static final Set<String> COST_TYPE = Set.of("code", "label", "category", "allocation_basis", "capitalize", "is_active");
+
+  @GetMapping("/import-files")
+  @Operation(operationId = "listImportFiles", summary = "Dossiers d'importation (V129)")
+  public JsonNode importFiles() {
+    return sql.list("SELECT f.*, (SELECT name FROM public.suppliers WHERE id = f.supplier_id) AS supplier_name,"
+        + " (SELECT name FROM public.suppliers WHERE id = f.forwarder_id) AS forwarder_name,"
+        + " (SELECT COALESCE(jsonb_agg(o.po_id), '[]') FROM public.import_file_orders o WHERE o.import_file_id = f.id) AS po_ids"
+        + " FROM public.import_files f ORDER BY f.created_at DESC");
+  }
+
+  @PostMapping("/import-files")
+  @Operation(operationId = "createImportFile", summary = "Ouvrir un dossier d'importation (droit procurement.import)")
+  public JsonNode createImportFile(@RequestBody Map<String, Object> b) {
+    return sql.insert("import_files", b, IMPORT_FILE, Map.of("created_by", "auth.uid()"));
+  }
+
+  @PatchMapping("/import-files/{id}")
+  @Operation(operationId = "updateImportFile", summary = "Modifier un dossier d'importation tant que ses frais ne sont pas répartis")
+  public JsonNode updateImportFile(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.update("import_files", id, b, IMPORT_FILE);
+  }
+
+  @PostMapping("/import-files/{id}/orders")
+  @Operation(operationId = "addImportFileOrder", summary = "Rattacher une commande au dossier")
+  public JsonNode addImportFileOrder(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.insert("import_file_orders", Map.of("import_file_id", id.toString(), "po_id", b.get("po_id")), Set.of("import_file_id", "po_id"));
+  }
+
+  @DeleteMapping("/import-files/{id}/orders/{poId}")
+  @Operation(operationId = "removeImportFileOrder", summary = "Détacher une commande du dossier")
+  public void removeImportFileOrder(@PathVariable UUID id, @PathVariable UUID poId) {
+    sql.deleteWhere("import_file_orders", "import_file_id = ?::uuid AND po_id = ?::uuid", id.toString(), poId.toString());
+  }
+
+  @GetMapping("/import-files/{id}/costs")
+  @Operation(operationId = "listImportFileCosts", summary = "Frais d'approche du dossier")
+  public JsonNode importFileCosts(@PathVariable UUID id) {
+    return sql.list("SELECT c.*, t.code AS type_code, t.label AS type_label, t.capitalize, t.allocation_basis AS type_basis,"
+        + " (SELECT invoice_number FROM public.ap_invoices WHERE id = c.ap_invoice_id) AS ap_invoice_number"
+        + " FROM public.import_file_costs c JOIN public.landed_cost_types t ON t.id = c.cost_type_id WHERE c.import_file_id = ? ORDER BY c.created_at", id);
+  }
+
+  @PostMapping("/import-files/{id}/costs")
+  @Operation(operationId = "addImportFileCost", summary = "Ajouter un frais au dossier")
+  public JsonNode addImportFileCost(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    java.util.Map<String, Object> body = new java.util.HashMap<>(b);
+    body.put("import_file_id", id.toString());
+    return sql.insert("import_file_costs", body, IMPORT_COST, Map.of("created_by", "auth.uid()"));
+  }
+
+  @DeleteMapping("/import-files/{id}/costs/{costId}")
+  @Operation(operationId = "deleteImportFileCost", summary = "Retirer un frais du dossier")
+  public void deleteImportFileCost(@PathVariable UUID id, @PathVariable UUID costId) {
+    sql.deleteWhere("import_file_costs", "id = ?::uuid AND import_file_id = ?::uuid", costId.toString(), id.toString());
+  }
+
+  @GetMapping("/import-files/{id}/received-lines")
+  @Operation(operationId = "listImportFileReceivedLines", summary = "Lignes reçues des commandes du dossier (bases de répartition)")
+  public JsonNode importFileReceivedLines(@PathVariable UUID id) {
+    return sql.list("SELECT * FROM public.import_file_received_lines(?)", id);
+  }
+
+  @GetMapping("/import-files/{id}/allocations")
+  @Operation(operationId = "listImportFileAllocations", summary = "Répartition des frais par ligne reçue")
+  public JsonNode importFileAllocations(@PathVariable UUID id) {
+    return sql.list("SELECT a.*, (SELECT name FROM public.items WHERE id = a.item_id) AS item_name FROM public.import_file_allocations a"
+        + " WHERE a.import_file_id = ? ORDER BY a.cost_id, a.allocated DESC", id);
+  }
+
+  @PostMapping("/import-files/{id}/allocate")
+  @Operation(operationId = "allocateImportCosts", summary = "Répartir les frais dans le coût du stock (dossier figé ensuite)")
+  public JsonNode allocateImportCosts(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.call("allocate_import_costs", args("_file", id, "_date", b.getOrDefault("date", java.time.LocalDate.now().toString())));
+  }
+
+  @GetMapping("/customs-estimate")
+  @Operation(operationId = "estimateCustoms", summary = "Droits et taxes à l'importation estimés (taux UEMOA du pays, catégorie TEC)")
+  public JsonNode customsEstimate(@RequestParam String country, @RequestParam(required = false) java.math.BigDecimal category, @RequestParam java.math.BigDecimal cif) {
+    return sql.list("SELECT * FROM public.customs_estimate(?, ?, ?)", country, category, cif);
+  }
+
+  @GetMapping("/landed-cost-types")
+  @Operation(operationId = "listLandedCostTypes", summary = "Types de frais d'approche de la société")
+  public JsonNode landedCostTypes() {
+    return sql.list("SELECT * FROM public.landed_cost_types ORDER BY code");
+  }
+
+  @PostMapping("/landed-cost-types")
+  @Operation(operationId = "createLandedCostType", summary = "Créer un type de frais d'approche")
+  public JsonNode createLandedCostType(@RequestBody Map<String, Object> b) {
+    return sql.insert("landed_cost_types", b, COST_TYPE);
+  }
+
+  @PatchMapping("/landed-cost-types/{id}")
+  @Operation(operationId = "updateLandedCostType", summary = "Modifier un type de frais d'approche")
+  public JsonNode updateLandedCostType(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.update("landed_cost_types", id, b, COST_TYPE);
+  }
+
   @GetMapping("/supplier-items")
   @Operation(operationId = "listSupplierItems", summary = "Catalogue fournisseurs (prix, délais, minimum, multiple)")
   public JsonNode supplierItems() {

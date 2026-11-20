@@ -37,7 +37,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 | G-34 | Réservation de stock à la commande | P2 | Projection seulement |
 | G-35 | Pièces jointes sur toutes les pièces | P2 | Seuls les justificatifs de notes de frais |
 | G-41 | Tests de concurrence et idempotence (double clic, deux onglets) | P3 | |
-| G-46–G-48 | Achats internationaux : devises, avance fournisseur, dossier d'import, frais d'approche, douane UEMOA, en-cours de route (lots I1–I3) | P1 importateurs | Décisions déjà prises (mémoire « Règles achats internationaux ») |
+| G-46–G-48 | Achats internationaux : en-cours de route (lot I3) | P1 importateurs | Devises et avances (I1, V124–V128), dossier d'import, frais d'approche et douane UEMOA (I2, V129) faits ; reste I3 (compte 38, étapes, alertes) |
 | G-49, G-50 | Lots / séries / péremption ; contrats-cadres et évaluation fournisseurs | P3 | |
 
 ## 3. Standard de présentation des modules

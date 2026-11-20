@@ -221,6 +221,14 @@ transit passés en charges sans lien avec la marchandise.
 - **Réévaluation de clôture (V128)** : aperçu au cours de clôture ; perte latente 478 / tiers, gain latent tiers / 479,
   contre-passés le lendemain ; provision 697 / 194 des pertes latentes, reprise 194 / 797 à la réévaluation suivante ;
   droit `currency.revaluation` (catalogue 139). `AvancesEtReevaluationDevisesIT`. Écran : Paramètres → Devises et cours.
-- **Restent** : import automatique des cours BCEAO, choix de la devise au moment du devis (aujourd'hui celle du client),
-  lot I2 (dossier d'import, frais d'approche, douane) et I3 (en-cours de route 38).
+- **Lot I2 (V129)** : dossier d'importation (IMP-AAAA-####, fournisseur, transitaire, Incoterm, transport, connaissement,
+  conteneurs, ETA, douane, commandes rattachées) ; types de frais propres à la société (créés au premier dossier :
+  fret, assurance, DD, RS, PCS, PC, transit, manutention), base de répartition (valeur, quantité, poids, volume — poids
+  et volume des articles ajoutés) et incorporation ou non ; taux de douane UEMOA en données (BF et CI de référence, à
+  confirmer par le transitaire ; la société peut les remplacer) et estimation DD / RS / PCS / PC / TVA import sur la
+  valeur CAF ; répartition sur les lignes reçues, part en stock au prorata du stock restant (coût moyen relevé, 311 /
+  6031 en inventaire permanent), part consommée laissée en charges (6015) ; dossier figé ensuite. Droit
+  `procurement.import` (catalogue 140). `DossiersImportFraisApprocheIT`, parcours `103-dossiers-import`.
+- **Restent** : import automatique des cours BCEAO, choix de la devise au moment du devis, lot I3 (en-cours de route
+  38, étapes logistiques et alertes de retard), pièces jointes du dossier (G-35).
 

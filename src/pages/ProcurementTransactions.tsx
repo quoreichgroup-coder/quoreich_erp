@@ -1,3 +1,4 @@
+import { ImportFiles } from "@/components/ImportFiles";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
@@ -619,6 +620,7 @@ export default function ProcurementTransactions() {
           <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
           <TabsTrigger value="replenishment">Réapprovisionnement</TabsTrigger>
           <TabsTrigger value="followup">Suivi des livraisons</TabsTrigger>
+          <TabsTrigger value="imports">Dossiers d'import</TabsTrigger>
           <TabsTrigger value="workflow" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" />Circuit d'approbation</TabsTrigger>
         </TabsList>
 
@@ -776,6 +778,11 @@ export default function ProcurementTransactions() {
         {/* Réapprovisionnement (V54) */}
         <TabsContent value="replenishment">
           <Card className="border-border"><CardContent className="p-4"><ReplenishmentProposalsPanel /></CardContent></Card>
+        </TabsContent>
+
+        {/* Dossiers d'importation, frais d'approche, douane (V129) */}
+        <TabsContent value="imports">
+          <ImportFiles suppliers={(suppliers ?? []) as any[]} purchaseOrders={pos as any[]} />
         </TabsContent>
 
         {/* Suivi des livraisons (V56) */}
