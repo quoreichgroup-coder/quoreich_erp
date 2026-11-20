@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronDown, ChevronRight, History, Loader2, Lock, LockOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DocumentPrintButtons } from "@/components/DocumentDetail";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useMyAccess } from "@/hooks/use-my-access";
 import {
   useCloseFiscalYear, useCreateFiscalYear, useFiscalCalendar, useFiscalCalendarAudit, useOpenFiscalYear, useSetPeriodStatus,
+  useFiscalClosePreview, useOpeningBalances, useFiscalCloseSettings,
 } from "@/hooks/use-fiscal-calendar";
 import {
   FISCAL_YEAR_STATUS_LABELS, blockedReason, cellStatus, closingSequence, endAfterMonths, periodLabel,
@@ -33,6 +35,7 @@ export function FiscalCalendarPanel() {
   const canClose = access.data?.permissions.includes("periods.close") ?? false;
   const canReopen = access.data?.permissions.includes("periods.reopen") ?? false;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [showAudit, setShowAudit] = useState(false);
 
   const years = calendar.data?.years ?? [];
@@ -58,6 +61,7 @@ export function FiscalCalendarPanel() {
 
   return (
     <div className="space-y-4" data-testid="fiscal-calendar-panel">
+      {canClose && <CloseSettingSwitch />}
       <div className="bg-card border border-border rounded-lg p-5 space-y-2">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><CalendarDays className="w-4 h-4" /> Exercices et périodes</h3>
         <p className="text-xs text-muted-foreground max-w-3xl">
@@ -102,8 +106,18 @@ export function FiscalCalendarPanel() {
                   fy.status === "open" ? "bg-success/15 text-success" : fy.status === "closed" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary")}>
                   {FISCAL_YEAR_STATUS_LABELS[fy.status]}
                 </span>
+                {fy.status === "closed" && (fy as { result_amount?: number | null }).result_amount != null && (
+                  <span className="text-[11px] tabular-nums" data-testid={`fiscal-result-${fy.code}`}>
+                    Résultat {fmtAmount(Number((fy as { result_amount?: number | null }).result_amount))}</span>
+                )}
+                <OpeningBalancesButton fy={fy} />
+                {canClose && fy.status === "open" && (
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setPreview(preview === fy.id ? null : fy.id)}
+                    data-testid={`fiscal-preview-${fy.code}`}>Aperçu de clôture</Button>
+                )}
                 {canClose && <YearActions fy={fy} complete={progress.total > 0 && progress.closed === progress.total} />}
               </div>
+              {preview === fy.id && <ClosePreview fy={fy} />}
               {open && (
                 <PeriodGrid fy={fy} periods={fyPeriods} canClose={canClose} canReopen={canReopen} calendar={calendar.data} />
               )}
@@ -333,5 +347,77 @@ function AuditTable({ modules }: { modules: { code: string; label: string }[] })
         </tbody>
       </table>
     </div>
+  );
+}
+
+const fmtAmount = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+/** Paramètre V121 : la clôture passe l'écriture de détermination du résultat (131 / 139), ou pas. */
+function CloseSettingSwitch() {
+  const { query, save } = useFiscalCloseSettings();
+  const on = query.data?.post_result_entry ?? true;
+  return (
+    <label className="flex items-start gap-3 text-xs bg-card border border-border rounded-lg p-3" data-testid="fiscal-close-setting">
+      <input type="checkbox" className="mt-0.5" checked={on} disabled={query.isLoading || save.isPending}
+        onChange={(e) => save.mutate(e.target.checked)} aria-label="Écriture de détermination du résultat à la clôture" />
+      <span>À la clôture de l'exercice, passer l'écriture de détermination du résultat
+        <span className="block text-muted-foreground">Les comptes de charges et de produits sont soldés sur le résultat net (bénéfice ou perte, comptes fixés dans
+          Paramètres → Comptabilisation). Le compte de résultat de l'exercice clos reste consultable ; les soldes de bilan se reportent sans écriture.</span></span>
+    </label>
+  );
+}
+
+/** Aperçu avant clôture : produits, charges, résultat et ce qui bloque encore. */
+function ClosePreview({ fy }: { fy: FiscalYear }) {
+  const q = useFiscalClosePreview(fy.id);
+  const closeFy = useCloseFiscalYear();
+  if (q.isLoading) return <div className="px-4 pb-3"><Loader2 className="w-4 h-4 animate-spin" /></div>;
+  if (q.error || !q.data) return <p className="px-4 pb-3 text-xs text-destructive">{(q.error as Error)?.message ?? "Aperçu indisponible"}</p>;
+  const d = q.data;
+  const blockers = [
+    d.open_periods > 0 && `${d.open_periods} période(s) de module encore ouverte(s)`,
+    d.draft_entries > 0 && `${d.draft_entries} écriture(s) en brouillon dans l'exercice`,
+    d.post_result_entry && d.missing_roles.length > 0 && `Compte de résultat manquant : ${d.missing_roles.join(", ")} (Paramètres → Comptabilisation)`,
+  ].filter(Boolean) as string[];
+  return (
+    <div className="mx-4 mb-3 bg-muted/30 border border-border rounded-lg p-3 text-xs space-y-2" data-testid={`fiscal-close-preview-${fy.code}`}>
+      <div className="grid grid-cols-3 gap-3">
+        <div><div className="text-muted-foreground">Produits</div><div className="font-semibold tabular-nums">{fmtAmount(d.revenue)}</div></div>
+        <div><div className="text-muted-foreground">Charges</div><div className="font-semibold tabular-nums">{fmtAmount(d.expense)}</div></div>
+        <div><div className="text-muted-foreground">{d.result >= 0 ? "Bénéfice" : "Perte"}</div>
+          <div className={cn("font-semibold tabular-nums", d.result < 0 && "text-destructive")} data-testid={`fiscal-preview-result-${fy.code}`}>{fmtAmount(d.result)}</div></div>
+      </div>
+      <p className="text-muted-foreground">{d.post_result_entry
+        ? "La clôture passera l'écriture de détermination du résultat au dernier jour de l'exercice (journal OD)."
+        : "Paramètre : clôture sans écriture de détermination du résultat."}</p>
+      {blockers.length > 0
+        ? <ul className="text-destructive list-disc pl-4">{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+        : <Button size="sm" className="h-7 text-xs" disabled={closeFy.isPending} data-testid={`fiscal-close-confirm-${fy.code}`}
+            onClick={() => { if (window.confirm(`Clôturer définitivement l'exercice ${fy.code} ? Il ne pourra plus être rouvert.`)) closeFy.mutate(fy.id); }}>
+            Clôturer l'exercice {fy.code}</Button>}
+    </div>
+  );
+}
+
+/** État des à-nouveaux de l'exercice : soldes de bilan à la veille de son ouverture, imprimable et exportable. */
+function OpeningBalancesButton({ fy }: { fy: FiscalYear }) {
+  const [want, setWant] = useState(false);
+  const q = useOpeningBalances(want ? fy.id : null);
+  if (!want) {
+    return <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setWant(true)} data-testid={`fiscal-opening-${fy.code}`}>État des à-nouveaux</Button>;
+  }
+  if (q.isLoading) return <Loader2 className="w-4 h-4 animate-spin" />;
+  const rows = q.data ?? [];
+  const debit = rows.reduce((t, r) => t + Number(r.debit), 0);
+  const credit = rows.reduce((t, r) => t + Number(r.credit), 0);
+  return (
+    <DocumentPrintButtons testId={`fiscal-opening-print-${fy.code}`} disabled={rows.length === 0} build={() => ({
+      title: `État des à-nouveaux — exercice ${fy.code}`, fileName: `a-nouveaux-${fy.code}`, amountInWords: false,
+      subtitle: `Soldes des comptes de bilan au ${new Date(fy.start_date).toLocaleDateString("fr-FR")} (veille d'ouverture incluse)`,
+      header: [["Exercice", fy.code], ["Ouverture", new Date(fy.start_date).toLocaleDateString("fr-FR")]],
+      columns: [{ label: "Compte" }, { label: "Intitulé" }, { label: "Débit", align: "right" }, { label: "Crédit", align: "right" }],
+      rows: rows.map((r) => [r.account_code ?? "—", r.account_name, fmtAmount(Number(r.debit)), fmtAmount(Number(r.credit))]),
+      footer: [["Total débit", fmtAmount(debit)], ["Total crédit", fmtAmount(credit)], ["Écart", fmtAmount(debit - credit), true]],
+    })} />
   );
 }

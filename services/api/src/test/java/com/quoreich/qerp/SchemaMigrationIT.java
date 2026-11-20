@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "120";
+  private static final String DERNIERE_MIGRATION = "121";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -159,6 +159,7 @@ class SchemaMigrationIT {
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
       Set.of(
+          "fiscal_close_settings",
           "accounting_frameworks",
           "accounting_framework_accounts",
           "posting_roles",
@@ -298,6 +299,8 @@ class SchemaMigrationIT {
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
+          // V121 — clôture d'exercice.
+          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances",
           // V120 — piste d'audit chaînée en SHA-256.
           "gl_audit_chain_breaks", "gl_audit_hash", "guard_gl_audit_log",
           // V118 — temps réel sur site.
@@ -642,6 +645,8 @@ class SchemaMigrationIT {
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
+          // V121.
+          "fiscal_close_settings/Lecture société", "fiscal_close_settings/Paramétrage habilité",
           // V116 — écritures réservées aux droits du catalogue.
           "purchase_requisitions/Lecture société", "purchase_requisitions/Saisie habilitée",
           "requisition_lines/Lecture avec la pièce", "requisition_lines/Saisie habilitée",

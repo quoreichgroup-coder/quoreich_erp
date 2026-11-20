@@ -24,6 +24,8 @@ test("contrôles du grand livre, limites de trésorerie, rapports et seuils d'ap
   testInfo.annotations.push({ type: "concordance clients", description: await page.getByTestId("gl-recon-row").filter({ hasText: /^Clients : factures/ }).innerText() });
   await page.getByRole("tab", { name: "Intégrité" }).click();
   await expect(page.getByTestId("gl-integrity-check").filter({ hasText: "équilibrées" })).toContainText("Réussi");
+  // V120 : chaîne SHA-256 de la piste d'audit vérifiée à chaque contrôle.
+  await expect(page.getByTestId("gl-integrity-check").filter({ hasText: "Chaîne de la piste d'audit intacte" })).toContainText("Réussi");
   await page.getByRole("tab", { name: "Piste d'audit" }).click();
   await expect(page.getByTestId("gl-audit-trail").locator("tbody tr").first()).toContainText(/Créée|Comptabilisée|Contre-passée/);
   await page.getByRole("tab", { name: "Simulateur d'écriture" }).click();
@@ -46,6 +48,22 @@ test("contrôles du grand livre, limites de trésorerie, rapports et seuils d'ap
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Paramètres des contrôles enregistrés" }).last()).toBeVisible();
 
   obs.etape("trésorerie : limites et piste d'audit réelles");
+  // V121 : aperçu de la clôture de l'exercice en cours et état des à-nouveaux (sans clôturer : irréversible).
+  await page.goto("/settings?tab=fiscal");
+  const annee = page.locator('[data-testid^="fiscal-preview-"]').first();
+  if (await annee.count()) {
+    await annee.click();
+    await expect(page.locator('[data-testid^="fiscal-close-preview-"]').first()).toContainText(/Produits/);
+    await expect(page.locator('[data-testid^="fiscal-preview-result-"]').first()).toHaveText(/\d/);
+  }
+  await expect(page.getByTestId("fiscal-close-setting")).toBeVisible();
+  // Une société sans exercice défini (régime des seules clôtures de période) n'a ni aperçu ni à-nouveaux.
+  const ouverture = page.locator('[data-testid^="fiscal-opening-"]').first();
+  if (await page.locator('[data-testid^="fiscal-year-"]').count()) {
+    await ouverture.click();
+    await expect(page.locator('[data-testid^="fiscal-opening-print-"]').first()).toBeVisible();
+  }
+
   await page.goto("/treasury/control");
   await page.getByRole("button", { name: "Limites des comptes" }).click();
   await expect(page.getByTestId("treasury-limits")).toBeVisible();

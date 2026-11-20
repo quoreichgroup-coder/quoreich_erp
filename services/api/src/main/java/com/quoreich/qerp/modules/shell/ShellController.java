@@ -158,7 +158,7 @@ public class ShellController {
   @Operation(operationId = "getFiscalCalendar", summary = "Exercices, périodes, modules et statuts des périodes")
   public JsonNode fiscalCalendar() {
     ObjectNode out = JSON.createObjectNode();
-    out.set("years", sql.list("SELECT id, code, start_date, end_date, status FROM public.fiscal_years ORDER BY start_date"));
+    out.set("years", sql.list("SELECT id, code, start_date, end_date, status, result_amount FROM public.fiscal_years ORDER BY start_date"));
     out.set("periods", sql.list("SELECT id, fiscal_year_id, period_no, code, start_date, end_date FROM public.fiscal_periods ORDER BY code"));
     out.set("modules", sql.list("SELECT code, label, sort_order, is_ledger FROM public.fiscal_modules ORDER BY sort_order"));
     out.set("locks", sql.list("SELECT period, module, status, closed_at, reason FROM public.period_locks"));
@@ -187,6 +187,31 @@ public class ShellController {
   @Operation(operationId = "closeFiscalYear", summary = "Clôturer définitivement un exercice")
   public JsonNode closeYear(@PathVariable UUID id) {
     return sql.call("close_fiscal_year", args("_id", id));
+  }
+
+  @GetMapping("/fiscal-calendar/years/{id}/close-preview")
+  @Operation(operationId = "previewFiscalYearClose", summary = "Aperçu de clôture : produits, charges, résultat, points bloquants (V121)")
+  public JsonNode closePreview(@PathVariable UUID id) {
+    return sql.call("fiscal_year_close_preview", args("_id", id));
+  }
+
+  @GetMapping("/fiscal-calendar/years/{id}/opening-balances")
+  @Operation(operationId = "listOpeningBalances", summary = "État des à-nouveaux de l'exercice : soldes de bilan à la veille de son ouverture (V121)")
+  public JsonNode openingBalances(@PathVariable UUID id) {
+    return sql.list("SELECT * FROM public.fiscal_year_opening_balances(?)", id);
+  }
+
+  @GetMapping("/fiscal-calendar/close-settings")
+  @Operation(operationId = "getFiscalCloseSettings", summary = "Paramètre de clôture : écriture de détermination du résultat")
+  public JsonNode closeSettings() {
+    return sql.one("SELECT post_result_entry FROM public.fiscal_close_settings WHERE tenant_id = public.get_user_tenant_id(auth.uid())");
+  }
+
+  @PutMapping("/fiscal-calendar/close-settings")
+  @Operation(operationId = "saveFiscalCloseSettings", summary = "Enregistrer le paramètre de clôture (droit periods.close)")
+  public JsonNode saveCloseSettings(@RequestBody Map<String, Object> b) {
+    return sql.upsertWith("fiscal_close_settings", Map.of("post_result_entry", b.get("post_result_entry")), Set.of("post_result_entry", "updated_at", "updated_by"),
+        List.of("tenant_id"), Map.of("updated_at", "now()", "updated_by", "auth.uid()"));
   }
 
   @PostMapping("/fiscal-calendar/period-status")
