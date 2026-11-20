@@ -92,7 +92,7 @@ class AuthorizationsApiIT {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(143));
+        .andExpect(jsonPath("$.catalog.length()").value(145));
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -174,7 +174,7 @@ class AuthorizationsApiIT {
         .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.containsInAnyOrder("budget.manage", "budget.forecast", "documents.attach", "treasury.match"))); // budget_planner : budget.manage (V73), budget.forecast (V78), documents.attach (V138)
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(143));
+        .andExpect(jsonPath("$.permissions.length()").value(145));
   }
 
   @Test

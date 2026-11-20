@@ -1,4 +1,5 @@
 import { useWarehouses } from "@/hooks/use-inventory-data";
+import { RfqPanel } from "@/components/Rfqs";
 import { ImportFiles } from "@/components/ImportFiles";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
@@ -632,6 +633,7 @@ export default function ProcurementTransactions() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="requisitions" className="gap-1.5"><ShoppingCart className="w-3.5 h-3.5" />Demandes d'achat ({prs.length})</TabsTrigger>
+          <TabsTrigger value="rfq">Demandes de prix</TabsTrigger>
           <TabsTrigger value="po" className="gap-1.5"><Package className="w-3.5 h-3.5" />Commandes fournisseurs ({pos.length})</TabsTrigger>
           <TabsTrigger value="gr" className="gap-1.5"><Truck className="w-3.5 h-3.5" />Réceptions ({grs.length})</TabsTrigger>
           <TabsTrigger value="returns" className="gap-1.5"><Undo2 className="w-3.5 h-3.5" />Retours ({supplierReturns.length})</TabsTrigger>
@@ -793,6 +795,11 @@ export default function ProcurementTransactions() {
         </TabsContent>
 
         {/* Réapprovisionnement (V54) */}
+        {/* Demandes de prix et comparatif fournisseurs (V139) */}
+        <TabsContent value="rfq">
+          <RfqPanel suppliers={(suppliers ?? []) as any[]} requisitions={prs as any[]} />
+        </TabsContent>
+
         <TabsContent value="replenishment">
           <Card className="border-border"><CardContent className="p-4"><ReplenishmentProposalsPanel /></CardContent></Card>
         </TabsContent>

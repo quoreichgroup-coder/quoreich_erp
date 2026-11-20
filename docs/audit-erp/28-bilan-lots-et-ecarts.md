@@ -30,7 +30,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 | G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Fait (V124–V128) : cours datés, factures, paiements et encaissements en devise (676 / 776), devise du client, devis, commandes de vente et fournisseurs en devise, avances fournisseurs (409), réévaluation de clôture (478 / 479, provision 194 / 697 / 797) ; reste l'import automatique des cours |
 | G-27 | ROXGOLD SANGO : reclassement 4000 → 70x, 4310 → 443x | P1 🧮 | Décision de l'expert-comptable (D4) |
 | G-28 | Paie : validation métier / fiscale par pays | P1 🧮 | Taux et comptes par pays (D5) |
-| G-29 | Demandes de prix et comparatif fournisseurs | P2 | |
+| G-29 | Demandes de prix et comparatif fournisseurs | P2 | **Fait (V139)** : consultation, offres en devise, comparatif au cours du jour, attribution motivée par une autre personne, commandes créées |
 | G-30 | Réception de services (sans stock) | P2 | |
 | G-31 | Retenues à la source appliquées au règlement fournisseur | P2 🧮 | **Fait (V136)** : catégorie par fournisseur, retenue figée à l'approbation, prélevée au paiement (401 / banque nette / 447x), état des retenues ; taux à saisir selon la loi fiscale |
 | G-32 | Relances clients exécutées (envoi, historique) | P2 | Règles saisies, aucun traitement ; dépend de la messagerie |
