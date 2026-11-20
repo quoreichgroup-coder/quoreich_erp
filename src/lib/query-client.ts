@@ -4,18 +4,27 @@ import { QueryClient, type InvalidateOptions, type InvalidateQueryFilters } from
  * Invalidation sans réponse périmée. Quand le PREMIER chargement d'une requête est encore en vol (pas encore de
  * données) au moment où une mutation l'invalide, TanStack Query ne relance pas : il rend la réponse en vol, lue avant
  * l'écriture. Observé dans le nuage (réseau plus lent) : une demande soumise n'affichait pas son niveau d'approbation, une
- * catégorie de retenue créée n'apparaissait pas. Ces premiers chargements sont annulés (état rétabli) avant
- * l'invalidation, qui relance alors une lecture postérieure à l'écriture. Les requêtes qui ont déjà des données sont
- * annulées et relancées par TanStack lui-même (cancelRefetch).
+ * catégorie de retenue créée n'apparaissait pas. Ce premier chargement n'est PAS annulé (les invalidations du temps réel
+ * arrivent en continu : annuler à chaque fois empêcherait une liste lente de jamais se charger) ; une seule relecture est
+ * programmée à sa fin, donc postérieure à l'écriture.
  */
 export class FreshQueryClient extends QueryClient {
-  override async invalidateQueries(filters?: InvalidateQueryFilters, options?: InvalidateOptions): Promise<void> {
-    const inFlight = this.getQueryCache().findAll(filters)
-      .filter((q) => q.state.fetchStatus === "fetching" && q.state.data === undefined);
-    await Promise.all(inFlight.map((q) => q.cancel({ revert: true, silent: true })));
+  private readonly rereadScheduled = new WeakSet<object>();
+
+  override invalidateQueries(filters?: InvalidateQueryFilters, options?: InvalidateOptions): Promise<void> {
+    for (const q of this.getQueryCache().findAll(filters)) {
+      if (q.state.fetchStatus !== "fetching" || q.state.data !== undefined || this.rereadScheduled.has(q)) continue;
+      this.rereadScheduled.add(q);
+      // fetch() sur une requête en vol rend la promesse en cours, sans nouvel appel réseau.
+      void q.fetch().catch(() => undefined).finally(() => {
+        this.rereadScheduled.delete(q);
+        void super.invalidateQueries({ queryKey: q.queryKey, exact: true });
+      });
+    }
     return super.invalidateQueries(filters, options);
   }
 }
+
 
 /**
  * Client React Query partagé.
