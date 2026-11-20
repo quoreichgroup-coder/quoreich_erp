@@ -1,3 +1,4 @@
+import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useEffect, useMemo, useState } from "react";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable, type ExportFormat } from "@/lib/table-export";
@@ -77,7 +78,12 @@ const addDays = (iso: string, days: number) => {
 function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: customers = [] } = useCustomers();
   const createInvoice = useCreateARInvoice();
+  const baseCurrency = useBaseCurrency();
+  const { data: rates = [] } = useExchangeRates();
+  const currencies = currencyChoices(baseCurrency, rates);
   const [form, setForm] = useState({
+    currency: "",
+    exchange_rate: "",
     customer_id: "",
     invoice_number: "",
     invoice_date: new Date().toISOString().split("T")[0],
@@ -111,14 +117,19 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
     if (!form.customer_id) { toast.error("Choisissez un client"); return; }
     if (!allValid) { toast.error("Chaque ligne doit avoir un libellé, une quantité positive, un prix et une remise entre 0 et 100 %"); return; }
     if (total <= 0) { toast.error("Le total de la facture doit être positif"); return; }
+    const foreign = Boolean(form.currency) && form.currency !== baseCurrency;
+    const rateN = form.exchange_rate === "" ? null : Number(form.exchange_rate.replace(",", "."));
+    if (foreign && rateN != null && (!Number.isFinite(rateN) || rateN <= 0)) { toast.error("Cours de la facture invalide"); return; }
     const missing = (analyticsSetup.data?.axes ?? []).filter((a) => required.has(a.id) && !analytics[a.id]);
     if (missing.length > 0) {
       toast.error(`Section obligatoire sur le compte de ventes ${salesAccount} : ${missing.map((a) => a.name).join(", ")}`);
       return;
     }
     try {
+      const { currency: _c, exchange_rate: _r, ...header } = form;
       await createInvoice.mutateAsync({
-        ...form, subtotal, tax_amount: tax, total, analytics,
+        ...header, subtotal, tax_amount: tax, total, analytics,
+        currency: foreign ? form.currency : null, exchange_rate: foreign ? rateN : null,
         lines: lines.map((l) => ({
           description: l.description.trim(), quantity: Number(l.quantity.replace(",", ".")),
           unit_price: Number(l.unitPrice.replace(",", ".")),
@@ -167,6 +178,26 @@ function CreateInvoiceDialog({ open, onClose }: { open: boolean; onClose: () => 
               <Label className="text-xs">Échéance</Label>
               <Input type="date" className="h-8 text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3" data-testid="ar-invoice-currency">
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="ar-currency">Devise</Label>
+              <select id="ar-currency" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+                value={form.currency || baseCurrency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value === baseCurrency ? "" : e.target.value }))}>
+                {currencies.map((c) => <option key={c} value={c}>{c === baseCurrency ? `${c} (devise de la société)` : c}</option>)}
+              </select>
+            </div>
+            {form.currency && form.currency !== baseCurrency && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="ar-rate">Cours (1 {form.currency} en {baseCurrency})</Label>
+                  <Input id="ar-rate" inputMode="decimal" className="h-8 text-xs text-right" placeholder="vide = cours du jour de la facture"
+                    value={form.exchange_rate} onChange={(e) => setForm((f) => ({ ...f, exchange_rate: e.target.value }))} />
+                </div>
+                <p className="col-span-2 text-[11px] text-muted-foreground self-end">Prix saisis en {form.currency} ; chaque ligne est convertie en {baseCurrency} au
+                  cours de la facture, figé à l'émission. La créance est suivie en {baseCurrency} et en {form.currency}.</p>
+              </>
+            )}
           </div>
           <CommercialLinesEditor lines={lines} onChange={setLines} taxCodes={taxCodes} />
           <AnalyticSelectors
@@ -339,15 +370,19 @@ function InvoicePanel({ inv, onClose, onRecordPayment }: { inv: ARInvoice; onClo
               ["Client", inv.customer?.name], ["Statut", statusLabel(inv.status)],
               ["Adresse du client", (inv as any).customer?.address ?? "—"], ["IFU / NIF du client", (inv as any).customer?.tax_id ?? "—"],
               ["Date facture", inv.invoice_date], ["Échéance", inv.due_date],
+              ...((inv as any).currency ? [["Devise et cours", `${(inv as any).currency} · 1 ${(inv as any).currency} = ${Number((inv as any).exchange_rate).toLocaleString("fr-FR", { maximumFractionDigits: 6 })} XOF`] as [string, string]] : []),
             ]}
-            columns={[{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: "P.U.", align: "right" },
+            columns={[{ label: "Libellé" }, { label: "Qté", align: "right" }, { label: (inv as any).currency ? `P.U. (${(inv as any).currency})` : "P.U.", align: "right" },
               { label: "Remise", align: "right" }, { label: "TVA", align: "right" }, { label: "Montant HT", align: "right" }]}
-            rows={(lines.data ?? []).map((l) => [l.description, fmtNum(l.quantity), fmtNum(l.unit_price),
+            rows={(lines.data ?? []).map((l) => [l.description, fmtNum(l.quantity), fmtNum((inv as any).currency && (l as any).fx_unit_price != null ? (l as any).fx_unit_price : l.unit_price),
               l.discount_pct ? `${fmtNum(l.discount_pct)} %` : "", l.tax_code ?? "—", fmtNum(l.net_amount)])}
             emptyLines={lines.isLoading ? "Chargement des lignes…" : "Facture sans lignes (saisie en en-tête seul)."}
             footer={[
               ["Total HT", fmtCurrency(inv.subtotal)], ["TVA", fmtCurrency(inv.tax_amount)],
-              ["Total TTC", fmtCurrency(inv.total), true], ["Déjà réglé", fmtCurrency(inv.amount_paid)],
+              ["Total TTC", fmtCurrency(inv.total), true],
+              ...((inv as any).currency ? [[`Total TTC en ${(inv as any).currency}`, `${fmtNum(Number((inv as any).fx_total))} ${(inv as any).currency}`, true] as [string, string, boolean],
+                [`Reste à payer en ${(inv as any).currency}`, `${fmtNum(Math.round(outstanding / Number((inv as any).exchange_rate) * 100) / 100)} ${(inv as any).currency}`] as [string, string]] : []),
+              ["Déjà réglé", fmtCurrency(inv.amount_paid)],
               ["Reste à payer", fmtCurrency(outstanding), true],
             ]}
           />

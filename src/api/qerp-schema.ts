@@ -6678,25 +6678,25 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            bigInteger?: boolean;
-            /** @enum {string} */
-            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            valueNode?: boolean;
-            integralNumber?: boolean;
-            floatingPointNumber?: boolean;
-            bigDecimal?: boolean;
-            missingNode?: boolean;
-            short?: boolean;
             double?: boolean;
+            pojo?: boolean;
+            number?: boolean;
+            int?: boolean;
+            string?: boolean;
+            short?: boolean;
+            long?: boolean;
             /** @deprecated */
             textual?: boolean;
-            binary?: boolean;
             boolean?: boolean;
-            pojo?: boolean;
-            int?: boolean;
-            long?: boolean;
-            number?: boolean;
-            string?: boolean;
+            binary?: boolean;
+            /** @enum {string} */
+            nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
+            integralNumber?: boolean;
+            bigDecimal?: boolean;
+            valueNode?: boolean;
+            bigInteger?: boolean;
+            floatingPointNumber?: boolean;
+            missingNode?: boolean;
             embeddedValue?: boolean;
         };
         CustomerInput: {
@@ -6774,6 +6774,10 @@ export interface components {
             taxAmount?: number;
             analytics?: components["schemas"]["InvoiceAnalytic"][];
             lines?: components["schemas"]["InvoiceLine"][];
+            /** @description Devise de la facture (V125) ; vide = devise de la société. Prix et montants sont alors saisis dans cette devise. */
+            currency?: string;
+            /** @description Cours (1 unité de devise en devise de la société) ; vide = cours enregistré à la date de la facture */
+            exchangeRate?: number;
         };
         InvoiceAnalytic: {
             /** Format: uuid */
@@ -6801,6 +6805,10 @@ export interface components {
             paymentDate?: string;
             reference?: string;
             paymentMethod?: string;
+            /** @description Facture en devise (V125) : montant reçu en devise (remplace amount) */
+            fxAmount?: number;
+            /** @description Cours du règlement ; vide = cours enregistré du jour */
+            exchangeRate?: number;
         };
         ReverseArPayment: {
             reason?: string;
@@ -6928,6 +6936,10 @@ export interface components {
             status: string;
             /** Format: uuid */
             journalEntryId?: string;
+            /** @description Devise de la facture (V125) ; absente = devise de la société */
+            currency?: string;
+            exchangeRate?: number;
+            fxTotal?: number;
         };
         ArPaymentView: {
             /** Format: uuid */

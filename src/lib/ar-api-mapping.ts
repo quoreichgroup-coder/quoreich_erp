@@ -24,6 +24,10 @@ export interface MappedARInvoice {
   created_by: string;
   created_at: string;
   customer?: { id: string; name: string; credit_limit: number; payment_terms: number };
+  /** Facture en devise (V125). */
+  currency?: string | null;
+  exchange_rate?: number | null;
+  fx_total?: number | null;
 }
 
 /**
@@ -48,6 +52,9 @@ export function toARInvoice(view: ArInvoiceView, customers: ReadonlyMap<string, 
     created_by: "",
     created_at: "",
     journal_entry_id: view.journalEntryId ?? null,
+    currency: view.currency ?? null,
+    exchange_rate: view.exchangeRate ?? null,
+    fx_total: view.fxTotal ?? null,
     customer: customer
       ? { id: customer.id, name: customer.name, credit_limit: 0, payment_terms: 0 }
       : undefined,

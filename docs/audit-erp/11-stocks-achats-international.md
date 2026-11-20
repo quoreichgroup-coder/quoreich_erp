@@ -207,6 +207,10 @@ transit passés en charges sans lien avec la marchandise.
   jour) ; la dette est soldée au cours de la facture, la trésorerie à la contre-valeur décaissée, l'écart en perte
   (676, rôle `FX_LOSS`) ou gain de change (776, `FX_GAIN`) ; l'annulation inverse devise et contre-valeur.
 - Tests : `DevisesAchatsIT` ; parcours `102-devises`.
-- **Restent pour I1** : clients et ventes en devise, avance fournisseur (409), réévaluation de clôture des dettes et
-  créances en devise (478 / 479, provision 194 / 697), devise sur les commandes et import des cours BCEAO.
+- **Ventes en devise (V125)** : facture client en devise (cours du jour de la facture ou saisi, figé à l'émission,
+  lignes converties), encaissement en devise au cours du jour ou de la banque ; la créance 411 est soldée à sa valeur
+  d'origine (le lettrage reste exact), l'écart en gain (776) quand on reçoit plus, en perte (676) sinon. API sur site :
+  `currency` / `exchangeRate` à la création, `fxAmount` / `exchangeRate` à l'encaissement. `DevisesVentesIT`.
+- **Restent pour I1** : avance fournisseur (409), réévaluation de clôture des dettes et créances en devise (478 / 479,
+  provision 194 / 697), devise sur les commandes et les devis, devise par défaut du client, import des cours BCEAO.
 

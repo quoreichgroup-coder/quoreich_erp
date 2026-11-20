@@ -477,8 +477,11 @@ export function useCreateARInvoice() {
       analytics?: Record<string, string>;
       /** Lignes (V21) : la base calcule HT et TVA ; l'en-tête devient leur somme. */
       lines?: { description: string; quantity: number; unit_price: number; discount_pct: number; tax_code_id?: string }[];
+      /** Devise (V125) : prix saisis dans cette devise ; vide = devise de la société. Cours vide = cours du jour. */
+      currency?: string | null;
+      exchange_rate?: number | null;
     }) => {
-      const { analytics: chosen = {}, lines = [], ...given } = inv;
+      const { analytics: chosen = {}, lines = [], currency = null, exchange_rate = null, ...given } = inv;
       // Numéro facultatif (V22) : en numérotation automatique, la base attribue le définitif à
       // l'émission ; un brouillon sans numéro reçoit un numéro provisoire unique.
       const fields = {
@@ -495,6 +498,8 @@ export function useCreateARInvoice() {
           dueDate: inv.due_date,
           subtotal: inv.subtotal,
           taxAmount: inv.tax_amount,
+          currency: currency || null,
+          exchangeRate: currency ? exchange_rate : null,
           analytics: analytics.map(([axisId, valueId]) => ({ axisId, valueId })),
           ...(lines.length > 0 ? {
             lines: lines.map((l) => ({
@@ -505,12 +510,14 @@ export function useCreateARInvoice() {
         });
       }
       const tenant_id = await fetchTenantId();
+      const fx = currency ? { currency, exchange_rate } : {};
       if (analytics.length > 0 || lines.length > 0) {
         // Les sections se posent sur une facture en brouillon (V19), lues à l'émission. Sans
         // transaction entre appels PostgREST, un refus à l'émission (section inactive, règle)
         // laisserait un brouillon orphelin : on le retire avant de rendre l'erreur d'origine.
-        const { data: draft, error: draftError } = await supabase.from("ar_invoices").insert({
-          ...fields, tenant_id, created_by: user!.id, status: "draft", amount_paid: 0,
+        const { data: draft, error: draftError } = await (supabase as any).from("ar_invoices").insert({
+          ...fields, ...fx, tenant_id, created_by: user!.id, status: "draft", amount_paid: 0,
+          ...(currency && lines.length === 0 ? { fx_subtotal: given.subtotal, fx_tax_amount: given.tax_amount } : {}),
           // Avec des lignes, l'en-tête part de zéro : la base le recalcule à chaque ligne.
           ...(lines.length > 0 ? { subtotal: 0, tax_amount: 0, total: 0 } : {}),
         }).select().single();
@@ -520,6 +527,7 @@ export function useCreateARInvoice() {
           ? await db.from("ar_invoice_lines").insert(lines.map((l, i) => ({
               tenant_id, invoice_id: draft.id, line_no: i + 1, description: l.description, quantity: l.quantity,
               unit_price: l.unit_price, discount_pct: l.discount_pct, tax_code_id: l.tax_code_id || null,
+              ...(currency ? { fx_unit_price: l.unit_price } : {}),
             })))
           : { error: null };
         const { error: anaError } = lineError
@@ -538,8 +546,10 @@ export function useCreateARInvoice() {
         return sent;
       }
       // status='sent' triggers the JE auto-post (DR 4110 / CR 4000 + 4310)
-      const { data, error } = await supabase.from("ar_invoices").insert({
+      const { data, error } = await (supabase as any).from("ar_invoices").insert({
         ...fields,
+        ...fx,
+        ...(currency ? { fx_subtotal: given.subtotal, fx_tax_amount: given.tax_amount } : {}),
         tenant_id,
         created_by: user!.id,
         status: "sent",

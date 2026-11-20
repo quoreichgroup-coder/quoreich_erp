@@ -25,7 +25,11 @@ public record CreateArInvoice(
     BigDecimal subtotal,
     BigDecimal taxAmount,
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) List<InvoiceAnalytic> analytics,
-    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) List<InvoiceLine> lines) {
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) List<InvoiceLine> lines,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED, description = "Devise de la facture (V125) ; vide = devise de la société."
+        + " Prix et montants sont alors saisis dans cette devise.") String currency,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED, description = "Cours (1 unité de devise en devise de la société) ; vide = cours"
+        + " enregistré à la date de la facture") BigDecimal exchangeRate) {
 
   /** Ligne de facture. Montants calculés par la base : quantité × prix × (1 − remise). */
   public record InvoiceLine(
@@ -51,6 +55,8 @@ public record CreateArInvoice(
   }
 
   public String problem() {
+    if (currency != null && !currency.isBlank() && !currency.strip().matches("[A-Za-z]{3}")) return "currency : code ISO à 3 lettres";
+    if (exchangeRate != null && exchangeRate.signum() <= 0) return "exchangeRate doit être > 0";
     // invoiceNumber facultatif : en numérotation automatique, la base attribue le numéro
     // définitif à l'émission (V22) ; sans numéro, le brouillon reçoit un numéro provisoire.
     if (customerId == null) return "customerId obligatoire";

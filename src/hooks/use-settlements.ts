@@ -31,7 +31,8 @@ export function useRecordSettlement(kind: SettlementKind) {
         for (const a of s.allocations) {
           try {
             await apiPost(`/api/v1/ar/invoices/${a.invoice_id}/payments`, {
-              amount: a.amount, paymentDate: s.paymentDate, paymentMethod: s.paymentMethod, reference: s.reference,
+              amount: a.amount ?? null, paymentDate: s.paymentDate, paymentMethod: s.paymentMethod, reference: s.reference,
+              ...(a.fx_amount != null ? { fxAmount: a.fx_amount, exchangeRate: s.exchangeRate ?? null } : {}),
             });
             faites += 1;
           } catch (e) {

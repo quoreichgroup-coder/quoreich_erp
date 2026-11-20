@@ -23,7 +23,7 @@ public class ArInvoiceQuery {
 
   private static final String COLUMNS =
       "id, invoice_number, customer_id, invoice_date, due_date, subtotal, tax_amount, total,"
-          + " amount_paid, status, journal_entry_id";
+          + " amount_paid, status, journal_entry_id, currency, exchange_rate, fx_total";
 
   private static final RowMapper<ArInvoiceView> MAPPER =
       (rs, i) -> {
@@ -41,7 +41,10 @@ public class ArInvoiceQuery {
             paid,
             total.subtract(paid),
             rs.getString("status"),
-            rs.getObject("journal_entry_id", UUID.class));
+            rs.getObject("journal_entry_id", UUID.class),
+            rs.getString("currency"),
+            rs.getBigDecimal("exchange_rate"),
+            rs.getBigDecimal("fx_total"));
       };
 
   /**
@@ -99,9 +102,9 @@ public class ArInvoiceQuery {
     UUID id =
         jdbc.queryForObject(
             "INSERT INTO ar_invoices (tenant_id, invoice_number, customer_id, invoice_date,"
-                + " due_date, subtotal, tax_amount, status, created_by)"
+                + " due_date, subtotal, tax_amount, status, created_by, currency, exchange_rate, fx_subtotal, fx_tax_amount)"
                 + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, COALESCE(?, CURRENT_DATE), ?, ?,"
-                + " COALESCE(?, 0), 'draft', auth.uid()) RETURNING id",
+                + " COALESCE(?, 0), 'draft', auth.uid(), ?, ?, ?, ?) RETURNING id",
             UUID.class,
             in.invoiceNumber() == null || in.invoiceNumber().isBlank()
                 ? "BROUILLON-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase()
@@ -111,7 +114,12 @@ public class ArInvoiceQuery {
             in.dueDate(),
             // Avec des lignes, l'en-tête part de zéro : la base le recalcule à chaque ligne.
             in.linesOrEmpty().isEmpty() ? in.subtotal() : java.math.BigDecimal.ZERO,
-            in.linesOrEmpty().isEmpty() ? in.taxAmount() : java.math.BigDecimal.ZERO);
+            in.linesOrEmpty().isEmpty() ? in.taxAmount() : java.math.BigDecimal.ZERO,
+            // Devise (V125) : la base convertit au cours ; sans lignes, les montants d'en-tête sont en devise.
+            in.currency() == null || in.currency().isBlank() ? null : in.currency().strip().toUpperCase(),
+            in.exchangeRate(),
+            in.linesOrEmpty().isEmpty() ? in.subtotal() : null,
+            in.linesOrEmpty().isEmpty() ? in.taxAmount() : null);
     // Sections choisies : posées sur la facture encore en brouillon, lues par
     // on_ar_invoice_posted au passage à 'sent'. Une section d'un autre axe, ou d'une autre
     // société (invisible sous la RLS), est refusée ici avec un message clair ; une section
@@ -171,14 +179,16 @@ public class ArInvoiceQuery {
     requireWriter();
     jdbc.update(
         "INSERT INTO payments (tenant_id, payment_type, ar_invoice_id, amount, payment_date,"
-            + " reference, payment_method, created_by) VALUES (get_user_tenant_id(auth.uid()),"
-            + " 'ar_receipt', ?, ?, COALESCE(?, CURRENT_DATE), ?, COALESCE(?, 'bank_transfer'),"
-            + " auth.uid())",
+            + " reference, payment_method, created_by, fx_amount, exchange_rate) VALUES (get_user_tenant_id(auth.uid()),"
+            + " 'ar_receipt', ?, COALESCE(?, 0), COALESCE(?, CURRENT_DATE), ?, COALESCE(?, 'bank_transfer'),"
+            + " auth.uid(), ?, ?)",
         invoiceId,
         in.amount(),
         in.paymentDate(),
         in.reference(),
-        in.paymentMethod());
+        in.paymentMethod(),
+        in.fxAmount(),
+        in.exchangeRate());
     return findById(invoiceId);
   }
 

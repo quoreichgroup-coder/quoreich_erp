@@ -25851,57 +25851,57 @@
           "container" : {
             "type" : "boolean"
           },
-          "bigInteger" : {
+          "double" : {
             "type" : "boolean"
           },
-          "nodeType" : {
-            "type" : "string",
-            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
-          },
-          "valueNode" : {
+          "pojo" : {
             "type" : "boolean"
           },
-          "integralNumber" : {
+          "number" : {
             "type" : "boolean"
           },
-          "floatingPointNumber" : {
+          "int" : {
             "type" : "boolean"
           },
-          "bigDecimal" : {
-            "type" : "boolean"
-          },
-          "missingNode" : {
+          "string" : {
             "type" : "boolean"
           },
           "short" : {
             "type" : "boolean"
           },
-          "double" : {
+          "long" : {
             "type" : "boolean"
           },
           "textual" : {
             "type" : "boolean",
             "deprecated" : true
           },
-          "binary" : {
-            "type" : "boolean"
-          },
           "boolean" : {
             "type" : "boolean"
           },
-          "pojo" : {
+          "binary" : {
             "type" : "boolean"
           },
-          "int" : {
+          "nodeType" : {
+            "type" : "string",
+            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
+          },
+          "integralNumber" : {
             "type" : "boolean"
           },
-          "long" : {
+          "bigDecimal" : {
             "type" : "boolean"
           },
-          "number" : {
+          "valueNode" : {
             "type" : "boolean"
           },
-          "string" : {
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
             "type" : "boolean"
           },
           "embeddedValue" : {
@@ -26103,6 +26103,14 @@
             "items" : {
               "$ref" : "#/components/schemas/InvoiceLine"
             }
+          },
+          "currency" : {
+            "type" : "string",
+            "description" : "Devise de la facture (V125) ; vide = devise de la société. Prix et montants sont alors saisis dans cette devise."
+          },
+          "exchangeRate" : {
+            "type" : "number",
+            "description" : "Cours (1 unité de devise en devise de la société) ; vide = cours enregistré à la date de la facture"
           }
         }
       },
@@ -26163,6 +26171,14 @@
           },
           "paymentMethod" : {
             "type" : "string"
+          },
+          "fxAmount" : {
+            "type" : "number",
+            "description" : "Facture en devise (V125) : montant reçu en devise (remplace amount)"
+          },
+          "exchangeRate" : {
+            "type" : "number",
+            "description" : "Cours du règlement ; vide = cours enregistré du jour"
           }
         }
       },
@@ -26506,6 +26522,16 @@
           "journalEntryId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "currency" : {
+            "type" : "string",
+            "description" : "Devise de la facture (V125) ; absente = devise de la société"
+          },
+          "exchangeRate" : {
+            "type" : "number"
+          },
+          "fxTotal" : {
+            "type" : "number"
           }
         },
         "required" : [ "amountPaid", "balance", "customerId", "dueDate", "id", "invoiceDate", "invoiceNumber", "status", "subtotal", "taxAmount", "total" ]

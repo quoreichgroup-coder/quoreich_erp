@@ -18,4 +18,7 @@ public record ArInvoiceView(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal amountPaid,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal balance,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status,
-    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) UUID journalEntryId) {}
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) UUID journalEntryId,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED, description = "Devise de la facture (V125) ; absente = devise de la société") String currency,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) BigDecimal exchangeRate,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) BigDecimal fxTotal) {}
