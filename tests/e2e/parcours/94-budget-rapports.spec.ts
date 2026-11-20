@@ -35,7 +35,7 @@ async function budgetImporte(page: Page, nom: string, annee: string, scenario: s
 
 test("budget : paramètres, scénario, comptes budgétables, rapports et exports", async ({ page, browser, baseURL }, testInfo) => {
   const obs = surveiller(page);
-  const annee = String(5000 + (Math.floor(Date.now() / 1000) % 900));
+  const annee = String(5000 + (Math.floor(Date.now() / 60000) % 900));
   const code = `e2e_${RUN.toLowerCase().replace(/[^a-z0-9]/g, "")}`.slice(0, 30);
   const scenario = `Hypothèse haute ${RUN}`;
 

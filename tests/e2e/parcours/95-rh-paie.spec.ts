@@ -45,7 +45,7 @@ async function assurerApprobateurPaie(browser: import("@playwright/test").Browse
 
 test("RH et paie : règles confirmées, référentiels, salarié, cycle approuvé par un tiers et comptabilisé", async ({ page, browser, baseURL }, testInfo) => {
   const obs = surveiller(page);
-  const annee = 6000 + (Math.floor(Date.now() / 1000) % 900);
+  const annee = 6000 + (Math.floor(Date.now() / 60000) % 900);
   const periode = `${annee}-03`;
   const nom = `Paie${RUN.replace(/[^A-Za-z0-9]/g, "")}`;
 

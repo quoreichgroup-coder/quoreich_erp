@@ -35,7 +35,7 @@ async function assurerComptes(page: Page) {
 
 test("immobilisations : catégorie, fiche, amortissement du mois, cession comptabilisée", async ({ page }, testInfo) => {
   const obs = surveiller(page);
-  const annee = 2100 + (Math.floor(Date.now() / 1000) % 800);
+  const annee = 2100 + (Math.floor(Date.now() / 60000) % 800);
   const mois = 1 + (Math.floor(Date.now() / 60000) % 11);
   const periode = `${annee}-${String(mois).padStart(2, "0")}`;
   const suivant = `${annee}-${String(mois + 1).padStart(2, "0")}`;
