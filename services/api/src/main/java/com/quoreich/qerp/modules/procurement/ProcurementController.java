@@ -353,6 +353,54 @@ public class ProcurementController {
     return sql.list("SELECT * FROM public.customs_estimate(?, ?, ?)", country, category, cif);
   }
 
+  // ─── Suivi des commandes et des expéditions (V131) ───
+  static final Set<String> SHIPMENT_EVENT = Set.of("import_file_id", "po_id", "event_code", "event_class", "event_at", "location", "vessel", "voyage",
+      "container_number", "notes");
+
+  @GetMapping("/shipment-event-codes")
+  @Operation(operationId = "listShipmentEventCodes", summary = "Étapes de suivi de référence (inspirées de DCSA Track & Trace)")
+  public JsonNode shipmentEventCodes() {
+    return sql.list("SELECT * FROM public.shipment_event_codes ORDER BY stage");
+  }
+
+  @GetMapping("/tracking-status")
+  @Operation(operationId = "listTrackingStatus", summary = "État de suivi des dossiers : dernier événement, ETA initiale et actuelle, retard")
+  public JsonNode trackingStatus() {
+    return sql.list("SELECT * FROM public.shipment_tracking_status");
+  }
+
+  @GetMapping("/import-files/{id}/timeline")
+  @Operation(operationId = "listShipmentTimeline", summary = "Chronologie du dossier : faits de l'ERP et événements de suivi")
+  public JsonNode shipmentTimeline(@PathVariable UUID id) {
+    return sql.list("SELECT * FROM public.shipment_timeline(?, NULL)", id);
+  }
+
+  @PostMapping("/import-files/{id}/events")
+  @Operation(operationId = "addShipmentEvent", summary = "Ajouter un événement de suivi (droit procurement.import ou procurement.followup)")
+  public JsonNode addShipmentEvent(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    java.util.Map<String, Object> body = new java.util.HashMap<>(b);
+    body.put("import_file_id", id.toString());
+    return sql.insert("shipment_events", body, SHIPMENT_EVENT, Map.of("created_by", "auth.uid()"));
+  }
+
+  @PostMapping("/import-files/{id}/events/import")
+  @Operation(operationId = "importShipmentEvents", summary = "Importer un fichier de suivi (tout ou rien, sans doublon)")
+  public JsonNode importShipmentEvents(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.call("import_shipment_events", args("_import_file", id, "_rows", b.get("rows")));
+  }
+
+  @DeleteMapping("/shipment-events/{eventId}")
+  @Operation(operationId = "deleteShipmentEvent", summary = "Retirer un événement de suivi")
+  public void deleteShipmentEvent(@PathVariable UUID eventId) {
+    sql.delete("shipment_events", eventId);
+  }
+
+  @PostMapping("/purchase-orders/{poId}/import-file")
+  @Operation(operationId = "createImportFileFromPo", summary = "Ouvrir un dossier d'importation depuis une commande, déjà rempli")
+  public JsonNode createImportFileFromPo(@PathVariable UUID poId) {
+    return sql.call("create_import_file_from_po", args("_po", poId));
+  }
+
   @GetMapping("/landed-cost-types")
   @Operation(operationId = "listLandedCostTypes", summary = "Types de frais d'approche de la société")
   public JsonNode landedCostTypes() {

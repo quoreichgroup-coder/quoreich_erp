@@ -92,6 +92,8 @@ public final class PostgresFixture {
     // slots are reserved for roles with the SUPERUSER attribute ».
     registry.add("spring.datasource.hikari.maximum-pool-size", () -> 3);
     registry.add("spring.datasource.hikari.minimum-idle", () -> 1);
+    // Aucune lecture de site externe pendant les tests (cours BCEAO, V130).
+    registry.add("qerp.rates.bceao-enabled", () -> false);
     // Les migrations : rôle propriétaire, distinct. Spring Boot fabrique pour
     // Flyway une seconde source de données à partir de ces trois propriétés.
     registry.add("spring.flyway.url", () -> urlOf(databaseName));

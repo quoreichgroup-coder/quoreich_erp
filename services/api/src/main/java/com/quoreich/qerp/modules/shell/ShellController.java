@@ -38,9 +38,11 @@ public class ShellController {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private final Sql sql;
+  private final BceaoRates bceaoRates;
 
-  public ShellController(Sql sql) {
+  public ShellController(Sql sql, BceaoRates bceaoRates) {
     this.sql = sql;
+    this.bceaoRates = bceaoRates;
   }
 
   @GetMapping("/me")
@@ -224,6 +226,33 @@ public class ShellController {
   @Operation(operationId = "postFxRevaluation", summary = "Réévaluer à une date de clôture (droit currency.revaluation)")
   public JsonNode postFxRevaluation(@RequestBody Map<String, Object> b) {
     return sql.call("post_fx_revaluation", args("_date", b.get("date"), "_reason", b.get("reason")));
+  }
+
+  @PostMapping("/exchange-rates/bceao")
+  @Operation(operationId = "importBceaoRates", summary = "Reprendre les cours publiés par la BCEAO à une date (droit currency.rates, V130)")
+  public Map<String, Object> importBceao(@RequestBody(required = false) Map<String, Object> b) {
+    if (!Boolean.TRUE.equals(sql.value(Boolean.class, "SELECT public.has_permission(auth.uid(), 'currency.rates')"))) {
+      throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Droit insuffisant : saisir les cours de change");
+    }
+    Object d = b == null ? null : b.get("date");
+    try {
+      return bceaoRates.importDate(d == null ? java.time.LocalDate.now() : java.time.LocalDate.parse(d.toString()));
+    } catch (IllegalStateException e) {
+      throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+  }
+
+  @GetMapping("/currency-settings")
+  @Operation(operationId = "getCurrencySettings", summary = "Cours retenu (milieu, achat, vente) et utilisation des cours publiés")
+  public JsonNode currencySettings() {
+    return sql.one("SELECT reference_rate, use_published_rates FROM public.currency_settings WHERE tenant_id = public.get_user_tenant_id(auth.uid())");
+  }
+
+  @PutMapping("/currency-settings")
+  @Operation(operationId = "saveCurrencySettings", summary = "Enregistrer le cours retenu et l'utilisation des cours publiés (droit currency.rates)")
+  public JsonNode saveCurrencySettings(@RequestBody Map<String, Object> b) {
+    return sql.upsertWith("currency_settings", Map.of("reference_rate", b.getOrDefault("reference_rate", "mid"), "use_published_rates", b.getOrDefault("use_published_rates", true)),
+        Set.of("reference_rate", "use_published_rates", "updated_at", "updated_by"), List.of("tenant_id"), Map.of("updated_at", "now()", "updated_by", "auth.uid()"));
   }
 
   @DeleteMapping("/exchange-rates/{id}")

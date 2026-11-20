@@ -10,6 +10,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, isApiEnabled } from "@/api/client
 import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { cn } from "@/lib/utils";
+import { ShipmentTracking, TrackingBadge, useTrackingStatus } from "@/components/ShipmentTracking";
 
 /*
  * Dossiers d'importation (V129, lot I2) : commandes rattachées, lignes reçues, frais d'approche (factures du transitaire,
@@ -46,7 +47,7 @@ function useImportMutation<I>(run: (i: I) => Promise<unknown>, success: string) 
   return useMutation({
     mutationFn: run,
     onSuccess: () => {
-      for (const k of ["import-files", "import-file-costs", "import-file-lines", "import-file-allocations", "items", "journal-entries"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["import-files", "import-file-costs", "import-file-lines", "import-file-allocations", "items", "journal-entries", "tracking-status", "shipment-timeline"]) qc.invalidateQueries({ queryKey: [k] });
       toast.success(success);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -67,6 +68,13 @@ export function ImportFiles({ suppliers, purchaseOrders }: { suppliers: any[]; p
     return check(db.from("import_files").insert({ ...body, tenant_id }).select("id"));
   }, "Dossier d'importation ouvert");
   const list = (files.data ?? []).map((f: any) => ({ ...f, supplier_name: f.supplier_name ?? f.supplier?.name, po_ids: f.po_ids ?? (f.orders ?? []).map((o: any) => o.po_id) }));
+  const tracking = useTrackingStatus();
+  const trackingById = new Map((tracking.data ?? []).map((t: any) => [t.import_file_id, t]));
+  // Dossier ouvert depuis une commande (V131) : fournisseur, Incoterm, date prévue et commande repris, sans ressaisie.
+  const linked = new Set(list.flatMap((f) => f.po_ids));
+  const openable = purchaseOrders.filter((p) => !linked.has(p.id) && ["approved", "ordered", "partially_received", "received"].includes(p.status));
+  const fromPo = useImportMutation(async (poId: string) => isApiEnabled() ? apiPost(`${P}/purchase-orders/${poId}/import-file`, {})
+    : check(db.rpc("create_import_file_from_po", { _po: poId })), "Dossier d'importation ouvert depuis la commande");
   const current = list.find((f) => f.id === selected) ?? null;
 
   return (
@@ -95,19 +103,24 @@ export function ImportFiles({ suppliers, purchaseOrders }: { suppliers: any[]; p
           <div className="space-y-1"><Label className="text-xs" htmlFor="imp-eta">Arrivée prévue (ETA)</Label>
             <Input id="imp-eta" type="date" className="h-8 text-xs w-36" value={form.eta} onChange={(e) => setForm((f) => ({ ...f, eta: e.target.value }))} /></div>
           <Button size="sm" className="h-8 text-xs" disabled={!form.supplier_id || create.isPending} onClick={() => create.mutate(undefined)} data-testid="import-file-create">Ouvrir le dossier</Button>
+          {openable.length > 0 && <div className="space-y-1 ml-auto"><Label className="text-xs" htmlFor="imp-from-po">Ou depuis une commande (déjà rempli)</Label>
+            <select id="imp-from-po" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value="" disabled={fromPo.isPending}
+              onChange={(e) => e.target.value && fromPo.mutate(e.target.value)}>
+              <option value="">— Commande —</option>{openable.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.supplier?.name ?? ""}</option>)}</select></div>}
         </div>
       )}
       <div className="bg-card border border-border rounded-lg overflow-x-auto">
         {files.isLoading ? <div className="p-3"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
           <table className="w-full text-xs">
             <thead className="bg-muted/30 text-muted-foreground"><tr><th className="text-left p-2">Dossier</th><th className="text-left">Fournisseur</th><th className="text-left">Incoterm</th>
-              <th className="text-left">Transport</th><th className="text-left">ETA</th><th className="text-left">Commandes</th><th className="text-left pr-2">Statut</th></tr></thead>
+              <th className="text-left">Transport</th><th className="text-left">ETA</th><th className="text-left">Suivi</th><th className="text-left">Commandes</th><th className="text-left pr-2">Statut</th></tr></thead>
             <tbody>
-              {list.length === 0 && <tr><td colSpan={7} className="p-3 text-muted-foreground">Aucun dossier d'importation.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={8} className="p-3 text-muted-foreground">Aucun dossier d'importation.</td></tr>}
               {list.map((f) => (
                 <tr key={f.id} data-testid="import-file-row" className={cn("border-t border-border/50 cursor-pointer hover:bg-muted/30", selected === f.id && "bg-primary/5")} onClick={() => setSelected(f.id)}>
                   <td className="p-2 font-mono">{f.file_number}</td><td>{f.supplier_name}</td><td>{f.incoterm ?? "—"}</td><td>{TRANSPORT[f.transport_mode] ?? "—"}</td>
-                  <td>{f.eta ?? "—"}</td><td>{f.po_ids.length}</td><td className="pr-2">{STATUS[f.status] ?? f.status}</td>
+                  <td>{f.eta ?? "—"}</td><td><TrackingBadge state={trackingById.get(f.id)?.tracking_state} delay={trackingById.get(f.id)?.delay_days} /></td>
+                  <td>{f.po_ids.length}</td><td className="pr-2">{STATUS[f.status] ?? f.status}</td>
                 </tr>
               ))}
             </tbody>
@@ -259,6 +272,8 @@ function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdi
             {allocate.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Répartir les frais dans le coût du stock</Button>
         </section>
       )}
+
+      <ShipmentTracking file={file} canEdit={canEdit && file.status !== "closed"} />
 
       {frozen && (
         <section className="space-y-2" data-testid="import-file-allocations">

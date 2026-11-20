@@ -36,6 +36,26 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
   const detail = page.getByTestId("import-file-detail");
   await expect(detail).toBeVisible();
 
+  obs.etape("suivi : événement saisi, fichier de suivi importé");
+  const suivi = detail.getByTestId("shipment-tracking");
+  const ev = suivi.getByTestId("shipment-event-form");
+  await ev.getByLabel("Étape").selectOption({ label: "Départ" });
+  await ev.getByLabel("Navire / vol").fill("MSC ANNA");
+  await suivi.getByTestId("shipment-event-add").click();
+  await expect(toast("Événement de suivi ajouté")).toBeVisible();
+  await expect(suivi.getByTestId("timeline-row").filter({ hasText: "Départ" })).toBeVisible();
+  const jour = new Date().toISOString().slice(0, 10).split("-").reverse().join("/");
+  const csv = `Date;Événement;Lieu;Navire;Conteneur
+${jour} 08:00;Vessel arrival;CIABJ;MSC ANNA;MSCU1234567
+${jour};Mainlevée accordée (BAE);CIABJ;;
+${jour};Inspection;CIABJ;;
+`;
+  await suivi.getByLabel("Fichier de suivi").setInputFiles({ name: "suivi-transitaire.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
+  await expect(suivi.getByTestId("shipment-import-preview")).toContainText("2 ligne(s) reconnue(s) sur 3");
+  await suivi.getByTestId("shipment-import-confirm").click();
+  await expect(toast("Suivi importé : 2 événement(s) ajouté(s)")).toBeVisible();
+  await expect(suivi.getByTestId("tracking-state")).toBeVisible();
+
   if (!disponible || !options.includes(fournisseur)) { expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]); return; }
 
   obs.etape("commande rattachée, fret, droits estimés");

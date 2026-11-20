@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "129";
+  private static final String DERNIERE_MIGRATION = "131";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -159,7 +159,7 @@ class SchemaMigrationIT {
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
       Set.of(
-          "fiscal_close_settings", "exchange_rates", "ap_supplier_advances", "fx_revaluation_runs", "landed_cost_types", "import_files", "import_file_orders", "import_file_costs", "import_file_allocations", "customs_tariffs", "annex_notes", "annex_note_groups", "annex_note_texts",
+          "fiscal_close_settings", "exchange_rates", "ap_supplier_advances", "fx_revaluation_runs", "landed_cost_types", "import_files", "import_file_orders", "import_file_costs", "import_file_allocations", "customs_tariffs", "currency_settings", "shipment_event_codes", "shipment_events", "annex_notes", "annex_note_groups", "annex_note_texts",
           "accounting_frameworks",
           "accounting_framework_accounts",
           "posting_roles",
@@ -300,7 +300,7 @@ class SchemaMigrationIT {
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
           // V121 — clôture d'exercice.
-          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding", "commercial_document_currency", "commercial_document_currency_lines", "record_supplier_advance", "apply_supplier_advance", "fx_revaluation_items", "post_fx_revaluation", "import_file_defaults", "guard_import_file_children", "customs_estimate", "import_file_received_lines", "allocate_import_costs",
+          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding", "commercial_document_currency", "commercial_document_currency_lines", "record_supplier_advance", "apply_supplier_advance", "fx_revaluation_items", "post_fx_revaluation", "import_file_defaults", "guard_import_file_children", "customs_estimate", "import_file_received_lines", "allocate_import_costs", "import_reference_rates", "shipment_event_effects", "import_file_initial_eta", "shipment_timeline", "import_shipment_events", "create_import_file_from_po",
           // V120 — piste d'audit chaînée en SHA-256.
           "gl_audit_chain_breaks", "gl_audit_hash", "guard_gl_audit_log",
           // V118 — temps réel sur site.
@@ -652,7 +652,7 @@ class SchemaMigrationIT {
           "ap_supplier_advances/Lecture société", "fx_revaluation_runs/Lecture société",
           "landed_cost_types/Lecture société", "landed_cost_types/Paramétrage habilité", "import_files/Lecture société", "import_files/Saisie habilitée",
           "import_file_orders/Lecture société", "import_file_orders/Saisie habilitée", "import_file_costs/Lecture société", "import_file_costs/Saisie habilitée",
-          "import_file_allocations/Lecture société", "customs_tariffs/Lecture référence et société", "customs_tariffs/Paramétrage habilité",
+          "import_file_allocations/Lecture société", "customs_tariffs/Lecture référence et société", "customs_tariffs/Paramétrage habilité", "currency_settings/Lecture société", "currency_settings/Paramétrage habilité", "shipment_event_codes/Lecture du référentiel", "shipment_events/Lecture société", "shipment_events/Saisie habilitée",
           // V116 — écritures réservées aux droits du catalogue.
           "purchase_requisitions/Lecture société", "purchase_requisitions/Saisie habilitée",
           "requisition_lines/Lecture avec la pièce", "requisition_lines/Saisie habilitée",
@@ -942,7 +942,7 @@ class SchemaMigrationIT {
       Set.of(
           // V120.
           "gl_audit_logs/trg_guard_gl_audit_log",
-          "ap_invoices/trg_ap_invoice_currency", "ap_invoices/trg_ap_invoice_currency_lines", "payments/trg_aa_payment_currency", "import_files/trg_import_file_defaults", "import_file_orders/trg_guard_import_file_orders", "import_file_costs/trg_guard_import_file_costs", "ar_invoices/trg_ar_invoice_currency", "ar_invoices/trg_ar_invoice_currency_lines",
+          "ap_invoices/trg_ap_invoice_currency", "ap_invoices/trg_ap_invoice_currency_lines", "payments/trg_aa_payment_currency", "import_files/trg_import_file_defaults", "import_files/trg_import_file_initial_eta", "shipment_events/trg_shipment_event_effects", "import_file_orders/trg_guard_import_file_orders", "import_file_costs/trg_guard_import_file_costs", "ar_invoices/trg_ar_invoice_currency", "ar_invoices/trg_ar_invoice_currency_lines",
           "quotations/trg_aa_quotation_currency", "sales_orders/trg_aa_sales_order_currency", "purchase_orders/trg_aa_purchase_order_currency",
           "quotations/trg_quotation_currency_lines", "sales_orders/trg_sales_order_currency_lines", "purchase_orders/trg_purchase_order_currency_lines",
           // V118 — temps réel sur site.
@@ -1112,7 +1112,7 @@ class SchemaMigrationIT {
           "risk_register/trg_guard_risk", "compliance_controls/trg_sync_framework_counts", "compliance_controls/trg_guard_compliance_control");
 
   /** V38 — synthèse des lots du grand livre. */
-  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "stock_projection_view", "purchase_order_followup_view",
+  private static final Set<String> VUES_AJOUTEES = Set.of("journal_batch_summary", "shipment_tracking_status", "stock_projection_view", "purchase_order_followup_view",
       // V107 — limites et piste d'audit de la trésorerie.
       "treasury_limit_status", "treasury_audit_trail");
 

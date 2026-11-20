@@ -5,7 +5,7 @@ import { FxRevaluationPanel } from "@/components/FxRevaluationPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { useBaseCurrency, useDeleteExchangeRate, useExchangeRates, useSaveExchangeRate } from "@/hooks/use-exchange-rates";
+import { useBaseCurrency, useCurrencySettings, useDeleteExchangeRate, useExchangeRates, useImportBceaoRates, useSaveExchangeRate } from "@/hooks/use-exchange-rates";
 
 /*
  * Devises et cours (V124) : cours de référence (BCEAO / BEAC, non modifiables) et cours de la société. Le dernier cours
@@ -20,6 +20,10 @@ export function ExchangeRatesPanel() {
   const remove = useDeleteExchangeRate();
   const access = useMyAccess();
   const canEdit = access.data?.permissions.includes("currency.rates") ?? false;
+  const { query: settings, save: saveSettings } = useCurrencySettings();
+  const bceao = useImportBceaoRates();
+  const [bceaoDate, setBceaoDate] = useState(new Date().toISOString().slice(0, 10));
+  const cfg = settings.data ?? { reference_rate: "mid" as const, use_published_rates: true };
   const [form, setForm] = useState({ currency: "USD", rate_date: new Date().toISOString().slice(0, 10), rate: "", source: "BCEAO" });
   const rateN = Number(form.rate.replace(",", "."));
   const valid = /^[A-Za-z]{3}$/.test(form.currency) && form.currency.toUpperCase() !== base && Number.isFinite(rateN) && rateN > 0 && Boolean(form.rate_date);
@@ -33,6 +37,27 @@ export function ExchangeRatesPanel() {
           prennent le dernier cours connu à leur date, sauf si un cours est saisi sur la pièce. Les cours de référence (parité fixe de l'euro) ne se
           modifient pas ; les cours de la société (cours BCEAO du jour, cours de la banque) priment à date égale.
         </p>
+      </div>
+      <div className="bg-card border border-border rounded-lg p-4 space-y-3" data-testid="bceao-rates">
+        <p className="text-xs font-medium">Cours publiés par la BCEAO (repris automatiquement chaque jour)</p>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={cfg.use_published_rates} disabled={!canEdit || saveSettings.isPending}
+              onChange={(e) => saveSettings.mutate({ reference_rate: cfg.reference_rate, use_published_rates: e.target.checked })} />
+            Utiliser les cours publiés par la BCEAO
+          </label>
+          <div className="space-y-1"><Label className="text-xs" htmlFor="fx-kind">Cours retenu</Label>
+            <select id="fx-kind" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value={cfg.reference_rate} disabled={!canEdit || saveSettings.isPending}
+              onChange={(e) => saveSettings.mutate({ reference_rate: e.target.value, use_published_rates: cfg.use_published_rates })}>
+              <option value="mid">Milieu (moyenne achat / vente)</option><option value="buy">Achat</option><option value="sell">Vente</option>
+            </select></div>
+          {canEdit && <div className="space-y-1"><Label className="text-xs" htmlFor="fx-bceao-date">Reprendre les cours du</Label>
+            <div className="flex gap-2"><Input id="fx-bceao-date" type="date" className="h-8 text-xs w-40" value={bceaoDate} onChange={(e) => setBceaoDate(e.target.value)} />
+              <Button size="sm" variant="outline" className="h-8 text-xs" disabled={bceao.isPending || !bceaoDate} data-testid="bceao-import"
+                onClick={() => bceao.mutate(bceaoDate)}>{bceao.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Reprendre les cours BCEAO</Button></div></div>}
+        </div>
+        <p className="text-[11px] text-muted-foreground">Cours « à appliquer aux transferts » (dollar US, livre sterling, franc suisse, dollar canadien, yen, yuan, dirham des EAU) ;
+          l'euro reste à la parité fixe. Un cours saisi par la société prime à date égale. Un jour non ouvré reprend le dernier cours publié.</p>
       </div>
       {canEdit && (
         <div className="bg-card border border-border rounded-lg p-4 flex flex-wrap items-end gap-3" data-testid="exchange-rate-form">
@@ -53,14 +78,15 @@ export function ExchangeRatesPanel() {
         {rates.isLoading ? <div className="p-4"><Loader2 className="w-4 h-4 animate-spin" /></div> : (
           <table className="w-full text-xs" data-testid="exchange-rates">
             <thead><tr className="bg-muted/30 text-muted-foreground"><th className="text-left p-2">Devise</th><th className="text-left">Date</th>
-              <th className="text-right pr-3">Cours ({base})</th><th className="text-left">Source</th><th className="text-left">Origine</th><th /></tr></thead>
+              <th className="text-right pr-3">Cours ({base})</th><th className="text-right pr-3">Achat / vente</th><th className="text-left">Source</th><th className="text-left">Origine</th><th /></tr></thead>
             <tbody>
-              {(rates.data ?? []).length === 0 && <tr><td colSpan={6} className="p-3 text-muted-foreground">Aucun cours pour la devise {base}.</td></tr>}
+              {(rates.data ?? []).length === 0 && <tr><td colSpan={7} className="p-3 text-muted-foreground">Aucun cours pour la devise {base}.</td></tr>}
               {(rates.data ?? []).map((r) => (
                 <tr key={r.id} className="border-t border-border/50">
                   <td className="p-2 font-mono">{r.currency}</td>
                   <td>{new Date(r.rate_date).toLocaleDateString("fr-FR")}</td>
                   <td className="text-right pr-3 tabular-nums">{fmtRate(r.rate)}</td>
+                  <td className="text-right pr-3 tabular-nums text-muted-foreground">{r.buy_rate != null ? `${fmtRate(r.buy_rate)} / ${fmtRate(Number(r.sell_rate))}` : "—"}</td>
                   <td>{r.source}</td>
                   <td>{r.tenant_id ? "Société" : "Référence"}</td>
                   <td className="text-right pr-2">
