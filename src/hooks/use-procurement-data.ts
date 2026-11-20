@@ -196,13 +196,16 @@ export function useCreateGoodsReceipt() {
       tenant_id: string;
       received_by: string;
       receipt_date?: string;
+      /** V132 : dépôt de réception (par ex. magasin de consolidation à l'étranger). */
+      warehouse_id?: string | null;
       complete?: boolean;
       lines: { po_line_id: string; item_id?: string; quantity_received: number; quantity_rejected?: number }[];
     }) => {
       const { lines, complete, ...header } = input;
       if (lines.length === 0) throw new Error("Une réception comporte au moins une ligne.");
       if (isApiEnabled()) return apiPost<any>(`${P}/goods-receipts`, { ...header, complete: !!complete, lines });
-      const { data, error } = await supabase
+      // warehouse_id (V132) : colonne absente des types générés tant qu'ils ne sont pas régénérés.
+      const { data, error } = await (supabase as any)
         .from("goods_receipts")
         .insert({ ...header, status: "pending" })
         .select()

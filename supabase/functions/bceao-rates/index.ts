@@ -24,7 +24,7 @@ const MONTHS: Record<string, number> = {
 };
 
 const key = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/\s+/g, " ");
-const num = (s: string) => Number(s.replace(/[\s .]/g, "").replace(",", "."));
+const num = (s: string) => Number(s.replace(/[\s\u00a0.]/g, "").replace(",", "."));
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -34,7 +34,7 @@ export function parseBceao(html: string): { date: string | null; rates: { curren
   const month = t ? MONTHS[key(t[2])] : undefined;
   const date = t && month ? `${t[3]}-${String(month).padStart(2, "0")}-${t[1].padStart(2, "0")}` : null;
   const rates: { currency: string; buy: number; sell: number }[] = [];
-  const row = /<tr>\s*<td>([^<]+)<\/td>\s*<td>([0-9 ., ]+)<\/td>\s*<td>([0-9 ., ]+)<\/td>/gi;
+  const row = /<tr>\s*<td>([^<]+)<\/td>\s*<td>([0-9 .,\u00a0]+)<\/td>\s*<td>([0-9 .,\u00a0]+)<\/td>/gi;
   for (let m = row.exec(html); m; m = row.exec(html)) {
     const code = CURRENCIES[key(m[1])];
     if (code) rates.push({ currency: code, buy: num(m[2]), sell: num(m[3]) });

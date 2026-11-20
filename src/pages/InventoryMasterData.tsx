@@ -123,11 +123,15 @@ function WarehouseDialog({ wh, open, onClose }: { wh: any | null; open: boolean;
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState("active");
+  // V132 : un dépôt de consolidation (à l'étranger) ou de transit porte son stock en 381 « marchandises en cours de route ».
+  const [kind, setKind] = useState("standard");
+  const [country, setCountry] = useState("");
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const key = wh?.id ?? "new";
   if (open && loadedFor !== key) {
     setLoadedFor(key);
     setCode(wh?.code ?? ""); setName(wh?.name ?? ""); setAddress(wh?.address ?? ""); setStatus(wh?.status ?? "active");
+    setKind(wh?.kind ?? "standard"); setCountry(wh?.country ?? "");
   }
   const close = () => { setLoadedFor(null); onClose(); };
   const ok = code.trim() && name.trim();
@@ -142,6 +146,13 @@ function WarehouseDialog({ wh, open, onClose }: { wh: any | null; open: boolean;
             <Input id="wh-name" className="h-8 text-xs" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="col-span-2 space-y-1.5"><Label className="text-xs" htmlFor="wh-address">Adresse</Label>
             <Input id="wh-address" className="h-8 text-xs" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="wh-kind">Type de dépôt</Label>
+            <select id="wh-kind" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="standard">Dépôt de la société</option><option value="consolidation">Magasin de consolidation (étranger)</option><option value="transit">Transit (en route)</option>
+            </select></div>
+          <div className="space-y-1.5"><Label className="text-xs" htmlFor="wh-country">Pays (ISO)</Label>
+            <Input id="wh-country" className="h-8 text-xs uppercase" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value.toUpperCase())} /></div>
+          {kind !== "standard" && <p className="col-span-2 text-[11px] text-muted-foreground">Stock comptabilisé en 381 « marchandises en cours de route » jusqu'à son transfert dans un dépôt de la société.</p>}
           {wh && (
             <div className="space-y-1.5"><Label className="text-xs" htmlFor="wh-status">Statut</Label>
               <select id="wh-status" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -153,8 +164,8 @@ function WarehouseDialog({ wh, open, onClose }: { wh: any | null; open: boolean;
           <Button variant="outline" size="sm" onClick={close}>Annuler</Button>
           <Button size="sm" disabled={!ok || create.isPending || update.isPending}
             onClick={() => wh
-              ? update.mutate({ id: wh.id, code: code.trim(), name: name.trim(), address: address.trim() || null, status }, { onSuccess: close })
-              : create.mutate({ code: code.trim(), name: name.trim(), address: address.trim() || undefined }, { onSuccess: close })}>
+              ? update.mutate({ id: wh.id, code: code.trim(), name: name.trim(), address: address.trim() || null, status, kind, country: country || null } as any, { onSuccess: close })
+              : create.mutate({ code: code.trim(), name: name.trim(), address: address.trim() || undefined, kind, country: country || null } as any, { onSuccess: close })}>
             Enregistrer
           </Button>
         </DialogFooter>

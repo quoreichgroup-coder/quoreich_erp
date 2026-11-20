@@ -94,7 +94,7 @@ export function useWarehouses() {
     queryKey: ["warehouses", tenantId],
     enabled: Boolean(tenantId),
     queryFn: async () => {
-      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/warehouses"), error: null } : await supabase.from("warehouses").select("id,code,name,is_default,status,address")
+      const { data, error } = isApiEnabled() ? { data: await apiGet<any[]>("/api/v1/inventory/warehouses"), error: null } : await supabase.from("warehouses").select("id,code,name,is_default,status,address,kind,country")
         .eq("tenant_id", tenantId!).order("code");
       if (error) throw error;
       return data ?? [];

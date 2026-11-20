@@ -102,6 +102,9 @@ class SuiviExpeditionsIT {
         .hasMessageContaining("ligne 1 : étape non reconnue");
     assertThat(asUser("SELECT import_shipment_events('" + file + "', " + lignes + ")::text")).contains("\"added\": 3", "\"ignored\": 1");
     assertThat(asUser("SELECT import_shipment_events('" + file + "', " + lignes + ")::text")).as("réimport : tout ignoré").contains("\"added\": 0");
+    // Le même fichier de suivi dans un autre dossier n'est pas un doublon (V133).
+    String autre = asUser("INSERT INTO import_files (tenant_id, supplier_id) VALUES ('" + T + "', '" + F + "') RETURNING id::text");
+    assertThat(asUser("SELECT import_shipment_events('" + autre + "', " + lignes + ")::text")).contains("\"added\": 3");
     assertThat(etat(file)).as("arrivée et mainlevée réelles : dédouané, date d'arrivée").isEqualTo("cleared 2031-07-05 2031-06-30 2031-07-04 MSC ANNA");
     assertThat(asUser("SELECT tracking_state || ' ' || delay_days || ' ' || last_event_code FROM shipment_tracking_status WHERE import_file_id = '" + file + "'"))
         .isEqualTo("arrived 4 CUSTOMS_RELEASED");

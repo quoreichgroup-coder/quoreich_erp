@@ -37,7 +37,7 @@ public class InventoryController {
       "inventory_cycle_policy", "inventory_cycle_prepare", "inventory_cycle_analysis");
   static final Set<String> ITEM = Set.of("code", "name", "category", "unit", "unit_cost", "selling_price", "reorder_level", "status", "valuation_method",
       "default_warehouse_id", "safety_stock", "max_stock", "abc_class", "account_set_id");
-  static final Set<String> WAREHOUSE = Set.of("code", "name", "address", "is_default", "status");
+  static final Set<String> WAREHOUSE = Set.of("code", "name", "address", "is_default", "status", "kind", "country");
   static final Set<String> SETTINGS = Set.of("valuation_method", "negative_stock_allowed", "auto_je_on_movement", "low_stock_alerts_enabled",
       "adjustment_reason_required", "campaign_tolerance_percent", "campaign_tolerance_value", "default_warehouse_id", "campaign_item_scope",
       "campaign_document_prefix", "campaign_document_width", "updated_at");

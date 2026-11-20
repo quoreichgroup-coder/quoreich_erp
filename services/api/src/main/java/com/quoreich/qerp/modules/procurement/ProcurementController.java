@@ -7,6 +7,7 @@ import com.quoreich.qerp.platform.Sql;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -269,7 +270,8 @@ public class ProcurementController {
   // ─── Dossiers d'importation, frais d'approche, douane (V129) ───
   static final Set<String> IMPORT_FILE = Set.of("supplier_id", "forwarder_id", "incoterm", "transport_mode", "bill_of_lading", "containers",
       "origin_country", "destination_country", "tec_category", "customs_office", "customs_declaration", "customs_date", "eta", "arrival_date",
-      "status", "notes");
+      "status", "notes", "consolidation_warehouse_id", "transit_warehouse_id", "destination_warehouse_id", "carrier", "vessel", "voyage",
+      "port_of_loading", "port_of_discharge", "etd");
   static final Set<String> IMPORT_COST = Set.of("import_file_id", "cost_type_id", "description", "amount", "allocation_basis", "ap_invoice_id");
   static final Set<String> COST_TYPE = Set.of("code", "label", "category", "allocation_basis", "capitalize", "is_active");
 
@@ -356,6 +358,80 @@ public class ProcurementController {
   // ─── Suivi des commandes et des expéditions (V131) ───
   static final Set<String> SHIPMENT_EVENT = Set.of("import_file_id", "po_id", "event_code", "event_class", "event_at", "location", "vessel", "voyage",
       "container_number", "notes");
+
+  // ─── Processus d'importation sans fichier Excel (V132) ───
+  static final Set<String> IMPORT_SETTINGS = Set.of("number_format", "mode_codes", "auto_transit_transfers", "default_consolidation_warehouse_id",
+      "default_transit_warehouse_id", "default_destination_warehouse_id", "updated_at", "updated_by");
+  static final Set<String> COST_RULE = Set.of("cost_type_id", "transport_mode", "supplier_id", "method", "value", "is_active");
+
+  @GetMapping("/import-files/{id}/cost-comparison")
+  @Operation(operationId = "listImportCostComparison", summary = "Frais estimés et réels du dossier, par type")
+  public JsonNode importCostComparison(@PathVariable UUID id) {
+    return sql.list("SELECT * FROM public.import_file_cost_comparison WHERE import_file_id = ?", id);
+  }
+
+  @GetMapping("/import-files/{id}/transfers")
+  @Operation(operationId = "listImportTransfers", summary = "Transferts de transit du dossier (expédition, arrivée)")
+  public JsonNode importTransfers(@PathVariable UUID id) {
+    return sql.list("SELECT t.*, (SELECT name FROM public.items WHERE id = t.item_id) AS item_name FROM public.import_file_transfers t"
+        + " WHERE t.import_file_id = ? ORDER BY t.created_at", id);
+  }
+
+  @PostMapping("/import-files/{id}/estimate")
+  @Operation(operationId = "applyLandedCostRules", summary = "Frais estimés du dossier d'après les règles de la société")
+  public JsonNode applyLandedCostRules(@PathVariable UUID id) {
+    return sql.call("apply_landed_cost_rules", args("_file", id));
+  }
+
+  @PostMapping("/import-files/{id}/transport-po")
+  @Operation(operationId = "createTransportPo", summary = "Créer la commande de transport du transitaire depuis le dossier")
+  public JsonNode createTransportPo(@PathVariable UUID id) {
+    return sql.call("create_transport_po", args("_file", id));
+  }
+
+  @PostMapping("/import-files/{id}/transit")
+  @Operation(operationId = "transitTransfer", summary = "Transfert de transit en un clic : expédition (ship) ou arrivée (deliver)")
+  public JsonNode transitTransfer(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.call("import_file_transit_transfer", args("_file", id, "_stage", b.get("stage"), "_date", b.getOrDefault("date", java.time.LocalDate.now().toString())));
+  }
+
+  @GetMapping("/consolidation-stock")
+  @Operation(operationId = "listConsolidationStock", summary = "Marchandises en consolidation ou en transit (381)")
+  public JsonNode consolidationStock() {
+    return sql.list("SELECT * FROM public.consolidation_stock ORDER BY warehouse_code, item_code");
+  }
+
+  @GetMapping("/import-settings")
+  @Operation(operationId = "getImportSettings", summary = "Paramètres des dossiers d'importation")
+  public JsonNode importSettings() {
+    return sql.one("SELECT * FROM public.import_settings WHERE tenant_id = public.get_user_tenant_id(auth.uid())");
+  }
+
+  @PutMapping("/import-settings")
+  @Operation(operationId = "saveImportSettings", summary = "Enregistrer les paramètres des dossiers d'importation (droit procurement.settings)")
+  public JsonNode saveImportSettings(@RequestBody Map<String, Object> b) {
+    java.util.Map<String, Object> body = new java.util.HashMap<>(b);
+    body.keySet().retainAll(IMPORT_SETTINGS);
+    return sql.upsertWith("import_settings", body, IMPORT_SETTINGS, List.of("tenant_id"), Map.of("updated_at", "now()", "updated_by", "auth.uid()"));
+  }
+
+  @GetMapping("/landed-cost-rules")
+  @Operation(operationId = "listLandedCostRules", summary = "Règles de frais estimés")
+  public JsonNode landedCostRules() {
+    return sql.list("SELECT * FROM public.landed_cost_rules ORDER BY cost_type_id");
+  }
+
+  @PostMapping("/landed-cost-rules")
+  @Operation(operationId = "createLandedCostRule", summary = "Ajouter une règle de frais estimés")
+  public JsonNode createLandedCostRule(@RequestBody Map<String, Object> b) {
+    return sql.insert("landed_cost_rules", b, COST_RULE);
+  }
+
+  @DeleteMapping("/landed-cost-rules/{ruleId}")
+  @Operation(operationId = "deleteLandedCostRule", summary = "Retirer une règle de frais estimés")
+  public void deleteLandedCostRule(@PathVariable UUID ruleId) {
+    sql.delete("landed_cost_rules", ruleId);
+  }
 
   @GetMapping("/shipment-event-codes")
   @Operation(operationId = "listShipmentEventCodes", summary = "Étapes de suivi de référence (inspirées de DCSA Track & Trace)")

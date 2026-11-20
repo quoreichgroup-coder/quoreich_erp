@@ -1,3 +1,4 @@
+import { useWarehouses } from "@/hooks/use-inventory-data";
 import { ImportFiles } from "@/components/ImportFiles";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
@@ -305,6 +306,8 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
   const [supplierId, setSupplierId] = useState("");
   const [poId, setPoId] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [warehouseId, setWarehouseId] = useState("");
+  const { data: receiptWarehouses = [] } = useWarehouses();
   const [qty, setQty] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -351,6 +354,7 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
       tenant_id: po.tenant_id,
       received_by: user.id,
       receipt_date: date,
+      warehouse_id: warehouseId || null,
       complete,
       lines: entries.filter((e) => e.quantity > 0).map((e) => ({ po_line_id: e.po_line_id, item_id: e.item_id ?? undefined, quantity_received: e.quantity })),
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
@@ -376,6 +380,13 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
                 onChange={(e) => choosePo(e.target.value)} disabled={!supplierId}>
                 <option value="">{supplierId ? "— Sélectionner —" : "Choisissez d'abord le fournisseur"}</option>
                 {receivable.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs" htmlFor="gr-warehouse">Dépôt de réception</Label>
+              <select id="gr-warehouse" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                <option value="">— Dépôt par défaut —</option>
+                {(receiptWarehouses as any[]).filter((w) => w.status !== "inactive").map((w) => <option key={w.id} value={w.id}>{w.code} · {w.name}{w.kind === "consolidation" ? " (consolidation)" : w.kind === "transit" ? " (transit)" : ""}</option>)}
               </select>
             </div>
             <div>

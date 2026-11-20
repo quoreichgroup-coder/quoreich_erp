@@ -25,7 +25,7 @@ public class ProcurementDocuments {
   static final Set<String> PO = Set.of("po_number", "supplier_id", "order_date", "expected_date", "incoterm", "total", "currency", "exchange_rate");
   static final Set<String> PR_LINE = Set.of("requisition_id", "description", "quantity", "estimated_unit_cost", "item_id");
   static final Set<String> PO_LINE = Set.of("po_id", "description", "quantity", "unit_cost", "item_id", "expected_date", "fx_unit_cost");
-  static final Set<String> GR = Set.of("gr_number", "po_id", "receipt_date");
+  static final Set<String> GR = Set.of("gr_number", "po_id", "receipt_date", "warehouse_id");
   static final Set<String> GR_LINE = Set.of("gr_id", "po_line_id", "item_id", "quantity_received", "quantity_rejected");
 
   private final Sql sql;

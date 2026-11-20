@@ -25,9 +25,18 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
 
   obs.etape("dossier d'importation ouvert");
   await page.getByRole("tab", { name: "Dossiers d'import" }).click();
+  // Numéro d'expédition au format de la procédure Sage 300 (ANNÉE-TRANSITAIRE-MODE-NNN), séquence continue.
+  const reglages = page.getByTestId("import-settings");
+  await reglages.getByRole("button", { name: /Paramètres des dossiers/ }).click();
+  const format = reglages.getByLabel("Numéro d'expédition");
+  if ((await format.inputValue()) !== "{YYYY}-{FWD}-{MODE}-{SEQ3}") {
+    await format.selectOption("{YYYY}-{FWD}-{MODE}-{SEQ3}");
+    await expect(toast("Paramètres des dossiers enregistrés")).toBeVisible();
+  }
   const form = page.getByTestId("import-file-form");
   const options = await form.getByLabel("Fournisseur *").locator("option").allTextContents();
   await form.getByLabel("Fournisseur *").selectOption({ label: disponible && options.includes(fournisseur) ? fournisseur : options[1] });
+  await form.getByLabel("Transitaire").selectOption({ index: 1 });
   await form.getByLabel("Connaissement / LTA").fill(`BL-${RUN}`);
   await form.getByLabel("Catégorie TEC").selectOption("10");
   await page.getByTestId("import-file-create").click();
@@ -35,6 +44,14 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
   await page.getByTestId("import-file-row").first().click();
   const detail = page.getByTestId("import-file-detail");
   await expect(detail).toBeVisible();
+  await expect(page.getByTestId("import-file-row").first().locator("td").first()).toHaveText(/^\d{4}-[A-Z]{3}-MER-\d{3}$/);
+
+  obs.etape("processus : frais estimés, commande de transport");
+  const processus = detail.getByTestId("import-process");
+  await processus.getByTestId("import-estimate").click();
+  await expect(toast("frais estimé(s) d'après les règles")).toBeVisible();
+  await processus.getByTestId("import-transport-po").click();
+  await expect(toast("Commande de transport créée")).toBeVisible();
 
   obs.etape("suivi : événement saisi, fichier de suivi importé");
   const suivi = detail.getByTestId("shipment-tracking");

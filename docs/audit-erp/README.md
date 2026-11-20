@@ -75,3 +75,4 @@ Légende utilisée dans tous les livrables :
 **Points à faire trancher par un expert-comptable 🧮 :** le paramétrage de ROXGOLD SANGO envoie la TVA collectée au compte **4310** (classe 43 = organismes sociaux en SYSCOHADA) et les ventes au compte **4000** (classe 4 = tiers) ; le taux de charges patronales 16,4 % est codé en dur dans la paie.
 
 La feuille de route (09) propose de traiter les P0 en **un seul lot court de sécurisation (V42–V44)** avant de reprendre les fonctions manquantes, sans réécriture et sans migration destructive.
+- [29 — Processus des commandes internationales sans Excel](29-processus-import-sans-excel.md) : procédure Sage 300 analysée, comparée aux ERP modernes, automatisée (V129–V133).

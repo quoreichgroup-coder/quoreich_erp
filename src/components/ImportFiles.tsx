@@ -11,6 +11,7 @@ import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { cn } from "@/lib/utils";
 import { ShipmentTracking, TrackingBadge, useTrackingStatus } from "@/components/ShipmentTracking";
+import { ConsolidationStock, ImportFileProcess, ImportSettingsPanel } from "@/components/ImportProcess";
 
 /*
  * Dossiers d'importation (V129, lot I2) : commandes rattachées, lignes reçues, frais d'approche (factures du transitaire,
@@ -79,6 +80,8 @@ export function ImportFiles({ suppliers, purchaseOrders }: { suppliers: any[]; p
 
   return (
     <div className="space-y-3" data-testid="import-files">
+      <ImportSettingsPanel />
+      <ConsolidationStock />
       {canEdit && (
         <div className="bg-card border border-border rounded-lg p-3 flex flex-wrap items-end gap-3" data-testid="import-file-form">
           <div className="space-y-1"><Label className="text-xs" htmlFor="imp-supplier">Fournisseur *</Label>
@@ -228,7 +231,7 @@ function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdi
           <tbody>
             {costRows.length === 0 && <tr><td colSpan={6} className="py-2 text-muted-foreground">Aucun frais.</td></tr>}
             {costRows.map((c) => <tr key={c.id} className="border-t border-border/50" data-testid="import-cost-row"><td>{c.type_label}</td><td>{c.description ?? ""}{c.ap_invoice_number ? ` · ${c.ap_invoice_number}` : ""}</td>
-              <td>{BASIS[c.basis] ?? c.basis}</td><td>{c.capitalize ? "Incorporé" : "En charges"}</td><td className="text-right tabular-nums">{fmt(c.amount)}</td>
+              <td>{BASIS[c.basis] ?? c.basis}</td><td>{c.is_estimate ? "Estimation" : c.capitalize ? "Incorporé" : "En charges"}</td><td className="text-right tabular-nums">{fmt(c.amount)}</td>
               <td className="text-right">{editable && <button type="button" aria-label={`Retirer ${c.type_label}`} onClick={() => removeCost.mutate(c.id)}><Trash2 className="w-3 h-3" /></button>}</td></tr>)}
           </tbody>
         </table>
@@ -273,6 +276,7 @@ function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdi
         </section>
       )}
 
+      <ImportFileProcess file={file} editable={canEdit && file.status !== "closed"} />
       <ShipmentTracking file={file} canEdit={canEdit && file.status !== "closed"} />
 
       {frozen && (
