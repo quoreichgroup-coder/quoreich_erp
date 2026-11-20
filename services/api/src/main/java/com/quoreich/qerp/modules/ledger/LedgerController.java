@@ -198,6 +198,32 @@ public class LedgerController {
     return sql.list("SELECT * FROM public.cash_flow_details(?, ?::date, ?::date) WHERE line_code IN ('ZN', 'ZU')", layout, from, to);
   }
 
+  @GetMapping("/annex-notes")
+  @Operation(operationId = "listAnnexNotes", summary = "Référentiel des notes annexes (V123)")
+  public JsonNode annexNotes() {
+    return sql.list("SELECT code, title, line_order, kind, normal_side, guidance FROM public.annex_notes ORDER BY line_order");
+  }
+
+  @GetMapping("/annex-notes/{code}/lines")
+  @Operation(operationId = "listAnnexNoteLines", summary = "Lignes chiffrées d'une note annexe, par compte et par rubrique")
+  public JsonNode annexNoteLines(@PathVariable String code, @RequestParam String from, @RequestParam String to) {
+    return sql.list("SELECT * FROM public.annex_note_lines(?, ?::date, ?::date)", code, from, to);
+  }
+
+  @GetMapping("/annex-notes/texts")
+  @Operation(operationId = "listAnnexNoteTexts", summary = "Commentaires des notes annexes à une date d'arrêté")
+  public JsonNode annexNoteTexts(@RequestParam String periodEnd) {
+    return sql.list("SELECT note_code, body, updated_at FROM public.annex_note_texts WHERE tenant_id = public.get_user_tenant_id(auth.uid()) AND period_end = ?::date", periodEnd);
+  }
+
+  @PutMapping("/annex-notes/{code}/text")
+  @Operation(operationId = "saveAnnexNoteText", summary = "Rédiger le commentaire d'une note annexe (droit accounting.annex)")
+  public JsonNode saveAnnexNoteText(@PathVariable String code, @RequestBody Map<String, Object> b) {
+    return sql.upsertWith("annex_note_texts", Map.of("note_code", code, "period_end", b.get("period_end"), "body", b.get("body")),
+        Set.of("note_code", "period_end", "body", "updated_at", "updated_by"), List.of("tenant_id", "note_code", "period_end"),
+        Map.of("updated_at", "now()", "updated_by", "auth.uid()"));
+  }
+
   @GetMapping("/company")
   @Operation(operationId = "getGlCompany", summary = "Devise et début d'exercice de la société")
   public JsonNode company() {

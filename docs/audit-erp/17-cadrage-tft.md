@@ -35,5 +35,18 @@ Intégration : poursuivre sur une base séparée du chantier Paie/RH. Réserver 
 - **À valider par l'expert-comptable** : affectation de 481 / 485 (ici dans l'investissement, au décaissement réel ;
   le modèle officiel peut les rattacher au BFR HAO), des comptes 42–47 mixtes, des capitaux propres (incorporation de
   réserves au capital).
-- **Restent** : notes annexes (tranche suivante).
 
+
+## Notes annexes (V123, 20 nov. 2026)
+
+- Référentiel en données : `annex_notes` (14 notes SYSCOHADA : 1 conformité, 2 règles et méthodes, 3A immobilisations
+  brutes, 3C amortissements, 6 stocks, 7 clients, 11 trésorerie, 16A dettes financières, 17 fournisseurs, 18 dettes
+  fiscales et sociales, 21 chiffre d'affaires, 22 achats, 25 impôts et taxes, 27 charges de personnel) et
+  `annex_note_groups` (rubriques par préfixes, préfixe le plus long dans la note).
+- Trois natures : tableau de mouvements (ouverture, augmentations, diminutions, clôture), montant de période avec N-1,
+  note rédigée. `annex_note_lines(note, du, au)` calcule par compte ; l'écran regroupe par rubrique, imprime / exporte.
+- Commentaire par note et par date d'arrêté (`annex_note_texts`), droit `accounting.annex` (admin, comptable ;
+  catalogue 137).
+- `NotesAnnexesIT` ; parcours 50 étendu.
+- **À compléter avec l'expert-comptable** : notes non comptables (effectifs, engagements hors bilan, parties liées),
+  échéanciers des créances et dettes, détail des cessions ; elles se rédigent en texte en attendant.

@@ -23,11 +23,10 @@ documents. Références : `docs/PLAN-BASCULE-JAVA.md` §6 (lots), `02-analyse-de
 **Traités (37, dont G-04 par V120)** : G-01 à G-03, G-05 à G-20, G-23, G-24, G-26 (impression), G-33, G-36 (balayage 27), G-37, G-38, G-39 (API Java
 pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-28 en partie (moteur de paie et tests).
 
-**Restants (13)** — G-22 traité le 20 nov. 2026 par V121 (modèle « report sans écritures d'à-nouveaux » choisi par le propriétaire) ; — G-04 traité le 20 nov. 2026 par V120 (chaîne SHA-256 vérifiable, journal intangible) :
+**Restants (12)** — G-21 traité le 20 nov. 2026 par V122 (tableau des flux) et V123 (notes annexes), à valider par l'expert-comptable ; G-22 traité le 20 nov. 2026 par V121 (modèle « report sans écritures d'à-nouveaux » choisi par le propriétaire) ; — G-04 traité le 20 nov. 2026 par V120 (chaîne SHA-256 vérifiable, journal intangible) :
 
 | # | Écart | Prio | Note |
 |---|---|---|---|
-| G-21 | États financiers complets : notes annexes | P1 🧮 | Bilan et compte de résultat (V63), tableau des flux de trésorerie (V122, doc 17) faits ; restent les notes annexes |
 | G-25 | Multi-devise : factures, commandes, règlements en devise, taux, écarts de change | P1 | Aucune colonne de devise sur les factures |
 | G-27 | ROXGOLD SANGO : reclassement 4000 → 70x, 4310 → 443x | P1 🧮 | Décision de l'expert-comptable (D4) |
 | G-28 | Paie : validation métier / fiscale par pays | P1 🧮 | Taux et comptes par pays (D5) |

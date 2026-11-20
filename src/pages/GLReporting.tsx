@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
 import { FinancialStatementPanel } from "@/components/FinancialStatementPanel";
+import { AnnexNotesPanel } from "@/components/AnnexNotesPanel";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { exportToCSV } from "@/lib/csv-export";
-import { TrendingUp, Download, Scale, Layers, Loader2, Activity } from "lucide-react";
+import { TrendingUp, Download, Scale, Layers, Loader2, Activity, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGLAccounts, useAccountBalances, useGLSig } from "@/hooks/use-gl-data";
 
@@ -19,6 +20,7 @@ const tabs = [
   { id: "balance", label: "Bilan", icon: Layers },
   { id: "sig", label: "SIG (SYSCOHADA)", icon: Activity },
   { id: "statements", label: "États SYSCOHADA (rubriques)", icon: Layers },
+  { id: "annex", label: "Notes annexes", icon: FileText },
 ];
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR");
@@ -94,6 +96,7 @@ export default function GLReporting() {
       </div>
 
       {activeTab === "statements" && <FinancialStatementPanel />}
+      {activeTab === "annex" && <AnnexNotesPanel />}
 
       {/* ═══ TRIAL BALANCE ═══ */}
       {activeTab === "trial" && (

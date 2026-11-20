@@ -115,6 +115,16 @@ test("plan comptable : attributs de compte, historique ; bilan SYSCOHADA équili
   await expect(page.getByTestId("cash-flow-balanced").or(page.getByTestId("cash-flow-controls"))).toBeVisible();
   testInfo.annotations.push({ type: "tft", description: `ZH ${await montant("ZH")} / bilan ${await montant("ZK")} / écart ${await montant("ZX")}` });
 
+  obs.etape("notes annexes : tableau des immobilisations et commentaire");
+  await page.getByRole("button", { name: "Notes annexes" }).click();
+  await page.getByTestId("annex-note-3A").click();
+  await expect(page.getByTestId("annex-detail-3A")).toBeVisible();
+  await expect(page.getByTestId("annex-table").or(page.getByTestId("annex-empty"))).toBeVisible();
+  await page.getByTestId("annex-note-2").click();
+  await page.getByLabel(/Commentaire de la note/).fill(`Coût historique ; amortissement linéaire (parcours ${suffixe}).`);
+  await page.getByTestId("annex-save-2").click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Commentaire de la note enregistré" })).toBeVisible();
+
   // Nettoyage : l'attribut de test est désactivé pour ne pas peser sur les autres parcours.
   await page.goto("/journal/master-data");
   await page.getByRole("button", { name: "Attributs personnalisés" }).click();
