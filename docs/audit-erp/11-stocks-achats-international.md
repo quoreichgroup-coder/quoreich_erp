@@ -211,6 +211,16 @@ transit passés en charges sans lien avec la marchandise.
   lignes converties), encaissement en devise au cours du jour ou de la banque ; la créance 411 est soldée à sa valeur
   d'origine (le lettrage reste exact), l'écart en gain (776) quand on reçoit plus, en perte (676) sinon. API sur site :
   `currency` / `exchangeRate` à la création, `fxAmount` / `exchangeRate` à l'encaissement. `DevisesVentesIT`.
-- **Restent pour I1** : avance fournisseur (409), réévaluation de clôture des dettes et créances en devise (478 / 479,
-  provision 194 / 697), devise sur les commandes et les devis, devise par défaut du client, import des cours BCEAO.
+- **Devise des clients et des pièces (V126)** : devise par défaut du client ; devis et commandes de vente dans cette
+  devise (cours du jour de la pièce, lignes converties), transmise du devis à la commande puis à la facture brouillon
+  issue de la livraison (prix en devise repris) ; commande fournisseur en devise (celle du fournisseur proposée à
+  l'écran ; une commande issue d'une demande reste en XOF), réception valorisée au coût converti, facture dans la même
+  devise rapprochée en devise (l'écart de cours n'est pas un écart de prix). `DevisesPiecesCommercialesIT`.
+- **Avances fournisseurs (V127)** : versement 4091 / trésorerie (droit `ap.pay`, contrôle des coordonnées bancaires),
+  en devise possible ; imputation 401 / 4091 sur une facture approuvée du même fournisseur ; registre ACF-AAAA-####.
+- **Réévaluation de clôture (V128)** : aperçu au cours de clôture ; perte latente 478 / tiers, gain latent tiers / 479,
+  contre-passés le lendemain ; provision 697 / 194 des pertes latentes, reprise 194 / 797 à la réévaluation suivante ;
+  droit `currency.revaluation` (catalogue 139). `AvancesEtReevaluationDevisesIT`. Écran : Paramètres → Devises et cours.
+- **Restent** : import automatique des cours BCEAO, choix de la devise au moment du devis (aujourd'hui celle du client),
+  lot I2 (dossier d'import, frais d'approche, douane) et I3 (en-cours de route 38).
 

@@ -209,11 +209,18 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
   const columns = [{ label: "Libellé" }, { label: "Qté", align: "right" as const }, { label: "P.U.", align: "right" as const },
     { label: "Remise", align: "right" as const }, { label: "TVA", align: "right" as const }, { label: "Montant HT", align: "right" as const },
     ...(extra ? [{ label: extra.label, align: "right" as const }] : [])];
-  const rows = lines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(l.unit_price)),
-    Number(l.discount_pct) ? `${Number(l.discount_pct)} %` : "", l.tax_code?.code ?? "—", fmt(Number(l.total)),
+  // Pièce en devise (V126) : prix et totaux dans la devise, contre-valeur en XOF.
+  const cur: string | null = kind !== "dn" ? (doc as any).currency ?? null : null;
+  if (cur) header.push(["Devise et cours", `${cur} · 1 ${cur} = ${Number((doc as any).exchange_rate).toLocaleString("fr-FR", { maximumFractionDigits: 6 })} XOF`]);
+  const fxNet = lines.reduce((s, l) => s + Number((l as any).fx_total ?? 0), 0);
+  const fxTax = lines.reduce((s, l) => s + Number((l as any).fx_tax_amount ?? 0), 0);
+  const rows = lines.map((l) => [l.description, fmt(Number(l.quantity)), fmt(Number(cur ? (l as any).fx_unit_price : l.unit_price)),
+    Number(l.discount_pct) ? `${Number(l.discount_pct)} %` : "", l.tax_code?.code ?? "—", fmt(Number(cur ? (l as any).fx_total : l.total)),
     ...(extra ? [extra.v(l)] : [])]);
-  const footer: [string, React.ReactNode, boolean?][] = [["Total HT", `${fmt(net)} XOF`], ["TVA", `${fmt(tax)} XOF`],
-    ["Total TTC", `${fmt(net + tax)} XOF`, true]];
+  const footer: [string, React.ReactNode, boolean?][] = cur
+    ? [["Total HT", `${fmt(fxNet)} ${cur}`], ["TVA", `${fmt(fxTax)} ${cur}`], ["Total TTC", `${fmt(fxNet + fxTax)} ${cur}`, true],
+       ["Contre-valeur TTC", `${fmt(net + tax)} XOF`]]
+    : [["Total HT", `${fmt(net)} XOF`], ["TVA", `${fmt(tax)} XOF`], ["Total TTC", `${fmt(net + tax)} XOF`, true]];
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl">
@@ -221,8 +228,8 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
           emptyLines="Chargement des lignes…"
           print={kind === "dn" ? { amountInWords: false, signatures: ["Livré par", "Reçu par le client (nom, date, cachet)"] }
-            : kind === "qt" ? { notes: doc.valid_until ? `Offre valable jusqu'au ${new Date(doc.valid_until).toLocaleDateString("fr-FR")}.` : null, signatures: ["Bon pour accord du client"] }
-            : { signatures: ["Le client", "La société"] }} />
+            : kind === "qt" ? { currency: cur ?? "XOF", notes: doc.valid_until ? `Offre valable jusqu'au ${new Date(doc.valid_until).toLocaleDateString("fr-FR")}.` : null, signatures: ["Bon pour accord du client"] }
+            : { currency: cur ?? "XOF", signatures: ["Le client", "La société"] }} />
       </DialogContent>
     </Dialog>
   );
@@ -409,7 +416,7 @@ function EditSalesDocDialog({ target, onClose }: { target: EditTarget; onClose: 
   useEffect(() => {
     if (target && source && lines === null) {
       setLines(source.map((l) => ({
-        description: l.description, quantity: String(l.quantity), unitPrice: String(l.unit_price),
+        description: l.description, quantity: String(l.quantity), unitPrice: String((l as any).fx_unit_price ?? l.unit_price),
         discountPct: Number(l.discount_pct) ? String(Number(l.discount_pct)) : "", taxCodeId: l.tax_code_id ?? "",
       })));
     }
@@ -508,6 +515,8 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
           <DialogTitle className="text-sm">Nouveau devis</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {(() => { const c = (customers as any[]).find((x) => x.id === form.customer_id); return c?.currency
+            ? <p className="text-[11px] text-muted-foreground" data-testid="sales-doc-currency">Prix en {c.currency} (devise du client), convertis en XOF au cours du jour.</p> : null; })()}
           <CustomerExposureBanner customerId={form.customer_id} />
           <div className="space-y-1.5">
             <Label className="text-xs">Client *</Label>
@@ -628,6 +637,8 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               ))}
             </select>
           </div>
+          {(() => { const c = (customers as any[]).find((x) => x.id === form.customer_id); return c?.currency
+            ? <p className="text-[11px] text-muted-foreground" data-testid="sales-doc-currency">Prix en {c.currency} (devise du client), convertis en XOF au cours du jour.</p> : null; })()}
           <CustomerExposureBanner customerId={form.customer_id} />
           {form.customer_id && (
             <div className="space-y-1.5">

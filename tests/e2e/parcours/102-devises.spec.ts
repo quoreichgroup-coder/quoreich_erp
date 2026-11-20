@@ -90,5 +90,41 @@ test("cours de change, facture fournisseur et facture client en USD, encaissemen
   await enc.getByRole("button", { name: "Enregistrer le règlement" }).click();
   await expect(enc).toBeHidden();
   await expect(panneau.getByRole("button", { name: /Enregistrer paiement/ }), "facture soldée en devise").toHaveCount(0);
+
+  obs.etape("client en EUR par défaut : le devis le rappelle");
+  const clientEur = `Client EUR ${RUN}`;
+  await page.goto("/customers");
+  await page.getByRole("button", { name: /Ajouter un client/i }).click();
+  const fc = page.getByRole("dialog");
+  await fc.getByPlaceholder("Raison sociale ou nom").fill(clientEur);
+  await fc.getByLabel("Devise du client").selectOption("EUR");
+  await fc.getByRole("button", { name: "Create" }).click();
+  await expect(fc).toBeHidden();
+  await page.goto("/sales/transactions");
+  await page.getByRole("button", { name: "Nouveau devis" }).click();
+  const dq = page.getByRole("dialog");
+  await dq.locator("select").first().selectOption({ label: clientEur });
+  await expect(dq.getByTestId("sales-doc-currency")).toContainText("Prix en EUR");
+  await dq.getByRole("button", { name: "Annuler" }).click();
+
+  obs.etape("avance fournisseur versée");
+  await page.goto("/payables/transactions");
+  await page.getByRole("button", { name: "Avance fournisseur" }).click();
+  const da = page.getByRole("dialog", { name: "Avance fournisseur" });
+  await da.getByLabel("Fournisseur *").selectOption({ label: fournisseur });
+  await da.getByLabel("Mode de règlement").selectOption("check");
+  await da.getByLabel("Devise").selectOption("XOF");
+  await da.getByLabel(/Montant \(XOF\)/).fill("50000");
+  await da.getByLabel("Référence").fill(`ACF-${RUN}`);
+  await da.getByTestId("supplier-advance-save").click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "Avance fournisseur enregistrée" })).toBeVisible();
+  await page.getByRole("tab", { name: "Règlements" }).click();
+  await expect(page.getByTestId("supplier-advance-row").filter({ hasText: fournisseur })).toContainText("50");
+
+  obs.etape("aperçu de la réévaluation de clôture");
+  await page.goto("/settings?tab=currency");
+  const rv = page.getByTestId("fx-revaluation");
+  await rv.getByLabel("Date de clôture").fill(jour);
+  await expect(rv.getByTestId("fx-revaluation-items")).toBeVisible();
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });

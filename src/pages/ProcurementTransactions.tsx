@@ -1,3 +1,4 @@
+import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -189,8 +190,16 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
   const [orderDate, setOrderDate] = useState(() => edit?.order_date ?? new Date().toISOString().slice(0, 10));
   const [expectedDate, setExpectedDate] = useState<string>(edit?.expected_date ?? "");
   const [incoterm, setIncoterm] = useState<string>(edit?.incoterm ?? "");
-  const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "unit_cost"));
+  // Devise (V126) : celle du fournisseur est proposée ; les coûts saisis sont alors en devise, convertis par la base.
+  const baseCurrency = useBaseCurrency();
+  const { data: rates = [] } = useExchangeRates();
+  const [currency, setCurrency] = useState<string>(edit?.currency ?? "");
+  const [rate, setRate] = useState<string>(edit?.currency && edit?.exchange_rate != null ? String(edit.exchange_rate) : "");
+  const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, edit?.currency ? "fx_unit_cost" : "unit_cost"));
   const supplier: any = (suppliers || []).find((s: any) => s.id === supplierId);
+  const foreign = Boolean(currency) && currency !== baseCurrency;
+  const rateN = rate === "" ? null : Number(rate.replace(",", "."));
+  const fx = { currency: foreign ? currency : null, exchange_rate: foreign ? rateN : null };
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<Record<string, string>>({});
   const saved = useDocumentAnalytics("PO", edit?.id);
@@ -203,9 +212,10 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
     const problem = validateDocLines(lines);
     if (problem) { setError(problem); return; }
     if (!tenantId || !user) { setError("Profil en cours de chargement, réessayez."); return; }
+    if (foreign && rateN != null && (!Number.isFinite(rateN) || rateN <= 0)) { setError("Cours de la commande invalide."); return; }
     if (edit) {
       updateDraft.mutate(
-        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null }, lines: withAnalytics(lines), analytics },
+        { docType: "PO", id: edit.id, header: { supplier_id: supplierId, order_date: orderDate, expected_date: expectedDate || null, incoterm: incoterm || null, ...fx }, lines: withAnalytics(lines), analytics },
         { onSuccess: () => onOpenChange(false) });
       return;
     }
@@ -215,6 +225,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       order_date: orderDate,
       expected_date: expectedDate || null,
       incoterm: incoterm || null,
+      ...fx,
       total: documentFooter(lines).total,
       tenant_id: tenantId,
       created_by: user.id,
@@ -231,7 +242,11 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><Label className="text-xs" htmlFor="po-supplier">Fournisseur</Label>
               <select id="po-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
-                value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                value={supplierId} onChange={(e) => {
+                  setSupplierId(e.target.value);
+                  const cur = (suppliers || []).find((s: any) => s.id === e.target.value)?.currency ?? "";
+                  if (!edit) setCurrency(cur && cur !== baseCurrency ? cur : "");
+                }}>
                 <option value="">— Sélectionner —</option>
                 {(suppliers || []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -246,6 +261,16 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
                 <option value="">{supplier?.default_incoterm ? `Celui du fournisseur (${supplier.default_incoterm})` : "—"}</option>
                 {INCOTERMS.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}
               </select></div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="po-currency">
+            <div><Label className="text-xs" htmlFor="po-currency-select">Devise</Label>
+              <select id="po-currency-select" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                value={currency || baseCurrency} onChange={(e) => setCurrency(e.target.value === baseCurrency ? "" : e.target.value)}>
+                {currencyChoices(baseCurrency, rates, supplier?.currency ?? null).map((c) => <option key={c} value={c}>{c === baseCurrency ? `${c} (devise de la société)` : c}</option>)}
+              </select></div>
+            {foreign && <div><Label className="text-xs" htmlFor="po-rate">Cours (1 {currency} en {baseCurrency})</Label>
+              <Input id="po-rate" inputMode="decimal" className="text-right" placeholder="vide = cours du jour" value={rate} onChange={(e) => setRate(e.target.value)} /></div>}
+            {foreign && <p className="col-span-2 text-[11px] text-muted-foreground self-end">Coûts saisis en {currency} ; la réception est valorisée au coût converti au cours de la commande.</p>}
           </div>
           <DocumentLinesEditor lines={lines} onChange={setLines} />
           <AnalyticSelectors date={orderDate} value={analytics} idPrefix="po"

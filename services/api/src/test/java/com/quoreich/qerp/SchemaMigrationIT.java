@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "125";
+  private static final String DERNIERE_MIGRATION = "128";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -159,7 +159,7 @@ class SchemaMigrationIT {
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
       Set.of(
-          "fiscal_close_settings", "exchange_rates", "annex_notes", "annex_note_groups", "annex_note_texts",
+          "fiscal_close_settings", "exchange_rates", "ap_supplier_advances", "fx_revaluation_runs", "annex_notes", "annex_note_groups", "annex_note_texts",
           "accounting_frameworks",
           "accounting_framework_accounts",
           "posting_roles",
@@ -300,7 +300,7 @@ class SchemaMigrationIT {
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
           // V121 — clôture d'exercice.
-          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding",
+          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding", "commercial_document_currency", "commercial_document_currency_lines", "record_supplier_advance", "apply_supplier_advance", "fx_revaluation_items", "post_fx_revaluation",
           // V120 — piste d'audit chaînée en SHA-256.
           "gl_audit_chain_breaks", "gl_audit_hash", "guard_gl_audit_log",
           // V118 — temps réel sur site.
@@ -649,6 +649,7 @@ class SchemaMigrationIT {
           "fiscal_close_settings/Lecture société", "fiscal_close_settings/Paramétrage habilité",
           "annex_notes/Lecture du référentiel", "annex_note_groups/Lecture du référentiel", "annex_note_texts/Lecture société", "annex_note_texts/Rédaction habilitée",
           "exchange_rates/Lecture société et référence", "exchange_rates/Saisie des cours habilitée",
+          "ap_supplier_advances/Lecture société", "fx_revaluation_runs/Lecture société",
           // V116 — écritures réservées aux droits du catalogue.
           "purchase_requisitions/Lecture société", "purchase_requisitions/Saisie habilitée",
           "requisition_lines/Lecture avec la pièce", "requisition_lines/Saisie habilitée",
@@ -939,6 +940,8 @@ class SchemaMigrationIT {
           // V120.
           "gl_audit_logs/trg_guard_gl_audit_log",
           "ap_invoices/trg_ap_invoice_currency", "ap_invoices/trg_ap_invoice_currency_lines", "payments/trg_aa_payment_currency", "ar_invoices/trg_ar_invoice_currency", "ar_invoices/trg_ar_invoice_currency_lines",
+          "quotations/trg_aa_quotation_currency", "sales_orders/trg_aa_sales_order_currency", "purchase_orders/trg_aa_purchase_order_currency",
+          "quotations/trg_quotation_currency_lines", "sales_orders/trg_sales_order_currency_lines", "purchase_orders/trg_purchase_order_currency_lines",
           // V118 — temps réel sur site.
           "ar_invoices/trg_zz_realtime_notify",
           "ap_invoices/trg_zz_realtime_notify",

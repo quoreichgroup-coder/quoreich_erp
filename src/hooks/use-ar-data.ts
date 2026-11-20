@@ -416,6 +416,8 @@ export interface Customer {
   created_at: string;
   /** V105 : jeu de comptes (vide = comptes par défaut). */
   account_set_id?: string | null;
+  /** V126 : devise par défaut des devis, commandes et factures (vide = devise de la société). */
+  currency?: string | null;
 }
 
 export interface Payment {
@@ -867,14 +869,14 @@ function customerFromApi(c: ApiSchemas["CustomerView"]): Customer {
   return {
     id: c.id, tenant_id: "", name: c.name, email: c.email ?? null, phone: c.phone ?? null,
     address: c.address ?? null, tax_id: c.taxId ?? null, credit_limit: Number(c.creditLimit ?? 0),
-    payment_terms: Number(c.paymentTerms ?? 30), status: c.status, created_at: "",
+    payment_terms: Number(c.paymentTerms ?? 30), status: c.status, created_at: "", currency: c.currency ?? null,
   };
 }
 
 function customerToApi(c: Partial<Customer>) {
   return {
     name: c.name, email: c.email ?? null, phone: c.phone ?? null, address: c.address ?? null,
-    taxId: c.tax_id ?? null, creditLimit: c.credit_limit ?? 0, paymentTerms: c.payment_terms ?? 30,
+    taxId: c.tax_id ?? null, creditLimit: c.credit_limit ?? 0, paymentTerms: c.payment_terms ?? 30, currency: c.currency || null,
   };
 }
 

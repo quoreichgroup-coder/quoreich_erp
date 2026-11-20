@@ -165,6 +165,29 @@ public class PayableController {
     return sql.call("ap_po_lines_to_invoice", args("_po", po, "_except", except));
   }
 
+  @GetMapping("/supplier-advances")
+  @Operation(operationId = "listSupplierAdvances", summary = "Avances versées aux fournisseurs : versé, imputé, disponible (V127)")
+  public JsonNode supplierAdvances() {
+    return sql.list("SELECT a.*, s.name AS supplier_name, a.amount - a.amount_applied AS available FROM public.ap_supplier_advances a"
+        + " JOIN public.suppliers s ON s.id = a.supplier_id ORDER BY a.paid_date DESC, a.advance_number DESC");
+  }
+
+  @PostMapping("/supplier-advances")
+  @Operation(operationId = "recordSupplierAdvance", summary = "Verser une avance à un fournisseur (droit ap.pay)")
+  public JsonNode recordSupplierAdvance(@RequestBody Map<String, Object> b) {
+    return sql.call("record_supplier_advance", args("_supplier_id", b.get("supplier_id"), "_paid_date", b.get("paid_date"),
+        "_payment_method", b.get("payment_method"), "_reference", b.get("reference"), "_amount", b.get("amount"), "_po_id", b.get("po_id"),
+        "_bank_account_id", b.get("bank_account_id"), "_currency", b.get("currency"), "_fx_amount", b.get("fx_amount"),
+        "_exchange_rate", b.get("exchange_rate")));
+  }
+
+  @PostMapping("/supplier-advances/{id}/applications")
+  @Operation(operationId = "applySupplierAdvance", summary = "Imputer une avance sur une facture du même fournisseur (droit ap.pay)")
+  public JsonNode applySupplierAdvance(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.call("apply_supplier_advance", args("_invoice_id", b.get("invoice_id"), "_advance_id", id, "_amount", b.get("amount"),
+        "_apply_date", b.getOrDefault("apply_date", java.time.LocalDate.now().toString())));
+  }
+
   @GetMapping("/payments")
   @Operation(operationId = "listApPayments", summary = "Paiements fournisseurs (avec la facture et le fournisseur)")
   public JsonNode payments() {

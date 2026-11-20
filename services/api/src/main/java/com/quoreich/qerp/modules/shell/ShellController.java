@@ -207,6 +207,25 @@ public class ShellController {
         Map.of("base_currency", "(SELECT t.currency FROM public.tenants t WHERE t.id = public.get_user_tenant_id(auth.uid()))", "created_by", "auth.uid()"));
   }
 
+  @GetMapping("/fx-revaluation/items")
+  @Operation(operationId = "listFxRevaluationItems", summary = "Créances et dettes en devise ouvertes à une date, valeur au cours de clôture (V128)")
+  public JsonNode fxRevaluationItems(@RequestParam String date) {
+    return sql.list("SELECT * FROM public.fx_revaluation_items(?::date)", date);
+  }
+
+  @GetMapping("/fx-revaluation/runs")
+  @Operation(operationId = "listFxRevaluationRuns", summary = "Réévaluations de clôture enregistrées")
+  public JsonNode fxRevaluationRuns() {
+    return sql.list("SELECT id, revaluation_date, reason, gains, losses, provision_amount, entry_id, reversal_entry_id, provision_entry_id,"
+        + " provision_reversal_entry_id, created_at FROM public.fx_revaluation_runs ORDER BY revaluation_date DESC");
+  }
+
+  @PostMapping("/fx-revaluation/runs")
+  @Operation(operationId = "postFxRevaluation", summary = "Réévaluer à une date de clôture (droit currency.revaluation)")
+  public JsonNode postFxRevaluation(@RequestBody Map<String, Object> b) {
+    return sql.call("post_fx_revaluation", args("_date", b.get("date"), "_reason", b.get("reason")));
+  }
+
   @DeleteMapping("/exchange-rates/{id}")
   @Operation(operationId = "deleteExchangeRate", summary = "Supprimer un cours de la société (droit currency.rates)")
   public void deleteExchangeRate(@PathVariable UUID id) {

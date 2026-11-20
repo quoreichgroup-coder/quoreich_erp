@@ -109,6 +109,9 @@ export function useCreatePurchaseOrder() {
       order_date?: string;
       expected_date?: string | null;
       incoterm?: string | null;
+      /** Devise de la commande (V126) ; vide = devise de la société. Les coûts des lignes sont alors en devise. */
+      currency?: string | null;
+      exchange_rate?: number | null;
       total: number;
       tenant_id: string;
       created_by: string;

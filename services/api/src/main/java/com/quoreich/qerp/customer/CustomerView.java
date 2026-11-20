@@ -32,4 +32,5 @@ public record CustomerView(
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED) String address,
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED, description = "Identifiant fiscal (IFU)") String taxId,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Plafond de crédit, XOF") BigDecimal creditLimit,
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Délai de paiement, jours") int paymentTerms) {}
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Délai de paiement, jours") int paymentTerms,
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED, description = "Devise par défaut du client (V126) ; absente = devise de la société") String currency) {}

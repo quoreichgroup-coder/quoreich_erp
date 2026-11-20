@@ -26,7 +26,7 @@ public class CustomerQuery {
 
   private static final String COLONNES =
       "id, name, status, email, phone, address, tax_id, COALESCE(credit_limit, 0) AS credit_limit,"
-          + " COALESCE(payment_terms, 30) AS payment_terms";
+          + " COALESCE(payment_terms, 30) AS payment_terms, currency";
 
   private static final RowMapper<CustomerView> VUE =
       (rs, rowNum) ->
@@ -39,7 +39,8 @@ public class CustomerQuery {
               rs.getString("address"),
               rs.getString("tax_id"),
               rs.getBigDecimal("credit_limit"),
-              rs.getInt("payment_terms"));
+              rs.getInt("payment_terms"),
+              rs.getString("currency"));
 
   private final JdbcTemplate jdbc;
 
@@ -55,11 +56,11 @@ public class CustomerQuery {
   @Transactional
   public CustomerView create(CustomerInput in) {
     return jdbc.queryForObject(
-        "INSERT INTO customers (tenant_id, name, email, phone, address, tax_id, credit_limit, payment_terms)"
-            + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, ?, ?, ?, ?, ?) RETURNING " + COLONNES,
+        "INSERT INTO customers (tenant_id, name, email, phone, address, tax_id, credit_limit, payment_terms, currency)"
+            + " VALUES (get_user_tenant_id(auth.uid()), ?, ?, ?, ?, ?, ?, ?, ?) RETURNING " + COLONNES,
         VUE,
         in.name().strip(), in.cleanEmail(), blank(in.phone()), blank(in.address()), blank(in.taxId()),
-        in.creditLimitOrZero(), in.paymentTermsOrDefault());
+        in.creditLimitOrZero(), in.paymentTermsOrDefault(), in.cleanCurrency());
   }
 
   /** Mise à jour d'une fiche de la société ; {@code null} si elle n'est pas visible (404). */
@@ -68,10 +69,10 @@ public class CustomerQuery {
     List<CustomerView> rows =
         jdbc.query(
             "UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, tax_id = ?, credit_limit = ?,"
-                + " payment_terms = ? WHERE id = ? RETURNING " + COLONNES,
+                + " payment_terms = ?, currency = ? WHERE id = ? RETURNING " + COLONNES,
             VUE,
             in.name().strip(), in.cleanEmail(), blank(in.phone()), blank(in.address()), blank(in.taxId()),
-            in.creditLimitOrZero(), in.paymentTermsOrDefault(), id);
+            in.creditLimitOrZero(), in.paymentTermsOrDefault(), in.cleanCurrency(), id);
     return rows.isEmpty() ? null : rows.getFirst();
   }
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FxRevaluationPanel } from "@/components/FxRevaluationPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMyAccess } from "@/hooks/use-my-access";
@@ -74,6 +75,7 @@ export function ExchangeRatesPanel() {
           </table>
         )}
       </div>
+      <FxRevaluationPanel />
     </div>
   );
 }

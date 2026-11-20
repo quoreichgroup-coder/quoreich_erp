@@ -1,3 +1,4 @@
+import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { useState } from "react";
 import { AccountSetSelect } from "@/components/AccountSets";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -17,11 +18,13 @@ import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, 
 import { exportToCSV } from "@/lib/csv-export";
 import { CustomerAnalyticDefaults } from "@/components/AnalyticSelectors";
 
-const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number; account_set_id: string | null } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30, account_set_id: null };
+const emptyForm: { name: string; email: string; phone: string; address: string; tax_id: string; status: string; credit_limit: number; payment_terms: number; account_set_id: string | null; currency: string } = { name: "", email: "", phone: "", address: "", tax_id: "", status: "active", credit_limit: 0, payment_terms: 30, account_set_id: null, currency: "" };
 
 const Customers = () => {
   const { data: customers = [], isLoading } = useCustomers();
   const createCustomer = useCreateCustomer();
+  const baseCurrency = useBaseCurrency();
+  const { data: rates = [] } = useExchangeRates();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
   // Actions groupées : sélection de fiches, export, activation / désactivation.
@@ -59,6 +62,7 @@ const Customers = () => {
       credit_limit: customer.credit_limit,
       payment_terms: customer.payment_terms,
       account_set_id: customer.account_set_id ?? null,
+      currency: customer.currency ?? "",
     });
     setDialogOpen(true);
   };
@@ -69,9 +73,9 @@ const Customers = () => {
     // la fiche reste ouverte, sans rejet non géré.
     try {
       if (editingCustomer) {
-        await updateCustomer.mutateAsync({ id: editingCustomer.id, ...form });
+        await updateCustomer.mutateAsync({ id: editingCustomer.id, ...form, currency: form.currency || null });
       } else {
-        await createCustomer.mutateAsync(form as any);
+        await createCustomer.mutateAsync({ ...form, currency: form.currency || null } as any);
       }
       setDialogOpen(false);
     } catch {
@@ -259,6 +263,14 @@ const Customers = () => {
                 <Label>Limite de crédit (XOF)</Label>
                 <Input type="number" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: Number(e.target.value) }))} />
               </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="customer-currency">Devise du client</Label>
+              <select id="customer-currency" className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+                value={form.currency || baseCurrency} onChange={(e) => setForm(f => ({ ...f, currency: e.target.value === baseCurrency ? "" : e.target.value }))}>
+                {currencyChoices(baseCurrency, rates, form.currency || null).map((c) => <option key={c} value={c}>{c === baseCurrency ? `${c} (devise de la société)` : c}</option>)}
+              </select>
+              <p className="text-[11px] text-muted-foreground">Devis, commandes et factures du client sont établis dans cette devise, au cours du jour.</p>
             </div>
             <AccountSetSelect kind="customer" value={form.account_set_id} onChange={(v) => setForm(f => ({ ...f, account_set_id: v }))} />
             {/* Une section par défaut se rattache à un client existant : visible en modification seulement. */}

@@ -1,3 +1,4 @@
+import { InvoiceSupplierAdvances, SupplierAdvanceDialog, SupplierAdvancesList } from "@/components/SupplierAdvances";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
@@ -124,7 +125,10 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
   const reprendre = () => {
     const open = toInvoice.filter((l) => l.remaining > 0);
     if (!open.length) { toast.error("Aucune quantité reçue non facturée sur cette commande"); return; }
-    setLines(open.map((l) => ({ description: l.description, quantity: String(l.remaining), unitPrice: String(l.unit_cost), discountPct: "", taxCodeId: "", poLineId: l.po_line_id })));
+    // Commande et facture dans la même devise (V126) : coût en devise repris, sinon coût converti de la commande.
+    setLines(open.map((l) => ({ description: l.description, quantity: String(l.remaining),
+      unitPrice: String(foreign && (l as any).currency === form.currency && (l as any).fx_unit_cost != null ? (l as any).fx_unit_cost : l.unit_cost),
+      discountPct: "", taxCodeId: "", poLineId: l.po_line_id })));
   };
 
   const handleCreate = async () => {
@@ -169,7 +173,11 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="ap-po">Commande d'origine</Label>
               <select id="ap-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
-                onChange={e => { setForm(f => ({ ...f, po_id: e.target.value })); setLines((ls) => ls.map((l) => ({ ...l, poLineId: null }))); }} disabled={!form.supplier_id}>
+                onChange={e => {
+                  const po = supplierOrders.find((p: any) => p.id === e.target.value);
+                  setForm(f => ({ ...f, po_id: e.target.value, ...(po && !edit ? { currency: po.currency ?? "", exchange_rate: "" } : {}) }));
+                  setLines((ls) => ls.map((l) => ({ ...l, poLineId: null })));
+                }} disabled={!form.supplier_id}>
                 <option value="">{form.supplier_id ? (supplierOrders.length ? "— Aucune —" : "Aucune commande de ce fournisseur") : "Choisissez d'abord le fournisseur"}</option>
                 {supplierOrders.map((p) => <option key={p.id} value={p.id}>{p.po_number} · {p.order_date} · {Number(p.total).toLocaleString("fr-FR")} XOF</option>)}
               </select>
@@ -292,6 +300,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
           />
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
           <APCreditNotesList invoiceId={inv.id} title="Avoirs sur cette facture" />
+          <InvoiceSupplierAdvances invoice={inv as any} canApply={canPay} />
         </div>
         <div className="p-4 border-t border-border flex items-center gap-2">
           {inv.status !== "paid" && inv.approval_status === "approved" && canPay && (
@@ -592,6 +601,8 @@ export default function APTransactions() {
   const { data: myAccess } = useMyAccess();
   // V42 : un paiement demande le droit ap.pay (contrôlé en base).
   const canPay = (myAccess?.permissions ?? []).includes("ap.pay");
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const { data: suppliersForAdvance } = useSuppliers();
 
   const statusOptions = ["all", "draft", "open", "partially_paid", "paid", "overdue"];
   const approvalOptions = ["all", "pending", "approved", "rejected"];
@@ -619,6 +630,8 @@ export default function APTransactions() {
         <div className="flex items-center gap-2">
           <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Nouvelle facture fournisseur</Button>
           {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
+          {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}>Avance fournisseur</Button>}
+          <SupplierAdvanceDialog open={advanceOpen} onClose={() => setAdvanceOpen(false)} suppliers={(suppliersForAdvance ?? []) as any[]} />
           <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => exportTable(f, 
             filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
@@ -744,8 +757,10 @@ export default function APTransactions() {
 
         </TabsContent>
 
-        <TabsContent value="payments">
+        <TabsContent value="payments" className="space-y-3">
           <PaymentsTab onOpenInvoice={(id) => { const inv = invoices.find((i) => i.id === id); if (inv) setSelectedInv(inv); }} />
+          <h3 className="text-xs font-semibold text-foreground pt-2">Avances fournisseurs</h3>
+          <SupplierAdvancesList />
         </TabsContent>
 
         <TabsContent value="credit-notes">

@@ -9745,6 +9745,105 @@
         }
       }
     },
+    "/api/v1/fx-revaluation/runs" : {
+      "get" : {
+        "tags" : [ "Application" ],
+        "summary" : "Réévaluations de clôture enregistrées",
+        "operationId" : "listFxRevaluationRuns",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Application" ],
+        "summary" : "Réévaluer à une date de clôture (droit currency.revaluation)",
+        "operationId" : "postFxRevaluation",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/fiscal-calendar/years" : {
       "post" : {
         "tags" : [ "Application" ],
@@ -12884,6 +12983,170 @@
             "format" : "uuid"
           }
         } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ap/supplier-advances" : {
+      "get" : {
+        "tags" : [ "Comptes fournisseurs" ],
+        "summary" : "Avances versées aux fournisseurs : versé, imputé, disponible (V127)",
+        "operationId" : "listSupplierAdvances",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Comptes fournisseurs" ],
+        "summary" : "Verser une avance à un fournisseur (droit ap.pay)",
+        "operationId" : "recordSupplierAdvance",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ap/supplier-advances/{id}/applications" : {
+      "post" : {
+        "tags" : [ "Comptes fournisseurs" ],
+        "summary" : "Imputer une avance sur une facture du même fournisseur (droit ap.pay)",
+        "operationId" : "applySupplierAdvance",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -21904,6 +22167,59 @@
         }
       }
     },
+    "/api/v1/fx-revaluation/items" : {
+      "get" : {
+        "tags" : [ "Application" ],
+        "summary" : "Créances et dettes en devise ouvertes à une date, valeur au cours de clôture (V128)",
+        "operationId" : "listFxRevaluationItems",
+        "parameters" : [ {
+          "name" : "date",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/fiscal-calendar" : {
       "get" : {
         "tags" : [ "Application" ],
@@ -25851,7 +26167,38 @@
           "container" : {
             "type" : "boolean"
           },
-          "double" : {
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "nodeType" : {
+            "type" : "string",
+            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
+          },
+          "short" : {
+            "type" : "boolean"
+          },
+          "int" : {
+            "type" : "boolean"
+          },
+          "long" : {
+            "type" : "boolean"
+          },
+          "boolean" : {
             "type" : "boolean"
           },
           "pojo" : {
@@ -25860,48 +26207,17 @@
           "number" : {
             "type" : "boolean"
           },
-          "int" : {
-            "type" : "boolean"
-          },
-          "string" : {
-            "type" : "boolean"
-          },
-          "short" : {
-            "type" : "boolean"
-          },
-          "long" : {
+          "double" : {
             "type" : "boolean"
           },
           "textual" : {
             "type" : "boolean",
             "deprecated" : true
           },
-          "boolean" : {
+          "string" : {
             "type" : "boolean"
           },
           "binary" : {
-            "type" : "boolean"
-          },
-          "nodeType" : {
-            "type" : "string",
-            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
-          },
-          "integralNumber" : {
-            "type" : "boolean"
-          },
-          "bigDecimal" : {
-            "type" : "boolean"
-          },
-          "valueNode" : {
-            "type" : "boolean"
-          },
-          "bigInteger" : {
-            "type" : "boolean"
-          },
-          "floatingPointNumber" : {
-            "type" : "boolean"
-          },
-          "missingNode" : {
             "type" : "boolean"
           },
           "embeddedValue" : {
@@ -25933,6 +26249,9 @@
           "paymentTerms" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "currency" : {
+            "type" : "string"
           }
         }
       },
@@ -26331,6 +26650,10 @@
             "type" : "integer",
             "format" : "int32",
             "description" : "Délai de paiement, jours"
+          },
+          "currency" : {
+            "type" : "string",
+            "description" : "Devise par défaut du client (V126) ; absente = devise de la société"
           }
         },
         "required" : [ "creditLimit", "id", "name", "paymentTerms", "status" ]
