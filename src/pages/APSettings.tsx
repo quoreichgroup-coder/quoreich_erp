@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Settings, CreditCard, FileText, Bell, Globe, Percent, BookOpen, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModulePostingSettings, PostingPendingNotice } from "@/components/AccountSets";
+import { WithholdingRatesPanel, WithholdingStatement } from "@/components/Withholding";
 import {
   useAPGeneralSettings,
   useUpdateAPGeneralSettings,
@@ -16,8 +17,6 @@ import {
   useUpdateAPNumberingSeries,
   useAPPaymentMethods,
   useUpsertAPPaymentMethod,
-  useAPWithholdingRates,
-  useUpsertAPWithholdingRate,
   useAPNotificationRules,
 } from "@/hooks/use-ap-data";
 
@@ -46,8 +45,6 @@ export default function APSettings() {
   const { data: numbering = [] } = useAPNumberingSeries();
   const updateSeries = useUpdateAPNumberingSeries();
 
-  const { data: withholding = [] } = useAPWithholdingRates();
-  const upsertWithholding = useUpsertAPWithholdingRate();
 
   const { data: notifications = [] } = useAPNotificationRules();
 
@@ -193,33 +190,9 @@ export default function APSettings() {
       )}
 
       {activeTab === "withholding" && (
-        <div className="bg-card border border-border rounded-lg">
-          <div className="p-3 border-b border-border flex justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Taux de retenue à la source</h3>
-          </div>
-          <table className="w-full text-xs">
-            <thead><tr className="border-b border-border bg-muted/30">
-              {["Catégorie", "Taux (%)", "Compte GL", "Actif", "Actions"].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {withholding.map((w: any) => (
-                <tr key={w.id} className="border-b border-border hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium">{w.category}</td>
-                  <td className="px-3 py-2">{w.rate_pct}%</td>
-                  <td className="px-3 py-2 font-mono">{w.gl_account}</td>
-                  <td className="px-3 py-2">{w.is_active ? <span className="text-success">●</span> : <span className="text-muted-foreground">●</span>}</td>
-                  <td className="px-3 py-2">
-                    <Button size="sm" variant="ghost" className="h-6 text-[10px]"
-                      onClick={() => upsertWithholding.mutate({ ...w, is_active: !w.is_active })}>
-                      {w.is_active ? "Désactiver" : "Activer"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          <WithholdingRatesPanel />
+          <WithholdingStatement />
         </div>
       )}
 

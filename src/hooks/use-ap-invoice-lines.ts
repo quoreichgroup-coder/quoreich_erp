@@ -22,6 +22,8 @@ export type APInvoiceHeader = {
   supplier_id: string; po_id: string | null; invoice_number: string; invoice_date: string; due_date: string; control_total: number | null;
   /** Devise de la facture (vide = devise de la société) et cours (vide = cours enregistré à la date de la facture). */
   currency?: string | null; exchange_rate?: number | null;
+  /** Catégorie de retenue à la source (V136 ; vide à la création = celle du fournisseur). */
+  withholding_rate_id?: string | null;
 };
 export type APInvoiceLine = Omit<APLineInput, "analytics"> & { id: string; line_no: number; net_amount: number; tax_amount: number; grni_cleared: number };
 export type POLineToInvoice = { po_line_id: string; description: string; unit_cost: number; ordered: number; received: number; invoiced: number; remaining: number };

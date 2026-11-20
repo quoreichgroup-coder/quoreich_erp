@@ -51,6 +51,10 @@ Excel**. Migrations V129 à V133.
 - **Suivi automatique par un prestataire** : connecteur générique prêt (V134) — adresse de réception propre à la société,
   événements au format DCSA rattachés par connaissement ou conteneur, clé API en écriture seule. Reste à choisir le
   prestataire (Terminal49, Vizion, ShipsGo, SeaRates : service payant) et, si besoin, son adaptateur d'abonnement.
-- **Réception par expédition** (NetSuite) : une réception unique pour toutes les commandes du dossier.
-- **Lecture automatique des factures du transitaire** (OCR / IA, comme Odoo) pour créer les frais réels.
-- Rapport de coût par voyage (estimé, réel, écart, coût de revient unitaire par article).
+- **Réception par expédition** (NetSuite) : fait (V135) — « Réceptionner tout le dossier » crée une réception validée par
+  commande, pour tout le reste à recevoir, dans le magasin de consolidation (sinon le dépôt de destination).
+- **Frais réels sans saisie** : fait (V135) — la facture du transitaire qui cite la commande de transport crée, à son
+  approbation, un frais réel par ligne (type repris de la ligne de commande). Reste la lecture automatique (OCR / IA) des
+  factures papier, qui supposerait un fournisseur d'IA de lecture de documents.
+- **Coût de revient par voyage** : fait (V135) — estimé / réel par type de frais (V132) et coût unitaire rendu par
+  article (achat + frais répartis).

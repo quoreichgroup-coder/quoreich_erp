@@ -31,7 +31,7 @@ async function check<T>(p: PromiseLike<{ data: T; error: unknown }>): Promise<T>
 
 function useInvalidate() {
   const qc = useQueryClient();
-  return () => { for (const k of ["import-files", "import-file-costs", "cost-comparison", "import-transfers", "consolidation-stock", "items", "purchase-orders", "import-settings", "landed-cost-rules", "shipment-timeline"]) qc.invalidateQueries({ queryKey: [k] }); };
+  return () => { for (const k of ["import-files", "import-file-costs", "cost-comparison", "import-transfers", "consolidation-stock", "items", "purchase-orders", "import-settings", "landed-cost-rules", "shipment-timeline", "import-cost-report", "goods-receipts"]) qc.invalidateQueries({ queryKey: [k] }); };
 }
 
 function useRun<I>(run: (i: I) => Promise<unknown>, success: (r: any) => string) {
@@ -59,6 +59,13 @@ export function ImportFileProcess({ file, editable }: { file: any; editable: boo
     (n) => `${n} frais estimé(s) d'après les règles de la société`);
   const transportPo = useRun(async () => isApiEnabled() ? apiPost(`${P}/import-files/${id}/transport-po`, {}) : check(db.rpc("create_transport_po", { _file: id })),
     () => "Commande de transport créée (brouillon) et rattachée au dossier");
+  const report = useQuery({
+    queryKey: ["import-cost-report", id],
+    queryFn: async (): Promise<any[]> => isApiEnabled() ? apiGet<any[]>(`${P}/import-files/${id}/cost-report`)
+      : check<any[]>(db.from("import_file_cost_report").select("*").eq("import_file_id", id).order("item_code")),
+  });
+  const receive = useRun(async () => isApiEnabled() ? apiPost(`${P}/import-files/${id}/receive`, { date })
+    : check(db.rpc("receive_import_file", { _file: id, _date: date })), (r) => `${r.receipts} réception(s) validée(s) pour le dossier`);
   const [date, setDate] = useState(today());
   const transfer = useRun(async (stage: "ship" | "deliver") => isApiEnabled() ? apiPost(`${P}/import-files/${id}/transit`, { stage, date })
     : check(db.rpc("import_file_transit_transfer", { _file: id, _stage: stage, _date: date })),
@@ -85,6 +92,9 @@ export function ImportFileProcess({ file, editable }: { file: any; editable: boo
             onClick={() => transportPo.mutate(undefined)} data-testid="import-transport-po">Créer la commande de transport</Button>
           <div className="space-y-1"><Label className="text-xs" htmlFor="imp-transit-date">Date du transfert</Label>
             <Input id="imp-transit-date" type="date" className="h-8 text-xs w-36" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={receive.isPending} onClick={() => receive.mutate(undefined)} data-testid="import-receive"
+            title="Une réception validée par commande du dossier, pour tout le reste à recevoir, dans le magasin de consolidation (sinon le dépôt de destination)">
+            Réceptionner tout le dossier</Button>
           <Button size="sm" className="h-8 text-xs" disabled={transfer.isPending} onClick={() => transfer.mutate("ship")} data-testid="import-ship">
             {transfer.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Expédier (consolidation → transit)</Button>
           <Button size="sm" className="h-8 text-xs" disabled={transfer.isPending} onClick={() => transfer.mutate("deliver")} data-testid="import-deliver">Arrivée au dépôt (transit → destination)</Button>
@@ -96,6 +106,17 @@ export function ImportFileProcess({ file, editable }: { file: any; editable: boo
           <tbody>{(comparison.data ?? []).map((c) => (
             <tr key={c.cost_type_id} className="border-t border-border/50"><td>{c.label}</td><td className="text-right tabular-nums">{fmt(c.estimated)}</td>
               <td className="text-right tabular-nums">{fmt(c.actual)}</td><td className={`text-right tabular-nums ${Number(c.variance) > 0 ? "text-destructive" : ""}`}>{fmt(c.variance)}</td></tr>))}</tbody>
+        </table>
+      )}
+      {(report.data ?? []).length > 0 && (
+        <table className="w-full text-xs" data-testid="import-cost-report">
+          <caption className="text-left font-medium pb-1">Coût de revient par article</caption>
+          <thead className="text-muted-foreground"><tr><th className="text-left">Article</th><th className="text-right">Quantité</th><th className="text-right">Valeur d'achat</th>
+            <th className="text-right">Frais répartis</th><th className="text-right">Coût unitaire rendu</th></tr></thead>
+          <tbody>{(report.data ?? []).map((c) => (
+            <tr key={`${c.item_id}-${c.item_name}`} className="border-t border-border/50"><td>{c.item_code ? `${c.item_code} — ` : ""}{c.item_name}</td>
+              <td className="text-right tabular-nums">{fmt(c.quantity)}</td><td className="text-right tabular-nums">{fmt(c.purchase_value)}</td>
+              <td className="text-right tabular-nums">{fmt(c.landed_costs)}</td><td className="text-right tabular-nums">{fmt(c.unit_landed_cost)}</td></tr>))}</tbody>
         </table>
       )}
       {(transfers.data ?? []).length > 0 && (

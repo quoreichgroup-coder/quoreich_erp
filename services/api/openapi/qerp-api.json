@@ -7294,6 +7294,71 @@
         }
       }
     },
+    "/api/v1/procurement/import-files/{id}/receive" : {
+      "post" : {
+        "tags" : [ "Approvisionnement" ],
+        "summary" : "Réceptionner tout le dossier en une action (une réception par commande)",
+        "operationId" : "receiveImportFile",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/procurement/import-files/{id}/orders" : {
       "post" : {
         "tags" : [ "Approvisionnement" ],
@@ -20666,6 +20731,60 @@
         }
       }
     },
+    "/api/v1/procurement/import-files/{id}/cost-report" : {
+      "get" : {
+        "tags" : [ "Approvisionnement" ],
+        "summary" : "Coût de revient par article du dossier (achat, frais répartis, coût unitaire)",
+        "operationId" : "listImportCostReport",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/procurement/import-files/{id}/cost-comparison" : {
       "get" : {
         "tags" : [ "Approvisionnement" ],
@@ -26391,6 +26510,66 @@
         }
       }
     },
+    "/api/v1/ap/withholding-statement" : {
+      "get" : {
+        "tags" : [ "Comptes fournisseurs" ],
+        "summary" : "État des retenues à la source prélevées sur une période (déclaration)",
+        "operationId" : "withholdingStatement",
+        "parameters" : [ {
+          "name" : "from",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ap/suppliers/{id}/change-log" : {
       "get" : {
         "tags" : [ "Comptes fournisseurs" ],
@@ -28293,10 +28472,16 @@
           "container" : {
             "type" : "boolean"
           },
-          "floatingPointNumber" : {
+          "bigDecimal" : {
             "type" : "boolean"
           },
-          "bigDecimal" : {
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
             "type" : "boolean"
           },
           "bigInteger" : {
@@ -28306,19 +28491,25 @@
             "type" : "string",
             "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ]
           },
-          "valueNode" : {
-            "type" : "boolean"
-          },
           "integralNumber" : {
             "type" : "boolean"
           },
-          "missingNode" : {
+          "pojo" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "type" : "boolean"
+          },
+          "long" : {
+            "type" : "boolean"
+          },
+          "double" : {
             "type" : "boolean"
           },
           "int" : {
             "type" : "boolean"
           },
-          "pojo" : {
+          "short" : {
             "type" : "boolean"
           },
           "textual" : {
@@ -28328,19 +28519,7 @@
           "binary" : {
             "type" : "boolean"
           },
-          "number" : {
-            "type" : "boolean"
-          },
-          "double" : {
-            "type" : "boolean"
-          },
           "boolean" : {
-            "type" : "boolean"
-          },
-          "short" : {
-            "type" : "boolean"
-          },
-          "long" : {
             "type" : "boolean"
           },
           "string" : {

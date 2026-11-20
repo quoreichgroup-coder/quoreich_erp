@@ -32,7 +32,7 @@ pour tous les modules), G-40 (traduction), G-42 à G-45, G-51 (paramétrage), G-
 | G-28 | Paie : validation métier / fiscale par pays | P1 🧮 | Taux et comptes par pays (D5) |
 | G-29 | Demandes de prix et comparatif fournisseurs | P2 | |
 | G-30 | Réception de services (sans stock) | P2 | |
-| G-31 | Retenues à la source appliquées au règlement fournisseur | P2 🧮 | Taux saisis mais jamais appliqués |
+| G-31 | Retenues à la source appliquées au règlement fournisseur | P2 🧮 | **Fait (V136)** : catégorie par fournisseur, retenue figée à l'approbation, prélevée au paiement (401 / banque nette / 447x), état des retenues ; taux à saisir selon la loi fiscale |
 | G-32 | Relances clients exécutées (envoi, historique) | P2 | Règles saisies, aucun traitement ; dépend de la messagerie |
 | G-34 | Réservation de stock à la commande | P2 | Projection seulement |
 | G-35 | Pièces jointes sur toutes les pièces | P2 | Seuls les justificatifs de notes de frais |

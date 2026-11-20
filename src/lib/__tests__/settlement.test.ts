@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoAllocate, checkAllocations, itemCurrencies, openItems } from "../settlement";
+import { autoAllocate, checkAllocations, itemCurrencies, openItems, withholdingEstimate } from "../settlement";
 
 const base = { invoice_date: "2026-10-01", amount_paid: 0, status: "sent" };
 const factures = [
@@ -55,5 +55,16 @@ describe("règlement en devise (V124)", () => {
     expect(r.error).toBeNull();
     expect(r.allocations).toEqual([{ invoice_id: "u", fx_amount: 300.5 }]);
     expect(checkAllocations(items, { u: 300.51 }, 300.51).error).toMatch(/au-delà du restant/);
+  });
+});
+
+describe("withholdingEstimate (V136)", () => {
+  it("estime la retenue au prorata du TTC imputé, ignore les factures sans retenue ou en devise", () => {
+    const items = openItems("ap", [
+      { id: "a", supplier_id: "s", status: "open", approval_status: "approved", total: 118000, amount_paid: 0, due_date: "2031-01-01", invoice_number: "A", withholding_amount: 5000 } as any,
+      { id: "b", supplier_id: "s", status: "open", approval_status: "approved", total: 10000, amount_paid: 0, due_date: "2031-01-02", invoice_number: "B" } as any,
+    ], "s");
+    expect(withholdingEstimate(items, { a: 59000, b: 10000 })).toBe(2500);
+    expect(withholdingEstimate(items, { a: 0 })).toBe(0);
   });
 });

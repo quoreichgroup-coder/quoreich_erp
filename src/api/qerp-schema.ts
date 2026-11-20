@@ -1495,6 +1495,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/procurement/import-files/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Réceptionner tout le dossier en une action (une réception par commande) */
+        post: operations["receiveImportFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/procurement/import-files/{id}/orders": {
         parameters: {
             query?: never;
@@ -4816,6 +4833,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/procurement/import-files/{id}/cost-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coût de revient par article du dossier (achat, frais répartis, coût unitaire) */
+        get: operations["listImportCostReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/procurement/import-files/{id}/cost-comparison": {
         parameters: {
             query?: never;
@@ -6684,6 +6718,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ap/withholding-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** État des retenues à la source prélevées sur une période (déclaration) */
+        get: operations["withholdingStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ap/suppliers/{id}/change-log": {
         parameters: {
             query?: never;
@@ -7299,24 +7350,24 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            floatingPointNumber?: boolean;
             bigDecimal?: boolean;
+            missingNode?: boolean;
+            valueNode?: boolean;
+            floatingPointNumber?: boolean;
             bigInteger?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            valueNode?: boolean;
             integralNumber?: boolean;
-            missingNode?: boolean;
-            int?: boolean;
             pojo?: boolean;
+            number?: boolean;
+            long?: boolean;
+            double?: boolean;
+            int?: boolean;
+            short?: boolean;
             /** @deprecated */
             textual?: boolean;
             binary?: boolean;
-            number?: boolean;
-            double?: boolean;
             boolean?: boolean;
-            short?: boolean;
-            long?: boolean;
             string?: boolean;
             embeddedValue?: boolean;
         };
@@ -13813,6 +13864,56 @@ export interface operations {
         };
     };
     transitTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    receiveImportFile: {
         parameters: {
             query?: never;
             header?: never;
@@ -25027,6 +25128,50 @@ export interface operations {
             };
         };
     };
+    listImportCostReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
     listImportCostComparison: {
         parameters: {
             query?: never;
@@ -29742,6 +29887,51 @@ export interface operations {
     listArAging: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    withholdingStatement: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

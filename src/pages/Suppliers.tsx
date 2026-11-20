@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AccountSetSelect } from "@/components/AccountSets";
+import { WithholdingSelect } from "@/components/Withholding";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
@@ -27,7 +28,7 @@ import { INCOTERMS, SUPPLIER_FIELD_LABELS, bankStatus, validateSupplier } from "
  */
 type Form = Record<string, string>;
 const FIELDS = ["name", "legal_name", "rccm", "tax_id", "tax_regime", "category", "contact_name", "email", "phone", "address", "city",
-  "country", "currency", "default_incoterm", "lead_time_days", "payment_terms", "bank_name", "bank_account", "bank_swift", "notes", "status", "account_set_id"] as const;
+  "country", "currency", "default_incoterm", "lead_time_days", "payment_terms", "bank_name", "bank_account", "bank_swift", "notes", "status", "account_set_id", "withholding_rate_id"] as const;
 const emptyForm: Form = Object.fromEntries(FIELDS.map((f) => [f, ""])) as Form;
 Object.assign(emptyForm, { currency: "XOF", payment_terms: "30", lead_time_days: "0", status: "active" });
 
@@ -43,7 +44,7 @@ function toRow(f: Form) {
     city: nul(f.city), country: nul(f.country.toUpperCase()), currency: (f.currency.trim() || "XOF").toUpperCase(),
     default_incoterm: nul(f.default_incoterm), lead_time_days: Number(f.lead_time_days || 0), payment_terms: Number(f.payment_terms || 30),
     bank_name: nul(f.bank_name), bank_account: nul(f.bank_account), bank_swift: nul(f.bank_swift.toUpperCase()), notes: nul(f.notes),
-    status: f.status || "active", account_set_id: nul(f.account_set_id),
+    status: f.status || "active", account_set_id: nul(f.account_set_id), withholding_rate_id: nul(f.withholding_rate_id),
   };
 }
 
@@ -223,6 +224,7 @@ const Suppliers = () => {
                 </select>
               </div>
               <div className="sm:col-span-2"><AccountSetSelect kind="supplier" value={form.account_set_id} onChange={(v) => set("account_set_id")(v ?? "")} /></div>
+              <div className="sm:col-span-2"><WithholdingSelect id="sup-withholding" value={form.withholding_rate_id} onChange={(v) => set("withholding_rate_id")(v ?? "")} /></div>
             </section>
             <section aria-label="Coordonnées bancaires" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field id="sup-bank" label="Banque" value={form.bank_name} onChange={set("bank_name")} />

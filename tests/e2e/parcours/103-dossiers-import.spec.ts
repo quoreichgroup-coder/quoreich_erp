@@ -47,9 +47,10 @@ test("dossier d'importation : commande, frais, droits estimés, répartition dan
   await form.getByLabel("Catégorie TEC").selectOption("10");
   await page.getByTestId("import-file-create").click();
   await expect(toast("Dossier d'importation ouvert")).toBeVisible();
-  await page.getByTestId("import-file-row").first().click();
+  // Le dossier créé s'ouvre seul ; cliquer la première ligne avant le rechargement ouvrirait le dossier précédent.
   const detail = page.getByTestId("import-file-detail");
   await expect(detail).toBeVisible();
+  await expect(detail).toContainText(`BL-${RUN}`);
   await expect(page.getByTestId("import-file-row").first().locator("td").first()).toHaveText(/^\d{4}-[A-Z]{3}-MER-\d{3}$/);
 
   if (process.env.E2E_SUR_SITE) {
@@ -111,5 +112,7 @@ ${jour};Inspection;CIABJ;;
   await expect(toast("Frais répartis dans le coût du stock")).toBeVisible();
   await expect(detail.getByTestId("import-file-allocations")).toBeVisible();
   await expect(detail.getByTestId("import-cost-form"), "dossier figé").toHaveCount(0);
+  // V135 : coût de revient unitaire par article (achat + frais répartis).
+  await expect(detail.getByTestId("import-cost-report").getByRole("row").nth(1)).toBeVisible();
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
 });

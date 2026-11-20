@@ -1,4 +1,5 @@
 import { InvoiceSupplierAdvances, SupplierAdvanceDialog, SupplierAdvancesList } from "@/components/SupplierAdvances";
+import { WithholdingSelect } from "@/components/Withholding";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
 import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
@@ -87,6 +88,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
     invoice_date: edit?.invoice_date ?? new Date().toISOString().split("T")[0],
     due_date: edit?.due_date ?? new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
     control_total: (edit as any)?.control_total != null ? String((edit as any).control_total) : "",
+    withholding_rate_id: (edit as any)?.withholding_rate_id ?? "",
   });
   const [lines, setLines] = useState<APDraftLine[]>([{ ...emptyLine(), poLineId: null }]);
   const [loaded, setLoaded] = useState(!edit);
@@ -139,7 +141,8 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
       await save.mutateAsync({
         id: edit?.id,
         header: { supplier_id: form.supplier_id, po_id: form.po_id || null, invoice_number: form.invoice_number, invoice_date: form.invoice_date,
-          due_date: form.due_date, control_total: control, currency: foreign ? form.currency : null, exchange_rate: foreign ? rateN : null },
+          due_date: form.due_date, control_total: control, currency: foreign ? form.currency : null, exchange_rate: foreign ? rateN : null,
+          withholding_rate_id: form.withholding_rate_id || null },
         lines: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity.replace(",", ".")), unit_price: Number(l.unitPrice.replace(",", ".")),
           fx_unit_price: foreign ? Number(l.unitPrice.replace(",", ".")) : null,
           discount_pct: l.discountPct === "" ? 0 : Number(l.discountPct.replace(",", ".")), tax_code_id: l.taxCodeId || null,
@@ -163,8 +166,10 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
             <div className="space-y-1.5">
               <Label className="text-xs">Fournisseur *</Label>
               <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => {
-                const cur = (suppliers as any[]).find((s) => s.id === e.target.value)?.currency ?? "";
-                setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "", currency: edit ? f.currency : (cur && cur !== baseCurrency ? cur : "") }));
+                const sup = (suppliers as any[]).find((s) => s.id === e.target.value);
+                const cur = sup?.currency ?? "";
+                setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "", currency: edit ? f.currency : (cur && cur !== baseCurrency ? cur : ""),
+                  withholding_rate_id: edit ? f.withholding_rate_id : (sup?.withholding_rate_id ?? "") }));
               }}>
                 <option value="">— Sélectionner —</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -200,6 +205,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
               <Label className="text-xs" htmlFor="ap-control">Montant TTC de la facture</Label>
               <Input id="ap-control" inputMode="decimal" className="h-8 text-xs text-right" placeholder="contrôle" value={form.control_total} onChange={e => setForm(f => ({ ...f, control_total: e.target.value }))} />
             </div>
+            <WithholdingSelect id="ap-withholding" value={form.withholding_rate_id} onChange={(v) => setForm((f) => ({ ...f, withholding_rate_id: v ?? "" }))} />
           </div>
           <div className="grid grid-cols-4 gap-3" data-testid="ap-invoice-currency">
             <div className="space-y-1.5">
@@ -294,6 +300,7 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
               ["Total TTC", fmtCurrency(inv.total), true],
               ...((inv as any).currency ? [[`Total TTC en ${(inv as any).currency}`, `${fmt(Number((inv as any).fx_total))} ${(inv as any).currency}`, true] as [string, string, boolean],
                 [`Reste à payer en ${(inv as any).currency}`, `${fmt(Math.round(outstanding / Number((inv as any).exchange_rate) * 100) / 100)} ${(inv as any).currency}`] as [string, string]] : []),
+              ...(Number((inv as any).withholding_amount) > 0 ? [[`Retenue à la source (${Number((inv as any).withholding_rate_pct)} %), prélevée au paiement`, fmtCurrency(Number((inv as any).withholding_amount))] as [string, string]] : []),
               ["Déjà payé", fmtCurrency(inv.amount_paid)],
               ["Reste à payer", fmtCurrency(outstanding), true],
             ]}

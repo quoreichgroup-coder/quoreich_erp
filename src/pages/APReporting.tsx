@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { WithholdingStatement } from "@/components/Withholding";
 import { PageShell } from "@/components/PageShell";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
@@ -18,6 +19,7 @@ const tabs = [
   { id: "supplier", label: "Performance fournisseurs", icon: BarChart3 },
   { id: "category", label: "Analyse par poste", icon: Layers },
   { id: "forecast", label: "Prévision paiements", icon: Calendar },
+  { id: "withholding", label: "Retenues à la source", icon: FileText },
   { id: "templates", label: "Modèles sauvegardés", icon: FileText },
 ];
 
@@ -231,6 +233,8 @@ export default function APReporting() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {activeTab === "withholding" && <WithholdingStatement />}
 
       {activeTab === "templates" && (
         <div className="bg-card border border-border rounded-lg">

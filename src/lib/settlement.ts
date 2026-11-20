@@ -81,3 +81,17 @@ export function checkAllocations(items: OpenItem[], entered: Record<string, numb
   }
   return { allocations, allocated, error: null };
 }
+
+/**
+ * Retenue à la source estimée sur un règlement fournisseur (V136) : au prorata du montant imputé sur le TTC de chaque
+ * facture. La base calcule le montant exact (le dernier paiement solde la retenue) ; ceci n'est qu'un affichage.
+ */
+export function withholdingEstimate(items: OpenItem[], allocations: Record<string, number>): number {
+  return cents(items.reduce((s, i: any) => {
+    const a = allocations[i.id];
+    const wh = Number(i.withholding_amount ?? 0);
+    const total = Number(i.total ?? 0);
+    if (!(a > 0) || !(wh > 0) || !(total > 0) || i.docCurrency) return s;
+    return s + Math.min(wh, wh * a / total);
+  }, 0));
+}

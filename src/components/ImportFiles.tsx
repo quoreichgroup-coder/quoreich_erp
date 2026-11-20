@@ -48,7 +48,7 @@ function useImportMutation<I>(run: (i: I) => Promise<unknown>, success: string) 
   return useMutation({
     mutationFn: run,
     onSuccess: () => {
-      for (const k of ["import-files", "import-file-costs", "import-file-lines", "import-file-allocations", "items", "journal-entries", "tracking-status", "shipment-timeline"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["import-files", "import-file-costs", "import-file-lines", "import-file-allocations", "items", "journal-entries", "tracking-status", "shipment-timeline", "import-cost-report", "cost-comparison", "import-transfers", "consolidation-stock"]) qc.invalidateQueries({ queryKey: [k] });
       toast.success(success);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -64,9 +64,12 @@ export function ImportFiles({ suppliers, purchaseOrders }: { suppliers: any[]; p
   const [form, setForm] = useState({ supplier_id: "", forwarder_id: "", incoterm: "FOB", transport_mode: "sea", bill_of_lading: "", destination_country: "BF", tec_category: "10", eta: "" });
   const create = useImportMutation(async () => {
     const body = { ...form, forwarder_id: form.forwarder_id || null, tec_category: Number(form.tec_category), eta: form.eta || null, bill_of_lading: form.bill_of_lading || null };
-    if (isApiEnabled()) return apiPost(`${P}/import-files`, body);
-    const tenant_id = (await db.from("profiles").select("tenant_id").limit(1).single()).data?.tenant_id;
-    return check(db.from("import_files").insert({ ...body, tenant_id }).select("id"));
+    // Le dossier créé s'ouvre aussitôt (pas de recherche dans la liste).
+    const created: any = isApiEnabled() ? await apiPost(`${P}/import-files`, body)
+      : await check(db.from("import_files").insert({ ...body, tenant_id: (await db.from("profiles").select("tenant_id").limit(1).single()).data?.tenant_id }).select("id"));
+    const newId = Array.isArray(created) ? created[0]?.id : created?.id;
+    if (newId) setSelected(newId);
+    return created;
   }, "Dossier d'importation ouvert");
   const list = (files.data ?? []).map((f: any) => ({ ...f, supplier_name: f.supplier_name ?? f.supplier?.name, po_ids: f.po_ids ?? (f.orders ?? []).map((o: any) => o.po_id) }));
   const tracking = useTrackingStatus();
@@ -130,12 +133,12 @@ export function ImportFiles({ suppliers, purchaseOrders }: { suppliers: any[]; p
           </table>
         )}
       </div>
-      {current && <ImportFileDetail file={current} canEdit={canEdit} purchaseOrders={purchaseOrders} />}
+      {current && <ImportFileDetail file={current} canEdit={canEdit} purchaseOrders={purchaseOrders} linked={linked} />}
     </div>
   );
 }
 
-function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdit: boolean; purchaseOrders: any[] }) {
+function ImportFileDetail({ file, canEdit, purchaseOrders, linked }: { file: any; canEdit: boolean; purchaseOrders: any[]; linked: Set<string> }) {
   const frozen = ["allocated", "closed"].includes(file.status);
   const editable = canEdit && !frozen;
   const id = file.id as string;
@@ -171,7 +174,8 @@ function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdi
   const estimate = useImportData<any[]>(["customs-estimate", id, cif, file.destination_country, file.tec_category],
     `${P}/customs-estimate?country=${file.destination_country ?? "BF"}&category=${file.tec_category ?? 0}&cif=${cif}`,
     () => db.rpc("customs_estimate", { _country: file.destination_country ?? "BF", _tec_category: file.tec_category ?? 0, _cif: cif }), cif > 0);
-  const linkable = purchaseOrders.filter((p) => p.supplier_id === file.supplier_id && !file.po_ids.includes(p.id) && p.status !== "draft");
+  // Une commande n'appartient qu'à un dossier : celles déjà rattachées ailleurs ne sont pas proposées.
+  const linkable = purchaseOrders.filter((p) => p.supplier_id === file.supplier_id && !linked.has(p.id) && p.status !== "draft");
   const typeByCode = useMemo(() => new Map((types.data ?? []).map((t: any) => [t.code, t])), [types.data]);
   const addDuties = async () => {
     for (const e of (estimate.data ?? []).filter((x) => x.capitalize && Number(x.amount) > 0)) {
@@ -183,7 +187,7 @@ function ImportFileDetail({ file, canEdit, purchaseOrders }: { file: any; canEdi
   return (
     <div className="bg-card border border-border rounded-lg p-4 space-y-4" data-testid="import-file-detail">
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-sm font-semibold flex-1">Dossier {file.file_number} — {file.supplier_name}</h3>
+        <h3 className="text-sm font-semibold flex-1">Dossier {file.file_number} — {file.supplier_name}{file.bill_of_lading ? <span className="font-normal text-muted-foreground"> · connaissement {file.bill_of_lading}</span> : null}</h3>
         {canEdit && file.status !== "closed" && (
           <select aria-label="Statut du dossier" className="h-8 px-2 rounded-md border border-input bg-background text-xs" value={file.status}
             onChange={(e) => setStatus.mutate(e.target.value)} disabled={file.status === "closed"}>

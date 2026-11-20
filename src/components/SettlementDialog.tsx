@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
 import { useRecordSettlement } from "@/hooks/use-settlements";
-import { autoAllocate, checkAllocations, itemCurrencies, openItems, type OpenItemSource, type SettlementKind } from "@/lib/settlement";
+import { autoAllocate, checkAllocations, itemCurrencies, openItems, withholdingEstimate, type OpenItemSource, type SettlementKind } from "@/lib/settlement";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -68,6 +68,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
   const amountN = amount === "" ? 0 : Number(amount.replace(",", "."));
   const allocated = Object.values(numbers).reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
   const totalOpen = items.reduce((s, i) => s + i.outstanding, 0);
+  const withheld = withholdingEstimate(items, numbers);
 
   const repartir = () => {
     const a = autoAllocate(amountN, items);
@@ -192,6 +193,12 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
                   <td className={`p-2 text-right tabular-nums ${Math.abs(amountN - allocated) < 0.005 ? "text-success" : "text-destructive"}`}
                     data-testid="settlement-remaining">{fmt(amountN - allocated)}</td>
                 </tr>
+                {kind === "ap" && withheld > 0 && (
+                  <tr data-testid="settlement-withholding">
+                    <td className="p-2 font-normal text-muted-foreground" colSpan={4}>Dont retenue à la source (estimée, déduite du décaissement)</td>
+                    <td className="p-2 text-right tabular-nums">{fmt(withheld)}</td>
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>

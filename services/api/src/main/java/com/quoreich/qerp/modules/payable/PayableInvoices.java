@@ -21,7 +21,7 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class PayableInvoices {
 
-  static final Set<String> HEADER = Set.of("supplier_id", "po_id", "invoice_number", "invoice_date", "due_date", "control_total", "currency", "exchange_rate");
+  static final Set<String> HEADER = Set.of("supplier_id", "po_id", "invoice_number", "invoice_date", "due_date", "control_total", "currency", "exchange_rate", "withholding_rate_id");
   static final Set<String> LINE = Set.of("invoice_id", "line_no", "description", "quantity", "unit_price", "discount_pct", "tax_code_id", "po_line_id",
       "expense_account_id", "fx_unit_price");
 

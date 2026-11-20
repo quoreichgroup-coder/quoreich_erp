@@ -349,6 +349,19 @@ public class ProcurementController {
     return sql.call("allocate_import_costs", args("_file", id, "_date", b.getOrDefault("date", java.time.LocalDate.now().toString())));
   }
 
+  @PostMapping("/import-files/{id}/receive")
+  @Operation(operationId = "receiveImportFile", summary = "Réceptionner tout le dossier en une action (une réception par commande)")
+  public JsonNode receiveImportFile(@PathVariable UUID id, @RequestBody Map<String, Object> b) {
+    return sql.call("receive_import_file", args("_file", id, "_warehouse", b.get("warehouse_id"),
+        "_date", b.getOrDefault("date", java.time.LocalDate.now().toString())));
+  }
+
+  @GetMapping("/import-files/{id}/cost-report")
+  @Operation(operationId = "listImportCostReport", summary = "Coût de revient par article du dossier (achat, frais répartis, coût unitaire)")
+  public JsonNode importCostReport(@PathVariable UUID id) {
+    return sql.list("SELECT * FROM public.import_file_cost_report WHERE import_file_id = ? ORDER BY item_code, item_name", id);
+  }
+
   @GetMapping("/customs-estimate")
   @Operation(operationId = "estimateCustoms", summary = "Droits et taxes à l'importation estimés (taux UEMOA du pays, catégorie TEC)")
   public JsonNode customsEstimate(@RequestParam String country, @RequestParam(required = false) java.math.BigDecimal category, @RequestParam java.math.BigDecimal cif) {

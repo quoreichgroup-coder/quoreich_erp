@@ -34,15 +34,15 @@ public class PayableController {
 
   static final Set<String> SUPPLIER = Set.of("name", "email", "phone", "address", "tax_id", "payment_terms", "status", "legal_name", "rccm",
       "tax_regime", "category", "contact_name", "city", "country", "currency", "default_incoterm", "lead_time_days", "bank_name", "bank_account",
-      "bank_swift", "notes", "account_set_id");
+      "bank_swift", "notes", "account_set_id", "withholding_rate_id");
   static final Set<String> INVOICE = Set.of("invoice_number", "supplier_id", "invoice_date", "due_date", "subtotal", "tax_amount", "total", "po_id",
-      "control_total", "currency", "exchange_rate", "fx_subtotal", "fx_tax_amount");
+      "control_total", "currency", "exchange_rate", "fx_subtotal", "fx_tax_amount", "withholding_rate_id");
   static final Set<String> PAYMENT = Set.of("ap_invoice_id", "amount", "payment_date", "payment_method", "reference", "bank_account_id");
   static final Set<String> GENERAL = Set.of("default_currency", "default_payment_method", "po_required", "three_way_match",
       "early_payment_discount_pct", "discount_window_days");
   static final Set<String> SERIES = Set.of("prefix", "format", "next_number", "reset_frequency");
   static final Set<String> METHOD = Set.of("code", "label", "is_default", "is_active");
-  static final Set<String> WITHHOLDING = Set.of("category", "rate_pct", "gl_account", "is_active");
+  static final Set<String> WITHHOLDING = Set.of("category", "rate_pct", "gl_account", "is_active", "base");
 
   private final Sql sql;
   private final PayableInvoices invoices;
@@ -288,6 +288,12 @@ public class PayableController {
   @Operation(operationId = "saveApPaymentMethod", summary = "Créer ou modifier un mode de paiement (par code)")
   public JsonNode saveMethod(@RequestBody Map<String, Object> body) {
     return sql.upsert("ap_payment_methods", body, METHOD, List.of("tenant_id", "code"));
+  }
+
+  @GetMapping("/withholding-statement")
+  @Operation(operationId = "withholdingStatement", summary = "État des retenues à la source prélevées sur une période (déclaration)")
+  public JsonNode withholdingStatement(@RequestParam String from, @RequestParam String to) {
+    return sql.list("SELECT * FROM public.withholding_statement(?::date, ?::date)", from, to);
   }
 
   @GetMapping("/settings/withholding-rates")

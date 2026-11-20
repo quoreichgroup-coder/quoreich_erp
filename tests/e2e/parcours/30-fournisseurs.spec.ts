@@ -301,3 +301,80 @@ test("facture à lignes reprises de la commande : quantité au-delà du reçu re
     await obs.joindre(testInfo);
     expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
   });
+
+// V136 : retenue à la source reprise du fournisseur, prélevée au paiement, déclarée.
+test("retenue à la source : catégorie du fournisseur, déduite du décaissement, état des retenues", async ({ page, browser }, testInfo) => {
+  const obs = surveiller(page);
+  const base = testInfo.project.use.baseURL;
+  const categorie = `${RUN} Prestations BIC`;
+  const fournisseur = `${RUN} Cabinet retenue`;
+  const numero = `FF-${RUN}-RAS`;
+
+  obs.etape("prérequis et catégorie de retenue (5 % du HT, compte 447)");
+  await assurerPlanComptable(page);
+  await parametresFournisseurs(page, "optional", false);
+  await page.goto("/payables/settings");
+  await page.getByRole("button", { name: "Retenue à la source" }).click();
+  const taux = page.getByTestId("withholding-rates");
+  await taux.getByLabel("Catégorie").fill(categorie);
+  await taux.getByLabel("Taux (%)").fill("5");
+  await taux.getByLabel("Base").selectOption("net");
+  await taux.getByLabel("Compte (plan de la société)").fill("447");
+  await taux.getByTestId("withholding-save").click();
+  await expect(taux.getByRole("cell", { name: categorie })).toBeVisible();
+
+  obs.etape("fournisseur rattaché à la catégorie, reprise sur sa facture");
+  await page.goto("/suppliers");
+  await page.getByRole("button", { name: "Ajouter un fournisseur" }).click();
+  const fiche = page.getByRole("dialog");
+  await fiche.getByLabel("Nom du fournisseur *").fill(fournisseur);
+  await fiche.getByLabel("Retenue à la source").selectOption({ label: `${categorie} — 5 % (HT)` });
+  await fiche.getByRole("button", { name: "Créer" }).click();
+  await expect(fiche).toBeHidden();
+
+  await page.goto("/payables/transactions");
+  await page.getByRole("button", { name: "Nouvelle facture fournisseur" }).click();
+  const d = page.getByRole("dialog");
+  await d.locator("select").first().selectOption({ label: fournisseur });
+  await expect(d.getByLabel("Retenue à la source").locator("option:checked")).toHaveText(`${categorie} — 5 % (HT)`);
+  await champ(d, "N° Facture").fill(numero);
+  await champ(d, "Date").fill(aujourdhui());
+  await champ(d, "Échéance").fill(aujourdhui());
+  await d.getByLabel("Libellé ligne 1").fill("Mission de conseil");
+  await d.getByLabel("Quantité ligne 1").fill("1");
+  await d.getByLabel("Prix unitaire ligne 1").fill("100000");
+  await d.getByRole("button", { name: "Créer" }).click();
+  await expect(d).toBeHidden();
+  await ligne(page, numero).getByRole("button", { name: "Soumettre" }).click();
+  await expect(ligne(page, numero)).toContainText("Soumise");
+  await approuverFactureFournisseur(browser, base, numero);
+
+  obs.etape("paiement : 5 000 retenus, 95 000 décaissés");
+  await page.goto("/payables/transactions");
+  await ligne(page, numero).locator("td").nth(1).click();
+  const panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
+  await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Retenue à la source (5 %)");
+  await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
+  await page.getByRole("button", { name: "Règlement fournisseur" }).click();
+  const r = page.getByRole("dialog");
+  await r.getByLabel("Fournisseur *").selectOption({ label: fournisseur });
+  await r.getByLabel("Montant du règlement (XOF)").fill("100000");
+  await r.getByRole("button", { name: "Répartir" }).click();
+  await expect(r.getByTestId("settlement-withholding")).toContainText(/5\s000/);
+  await r.getByLabel("Référence").fill(`VIR-${RUN}-RAS`);
+  await r.getByRole("button", { name: "Enregistrer le règlement" }).click();
+  await expect(r).toBeHidden();
+
+  obs.etape("état des retenues de la période");
+  await page.goto("/payables/reporting");
+  await page.getByRole("button", { name: "Retenues à la source" }).click();
+  const etat = page.getByTestId("withholding-statement");
+  await expect(etat.getByRole("row").filter({ hasText: numero })).toContainText(/5\s000/);
+  const telechargement = page.waitForEvent("download");
+  await etat.getByRole("button", { name: /Exporter l'état/ }).first().click();
+  expect((await telechargement).suggestedFilename()).toMatch(/^retenues-a-la-source/);
+  await parametresFournisseurs(page, "mandatory", true);
+
+  await obs.joindre(testInfo);
+  expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);
+});
