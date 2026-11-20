@@ -183,7 +183,7 @@ function PisteAudit() {
   const [search, setSearch] = useState("");
   const q = useGlAuditTrail(from, to);
   const rows = (q.data ?? []).filter((r) => `${r.action} ${r.user_name ?? ""} ${r.details ?? ""} ${r.piece_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
-  const ACTIONS: Record<string, string> = { Created: "Créée", Posted: "Comptabilisée", Reversed: "Contre-passée", Cancelled: "Annulée", Updated: "Modifiée", Approved: "Validée", Rejected: "Rejetée" };
+  const ACTIONS: Record<string, string> = { Created: "Créée", Posted: "Comptabilisée", Reversed: "Contre-passée", Cancelled: "Annulée", Updated: "Modifiée", Approved: "Validée", Rejected: "Rejetée", Deleted: "Brouillon supprimé" };
   return (
     <section className="bg-card border border-border rounded-lg" aria-label="Piste d'audit">
       <div className="p-3 border-b border-border flex flex-wrap items-center gap-3">

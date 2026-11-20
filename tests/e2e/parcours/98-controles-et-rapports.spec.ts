@@ -27,7 +27,7 @@ test("contrôles du grand livre, limites de trésorerie, rapports et seuils d'ap
   // V120 : chaîne SHA-256 de la piste d'audit vérifiée à chaque contrôle.
   await expect(page.getByTestId("gl-integrity-check").filter({ hasText: "Chaîne de la piste d'audit intacte" })).toContainText("Réussi");
   await page.getByRole("tab", { name: "Piste d'audit" }).click();
-  await expect(page.getByTestId("gl-audit-trail").locator("tbody tr").first()).toContainText(/Créée|Comptabilisée|Contre-passée/);
+  await expect(page.getByTestId("gl-audit-trail").locator("tbody tr").first()).toContainText(/Créée|Comptabilisée|Contre-passée|Brouillon supprimé|Modifiée/);
   await page.getByRole("tab", { name: "Simulateur d'écriture" }).click();
   await page.getByLabel("Débit ligne 1").fill("1000");
   await expect(page.getByTestId("simulation-result")).toContainText("Écart débit − crédit");

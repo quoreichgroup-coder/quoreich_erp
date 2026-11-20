@@ -152,13 +152,23 @@ export function useGlAuditTrail(from: string, to: string) {
       const all: GlAuditRow[] = [];
       for (let start = 0; ; start += 1000) {
         if (isApiEnabled()) { all.push(...await apiGet<any[]>(`/api/v1/gl/audit-logs?from=${from}&to=${to}`)); break; }
+        // Pas de jointure : la piste garde une référence historique (V121, plus de clé vers journal_entries). Le numéro de
+        // pièce vient de l'instantané enregistré avec l'événement (V120), sinon d'une lecture des écritures encore présentes.
         const { data, error } = await db.from("gl_audit_logs")
-          .select("id, created_at, action, user_name, details, entry_id, entry:journal_entries(piece_number)")
+          .select("id, seq, created_at, action, user_name, details, entry_id, snapshot")
           .eq("tenant_id", tenantId).gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59.999`)
-          .order("created_at", { ascending: false }).range(start, start + 999);
+          .order("seq", { ascending: false }).range(start, start + 999);
         if (error) throw error;
-        all.push(...(data ?? []).map((r: any) => ({ ...r, piece_number: r.entry?.piece_number ?? null })));
-        if (!data || data.length < 1000) break;
+        const rows = (data ?? []) as any[];
+        const missing = [...new Set(rows.filter((r) => !r.snapshot?.piece_number && r.entry_id).map((r) => r.entry_id as string))];
+        const pieces = new Map<string, string | null>();
+        for (let i = 0; i < missing.length; i += 200) {
+          const { data: je, error: jeErr } = await db.from("journal_entries").select("id, piece_number").in("id", missing.slice(i, i + 200));
+          if (jeErr) throw jeErr;
+          for (const e of je ?? []) pieces.set(e.id, e.piece_number);
+        }
+        all.push(...rows.map((r) => ({ ...r, piece_number: r.snapshot?.piece_number ?? pieces.get(r.entry_id) ?? null })));
+        if (rows.length < 1000) break;
       }
       return all;
     },
