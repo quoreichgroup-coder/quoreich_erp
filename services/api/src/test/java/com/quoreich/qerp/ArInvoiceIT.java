@@ -284,9 +284,10 @@ class ArInvoiceIT {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"amount\":10.00}"))
           .andExpect(status().isForbidden());
-      // Même société : la lecture et l'export restent ouverts.
-      mockMvc.perform(get("/api/v1/ar/invoices/" + id).with(as(user))).andExpect(status().isOk());
-      mockMvc.perform(get("/api/v1/ar/invoices/export").with(as(user))).andExpect(status().isOk());
+      // Depuis le contrôle d'accès aux modules (V146–V147), la lecture exige aussi un droit « ar. » dans la société
+      // courante : ni le lecteur (aucun droit « ar. ») ni le comptable d'une autre société n'ouvrent la facture.
+      mockMvc.perform(get("/api/v1/ar/invoices/" + id).with(as(user))).andExpect(status().isForbidden());
+      mockMvc.perform(get("/api/v1/ar/invoices/export").with(as(user))).andExpect(status().isForbidden());
     }
 
     assertThat(PostgresFixture.countAsAdmin(DATABASE, "SELECT count(*) FROM ar_invoices"))
