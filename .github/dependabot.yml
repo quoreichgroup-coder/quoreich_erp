@@ -1,0 +1,48 @@
+# Mises à jour de dépendances proposées par Dependabot.
+#
+# Une demande de fusion par écosystème et par semaine, regroupant les versions mineures et correctives : assez pour
+# ne pas laisser vieillir les dépendances (failles connues), assez peu pour que chaque demande soit relue. La CI
+# complète (tests d'intégration sur vraie base comprise) tourne sur chacune avant toute fusion.
+# Les versions majeures arrivent séparément : elles demandent une lecture du journal des changements.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-mineures:
+        update-types: [minor, patch]
+
+  - package-ecosystem: maven
+    directory: /services/api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      maven-mineures:
+        update-types: [minor, patch]
+
+  # Les actions sont épinglées par SHA : Dependabot met à jour le SHA et le commentaire de version ensemble.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /services/api
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: docker
+    directory: /infra/pdf
+    schedule:
+      interval: monthly
