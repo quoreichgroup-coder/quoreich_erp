@@ -1,18 +1,22 @@
-# Déploiement du schéma sur Supabase (nuage).
+# Déploiement du schéma sur Supabase (nuage), par environnement.
 #
 # QUOREICH se livre sur site (API Java + PostgreSQL, schéma appliqué par Flyway au démarrage de
-# l'API) ou dans le nuage (Supabase). Les deux bases doivent être identiques en permanence :
+# l'API) ou dans le nuage (Supabase). Les deux bases doivent être identiques :
 #   - la CI vérifie que chaque migration a sa jumelle au même SQL (npm run db:check-twins) ;
-#   - ce workflow applique sur Supabase, après une CI verte sur main, les migrations qui n'y
-#     sont pas encore (scripts/schema/deploy-supabase.sh, registre qerp_deploy.applied_migrations).
-# Sans lui, une migration poussée sur main n'atteint pas Supabase : Lovable n'exécute pas les
-# fichiers de supabase/migrations écrits hors de son éditeur.
+#   - ce workflow applique les migrations absentes (scripts/schema/deploy-supabase.sh, registre
+#     qerp_deploy.applied_migrations, empreinte SHA-256 : une migration déjà déployée et modifiée est refusée).
 #
-# Prérequis (une fois) : dans GitHub → Settings → Environments, créer l'environnement
-# « supabase-production » (avec, au choix, une validation manuelle avant chaque déploiement) et
-# y déclarer le secret SUPABASE_DB_URL : chaîne de connexion Supabase (Settings → Database →
-# Connection string, connexion directe ou pooler en mode session), rôle postgres. Tant que ce
-# secret manque, le workflow échoue : c'est le signal que le nuage n'est pas à jour.
+# Deux environnements GitHub (Settings → Environments), décision DIR-02 du 26/11/2026 :
+#   - « supabase-staging » : projet de RECETTE, mis à jour AUTOMATIQUEMENT après chaque CI verte sur main.
+#     Tant que son secret manque, l'étape est ignorée avec un avertissement (pas d'échec rouge).
+#   - « supabase-production » : projet de PRODUCTION, mis à jour UNIQUEMENT à la demande (onglet Actions →
+#     « Déploiement Supabase » → Run workflow → cible production), avec validation obligatoire d'une personne
+#     désignée (« Required reviewers » de l'environnement). Simulation possible (dry_run).
+#     Une migration qui supprime des données en production exige l'accord explicite du propriétaire.
+#
+# Secret de chaque environnement : SUPABASE_DB_URL, rôle postgres, **par le pooler** de Supabase
+# (aws-…pooler.supabase.com, port 6543 ou 5432) : l'hôte direct db.<ref>.supabase.co n'a qu'une adresse
+# IPv6, que les exécutants GitHub n'ont pas.
 
 name: Déploiement Supabase
 
@@ -23,14 +27,19 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      cible:
+        description: "Projet Supabase à mettre à jour"
+        type: choice
+        options: [staging, production]
+        default: staging
       dry_run:
         description: "Lister les migrations en attente sans les appliquer"
         type: boolean
-        default: false
+        default: true
 
-# Un seul déploiement à la fois, jamais interrompu en cours de route.
+# Un seul déploiement à la fois par cible, jamais interrompu en cours de route.
 concurrency:
-  group: deploy-supabase
+  group: deploy-supabase-${{ inputs.cible || 'staging' }}
   cancel-in-progress: false
 
 permissions:
@@ -38,42 +47,66 @@ permissions:
 
 jobs:
   deploy:
-    name: Migrations Supabase
-    # Après une CI réussie sur main, ou à la demande.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    name: Migrations Supabase (${{ inputs.cible || 'staging' }})
+    # Automatique : recette seulement, après une CI réussie sur main. Production : à la demande seulement.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: supabase-production
+    timeout-minutes: 30
+    environment: supabase-${{ inputs.cible || 'staging' }}
+    env:
+      PGCLIENTENCODING: UTF8
     steps:
+      - name: Secret présent
+        id: secret
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CIBLE: ${{ inputs.cible || 'staging' }}
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CIBLE" = "production" ]; then
+            echo "::error::Secret SUPABASE_DB_URL absent de l'environnement supabase-production."
+            exit 1
+          else
+            echo "::warning::Projet de recette non configuré (secret SUPABASE_DB_URL absent de supabase-staging) : déploiement ignoré."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Récupération du dépôt (commit validé par la CI)
+        if: steps.secret.outputs.ok == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-
-      - name: Client PostgreSQL
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null && psql --version
-
-      - name: Secret présent
+      # À la demande, on ne déploie que ce que main contient et que la CI a validé.
+      - name: Commit validé par la CI
+        if: steps.secret.outputs.ok == 'true' && github.event_name == 'workflow_dispatch'
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Secret SUPABASE_DB_URL absent de l'environnement supabase-production : Supabase n'est pas mis à jour."
+          ok="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$GITHUB_SHA" \
+                --status success --json databaseId --jq 'length')"
+          if [ "$ok" = "0" ]; then
+            echo "::error::Aucune CI réussie sur $GITHUB_SHA : déploiement refusé."
             exit 1
           fi
 
+      - name: Client PostgreSQL
+        if: steps.secret.outputs.ok == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null && psql --version
+
       - name: Migrations en attente
+        if: steps.secret.outputs.ok == 'true'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: bash scripts/schema/deploy-supabase.sh --dry-run
+        run: |
+          set -o pipefail
+          bash scripts/schema/deploy-supabase.sh --dry-run | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Application
-        if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
+        if: steps.secret.outputs.ok == 'true' && (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash scripts/schema/deploy-supabase.sh

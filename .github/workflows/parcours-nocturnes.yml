@@ -1,0 +1,98 @@
+# Parcours métier de bout en bout, chaque nuit, sur le projet Supabase de RECETTE.
+#
+# Les parcours écrivent et conservent des données (société « E2E QUOREICH (société de test) », préfixe E2E-<run>) :
+# ils ne visent JAMAIS le projet de production (décision DIR-02, risque R-02 de l'audit). Tant que l'environnement
+# « supabase-staging » n'a pas ses secrets, le workflow s'arrête sur un avertissement.
+#
+# Environnement GitHub « supabase-staging » :
+#   variables : VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_SUPABASE_PROJECT_ID (clé PUBLIABLE seulement) ;
+#   secrets   : E2E_EMAIL, E2E_PASSWORD (compte auteur, scripts/e2e/compte-de-test.sql),
+#               E2E_APPROVER_EMAIL, E2E_APPROVER_PASSWORD (second membre approbateur).
+
+name: Parcours nocturnes
+
+on:
+  schedule:
+    - cron: "30 1 * * *" # 01:30 UTC = 01:30 à Ouagadougou
+  workflow_dispatch:
+
+concurrency:
+  group: parcours-nocturnes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  parcours:
+    name: Parcours métier (recette)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: supabase-staging
+    steps:
+      - name: Configuration présente
+        id: conf
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          EMAIL: ${{ secrets.E2E_EMAIL }}
+        run: |
+          if [ -n "$URL" ] && [ -n "$EMAIL" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Environnement supabase-staging incomplet (VITE_SUPABASE_URL ou E2E_EMAIL) : parcours non lancés."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Récupération du dépôt
+        if: steps.conf.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Node.js
+        if: steps.conf.outputs.ok == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installation
+        if: steps.conf.outputs.ok == 'true'
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # Le front des parcours tourne en mode « cloud » (lit .env.cloud) : on l'écrit depuis les variables publiques.
+      - name: Configuration du front (recette)
+        if: steps.conf.outputs.ok == 'true'
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          CLE: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          REF: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
+        run: |
+          {
+            echo "VITE_SUPABASE_URL=$URL"
+            echo "VITE_SUPABASE_PUBLISHABLE_KEY=$CLE"
+            echo "VITE_SUPABASE_PROJECT_ID=$REF"
+          } > .env.cloud
+
+      - name: Parcours
+        if: steps.conf.outputs.ok == 'true'
+        env:
+          CI: "true"
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_APPROVER_EMAIL: ${{ secrets.E2E_APPROVER_EMAIL }}
+          E2E_APPROVER_PASSWORD: ${{ secrets.E2E_APPROVER_PASSWORD }}
+          E2E_CREDENTIALS_FILE: /dev/null
+          E2E_PARCOURS_CAPTURE: "1"
+        run: npm run test:e2e:parcours
+
+      - name: Rapport des parcours
+        if: always() && steps.conf.outputs.ok == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rapport-parcours
+          path: |
+            playwright-report-parcours/
+            test-results-parcours/
+            !test-results-parcours/.auth/
+          retention-days: 14
+          if-no-files-found: ignore

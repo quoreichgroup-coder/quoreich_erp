@@ -91,11 +91,56 @@ jobs:
       - name: Migrations synchronisées (sur site / nuage)
         run: npm run db:check-twins
 
-      # Aucune variable `VITE_*` n'est fournie, et c'est voulu : la construction
-      # ne doit dépendre d'aucune configuration. Les valeurs de `.env` sont lues
-      # à l'exécution dans le navigateur, pas à la compilation.
+      # Aucune variable `VITE_*` n'est fournie : ce contrôle prouve seulement que le
+      # code se compile. Attention, Vite remplace `import.meta.env.VITE_*` à la
+      # compilation : un front livrable est construit par environnement (voir
+      # `livraison.yml`), jamais à partir de ce paquet.
       - name: Construction
         run: npm run build
+
+      # Bloque seulement une faille critique d'une dépendance livrée au navigateur ;
+      # les autres niveaux arrivent par Dependabot et sont traités en revue.
+      - name: Failles critiques des dépendances
+        run: npm audit --omit=dev --audit-level=critical
+
+  e2e-simule:
+    name: E2E simulés
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Playwright contre le front réel et un Supabase simulé (fixtures de
+    # `tests/e2e/fixtures`) : aucun secret, aucun appel réseau sortant. Les specs
+    # connectées s'ignorent d'elles-mêmes sans identifiants.
+    env:
+      # Adresse factice : les fixtures interceptent par chemin (`/rest/v1`, `/auth/v1`…),
+      # et la clé de session simulée est dérivée de cette adresse.
+      VITE_SUPABASE_URL: https://e2e-simule.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: cle-publiable-factice
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installation
+        run: npm ci
+
+      - name: Navigateur Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Suite E2E simulée
+        run: npm run test:e2e
+
+      - name: Rapport Playwright
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rapport-e2e-simule
+          path: playwright-report/
+          if-no-files-found: ignore
 
   api-java:
     name: API Java

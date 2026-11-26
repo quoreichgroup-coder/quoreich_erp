@@ -1,0 +1,146 @@
+# Livraison continue QUOREICH : ce qui part d'un commit vérifié.
+#
+#   - Après une CI verte sur main : l'image de l'API est publiée sur le registre GitHub
+#     (ghcr.io/<propriétaire>/qerp-api) avec les étiquettes `main` et `sha-<commit>`.
+#   - Sur une étiquette `vX.Y.Z` : on vérifie que la CI a réussi sur ce commit, puis on publie
+#     l'image `vX.Y.Z` + `latest`, le front construit pour le nuage de production, le contrat OpenAPI
+#     et les migrations, dans une version GitHub.
+#
+# Le front n'est PAS un paquet universel : Vite écrit `VITE_*` dans le code à la compilation.
+#   - nuage : construit ici avec les variables de l'environnement GitHub « supabase-production »
+#     (adresse et clé PUBLIABLE seulement, jamais de clé secrète) ;
+#   - sur site : chaque client a l'adresse de son API ; le front y est construit à l'installation
+#     (`VITE_QERP_API_URL=… npm run build`) à partir des sources de la version.
+#
+# Aucun secret n'est nécessaire hors du jeton GitHub fourni par la plateforme.
+
+name: Livraison
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ["v*.*.*"]
+
+concurrency:
+  group: livraison-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  image-main:
+    name: Image de l'API (main)
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Récupération du commit validé par la CI
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Construction et publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=$SHA" \
+            --tag "$image:sha-${SHA::12}" --tag "$image:main" services/api
+          test "$(docker run --rm --entrypoint id "$image:main" -u)" -ne 0
+          docker push "$image:sha-${SHA::12}"
+          docker push "$image:main"
+          echo "Image publiée : $image:sha-${SHA::12}" >> "$GITHUB_STEP_SUMMARY"
+
+  version:
+    name: Version ${{ github.ref_name }}
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: supabase-production
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Une version ne se publie que depuis un commit dont la CI complète a réussi.
+      - name: CI réussie sur ce commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ok="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$GITHUB_SHA" \
+                --status success --json databaseId --jq 'length')"
+          if [ "$ok" = "0" ]; then
+            echo "::error::Aucune CI réussie sur $GITHUB_SHA : poussez d'abord ce commit sur main ou une PR, attendez le vert, puis étiquetez."
+            exit 1
+          fi
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Front pour le nuage de production
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Variables VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY absentes de l'environnement supabase-production."
+            exit 1
+          fi
+          npm ci
+          npm run build
+          tar -czf "qerp-front-nuage-${GITHUB_REF_NAME}.tar.gz" -C dist .
+
+      - name: Image de l'API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image:$GITHUB_REF_NAME" --tag "$image:latest" services/api
+          test "$(docker run --rm --entrypoint id "$image:latest" -u)" -ne 0
+          docker push "$image:$GITHUB_REF_NAME"
+          docker push "$image:latest"
+
+      - name: Paquets de la version
+        run: |
+          cp services/api/openapi/qerp-api.json "qerp-api-openapi-${GITHUB_REF_NAME}.json"
+          tar -czf "qerp-migrations-${GITHUB_REF_NAME}.tar.gz" \
+            services/api/src/main/resources/db/migration supabase/migrations
+          sha256sum qerp-*-"${GITHUB_REF_NAME}"* > "SHA256SUMS-${GITHUB_REF_NAME}.txt"
+
+      - name: Version GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "${{ github.repository }}" --verify-tag \
+            --title "QUOREICH $GITHUB_REF_NAME" --generate-notes \
+            "qerp-front-nuage-${GITHUB_REF_NAME}.tar.gz" \
+            "qerp-api-openapi-${GITHUB_REF_NAME}.json" \
+            "qerp-migrations-${GITHUB_REF_NAME}.tar.gz" \
+            "SHA256SUMS-${GITHUB_REF_NAME}.txt"
+          {
+            echo "Image : ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api:${GITHUB_REF_NAME}"
+            echo "Les migrations de cette version s'appliquent sur Supabase par le workflow « Déploiement Supabase »."
+          } >> "$GITHUB_STEP_SUMMARY"
