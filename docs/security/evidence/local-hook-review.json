@@ -1,0 +1,53 @@
+{
+  "method": "isolated classifiers; candidate shell commands never executed",
+  "plugins": {
+    "megapowers": "0.34.0",
+    "one-shot-prompting": "1.2.9"
+  },
+  "megapowers_classifier_tests": {
+    "exit_code": 0,
+    "stdout": "=== RUN   TestCommandLengthBoundary\n=== PAUSE TestCommandLengthBoundary\n=== RUN   TestGateDeniesOncePerSessionAndSkill\n=== PAUSE TestGateDeniesOncePerSessionAndSkill\n=== RUN   TestGateStopsGitDiscardOncePerCommand\n=== PAUSE TestGateStopsGitDiscardOncePerCommand\n=== RUN   TestGateDiscardFallsBackToContextWithoutMarker\n=== PAUSE TestGateDiscardFallsBackToContextWithoutMarker\n=== RUN   TestQERPRepeatedCatastrophicGuard\n--- PASS: TestQERPRepeatedCatastrophicGuard (0.00s)\n=== CONT  TestCommandLengthBoundary\n=== RUN   TestCommandLengthBoundary/ordinary_long_command\n=== CONT  TestGateStopsGitDiscardOncePerCommand\n=== CONT  TestGateDiscardFallsBackToContextWithoutMarker\n=== CONT  TestGateDeniesOncePerSessionAndSkill\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_reset_--hard\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_reset_--hard\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_reset_--hard_origin/main\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_reset_--hard_origin/main\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_-C_/repo_reset_--hard_HEAD~1\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_-C_/repo_reset_--hard_HEAD~1\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_clean_-fdx\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_clean_-fdx\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_clean_--force_-d\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_clean_--force_-d\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_clean_-f\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_clean_-f\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_checkout_.\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_checkout_.\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_checkout_--_.\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_checkout_--_.\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_checkout_-f_main\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_checkout_-f_main\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_checkout_--force_main\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_checkout_--force_main\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_restore_.\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_restore_.\n=== RUN   TestCommandLengthBoundary/catastrophe_within_parsing_budget\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_restore_--staged_--worktree_.\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_restore_--staged_--worktree_.\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_restore_:/\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_restore_:/\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_branch_-D_feature\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_branch_-D_feature\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_branch_-Dr_origin/feature\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_branch_-Dr_origin/feature\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_branch_--delete_--force_feature\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_branch_--delete_--force_feature\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_stash_drop\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_stash_drop\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_stash_drop_stash@{1}\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_stash_drop_stash@{1}\n=== RUN   TestGateStopsGitDiscardOncePerCommand/git_stash_clear\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/git_stash_clear\n=== RUN   TestGateStopsGitDiscardOncePerCommand/cd_repo_&&_git_reset_--hard_origin/main\n=== PAUSE TestGateStopsGitDiscardOncePerCommand/cd_repo_&&_git_reset_--hard_origin/main\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_reset_--hard\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_restore_.\n=== CONT  TestGateStopsGitDiscardOncePerCommand/cd_repo_&&_git_reset_--hard_origin/main\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_stash_clear\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_branch_--delete_--force_feature\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_stash_drop\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_checkout_--force_main\n=== RUN   TestCommandLengthBoundary/reversible_long_command\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_stash_drop_stash@{1}\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_branch_-Dr_origin/feature\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_branch_-D_feature\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_restore_:/\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_restore_--staged_--worktree_.\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_checkout_-f_main\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_checkout_--_.\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_checkout_.\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_clean_-f\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_clean_--force_-d\n=== RUN   TestCommandLengthBoundary/over_budget_delegates_to_harness\n--- PASS: TestCommandLengthBoundary (0.02s)\n    --- PASS: TestCommandLengthBoundary/ordinary_long_command (0.00s)\n    --- PASS: TestCommandLengthBoundary/catastrophe_within_parsing_budget (0.00s)\n    --- PASS: TestCommandLengthBoundary/reversible_long_command (0.01s)\n    --- PASS: TestCommandLengthBoundary/over_budget_delegates_to_harness (0.00s)\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_clean_-fdx\n--- PASS: TestGateDiscardFallsBackToContextWithoutMarker (0.03s)\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_-C_/repo_reset_--hard_HEAD~1\n=== CONT  TestGateStopsGitDiscardOncePerCommand/git_reset_--hard_origin/main\n--- PASS: TestGateDeniesOncePerSessionAndSkill (0.03s)\n--- PASS: TestGateStopsGitDiscardOncePerCommand (0.01s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_reset_--hard (0.02s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_restore_. (0.02s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_stash_clear (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/cd_repo_&&_git_reset_--hard_origin/main (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_stash_drop_stash@{1} (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_stash_drop (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_branch_--delete_--force_feature (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_restore_:/ (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_branch_-D_feature (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_checkout_-f_main (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_checkout_--force_main (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_checkout_--_. (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_branch_-Dr_origin/feature (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_restore_--staged_--worktree_. (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_checkout_. (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_clean_-f (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_clean_-fdx (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_clean_--force_-d (0.03s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_-C_/repo_reset_--hard_HEAD~1 (0.01s)\n    --- PASS: TestGateStopsGitDiscardOncePerCommand/git_reset_--hard_origin/main (0.01s)\nPASS\nok  \tqerp-hook-review/hooks\t2.667s\n",
+    "stderr": ""
+  },
+  "one_shot_cases": [
+    {
+      "case": "safe read-only text",
+      "exit_code": 0,
+      "expected_observed_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "case": "secret word false positive",
+      "exit_code": 2,
+      "expected_observed_exit_code": 2,
+      "stderr": "ERROR: Do not commit .env files or credentials. These must be local-only."
+    },
+    {
+      "case": "repeat same false positive",
+      "exit_code": 2,
+      "expected_observed_exit_code": 2,
+      "stderr": "ERROR: Do not commit .env files or credentials. These must be local-only."
+    },
+    {
+      "case": "force-before-main string",
+      "exit_code": 2,
+      "expected_observed_exit_code": 2,
+      "stderr": "ERROR: Force push to main is blocked. Use a PR or ask repo owner."
+    },
+    {
+      "case": "force-after-main string",
+      "exit_code": 0,
+      "expected_observed_exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "one_shot_regex_compilation_error_reproduced": false,
+  "source_sha256": {
+    "b6378321-d008-4d31-93f7-7557042d0426/hooks/deny_destructive.go": "b53034d16e5d6173c6accc8d91f80718700d0288996e542a2d67138eeb6f1941",
+    "b6378321-d008-4d31-93f7-7557042d0426/hooks/hook_runner.go": "92f076183b2adb96e03b80c72e357b0dc78270d5d0c34a72e87be2680ad5d847",
+    "b6378321-d008-4d31-93f7-7557042d0426/hooks/gate_context.go": "dfd54fd94ea2de324f4611281a576566a3e77a3b402ff7c90f760f72f683535a",
+    "17ccfb04-2b9d-4688-bf2d-0b214c8fcd08/hooks/block-bad-commands.sh": "525c369390547ab6b0afd0f0d83bbb226d3c80aa65f21602a68ff5af519e5375",
+    "17ccfb04-2b9d-4688-bf2d-0b214c8fcd08/hooks/guard-file-writes.sh": "4fffcaa1360043bd8bfa4f39a0d87e20ffa3c8155f2b2164a2eca5c6c8dbe952",
+    "17ccfb04-2b9d-4688-bf2d-0b214c8fcd08/hooks/validate-after-write.sh": "e70894d8e284527fdcee54e9b0edaa1b6527cb72d893fe1fcde311275fd210bc"
+  }
+}

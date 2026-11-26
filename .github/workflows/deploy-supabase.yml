@@ -1,23 +1,5 @@
-# Déploiement du schéma sur Supabase (nuage), par environnement.
-#
-# QUOREICH se livre sur site (API Java + PostgreSQL, schéma appliqué par Flyway au démarrage de
-# l'API) ou dans le nuage (Supabase). Les deux bases doivent être identiques :
-#   - la CI vérifie que chaque migration a sa jumelle au même SQL (npm run db:check-twins) ;
-#   - ce workflow applique les migrations absentes (scripts/schema/deploy-supabase.sh, registre
-#     qerp_deploy.applied_migrations, empreinte SHA-256 : une migration déjà déployée et modifiée est refusée).
-#
-# Deux environnements GitHub (Settings → Environments), décision DIR-02 du 26/11/2026 :
-#   - « supabase-staging » : projet de RECETTE, mis à jour AUTOMATIQUEMENT après chaque CI verte sur main.
-#     Tant que son secret manque, l'étape est ignorée avec un avertissement (pas d'échec rouge).
-#   - « supabase-production » : projet de PRODUCTION, mis à jour UNIQUEMENT à la demande (onglet Actions →
-#     « Déploiement Supabase » → Run workflow → cible production), avec validation obligatoire d'une personne
-#     désignée (« Required reviewers » de l'environnement). Simulation possible (dry_run).
-#     Une migration qui supprime des données en production exige l'accord explicite du propriétaire.
-#
-# Secret de chaque environnement : SUPABASE_DB_URL, rôle postgres, **par le pooler** de Supabase
-# (aws-…pooler.supabase.com, port 6543 ou 5432) : l'hôte direct db.<ref>.supabase.co n'a qu'une adresse
-# IPv6, que les exécutants GitHub n'ont pas.
-
+# Automatic migrations are staging only. Production is manual, independent-review
+# protected and refused before environment access if protection metadata is absent.
 name: Déploiement Supabase
 
 on:
@@ -37,21 +19,37 @@ on:
         type: boolean
         default: true
 
-# Un seul déploiement à la fois par cible, jamais interrompu en cours de route.
-concurrency:
-  group: deploy-supabase-${{ inputs.cible || 'staging' }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  authorize:
+    if: >-
+      github.repository == 'quoreichgroup-coder/quoreich_erp' &&
+      ((github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.id == github.repository_id) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      (inputs.cible == 'staging' || inputs.cible == 'production')))
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/authorize.yml
+    with:
+      mode: deploy
+      target: ${{ inputs.cible || 'staging' }}
+
   deploy:
     name: Migrations Supabase (${{ inputs.cible || 'staging' }})
-    # Automatique : recette seulement, après une CI réussie sur main. Production : à la demande seulement.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    needs: authorize
+    if: needs.authorize.result == 'success' && needs.authorize.outputs.attempt == github.run_attempt
+    concurrency:
+      group: deploy-supabase-${{ inputs.cible || 'staging' }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: supabase-${{ inputs.cible || 'staging' }}
@@ -67,31 +65,19 @@ jobs:
           if [ -n "$SUPABASE_DB_URL" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           elif [ "$CIBLE" = "production" ]; then
-            echo "::error::Secret SUPABASE_DB_URL absent de l'environnement supabase-production."
+            echo "::error::Secret SUPABASE_DB_URL absent de supabase-production."
             exit 1
           else
-            echo "::warning::Projet de recette non configuré (secret SUPABASE_DB_URL absent de supabase-staging) : déploiement ignoré."
+            echo "::warning::Recette non configurée : déploiement ignoré."
             echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Récupération du dépôt (commit validé par la CI)
+      - name: Récupération du commit autorisé
         if: steps.secret.outputs.ok == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
-      # À la demande, on ne déploie que ce que main contient et que la CI a validé.
-      - name: Commit validé par la CI
-        if: steps.secret.outputs.ok == 'true' && github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ok="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$GITHUB_SHA" \
-                --status success --json databaseId --jq 'length')"
-          if [ "$ok" = "0" ]; then
-            echo "::error::Aucune CI réussie sur $GITHUB_SHA : déploiement refusé."
-            exit 1
-          fi
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
 
       - name: Client PostgreSQL
         if: steps.secret.outputs.ok == 'true'

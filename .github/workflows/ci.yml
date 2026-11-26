@@ -55,6 +55,8 @@ jobs:
     steps:
       - name: Récupération du dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -66,6 +68,9 @@ jobs:
       # n'est plus synchrone avec `package.json`, pas le corriger en silence.
       - name: Installation
         run: npm ci
+
+      - name: Sécurité des workflows (provenance et conditions)
+        run: npm run security:check
 
       # Les deux `tsc` et non `npm run build` seul : le build de Vite n'exécute
       # pas le compilateur, donc un build vert ne prouve rien sur les types.
@@ -118,6 +123,8 @@ jobs:
     steps:
       - name: Récupération du dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -157,6 +164,8 @@ jobs:
     steps:
       - name: Récupération du dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: JDK 25
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -202,6 +211,8 @@ jobs:
     steps:
       - name: Récupération du dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # La construction Docker est le seul contrôle qui attrape une classe
       # entière de défauts invisibles ailleurs : un bit exécutable perdu sur
