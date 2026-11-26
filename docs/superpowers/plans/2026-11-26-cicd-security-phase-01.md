@@ -43,3 +43,6 @@
 
 - Final review: four material findings fixed with RED-to-GREEN regressions; suite62/62, actionlint0 and Bash32/32.
 - Ruling: retain safe input-only hook reproductions requested by the user; no candidate command executes and no installed security control changes.
+
+- Full final local suite: npm test -- --maxWorkers=2 -> 741/741 passed. Earlier 2 load-sensitive failures and isolated12/12 preserved in audit.
+- Dedicated PR #13 opened; waiting for final-head required checks. No merge or deployment.

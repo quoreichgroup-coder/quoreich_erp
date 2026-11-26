@@ -1,7 +1,7 @@
 # QERP CI/CD remediation register — Phase 01
 
 Decision D-CICD-001. Base main: a7e32882a307c379dd1f7efbb0f9c1a3c56d680b.
-Branch: security/cicd-phase-01. Merge and production actions remain unapproved.
+Branch: security/cicd-phase-01. Pull request: [#13](https://github.com/quoreichgroup-coder/quoreich_erp/pull/13). Merge and production actions remain unapproved.
 
 | Item | Corrective measure | Status | Validation / owner |
 |---|---|---|---|
@@ -31,15 +31,15 @@ Branch: security/cicd-phase-01. Merge and production actions remain unapproved.
 | OpenAPI client | Matches committed contract |
 | Migration twins | 138 matching pairs |
 | Functional files | git diff confirms no src/services/supabase/tests changes |
-| Local Vitest full suite | 739 passed / 2 failed, unchanged KpiDrilldownDialog.a11y.test.tsx; isolated rerun 12/12 passed (local load sensitivity) |
+| Local Vitest full suite | Final npm test -- --maxWorkers=2: 741/741 passed (133 files, 186.07s). Initial default-worker run: 739 passed / 2 failed in unchanged KpiDrilldownDialog.a11y.test.tsx; isolated rerun 12/12 passed |
 | Local hooks | Five selected Go test groups pass; catastrophic command denied 3/3; five one-shot input cases match documented behavior |
 | Live image authorization | Authorized main SHA using successful push CI 45865682082 and four actual successful jobs |
 | Live staging authorization | Refused before environment access: explicit branch policy missing |
 | Historical GHCR | Publication job 140089230046 succeeded in run 45871922000 |
 | Post-change GHCR external publication | Not executed; operator verification after approved merge required |
 | Independent review | Four material findings corrected; attempt replay, moved tags, maintain role and unauthenticated queues all covered by RED-to-GREEN regressions |
-| PR / final head CI | To be filled after PR creation |
-| Main ruleset preservation | Baseline stored; compare again after PR checks |
+| PR / final head CI | [PR #13 live checks](https://github.com/quoreichgroup-coder/quoreich_erp/pull/13/checks): Client web, E2E simulés, API Java, Image de l'API must each be success on the latest head. Final observed head/run/results are attached to the PR validation report after completion |
+| Main ruleset preservation | Authenticated re-read after PR creation: same rules, no bypass actors, active, updated_at remains 2026-11-26T17:22:03.597+00:00; compare once more at final report |
 
 ## Completion conditions
 
@@ -47,3 +47,11 @@ Branch: security/cicd-phase-01. Merge and production actions remain unapproved.
 - Explicit human approval before merge. No merge operation or auto-merge is authorized.
 - Environment protections and release-tag rules remain operational prerequisites; their absence is not waived by green CI.
 - No secrets added; no Supabase project modified; no production execution; no repository/package visibility change.
+
+## Review closure and final reporting
+
+Implementation commit: 67c756897cdd0164a6ea8db394a27fa649e7672c. Following changes are documentation/evidence only.
+The PR validation report records the final head SHA and all four checks without requiring a self-referential
+commit SHA in this file. A green run on a previous head is insufficient.
+The dedicated worktree is retained for human review; i18n/poc-langues still has its original modified decision
+register and untracked archive. No request to discard those files was made or acted on.

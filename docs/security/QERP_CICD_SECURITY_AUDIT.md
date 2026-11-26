@@ -4,6 +4,8 @@ Date: 2026-11-26. Owner: QUOREICH GROUP. Decision: D-CICD-001 (approved by the r
 Base: `origin/main` at `a7e32882a307c379dd1f7efbb0f9c1a3c56d680b`.
 Scope: every file in `.github/workflows/`, deployment/publication boundaries, dispatches, tags, environment protections and the two installed local hooks.
 
+Pull request: [#13](https://github.com/quoreichgroup-coder/quoreich_erp/pull/13).
+
 ## Verdict and acceptance
 
 **CONDITIONAL GO for the remediation pull request; NO-GO for production operation.**
@@ -122,6 +124,7 @@ denied real action as an authorization mechanism.
 - Initial full local Vitest: **739 passed, 2 failed** in unchanged KpiDrilldownDialog.a11y.test.tsx
   (modal accessible naming and focus containment); subsequent isolated result recorded in register.
   Local Node 24.14.1 differs from CI's .nvmrc 26.13.0.
+- Final complete local rerun with two workers: **741/741 tests passed**, 133 files, 186.07 seconds.
 - Post-review security tests: 62/62; tag-write-step tests execute only stubbed API reads, never publication commands.
 - Linux CI and final PR-head checks are recorded in the remediation register and PR.
 - No production run, tag push, release creation, registry publication or secret read was used as a test.
