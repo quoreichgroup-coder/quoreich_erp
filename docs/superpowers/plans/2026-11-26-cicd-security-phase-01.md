@@ -31,7 +31,7 @@
 4. [x] Investigate installed Megapowers and one-shot hooks via isolated tests only. No real destructive commands or plugin changes.
 5. [x] Update all four requested documents with findings, evidence, decisions, verification and operational limitations.
 6. [x] Run syntax/security tests, applicable local checks and fresh whole-branch review; correct material findings.
-7. [ ] Push dedicated branch and open PR; observe all four required checks, re-read unchanged main ruleset, report verdict and stop.
+7. [x] Push dedicated branch and open PR; observe all four required checks, re-read unchanged main ruleset, report verdict and stop.
 
 ## Execution record
 
@@ -46,3 +46,5 @@
 
 - Full final local suite: npm test -- --maxWorkers=2 -> 741/741 passed. Earlier 2 load-sensitive failures and isolated12/12 preserved in audit.
 - Dedicated PR #13 opened; waiting for final-head required checks. No merge or deployment.
+
+- GitHub validation: all four required checks succeeded on 1340c22, run45889716418; snapshot committed. Final documentation revision must also pass, with results in PR validation report. No merge approval.

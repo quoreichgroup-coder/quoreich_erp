@@ -126,7 +126,7 @@ denied real action as an authorization mechanism.
   Local Node 24.14.1 differs from CI's .nvmrc 26.13.0.
 - Final complete local rerun with two workers: **741/741 tests passed**, 133 files, 186.07 seconds.
 - Post-review security tests: 62/62; tag-write-step tests execute only stubbed API reads, never publication commands.
-- Linux CI and final PR-head checks are recorded in the remediation register and PR.
+- GitHub CI: all four gates succeeded on 1340c2262e0e558471a997079a2ee6d8b72d6193, run 45889716418; [snapshot](evidence/github-validated-implementation.json). Final documentation-head checks are recorded in the PR validation report.
 - No production run, tag push, release creation, registry publication or secret read was used as a test.
 
 GHCR historical run [45871922000](https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45871922000)

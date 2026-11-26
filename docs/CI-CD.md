@@ -21,10 +21,10 @@ Chaque nuit ──► Parcours métier sur la RECETTE (main validé, pas de rapp
 | Workflow | Déclencheur | Ce qu'il fait |
 |---|---|---|
 | `ci.yml` | PR, poussée sur `main` | Lint, types, Vitest, contrat API, migrations jumelles, construction, failles critiques npm ; E2E simulés (Playwright, aucun secret) ; `mvnw verify` ; image non root |
-| `livraison.yml` | CI verte sur `main` ; étiquette `v*.*.*` | Publication de l'image ; version complète sur étiquette (refusée si la CI n'a pas réussi sur ce commit) |
+| `livraison.yml` | CI push/main du dépôt QERP ; étiquette stricte vX.Y.Z | Image GHCR ; version sur un commit de main validé par les quatre contrôles et autorisé pour la tentative courante |
 | `deploy-supabase.yml` | CI verte sur `main` (recette) ; à la demande (recette ou production) | Migrations absentes appliquées avec registre et empreintes ; simulation par défaut à la demande |
 | `deploy-fonctions.yml` | À la demande | Fonctions edge choisies, CLI Supabase épinglé |
-| `parcours-nocturnes.yml` | Chaque nuit, à la demande | Parcours Playwright connectés sur la recette ; rapport conservé 14 jours |
+| `parcours-nocturnes.yml` | Chaque nuit, à la demande | Parcours Playwright connectés sur la recette ; aucun rapport connecté téléversé (sessions/données) |
 | `dependabot.yml` | Chaque semaine | Mises à jour npm, Maven, actions, Docker |
 
 ## 2. Le front se construit par environnement
@@ -41,8 +41,8 @@ universel :
 
 | Environnement | Protection | Secrets | Variables |
 |---|---|---|---|
-| `supabase-staging` | aucune | `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_APPROVER_EMAIL`, `E2E_APPROVER_PASSWORD` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` |
-| `supabase-production` | **Required reviewers** (le propriétaire), branche `main` et étiquettes `v*` seulement | `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` |
+| `supabase-staging` | branche main uniquement (à configurer, voir §6) | `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_APPROVER_EMAIL`, `E2E_APPROVER_PASSWORD` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` |
+| `supabase-production` | reviewers indépendants, sans auto-approbation ni bypass admin ; main et v* (à configurer, voir §6) | `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` |
 
 - `SUPABASE_DB_URL` : chaîne **du pooler** (`aws-…pooler.supabase.com`, port 6543 ou 5432), rôle postgres ; l'hôte
   direct `db.<ref>.supabase.co` est IPv6 seulement, inaccessible aux exécutants GitHub.

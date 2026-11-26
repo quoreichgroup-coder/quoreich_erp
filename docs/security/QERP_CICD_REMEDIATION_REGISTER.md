@@ -48,6 +48,23 @@ Branch: security/cicd-phase-01. Pull request: [#13](https://github.com/quoreichg
 - Environment protections and release-tag rules remain operational prerequisites; their absence is not waived by green CI.
 - No secrets added; no Supabase project modified; no production execution; no repository/package visibility change.
 
+## GitHub CI validation snapshot
+
+All four required checks passed on validation head 1340c2262e0e558471a997079a2ee6d8b72d6193 in
+[run 45889716418](https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418):
+
+| Required check | Result | GitHub job |
+|---|---|---|
+| Client web | success | 140149176019 |
+| E2E simulés | success | 140149175739 |
+| API Java | success | 140149175998 |
+| Image de l'API | success | 140156853621 |
+
+[Authenticated snapshot](evidence/github-validated-implementation.json) confirms GitHub Actions app 15368,
+unchanged active main ruleset and unmerged PR. Later changes are documentation/evidence only.
+The final documentation head is also required to pass all four checks; its final observed results are
+recorded in the PR validation report and final handoff.
+
 ## Review closure and final reporting
 
 Implementation commit: 67c756897cdd0164a6ea8db394a27fa649e7672c. Following changes are documentation/evidence only.
