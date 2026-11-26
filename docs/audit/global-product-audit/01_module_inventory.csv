@@ -1,0 +1,25 @@
+domaine;routes_front;controleurs_api_java;parcours_e2e;migrations_cles;statut_observe
+Comptabilite generale;/journal (7);LedgerController, ChartController, AccountingSetupController, AnalyticsController;50, 97, 98;V18-V19, V38, V60-V69, V106, V120-V123;implemente
+Comptes clients;/receivables (6), /customers;ArInvoiceController, ReceivableController, CustomerController, ArDunningController;40;V16-V22, V42, V45, V48-V49, V58, V125, V142-V145;implemente
+Ventes;/sales (6);SalesController;60;V40, V43-V44, V46, V50, V126;implemente
+CRM;/crm (7);CrmController;60, 61;V29;implemente
+Comptes fournisseurs;/payables (6), /suppliers;PayableController, SupplierReturnsController;10, 30;V37, V41, V52, V56, V72, V124, V127, V136-V137;implemente
+Achats et import;/procurement (6);ProcurementController, RfqController;20, 25, 103, 105, 106;V34-V35, V39, V54, V57, V129-V135, V139-V140;implemente
+Stocks;/inventory (6);InventoryController;70, 71;V51, V53-V54, V59, V91-V96, V100;implemente
+Tresorerie;/treasury (6);TreasuryController;80, 81;V70-V71, V107, V130;implemente
+Budget;/budget (6);BudgetController;90, 92, 93, 94;V73, V77-V79;implemente
+Immobilisations;/assets (6);AssetsController;91;V75-V76;implemente
+RH et paie;/hr (10), /payroll;HrController;95;V80-V89, V95, V97-V99, V102-V104, V148-V154;implemente
+Notes de frais;/expenses (6);ExpensesController;99;V109-V110, V112;implemente
+Projets;/projects (6);ProjectsController;100;V111;implemente
+Conformite et risques;/compliance (6), /risk (6);GrcController;101;V113;implemente
+Pilotage CFO et IA;/cockpit (2), /ai, /alerts, /reports;PilotageController, AiController;102;V117-V118;partiel (2 analyses IA)
+Administration et identite;/admin (2), /settings, /onboarding;AdminController, AuthController, AuthorizationController, DataImportController;00, 01;V23-V33, V114-V116, V146-V147;implemente
+Documents et pieces jointes;(transverse);DocumentsController, DocumentEditionsController, AttachmentsController;104, 107;V138, V141;implemente (rendu cloud non deploye)
+Fiscalite (declarations TVA, e-facture);aucune;aucun;aucun;aucune;non demarre
+Mobile;aucune;aucun;aucun;aucune;non demarre
+EAM / maintenance;aucune;aucun;aucun;aucune;non demarre
+Downtime Management;aucune;aucun;aucun;aucune;non demarre
+Production / Flotte;aucune;aucun;aucun;aucune;non demarre
+Smart Notes;aucune;aucun;aucun;aucune;non demarre
+Internationalisation;aucune;aucun;aucun;aucune;cadrage seulement (docs/i18n non versionne)
