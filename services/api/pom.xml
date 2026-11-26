@@ -17,7 +17,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.2</version>
+    <version>4.2.0</version>
     <relativePath/>
   </parent>
 
@@ -59,7 +59,7 @@
       alors que `maven-metadata.xml` publie 3.2.0. Se fier à l'index de recherche
       ferait retenir la ligne Boot 3, incompatible.
     -->
-    <springdoc.version>3.2.0</springdoc.version>
+    <springdoc.version>3.2.1</springdoc.version>
   </properties>
 
   <dependencies>
