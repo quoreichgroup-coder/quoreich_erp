@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { canAccessPage } from "@/lib/module-access";
+import { Button } from "@/components/ui/button";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
@@ -56,6 +59,8 @@ const allPages = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const access = useMyAccess();
+  const pages = access.isSuccess ? allPages.filter((p) => canAccessPage(p.url, access.data)) : [];
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -76,20 +81,24 @@ export function CommandPalette() {
     [navigate],
   );
 
-  const groups = [...new Set(allPages.map((p) => p.group))];
+  const groups = [...new Set(pages.map((p) => p.group))];
 
   return (
     <>
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="Rechercher une page"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-muted/30 hover:bg-muted/60 transition-colors text-xs text-muted-foreground"
+        className="size-10 shrink-0 p-0 text-muted-foreground lg:h-9 lg:w-auto lg:px-3"
       >
         <Search className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Rechercher…</span>
-        <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+        <span className="hidden lg:inline">Rechercher…</span>
+        <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
           ⌘K
         </kbd>
-      </button>
+      </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Rechercher une page, un module…" />
@@ -97,7 +106,7 @@ export function CommandPalette() {
           <CommandEmpty>Aucun résultat trouvé.</CommandEmpty>
           {groups.map((group) => (
             <CommandGroup key={group} heading={group}>
-              {allPages
+              {pages
                 .filter((p) => p.group === group)
                 .map((page) => (
                   <CommandItem

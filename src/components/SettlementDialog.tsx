@@ -19,7 +19,7 @@ const METHODS = [
  * ouvertes, montant imputé), pied (total imputé, reste à imputer). Le tiers vient d'abord : la
  * liste des factures en dépend, et la base refuse toute facture d'un autre tiers (V36).
  */
-export function SettlementDialog({ kind, open, onClose, parties, invoices, initialPartyId, initialInvoiceId }: {
+export function SettlementDialog({ kind, open, onClose, parties, invoices, initialPartyId, initialInvoiceId, returnFocusRef }: {
   kind: SettlementKind;
   open: boolean;
   onClose: () => void;
@@ -27,6 +27,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
   invoices: OpenItemSource[];
   initialPartyId?: string;
   initialInvoiceId?: string;
+  returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
 }) {
   const record = useRecordSettlement(kind);
   const tiers = kind === "ar" ? "Client" : "Fournisseur";
@@ -90,7 +91,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">{kind === "ar" ? "Encaissement client" : "Règlement fournisseur"}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -98,8 +99,8 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1.5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="col-span-1 space-y-1.5 sm:col-span-2">
             <Label className="text-xs" htmlFor="st-party">{tiers} *</Label>
             <select id="st-party" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
               value={partyId} onChange={(e) => choosePartie(e.target.value)}>
@@ -136,7 +137,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
         </div>
 
         {partyId && (currencies.length > 1 || currency) && (
-          <div className="grid grid-cols-2 gap-3" data-testid="settlement-currency">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="settlement-currency">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="st-currency">Devise du règlement</Label>
               <select id="st-currency" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
@@ -151,7 +152,7 @@ export function SettlementDialog({ kind, open, onClose, parties, invoices, initi
                   placeholder="vide = cours enregistré du jour" />
               </div>
             )}
-            {currency && <p className="col-span-2 text-[11px] text-muted-foreground">Montants en {currency}. La dette est soldée au cours de chaque facture ; la différence avec le décaissement au cours du paiement est passée en perte ou gain de change.</p>}
+            {currency && <p className="col-span-1 text-[11px] text-muted-foreground sm:col-span-2">Montants en {currency}. La dette est soldée au cours de chaque facture ; la différence avec le décaissement au cours du paiement est passée en perte ou gain de change.</p>}
           </div>
         )}
 

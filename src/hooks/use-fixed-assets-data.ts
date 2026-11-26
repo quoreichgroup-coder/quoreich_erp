@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMyAccess } from "@/hooks/use-my-access";
+import { moduleCan, useMyAccess } from "@/hooks/use-my-access";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
-import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { FixedAssetPerms, FixedAssetRole } from "@/lib/fixed-assets-roles";
 import { useTenantRoleMembers } from "@/hooks/use-role-members";
@@ -99,21 +98,17 @@ export { useRunDepreciation as useRunMonthlyDepreciation, useDisposeAsset as use
 /* ===== RBAC ===== */
 
 export function useMyFixedAssetRoles(): FixedAssetPerms {
-  const { user } = useAuth();
-  // Rôles de la société courante, dits par la base (my_access, V27) ; la base contrôle ce module
-  // par has_role, d'où une logique encore par rôle.
-  const roles = useMyAccess().data?.roles ?? [];
-  const has = (r: FixedAssetRole | "admin") => roles.includes(r);
-  const admin = has("asset_admin") || has("admin");
-  const any = admin || has("asset_clerk") || has("asset_accountant") || has("asset_controller");
+  // Même catalogue que les contrôles SQL V75, y compris pour un rôle standard personnalisé.
+  const can = moduleCan(useMyAccess().data, "assets");
+  const any = can("manage") || can("depreciate") || can("dispose") || can("settings");
   return {
-    canCreate:           admin || has("asset_clerk") || has("asset_accountant"),
-    canEdit:             admin || has("asset_clerk") || has("asset_accountant"),
-    canPutInService:     admin || has("asset_accountant"),
-    canRunDepreciation:  admin || has("asset_accountant") || has("asset_controller"),
-    canDispose:          admin || has("asset_accountant"),
-    canManageCategories: admin,
-    canExport:           admin || has("asset_accountant") || has("asset_controller"),
+    canCreate:           can("manage"),
+    canEdit:             can("manage"),
+    canPutInService:     can("manage"),
+    canRunDepreciation:  can("depreciate"),
+    canDispose:          can("dispose"),
+    canManageCategories: can("settings"),
+    canExport:           can("depreciate") || can("dispose"),
     canViewSensitive:    any,
   };
 }

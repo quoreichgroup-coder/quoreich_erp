@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageShell } from "@/components/PageShell";
+import { PageHeader } from "@/components/PageHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import {
   TableCell,
   TableHeader,
   TableRow,
+  type MobileTableColumn,
 } from "@/components/ui/table";
 import {
   Dialog,
@@ -89,6 +91,27 @@ import { SalesEmptyState } from "@/components/SalesEmptyState";
 
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("fr-FR");
+
+const mobileColumns = {
+  quotations: [
+    { label: "Sélection", kind: "selection" }, { label: "N° de devis", kind: "primary", sortable: true },
+    { label: "Date", sortable: true }, { label: "Client", wide: true, sortable: true },
+    { label: "Total TTC (XOF)", sortable: true }, { label: "Valide jusqu'au", sortable: true },
+    { label: "Statut", sortable: true }, { label: "Actions", kind: "actions" },
+  ],
+  orders: [
+    { label: "Sélection", kind: "selection" }, { label: "N° commande", kind: "primary", sortable: true },
+    { label: "Date", sortable: true }, { label: "Client", wide: true, sortable: true },
+    { label: "Réf. devis", sortable: true }, { label: "Total TTC (XOF)", sortable: true },
+    { label: "Statut", sortable: true }, { label: "Actions", kind: "actions" },
+  ],
+  deliveries: [
+    { label: "Sélection", kind: "selection" }, { label: "N° livraison", kind: "primary", sortable: true },
+    { label: "Commande", sortable: true }, { label: "Date", sortable: true },
+    { label: "Client", wide: true, sortable: true }, { label: "Statut", sortable: true },
+    { label: "Actions", kind: "actions" },
+  ],
+} satisfies Record<string, MobileTableColumn[]>;
 
 const EXPORT_HINT_ID = "sales-tx-export-hint";
 
@@ -187,7 +210,7 @@ function QuoteLinesPicker({ quoteId, qtys, onChange }: {
 /* ──────── VUE D'UNE PIÈCE : EN-TÊTE, LIGNES, PIED ; EXPORTER, IMPRIMER ──────── */
 type SalesView = { kind: "qt" | "so" | "dn"; doc: any } | null;
 
-function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => void }) {
+function SalesDocDialog({ view, onClose, returnFocusRef }: { view: SalesView; onClose: () => void; returnFocusRef?: React.RefObject<HTMLElement | null> }) {
   const qt = useQuoteLines(view?.kind === "qt" ? view.doc.id : undefined);
   const so = useSoLines(view?.kind === "so" ? view.doc.id : undefined);
   const dn = useDnLines(view?.kind === "dn" ? view.doc.id : undefined);
@@ -223,7 +246,7 @@ function SalesDocDialog({ view, onClose }: { view: SalesView; onClose: () => voi
     : [["Total HT", `${fmt(net)} XOF`], ["TVA", `${fmt(tax)} XOF`], ["Total TTC", `${fmt(net + tax)} XOF`, true]];
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" returnFocusRef={returnFocusRef}>
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title} fileName={documentFileName(title)}
           attachments={{ docType: kind === "qt" ? "quotation" : kind === "so" ? "sales_order" : "delivery_note", docId: doc.id }}
@@ -261,8 +284,8 @@ function ReturnDialog({ dn, onClose }: { dn: any | null; onClose: () => void }) 
             ? "La livraison est facturée : un avoir lié peut être émis sur les lignes retournées."
             : "La livraison n'est pas encore facturée : la facture ne reprendra que le livré non retourné."}
         </p>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2 space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label className="text-xs" htmlFor="return-reason">Motif (obligatoire)</Label>
             <Input id="return-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, erreur de livraison, non conforme…" />
           </div>
@@ -444,7 +467,7 @@ function EditSalesDocDialog({ target, onClose }: { target: EditTarget; onClose: 
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="edit-customer">Client</Label>
               <select id="edit-customer" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
@@ -535,7 +558,7 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">N° Devis</Label>
               <Input
@@ -554,7 +577,7 @@ function CreateQuotationDialog({ open, onClose }: { open: boolean; onClose: () =
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Validité</Label>
               <Input
@@ -660,7 +683,7 @@ function CreateOrderDialog({ open, onClose }: { open: boolean; onClose: () => vo
               <p className="text-[11px] text-muted-foreground">Seuls les devis non expirés de ce client, avec un reste à commander, sont proposés.</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">N° Commande</Label>
               <Input
@@ -807,6 +830,11 @@ export default function SalesTransactions() {
   const canOverride = (myAccess?.permissions ?? []).includes("sales.credit_override");
   const [deliverSoId, setDeliverSoId] = useState<string | null>(null);
   const [salesView, setSalesView] = useState<SalesView>(null);
+  const salesViewTrigger = useRef<HTMLButtonElement | null>(null);
+  const openSalesView = (view: NonNullable<SalesView>, trigger: HTMLButtonElement | null = null) => {
+    salesViewTrigger.current = trigger;
+    setSalesView(view);
+  };
   const [returnDn, setReturnDn] = useState<any | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const deleteQuote = useDeleteQuotation();
@@ -1049,9 +1077,7 @@ export default function SalesTransactions() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold text-foreground">Transactions de vente</h1>
-        <div className="flex gap-2">
+      <PageHeader title="Transactions de vente" actions={<>
           {perms?.canCreate && (
             <>
               <Button size="sm" className="gap-1.5" onClick={() => setShowNewQuote(true)}>
@@ -1106,8 +1132,7 @@ export default function SalesTransactions() {
             </span>
           )}
 
-        </div>
-      </div>
+      </>} />
 
       {/* Global filters: période + client */}
       <Card className="border-border mb-4">
@@ -1237,7 +1262,7 @@ export default function SalesTransactions() {
 
 
               ) : (
-                <Table>
+                <Table mobileColumns={mobileColumns.quotations} aria-label="Devis de vente">
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner tous les devis" className="rounded border-input"
@@ -1254,9 +1279,11 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {qtTable.pagedData.map((q) => (
-                      <TableRow key={q.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "qt", doc: q.raw })}>
+                      <TableRow key={q.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => openSalesView({ kind: "qt", doc: q.raw })}>
                         <SelectBox checked={selQt.has(q.quoteId)} onChange={() => setSelQt((s) => flip(s, q.quoteId))} label={`Sélectionner le devis ${q.id}`} />
-                        <TableCell className="font-mono text-primary">{q.id}</TableCell>
+                        <TableCell className="font-mono text-primary"><Button type="button" variant="link" size="compact"
+                          className="h-auto max-w-full whitespace-normal p-0 text-left font-mono max-md:min-h-11 max-md:text-base"
+                          onClick={(event) => { event.stopPropagation(); openSalesView({ kind: "qt", doc: q.raw }, event.currentTarget); }}>{q.id}</Button></TableCell>
                         <TableCell>{q.date}</TableCell>
                         <TableCell className="font-medium">{q.customer}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(Number((q as { total_ttc?: number }).total_ttc ?? q.total))}</TableCell>
@@ -1373,7 +1400,7 @@ export default function SalesTransactions() {
 
 
               ) : (
-                <Table>
+                <Table mobileColumns={mobileColumns.orders} aria-label="Commandes de vente">
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner toutes les commandes" className="rounded border-input"
@@ -1390,9 +1417,11 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {soTable.pagedData.map((so) => (
-                      <TableRow key={so.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "so", doc: so.raw })}>
+                      <TableRow key={so.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => openSalesView({ kind: "so", doc: so.raw })}>
                         <SelectBox checked={selSo.has(so.soId)} onChange={() => setSelSo((s) => flip(s, so.soId))} label={`Sélectionner la commande ${so.id}`} />
-                        <TableCell className="font-mono text-primary">{so.id}</TableCell>
+                        <TableCell className="font-mono text-primary"><Button type="button" variant="link" size="compact"
+                          className="h-auto max-w-full whitespace-normal p-0 text-left font-mono max-md:min-h-11 max-md:text-base"
+                          onClick={(event) => { event.stopPropagation(); openSalesView({ kind: "so", doc: so.raw }, event.currentTarget); }}>{so.id}</Button></TableCell>
                         <TableCell>{so.date}</TableCell>
                         <TableCell className="font-medium">{so.customer}</TableCell>
                         <TableCell className="font-mono text-muted-foreground">{so.qtRef}</TableCell>
@@ -1521,7 +1550,7 @@ export default function SalesTransactions() {
 
 
               ) : (
-                <Table>
+                <Table mobileColumns={mobileColumns.deliveries} aria-label="Livraisons de vente">
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableCell className="w-8"><input type="checkbox" aria-label="Sélectionner toutes les livraisons" className="rounded border-input"
@@ -1537,9 +1566,11 @@ export default function SalesTransactions() {
                   </TableHeader>
                   <TableBody>
                     {dnTable.pagedData.map((d) => (
-                      <TableRow key={d.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => setSalesView({ kind: "dn", doc: d.raw })}>
+                      <TableRow key={d.id} className="text-xs cursor-pointer hover:bg-muted/40" data-testid="sales-row" title="Voir le détail" onClick={() => openSalesView({ kind: "dn", doc: d.raw })}>
                         <SelectBox checked={selDn.has(d.dnId)} onChange={() => setSelDn((s) => flip(s, d.dnId))} label={`Sélectionner la livraison ${d.id}`} />
-                        <TableCell className="font-mono text-primary">{d.id}</TableCell>
+                        <TableCell className="font-mono text-primary"><Button type="button" variant="link" size="compact"
+                          className="h-auto max-w-full whitespace-normal p-0 text-left font-mono max-md:min-h-11 max-md:text-base"
+                          onClick={(event) => { event.stopPropagation(); openSalesView({ kind: "dn", doc: d.raw }, event.currentTarget); }}>{d.id}</Button></TableCell>
                         <TableCell className="font-mono text-muted-foreground">{d.soRef}</TableCell>
                         <TableCell>{d.date}</TableCell>
                         <TableCell className="font-medium">{d.customer}</TableCell>
@@ -1612,7 +1643,7 @@ export default function SalesTransactions() {
       <CreateQuotationDialog open={showNewQuote} onClose={() => setShowNewQuote(false)} />
       <CreateOrderDialog open={showNewOrder} onClose={() => setShowNewOrder(false)} />
       <DeliverDialog soId={deliverSoId} onClose={() => setDeliverSoId(null)} />
-      <SalesDocDialog view={salesView} onClose={() => setSalesView(null)} />
+      <SalesDocDialog view={salesView} onClose={() => setSalesView(null)} returnFocusRef={salesViewTrigger} />
       <ReturnDialog dn={returnDn} onClose={() => setReturnDn(null)} />
       <EditSalesDocDialog target={editTarget} onClose={() => setEditTarget(null)} />
 

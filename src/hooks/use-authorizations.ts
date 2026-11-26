@@ -10,8 +10,8 @@ import {
 
 /*
  * Matrice des autorisations : deux sources, une forme (voir use-accounting-setup.ts). Côté
- * Supabase, les écritures vont directement dans les tables ; la base impose les règles (V23,
- * V26 : rôle système intouchable, dernier administrateur, rôle à revoir, rôle affecté) et tient
+ * Supabase, les droits sont remplacés atomiquement par RPC ; la base impose les règles (V147 :
+ * Administrateur protégé ; V26 : dernier administrateur, rôle à revoir, rôle affecté) et tient
  * le journal (V25). Son message remonte tel quel.
  */
 const db = supabase as any;
@@ -121,14 +121,11 @@ export function useUpdateRole() {
   }, "Rôle enregistré");
 }
 
-/** Fixe la liste complète des droits d'un rôle sur mesure. */
+/** Fixe atomiquement la liste complète des droits d'un rôle, sauf Administrateur. */
 export function useSetRolePermissions() {
   return useMatrixMutation(async (r: { id: string; permissions: string[]; current: string[] }) => {
     if (isApiEnabled()) return apiPut(`/api/v1/authorizations/roles/${r.id}/permissions`, { permissions: r.permissions });
-    const removed = r.current.filter((c) => !r.permissions.includes(c));
-    const added = r.permissions.filter((c) => !r.current.includes(c));
-    if (removed.length > 0) await check(db.from("erp_role_permissions").delete().eq("role_id", r.id).in("permission_code", removed));
-    if (added.length > 0) await check(db.from("erp_role_permissions").insert(added.map((permission_code) => ({ role_id: r.id, permission_code }))));
+    return check(db.rpc("set_erp_role_permissions", { _role: r.id, _permissions: r.permissions }));
   }, "Droits enregistrés");
 }
 

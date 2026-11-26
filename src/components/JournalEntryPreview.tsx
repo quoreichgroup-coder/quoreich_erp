@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isApiEnabled } from "@/api/client";
 import { apiGet } from "@/api/client";
+import { AccountingAccess } from "@/components/AccountingAccess";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
@@ -10,6 +11,9 @@ const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 
  * la preuve que la pièce est comptabilisée. Sur site, l'écriture est lue par l'API (/api/v1/gl/journal-entries/{id}).
  */
 export function JournalEntryPreview({ entryId }: { entryId: string | null | undefined }) {
+  return <AccountingAccess><JournalEntryContent entryId={entryId} /></AccountingAccess>;
+}
+function JournalEntryContent({ entryId }: { entryId: string | null | undefined }) {
   const api = isApiEnabled();
   const { data, isLoading, error } = useQuery({
     queryKey: ["journal-entry-preview", entryId],

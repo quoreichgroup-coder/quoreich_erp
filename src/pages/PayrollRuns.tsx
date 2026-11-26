@@ -30,9 +30,10 @@ const STATUS_STYLES: Record<string, string> = {
   draft:    "bg-muted text-muted-foreground border-muted",
   approved: "bg-blue-500/15 text-blue-700 border-blue-500/20",
   posted:   "bg-success/15 text-success border-success/20",
+  reversed: "bg-destructive/10 text-destructive border-destructive/20",
 };
 const STATUS_LABEL: Record<string, string> = {
-  draft: "Brouillon", approved: "Approuvé", posted: "Comptabilisé",
+  draft: "Brouillon", approved: "Approuvé", posted: "Comptabilisé", reversed: "Contrepassé",
 };
 
 type SortKey = "period" | "pay_date" | "status" | "gross_total" | "net_total" | "employee_count";
@@ -207,7 +208,7 @@ export default function PayrollRuns() {
                   )}
                   {filtered.map((r) => (
                     <tr key={r.id} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="px-3 py-2 font-mono text-primary">{r.period}</td>
+                      <td className="px-3 py-2 font-mono text-primary">{r.period}{r.run_kind === "regularization" && <span className="ml-1 font-sans text-[10px] text-muted-foreground">régularisation</span>}</td>
                       <td className="px-3 py-2 font-mono text-[11px]">{r.pay_date}</td>
                       <td className="px-3 py-2">{r.employee_count}</td>
                       <td className="px-3 py-2 text-right font-mono">{maskAmount(perms, Number(r.gross_total))}</td>
@@ -244,7 +245,7 @@ export default function PayrollRuns() {
               {kpis.upcoming.map((r) => (
                 <div key={r.id} className="flex items-center justify-between border border-border rounded-md px-3 py-2">
                   <div>
-                    <div className="text-xs font-medium">{r.period}</div>
+                    <div className="text-xs font-medium">{r.period}{r.run_kind === "regularization" ? " · régularisation" : ""}</div>
                     <div className="text-[11px] text-muted-foreground font-mono">{r.pay_date}</div>
                   </div>
                   <Badge variant="outline" className={`text-[10px] ${STATUS_STYLES[r.status] ?? STATUS_STYLES.draft}`}>

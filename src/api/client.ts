@@ -99,9 +99,12 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
-/** Télécharge un CSV servi par l'API (avec jeton : un simple lien `<a href>` n'en porte pas). */
-export async function apiDownloadCsv(path: string, filename: string): Promise<void> {
-  const blob = await (await authorizedFetch(path)).blob();
+/** Télécharge un fichier servi par l'API (un simple lien ne porte pas le jeton de session). */
+export async function apiDownloadFile(path: string, filename: string): Promise<void> {
+  saveFileBlob(await (await authorizedFetch(path)).blob(), filename);
+}
+
+export function saveFileBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -111,6 +114,8 @@ export async function apiDownloadCsv(path: string, filename: string): Promise<vo
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export const apiDownloadCsv = apiDownloadFile;
 
 /** Envoie un fichier (multipart) à l'API ; le navigateur pose lui-même l'en-tête de type. */
 export async function apiUpload<T>(path: string, field: string, file: File): Promise<T> {

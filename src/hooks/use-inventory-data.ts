@@ -61,6 +61,7 @@ export function useCreateItem() {
       unit_cost?: number; selling_price?: number; reorder_level?: number;
       safety_stock?: number; max_stock?: number; default_warehouse_id?: string;
       valuation_method?: string;
+      item_type?: string;
     }) => {
       if (isApiEnabled()) { await apiPost("/api/v1/inventory/items", input); return; }
       const { error } = await supabase.from("items").insert({ ...input, tenant_id: tenantId! } as never);

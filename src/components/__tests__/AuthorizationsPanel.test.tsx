@@ -32,6 +32,7 @@ const base = (over: Partial<Authorizations> = {}): Authorizations => ({
     { id: "r-cai", name: "Caissier", system: false, needsReview: false, permissions: ["treasury.match"], memberCount: 1 },
     { id: "r-old", name: "Ancien rôle", system: false, needsReview: true, permissions: [], memberCount: 0 },
     { id: "r-adm", name: "Administrateur", code: "admin", system: true, needsReview: false, permissions: ["treasury.match", "treasury.export"], memberCount: 1 },
+    { id: "r-acc", name: "Comptable", code: "accountant", system: true, needsReview: false, permissions: ["treasury.match"], memberCount: 2 },
   ],
   users: [
     { id: "u-awa", fullName: "Awa", roleIds: ["r-adm"] },
@@ -45,6 +46,15 @@ beforeEach(() => Object.values(mocks).forEach((f) => (f as any)?.mockReset?.()))
 afterEach(cleanup);
 
 describe("AuthorizationsPanel", () => {
+  it("mode droits seuls : ne remplace pas le parcours d'affectation et ses contrôles propres au module", () => {
+    mocks.view = loaded(base());
+    render(<AuthorizationsPanel permissionsOnly />);
+    expect(screen.getByTestId("authz-tab-roles")).toBeInTheDocument();
+    expect(screen.queryByTestId("authz-tab-users")).toBeNull();
+    expect(screen.queryByTestId("authz-tab-invitations")).toBeNull();
+    expect(screen.queryByTestId("authz-tab-audit")).toBeNull();
+  });
+
   it("rôle sur mesure : cocher un droit puis enregistrer la liste complète ; suppression bloquée s'il est affecté", () => {
     mocks.view = loaded(base());
     render(<AuthorizationsPanel />);
@@ -54,13 +64,28 @@ describe("AuthorizationsPanel", () => {
     expect(mocks.setPerms).toHaveBeenCalledWith({ id: "r-cai", permissions: ["treasury.match", "treasury.export"], current: ["treasury.match"] });
   });
 
-  it("rôle système : droits en lecture seule, ni renommage ni suppression", () => {
+  it("Administrateur : droits verrouillés, ni renommage ni suppression", () => {
     mocks.view = loaded(base());
     render(<AuthorizationsPanel />);
     fireEvent.click(screen.getByTestId("role-item-admin"));
     expect(screen.getByTestId("perm-treasury.export")).toBeDisabled();
     expect(screen.queryByTestId("btn-delete-role")).toBeNull();
-    expect(screen.getByText(/Créez un rôle sur mesure en le copiant/)).toBeInTheDocument();
+    expect(screen.getByText(/Administrateur est protégé/)).toBeInTheDocument();
+    expect(screen.queryByTestId("btn-save-permissions")).toBeNull();
+  });
+
+  it("Comptable : droits directement personnalisables sans copier ou réaffecter le rôle", () => {
+    mocks.view = loaded(base());
+    render(<AuthorizationsPanel />);
+    fireEvent.click(screen.getByTestId("role-item-accountant"));
+    expect(screen.getByTestId("perm-treasury.match")).toBeEnabled();
+    expect(screen.queryByTestId("btn-delete-role")).toBeNull();
+    expect(document.getElementById("role-name")).toBeNull();
+    fireEvent.click(screen.getByTestId("perm-treasury.match"));
+    fireEvent.click(screen.getByTestId("perm-treasury.export"));
+    fireEvent.click(screen.getByTestId("btn-save-permissions"));
+    expect(mocks.setPerms).toHaveBeenCalledWith({ id: "r-acc", permissions: ["treasury.export"], current: ["treasury.match"] });
+    expect(screen.getByText(/tous les utilisateurs de ce rôle dans cette société/)).toBeInTheDocument();
   });
 
   it("rôle à revoir : annoncé sans effet, activable", () => {
@@ -102,6 +127,8 @@ describe("AuthorizationsPanel", () => {
     expect(screen.getByTestId("authorizations-readonly")).toBeInTheDocument();
     expect(screen.queryByTestId("authz-tab-audit")).toBeNull();
     expect(screen.queryByTestId("new-role-form")).toBeNull();
+    expect(screen.getByTestId("perm-treasury.match")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("role-item-accountant"));
     expect(screen.getByTestId("perm-treasury.match")).toBeDisabled();
   });
 

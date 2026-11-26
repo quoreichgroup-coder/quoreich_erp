@@ -1,5 +1,5 @@
 /* Charte QUOREICH : Montserrat (texte), Playfair Display (titres). */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+@import "./styles/brand-fonts.css";
 
 @import "tailwindcss";
 /* La configuration JS reste la source unique des jetons (couleurs, polices,
@@ -18,7 +18,7 @@
     --popover-foreground: 220 30% 12%;
 
     /* QUOREICH — #0062db. Contraste 5,6:1 avec le blanc (AA). */
-    --primary: 213 100% 43%;
+    --primary: 213.1507 100% 42.9412%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 92%;
@@ -33,7 +33,7 @@
     /* QUOREICH — #ff8a51. Volontairement distinct de `--accent` : `--accent`
        est le fond de survol neutre de shadcn, partagé par toutes les pages.
        Le orange de la charte est réservé aux mises en avant explicites. */
-    --brand-accent: 20 100% 66%;
+    --brand-accent: 19.6552 100% 65.8824%;
     --brand-accent-foreground: 20 60% 16%;
 
     --destructive: 0 45% 45%;
@@ -42,20 +42,25 @@
     --success: 152 40% 32%;
     --success-foreground: 0 0% 100%;
 
+    --warning: 32 95% 30%;
+    --warning-foreground: 0 0% 100%;
+    --info: 213.1507 100% 42.9412%;
+    --info-foreground: 0 0% 100%;
+
     --border: 220 14% 88%;
     --input: 220 14% 88%;
-    --ring: 213 100% 43%;
+    --ring: 213.1507 100% 42.9412%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 220 40% 14%;
-    --sidebar-foreground: 220 14% 80%;
+    --sidebar-background: 213.1507 100% 42.9412%;
+    --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 220 40% 14%;
-    --sidebar-accent: 220 40% 20%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 30% 20%;
-    --sidebar-ring: 220 50% 30%;
+    --sidebar-primary-foreground: 213.1507 100% 42.9412%;
+    --sidebar-accent: 0 0% 100%;
+    --sidebar-accent-foreground: 213.1507 100% 42.9412%;
+    --sidebar-border: 213 100% 65%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
@@ -69,18 +74,18 @@
     --popover-foreground: 220 14% 90%;
 
     --primary: 213 100% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 220 18% 16%;
     --secondary-foreground: 220 14% 80%;
 
     --muted: 220 18% 14%;
-    --muted-foreground: 220 10% 50%;
+    --muted-foreground: 220 10% 65%;
 
     --accent: 220 18% 18%;
     --accent-foreground: 220 14% 88%;
 
-    --brand-accent: 20 100% 66%;
+    --brand-accent: 19.6552 100% 65.8824%;
     --brand-accent-foreground: 20 60% 12%;
 
     --destructive: 0 40% 38%;
@@ -89,16 +94,21 @@
     --success: 152 35% 30%;
     --success-foreground: 0 0% 100%;
 
+    --warning: 38 95% 65%;
+    --warning-foreground: 32 70% 12%;
+    --info: 213 100% 70%;
+    --info-foreground: 213 70% 12%;
+
     --border: 220 18% 18%;
     --input: 220 18% 18%;
     --ring: 213 100% 55%;
 
     --sidebar-background: 220 30% 8%;
-    --sidebar-foreground: 220 14% 65%;
-    --sidebar-primary: 215 60% 55%;
+    --sidebar-foreground: 220 14% 90%;
+    --sidebar-primary: 0 0% 100%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 14%;
-    --sidebar-accent-foreground: 215 60% 60%;
+    --sidebar-accent: 213 65% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 220 20% 14%;
     --sidebar-ring: 215 60% 50%;
   }
@@ -115,7 +125,7 @@
   }
 
   h1 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply font-display text-2xl font-semibold tracking-tight text-primary;
   }
   h2 {
     @apply text-xl font-medium tracking-tight;
@@ -126,6 +136,20 @@
 }
 
 @layer components {
+  /* Un repère orange accompagne le fond actif ; la couleur du texte reste
+     contrastée sur le bleu de marque, y compris au survol et au clavier. */
+  .brand-nav-active {
+    position: relative;
+  }
+  .brand-nav-active::before {
+    content: "";
+    position: absolute;
+    inset-block: 0.375rem;
+    inset-inline-start: 0;
+    width: 0.1875rem;
+    border-radius: 999px;
+    background: hsl(var(--brand-accent));
+  }
   .btn-primary {
     @apply h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity;
   }

@@ -45,6 +45,11 @@ class ApiSecurityIT {
   @BeforeEach
   void chargerLeJeuDeRecette() {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
+    // Depuis le contrôle d'accès aux modules (V146–V147), un compte sans rôle dans sa société n'entre plus dans le module
+    // clients : chaque compte reçoit un rôle chez lui, et le test prouve toujours qu'il ne voit que sa propre société.
+    PostgresFixture.grantRoles(DATABASE,
+        PostgresFixture.ALPHA_USER, "accountant", PostgresFixture.ALPHA_TENANT,
+        PostgresFixture.BETA_USER, "accountant", PostgresFixture.BETA_TENANT);
     TenantContextHolder.clear();
   }
 

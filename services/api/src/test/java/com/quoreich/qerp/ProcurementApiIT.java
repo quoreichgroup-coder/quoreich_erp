@@ -51,6 +51,9 @@ class ProcurementApiIT {
     PostgresFixture.execute(PostgresFixture.urlOf(DATABASE), "INSERT INTO auth.users (id) VALUES ('" + APPROBATEUR + "') ON CONFLICT DO NOTHING;"
         + "INSERT INTO profiles (id, tenant_id, full_name) VALUES ('" + APPROBATEUR + "', '" + A + "', 'Approbateur') ON CONFLICT (id) DO NOTHING;");
     PostgresFixture.grantRoles(DATABASE, ACHETEUR, "admin", A, APPROBATEUR, "procurement_l3", A);
+    // Depuis le contrôle d'accès aux modules (V146–V147), un compte sans rôle dans sa propre société est refusé avant même
+    // l'isolation : BETA reçoit donc un rôle chez elle, et le test prouve toujours qu'elle ne voit rien d'ALPHA.
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.BETA_USER, "admin", PostgresFixture.BETA_TENANT);
     TenantContextHolder.clear();
   }
 

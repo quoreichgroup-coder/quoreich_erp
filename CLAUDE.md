@@ -8,6 +8,12 @@ QUOREICH is a multi-tenant financial ERP for OHADA/SYSCOHADA SMEs: French UI, XO
 
 Read `AGENTS.md` as well — its CFO/tenant rules are binding and are summarized under "CFO consolidation invariants".
 
+## Current delivery: Lot 6 D1 (20 Nov 2026)
+
+V141 implements versioned customer-invoice templates and immutable issued-PDF records. The editor accepts structured text/style fields only; PostgreSQL generates escaped HTML, freezes the invoice context, and requires `reports.templates` plus a nonblank audit reason to save/publish. Issue/replace requires `ar.invoice`; reprints download the archived bytes and verify SHA-256. The Java API renderer and Supabase `document-render` function both use the same claim/complete/fail RPCs. V141's Flyway and Supabase files must remain byte-identical (`node scripts/schema/check-migration-twins.mjs`).
+
+The renderer is Gotenberg 9.2 in `infra/pdf/compose.yml`: internal Docker network, JavaScript/downloads disabled, outbound-deny settings, bounded work, PDF/A-2b conversion, bundled Montserrat/Playfair fonts. The optional `infra/pdf/compose.api.yml` attaches the development API to `qerp-pdf` without publishing Gotenberg. The full API → renderer → archive → reprint/replacement journey passed locally against `qerp_reel`; the matching Playwright journey is `tests/e2e/sur-site/107-editions-factures.spec.ts`. No renderer endpoint is configured for cloud yet. V141 and `document-render` are **not deployed** there. See `docs/audit-erp/28-bilan-lots-et-ecarts.md` and `30-documents-modeles-et-archives.md` for verified state and next work.
+
 ## Commands
 
 ```bash
@@ -303,6 +309,12 @@ The backend is moving to Java 25 / Spring Boot 4.1 on a single VPS; the PostgreS
 - **Tenant context contract**: the API connects as `qerp_api` (non-owner, `NOBYPASSRLS`, member of `authenticated`) and sets `SET LOCAL request.jwt.claims = '{"sub":...,"role":"authenticated"}'` per transaction. `V2__compat_auth_schema.sql` reimplements `auth.uid()/jwt()/role()/email()` so the 157 policies stay byte-identical. With no session variable `auth.uid()` is NULL and RLS fails closed.
 - `auth.users` is reduced to `(id uuid primary key)`; Keycloak must import users **with their original UUIDs** to keep the 16 FKs valid. The `on_auth_user_created` trigger is not recreated — profile provisioning becomes an API responsibility.
 - `storage`, `realtime`, `cron`, `vault`, `pg_net` are dropped (MinIO, SSE/WebSocket, Quartz). No `public` function calls them.
+
+- **Services and non-stock items since V140 (G-30).** `items.item_type`: `stock` (default), `non_stock`, `service`. Purchase requisition / PO lines can select an article from the tenant catalogue; `item_id` survives create/edit. Receipt quantities express partial progress (0,3 out of 1 = 30%; French decimal comma accepted). `aa_non_stock_item` runs before the inventory-campaign freeze: receipt/delivery/return rows for non-stock items create no stock movement; manual stock actions and direct location writes are refused (QG037). No replenishment thresholds/rules; type changes require zero global and depot balances. Stock campaigns, projection, valuation, closure snapshots and KPIs exclude non-stock items. `procurement_settings.service_acceptance_second_person` (default false), editable in Controls and follow-up, requires another authorised person than the PO creator to attest service completion; PO/item locks serialize this check with concurrent item-type changes. GRNI and receipt/PO status processing remain active. Tests: `ArticlesNonStockesIT` (including a non-admin receiver and concurrent classification), journey `106-services-non-stockes`. Cloud deployment requires the owner's explicit approval.
+
+- **Client dunning email (G-32), V142 + cloud tranche V145.** `ar_dunning_events` freezes tenant, invoice, customer, recipient, subject, message, balance, currency and overdue days with one unique event per tenant/invoice/rule; direct user writes are revoked. The SQL candidates RPC selects due positive-balance invoices and the next active email rule. V145 adds actor-scoped `service_role` RPCs; `supabase/functions/ar-dunning` validates the end-user JWT, checks `ar.invoice`, supports preview/history/status/manual send, and uses implicit TLS on SMTP 465 (hosted Supabase blocks 25 and 587). Its “Tester SMTP” probe authenticates and quits without sending. Local Spring API also exposes `/probe`. Secrets are not stored in the repo. V144 and V145 migrations, the Edge Function and SMTP secrets remain undeployed; no real email was sent. Cloud SMTP authentication and the repeat-send IT remain unverified.
+
+- **Cloud rollout, 21 Nov 2026.** Owner Supabase project `ymomubgdhufwtbsqqnas` is at V145: 129 post-baseline migrations match their local fingerprints; V144–V145 were applied in separate transactions after a rollback validation. The private `documents` bucket and cloud journeys 104–106 were previously verified. Edge functions `document-render` / `ar-dunning` still require deployment; SMTP secrets and a public HTTPS Gotenberg host are not configured. The local Supabase CLI was not authenticated in this session.
 
 ### CFO consolidation invariants
 

@@ -1,11 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { ModuleAccessGate } from "@/components/ModuleAccessGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { apiGet, isApiEnabled } from "@/api/client";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -33,9 +35,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Redirect to onboarding if no tenant assigned
-  if (profile && !profile.tenant_id && window.location.pathname !== "/onboarding") {
+  if (profile && !profile.tenant_id && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 
-  return <>{children}</>;
+  if (location.pathname === "/onboarding") return <>{children}</>;
+  return <ModuleAccessGate>{children}</ModuleAccessGate>;
 }

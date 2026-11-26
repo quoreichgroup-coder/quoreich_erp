@@ -1,0 +1,27 @@
+module;fonctionnalite;statut;maturite_0_5;preuve;risque;priorite;effort_jh;version_cible
+Finance;GL, journaux, periodes, cloture, etats SYSCOHADA, TFT, notes;TESTED;3;JournauxEtLotsIT, ClotureExerciceIT, EtatsParRubriquesIT, TableauFluxTresorerieIT, NotesAnnexesIT (EV-11);R-03;P1;10;MVP
+Ventes;Devis-commande-livraison-facture-encaissement, avoirs, lettrage, retours, devises;TESTED;3;VentesPiecesCompletesIT, AvoirsClientsIT, AcomptesEtLettrageIT (EV-11);-;P1;3;MVP
+Ventes;Relances SMTP, impression PDF cloud;PARTIAL;2;EV-14;-;P2;3;Pilot
+Achats;Demande-approbation-commande-reception-facture-3 voies-reglement;TESTED;3;CycleDeVieAchatsIT, FacturesFournisseursLignesIT, ReceptionsEtPaiementsIT (EV-11);R-11;P1;8;MVP
+Tresorerie;Comptes, reglements, releves, rapprochement;TESTED;3;TresorerieReglementsIT, RapprochementBancaireIT (EV-11);-;P1;0;MVP
+Stocks;Mouvements, CMUP, inventaires, reapprovisionnement;TESTED;3;StocksSecurisationIT, ComptabilisationStocksIT (EV-11);-;P1;0;MVP
+Stocks;Reservation ferme, lots/series/peremption;NOT STARTED;0;EV-13;-;P2;15;Stable
+Budget;Controle, pre-engagement, revisions, previsions;TESTED;3;ControleBudgetaireIT, BudgetPreEngagementAnalytiqueIT (EV-11);-;P2;0;Pilot
+Immobilisations;Amortissements, cessions;TESTED;3;ImmobilisationsIT (EV-11);-;P2;0;Pilot
+Paie;Moteur parametrable;TESTED;3;PaieReglesVersionneesIT, PaieProrataPresenceIT (EV-11);R-04;P2;0;Pilot
+Paie;Baremes BF, declarations CNSS/IUTS;BLOCKED;1;EV-13;R-04;P2;15;Pilot
+Fiscalite;Declarations TVA et retenues;NOT STARTED;0;EV-04;-;P2;10;Pilot
+Workflows;Delegation, moteur transverse;NOT STARTED;0;EV-12;R-11;P1;8;MVP
+Administration;Droits de consultation (AUD-01);PARTIAL;2;EV-06, AUD-01;-;P1;4;MVP
+Securite;Durcissement anon (AUD-02);PARTIAL;3;EV-17;R-05;P1;2;MVP
+Securite;Limitation de debit, MFA;NOT STARTED;0;EV-21;R-05;P1;9;MVP
+Exploitation;Sauvegarde et restauration;NOT STARTED;0;EV-25;R-01;P0;8;MVP
+Exploitation;Production VPS, recette, supervision;NOT STARTED;1;EV-25;R-02;P1;19;MVP
+CI;Protection de branche;NOT STARTED;0;EV-26;R-09;P1;0.5;MVP
+IA;Gouvernance et 2 analyses;PARTIAL;1;EV-23;R-06;P1;4;MVP
+Mobile;App V1 en apercu;NOT STARTED;0;EV-04;R-07;P1;35;MVP (apercu)
+Maintenance;Equipements, OT, pieces, preventif calendaire;NOT STARTED;0;EV-04;R-12;P1;30;MVP (apercu)
+Arrets;Declaration, causes, MTTR/MTBF, Pareto;NOT STARTED;0;EV-04;R-12;P1;15;MVP (apercu)
+Production;Nomenclature, ordre de fabrication;NOT STARTED;0;EV-04;R-07;P1;20;MVP (apercu)
+Qualite;Parcours rejoues, UAT;PARTIAL;2;EV-11, 11_TEST_QUALITY_REPORT;R-03;P1;8;MVP
+Documentation;Guides utilisateurs, reprise de donnees;NOT STARTED;0;15_COMMERCIAL_READINESS;-;P1;15;MVP

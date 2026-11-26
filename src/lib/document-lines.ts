@@ -4,7 +4,7 @@
  * principe transversal) ; la base recalcule de même (colonnes calculées, recompute_po_total).
  */
 
-export type DraftDocLine = { description: string; quantity: string; unitPrice: string };
+export type DraftDocLine = { description: string; quantity: string; unitPrice: string; item_id?: string | null };
 
 export const emptyDocLine = (): DraftDocLine => ({ description: "", quantity: "1", unitPrice: "" });
 
@@ -44,5 +44,6 @@ export function validateDocLines(lines: DraftDocLine[]): string | null {
 export function toLines(lines: DraftDocLine[]) {
   return lines
     .filter((l) => l.description.trim() !== "")
-    .map((l) => ({ description: l.description.trim(), quantity: num(l.quantity), unitPrice: num(l.unitPrice) }));
+    .map((l) => ({ description: l.description.trim(), quantity: num(l.quantity), unitPrice: num(l.unitPrice),
+      ...(l.item_id ? { item_id: l.item_id } : {}) }));
 }

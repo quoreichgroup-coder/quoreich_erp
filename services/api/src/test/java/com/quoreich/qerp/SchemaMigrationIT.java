@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "139";
+  private static final String DERNIERE_MIGRATION = "154";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -154,11 +154,27 @@ class SchemaMigrationIT {
       // V109 — le salarié d'une note de frais est une fiche du personnel, plus un compte utilisateur.
       "expense_reports/expense_reports_employee_id_fkey");
   /** V80 — référence au validateur qui a confirmé les paramètres de paie. */
-  private static final Set<String> CLES_AUTH_AJOUTEES = Set.of("hr_payroll_settings/hr_payroll_settings_rules_validated_by_fkey");
+  private static final Set<String> CLES_AUTH_AJOUTEES = Set.of("hr_payroll_settings/hr_payroll_settings_rules_validated_by_fkey",
+      // V153 — compte du salarié (libre-service) et approbateur désigné.
+      "employees/employees_user_id_fkey", "employees/employees_time_approver_user_id_fkey");
 
   /** V18 — paramétrage comptable : référentiels et comptes de comptabilisation par société. */
   private static final Set<String> TABLES_AJOUTEES =
       Set.of(
+          // V149 — règles de paie versionnées et cotisations.
+          "payroll_rule_versions", "payroll_contributions",
+          // V150 — bases de calcul nommées.
+          "payroll_bases",
+          // V152 — absences, congés, heures supplémentaires.
+          "hr_time_types", "hr_time_requests", "hr_leave_ledger",
+          // V153 — calendrier des jours fériés.
+          "hr_public_holidays",
+          // V154 — paiement des salaires.
+          "payroll_bank_file_profiles", "payroll_payment_batches", "payroll_payment_lines",
+          // V142 — relances clients.
+          "ar_dunning_events",
+          // V141 — modèles et éditions de factures clients.
+          "document_templates", "document_template_versions", "issued_documents",
           "fiscal_close_settings", "exchange_rates", "ap_supplier_advances", "fx_revaluation_runs", "landed_cost_types", "import_files", "import_file_orders", "import_file_costs", "import_file_allocations", "customs_tariffs", "currency_settings", "shipment_event_codes", "shipment_events", "import_settings", "import_file_transfers", "landed_cost_rules", "tracking_connections", "ap_withholding_settings", "attachment_settings", "attachment_categories", "document_attachments", "rfq_settings", "rfqs", "rfq_lines", "rfq_suppliers", "rfq_quotes", "rfq_awards", "annex_notes", "annex_note_groups", "annex_note_texts",
           "accounting_frameworks",
           "accounting_framework_accounts",
@@ -299,8 +315,47 @@ class SchemaMigrationIT {
 
   private static final Set<String> FONCTIONS_AJOUTEES =
       Set.of(
+          "set_erp_role_permissions",
+          "can_access_alert_module",
+          // V142 — relances clients.
+          "guard_ar_dunning_event_update", "ar_dunning_candidates", "prepare_ar_dunning_event", "claim_ar_dunning_event", "finish_ar_dunning_event",
+          // V143/V144 — bons de commande et modèle par défaut.
+          "document_po_template_html", "install_purchase_order_templates", "document_purchase_order_snapshot",
+          "request_purchase_order_edition", "set_default_document_template",
+          // V148 — paie au prorata des jours de présence.
+          "payroll_day_weight", "payroll_presence_segments",
+          // V149 — règles de paie versionnées, cotisations, abattement, charges de famille.
+          "guard_payroll_rule_version", "guard_payroll_contribution", "payroll_tenant_currency", "payroll_round",
+          "payroll_tax_bands_valid", "payroll_rule_version_issues", "payroll_effective_rules", "list_payroll_rule_versions",
+          "save_payroll_rule_version", "validate_payroll_rule_version", "archive_payroll_rule_version", "delete_payroll_rule_version",
+          // V150 — ordre de calcul, bases, formule contrôlée, barème.
+          "payroll_formula_rpn", "payroll_formula_eval", "payroll_formula_refs", "payroll_formula_try",
+          "payroll_scale_valid", "payroll_scale_value", "payroll_dependency_issues", "list_payroll_bases", "save_payroll_base",
+          // V151 — contrepassation et régularisation des cycles de paie.
+          "payroll_generate_core", "payroll_apply_regularization", "create_payroll_regularization", "reverse_payroll_run",
+          // V152 — temps, absences et congés.
+          "reject_hr_leave_ledger_change", "hr_time_days", "hr_leave_balance", "save_hr_time_type", "list_hr_time_types",
+          "submit_hr_time_request", "decide_hr_time_request", "cancel_hr_time_request", "list_hr_time_requests", "accrue_hr_leave",
+          "adjust_hr_leave_balance", "list_hr_leave_balances", "transfer_hr_time_to_payroll",
+          // V153 — fériés, acquisition automatique, libre-service.
+          "hr_holiday_dates", "list_hr_public_holidays", "save_hr_public_holiday", "delete_hr_public_holiday", "hr_time_quantity",
+          "hr_employee_state_internal", "hr_employee_presence_days", "hr_leave_accrue_month", "hr_leave_accrue_due",
+          "hr_time_request_create", "hr_time_request_approve", "set_hr_employee_self_service", "list_hr_self_service_links",
+          "hr_my_employee_id", "my_hr_self_service", "hr_manager_pending", "submit_my_time_request", "cancel_my_time_request",
+          // V154 — virements de salaires.
+          "save_payroll_bank_file_profile", "create_payroll_payment_batch", "approve_payroll_payment_batch", "cancel_payroll_payment_batch",
+          "payroll_file_value", "generate_payroll_payment_file", "record_payroll_payment_results", "list_payroll_payment_batches",
+          "payroll_run_payment_status",
+          // V145 — façade de service des relances cloud.
+          "dunning_actor_tenant", "ar_dunning_candidates_actor", "ar_dunning_history_actor",
+          "prepare_ar_dunning_event_actor", "claim_ar_dunning_event_actor", "finish_ar_dunning_event_actor",
+          // V141 — modèles et éditions de factures clients.
+          "guard_document_template_version", "guard_issued_document", "document_hash", "document_html_escape",
+          "document_template_interpolate", "document_template_html", "document_actor_tenant", "document_invoice_snapshot",
+          "document_worker_job", "document_render_snapshot", "save_document_template", "publish_document_template",
+          "request_document_edition", "retry_document_edition", "claim_document_edition", "complete_document_edition", "fail_document_edition",
           // V121 — clôture d'exercice.
-          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding", "commercial_document_currency", "commercial_document_currency_lines", "record_supplier_advance", "apply_supplier_advance", "fx_revaluation_items", "post_fx_revaluation", "import_file_defaults", "guard_import_file_children", "customs_estimate", "import_file_received_lines", "allocate_import_costs", "import_reference_rates", "shipment_event_effects", "import_file_initial_eta", "shipment_timeline", "import_shipment_events", "create_import_file_from_po", "warehouse_stock_role", "next_import_file_number", "create_transport_po", "stock_reclass_entry", "import_file_transit_transfer", "apply_landed_cost_rules", "set_tracking_connection", "dcsa_event_code", "ingest_tracking_events", "import_costs_from_ap_invoice", "receive_import_file", "ap_invoice_withholding", "payment_withholding", "withholding_account", "withholding_statement", "withholding_setting", "attachment_setting", "attachment_doc_info", "attachment_doc_in_my_tenant", "ensure_attachment_categories", "register_attachment", "delete_attachment", "assert_required_attachments", "rfq_setting", "rfq_require", "create_rfq", "rfq_set_suppliers", "rfq_send", "record_rfq_quote", "award_rfq", "rfq_cancel",
+          "fiscal_year_management_balances", "fiscal_year_close_preview", "fiscal_year_opening_balances", "cash_flow_line_of", "cash_flow_details", "cash_flow_cash_balance", "cash_flow_compute", "annex_note_lines", "exchange_rate_at", "ap_invoice_currency", "ap_invoice_currency_lines", "ap_invoice_fx_outstanding", "payment_currency", "ar_invoice_currency", "ar_invoice_currency_lines", "ar_invoice_fx_outstanding", "commercial_document_currency", "commercial_document_currency_lines", "record_supplier_advance", "apply_supplier_advance", "fx_revaluation_items", "post_fx_revaluation", "import_file_defaults", "guard_import_file_children", "customs_estimate", "import_file_received_lines", "allocate_import_costs", "import_reference_rates", "shipment_event_effects", "import_file_initial_eta", "shipment_timeline", "import_shipment_events", "create_import_file_from_po", "warehouse_stock_role", "next_import_file_number", "create_transport_po", "stock_reclass_entry", "import_file_transit_transfer", "apply_landed_cost_rules", "set_tracking_connection", "dcsa_event_code", "ingest_tracking_events", "import_costs_from_ap_invoice", "receive_import_file", "ap_invoice_withholding", "payment_withholding", "withholding_account", "withholding_statement", "withholding_setting", "attachment_setting", "attachment_doc_info", "attachment_doc_in_my_tenant", "ensure_attachment_categories", "register_attachment", "delete_attachment", "assert_required_attachments", "rfq_setting", "rfq_require", "create_rfq", "rfq_set_suppliers", "rfq_send", "record_rfq_quote", "award_rfq", "rfq_cancel", "guard_item_type", "guard_replenishment_item_type", "non_stock_item_movement", "service_acceptance_check", "guard_non_stock_location",
           // V120 — piste d'audit chaînée en SHA-256.
           "gl_audit_chain_breaks", "gl_audit_hash", "guard_gl_audit_log",
           // V118 — temps réel sur site.
@@ -645,6 +700,17 @@ class SchemaMigrationIT {
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
+          "erp_alerts/alert_module_select",
+          // V149 — règles de paie lisibles par la paie et le paramétrage.
+          "payroll_rule_versions/payroll_rule_versions_read", "payroll_contributions/payroll_contributions_read",
+          "payroll_bases/payroll_bases_read",
+          "hr_time_types/hr_time_types_read", "hr_time_requests/hr_time_requests_read", "hr_leave_ledger/hr_leave_ledger_read",
+          "hr_public_holidays/hr_public_holidays_read",
+          "payroll_bank_file_profiles/payroll_bank_file_profiles_read",
+          // V142 — journal lisible seulement dans la société et par le droit AR.
+          "ar_dunning_events/ar_dunning_events_read",
+          // V141 — modèles et éditions de factures clients.
+          "document_templates/Lecture société", "document_template_versions/Lecture société", "issued_documents/Lecture société",
           // V121.
           "fiscal_close_settings/Lecture société", "fiscal_close_settings/Paramétrage habilité",
           "annex_notes/Lecture du référentiel", "annex_note_groups/Lecture du référentiel", "annex_note_texts/Lecture société", "annex_note_texts/Rédaction habilitée",
@@ -940,9 +1006,16 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V149 — versions de règles validées figées.
+          "payroll_rule_versions/trg_guard_payroll_rule_version", "payroll_contributions/trg_guard_payroll_contribution",
+          "hr_leave_ledger/trg_hr_leave_ledger_immutable",
+          // V142 — journal de relances immuable.
+          "ar_dunning_events/trg_guard_ar_dunning_event_update",
+          // V141 — modèles et éditions de factures clients.
+          "document_template_versions/trg_guard_document_template_version", "issued_documents/trg_guard_issued_document",
           // V120.
           "gl_audit_logs/trg_guard_gl_audit_log",
-          "ap_invoices/trg_ap_invoice_currency", "ap_invoices/trg_ap_invoice_currency_lines", "payments/trg_aa_payment_currency", "import_files/trg_import_file_defaults", "ap_invoices/trg_import_costs_from_ap_invoice", "ap_invoices/trg_ap_invoice_withholding", "ap_invoices/trg_required_attachments", "purchase_requisitions/trg_required_attachments", "purchase_orders/trg_required_attachments", "import_files/trg_required_attachments", "payments/trg_ab_payment_withholding", "import_files/trg_import_file_initial_eta", "shipment_events/trg_shipment_event_effects", "import_file_orders/trg_guard_import_file_orders", "import_file_costs/trg_guard_import_file_costs", "ar_invoices/trg_ar_invoice_currency", "ar_invoices/trg_ar_invoice_currency_lines",
+          "ap_invoices/trg_ap_invoice_currency", "ap_invoices/trg_ap_invoice_currency_lines", "payments/trg_aa_payment_currency", "import_files/trg_import_file_defaults", "ap_invoices/trg_import_costs_from_ap_invoice", "ap_invoices/trg_ap_invoice_withholding", "ap_invoices/trg_required_attachments", "purchase_requisitions/trg_required_attachments", "purchase_orders/trg_required_attachments", "import_files/trg_required_attachments", "items/trg_guard_item_type", "item_replenishment_rules/trg_guard_replenishment_item_type", "stock_movements/aa_non_stock_item", "item_locations/aa_non_stock_location", "goods_receipts/trg_service_acceptance", "payments/trg_ab_payment_withholding", "import_files/trg_import_file_initial_eta", "shipment_events/trg_shipment_event_effects", "import_file_orders/trg_guard_import_file_orders", "import_file_costs/trg_guard_import_file_costs", "ar_invoices/trg_ar_invoice_currency", "ar_invoices/trg_ar_invoice_currency_lines",
           "quotations/trg_aa_quotation_currency", "sales_orders/trg_aa_sales_order_currency", "purchase_orders/trg_aa_purchase_order_currency",
           "quotations/trg_quotation_currency_lines", "sales_orders/trg_sales_order_currency_lines", "purchase_orders/trg_purchase_order_currency_lines",
           // V118 — temps réel sur site.

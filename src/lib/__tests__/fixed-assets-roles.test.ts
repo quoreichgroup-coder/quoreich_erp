@@ -131,9 +131,10 @@ describe("maskAmount", () => {
 });
 
 describe("tooltips", () => {
-  it("missingRoleHint lists required roles by label", () => {
+  it("missingRoleHint indique le droit personnalisable à demander", () => {
     const hint = missingRoleHint("manage_categories");
-    expect(hint).toContain(ROLE_LABELS.asset_admin);
+    expect(hint).toContain("assets.settings");
+    expect(hint).toContain("administrateur de la société");
   });
 
   it("actionTooltip returns enabledLabel when allowed, hint when not", () => {

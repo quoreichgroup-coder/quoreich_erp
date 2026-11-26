@@ -1,0 +1,5 @@
+# Réservé aux tests depuis l’hôte.
+services:
+  gotenberg:
+    ports:
+      - "127.0.0.1:${QERP_PDF_PORT:-3009}:3000"

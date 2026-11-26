@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), userId: "u1" }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc, from: vi.fn() } }));
 vi.mock("@/hooks/use-tenant", () => ({ useTenantId: () => ({ data: "tenant-a" }), fetchTenantId: async () => "tenant-a" }));
 vi.mock("@/api/client", () => ({ isApiEnabled: () => false, apiGet: vi.fn() }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: mocks.userId } }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { moduleCan, useMyAccess } from "../use-my-access";
@@ -18,10 +18,23 @@ import { useMyBudgetRoles } from "../use-budget-data";
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
 );
-beforeEach(() => mocks.rpc.mockReset());
+beforeEach(() => { mocks.rpc.mockReset(); mocks.userId = "u1"; });
 afterEach(cleanup);
 
 describe("droits dits par la base (my_access)", () => {
+  it("ne réutilise pas les droits admin d'un autre compte de la même société", async () => {
+    const client = new QueryClient();
+    const sameSession = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    mocks.rpc.mockResolvedValue({ data: { roles: ["admin"], permissions: [] }, error: null });
+    const { result, rerender } = renderHook(() => useMyAccess(), { wrapper: sameSession });
+    await waitFor(() => expect(result.current.data?.roles).toEqual(["admin"]));
+    mocks.userId = "u2";
+    mocks.rpc.mockResolvedValue({ data: { roles: ["accountant"], permissions: ["ar.invoice"] }, error: null });
+    rerender();
+    await waitFor(() => expect(result.current.data?.roles).toEqual(["accountant"]));
+    client.clear();
+  });
+
   it("lit my_access une fois, sans nouvelle tentative en cas de refus", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "permission denied" } });
     const { result } = renderHook(() => useMyAccess(), { wrapper });

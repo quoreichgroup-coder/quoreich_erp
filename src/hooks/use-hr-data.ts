@@ -30,6 +30,9 @@ export type Employee = {
   status: string;
   created_at: string;
   updated_at: string;
+  /** V149 — catégorie de paie (référentiel) et charges de famille, datées par mouvement. */
+  payroll_category?: string | null;
+  tax_dependents?: number | null;
 };
 
 export type EmployeeMovement = {
@@ -53,7 +56,7 @@ export type EmployeeMovement = {
 export type HrMovementReference = {
   id: string;
   tenant_id: string;
-  kind: "movement_type" | "reason_code" | "contract_type" | "department" | "job_title";
+  kind: "movement_type" | "reason_code" | "contract_type" | "department" | "job_title" | "payroll_category";
   code: string;
   label: string;
   active: boolean;
@@ -159,6 +162,13 @@ export type PayrollRun = {
   payroll_rules_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  /** V151 — cycle normal ou de régularisation, écriture, contrepassation. */
+  run_kind?: "regular" | "regularization";
+  regularizes_run_id?: string | null;
+  journal_entry_id?: string | null;
+  reversed_at?: string | null;
+  reversal_reason?: string | null;
+  reversal_entry_id?: string | null;
 };
 
 export type HrRoleAuditRow = {
@@ -179,6 +189,8 @@ export type HrPayrollSettings = {
   rules_reference: string | null;
   rules_validated_at: string | null;
   rules_validated_by: string | null;
+  /** V148 — décompte des jours de présence : jours calendaires ou mois de 30 jours. */
+  proration_method?: "calendar_days" | "thirty_days" | null;
 };
 
 export type HrPayrollComponent = {
@@ -187,7 +199,7 @@ export type HrPayrollComponent = {
   code: string;
   label: string;
   kind: "earning" | "deduction" | "employer_charge";
-  calculation_method: "fixed" | "percent_base";
+  calculation_method: "fixed" | "percent_base" | "quantity_rate" | "scale" | "formula";
   amount: number;
   cap: number | null;
   effective_from: string;
@@ -199,7 +211,72 @@ export type HrPayrollComponent = {
   taxable: boolean;
   subject_employee_social: boolean;
   subject_employer_social: boolean;
+  /** V148 — montant fixe réduit au prorata des jours de présence. */
+  prorated?: boolean;
+  /** V149 — part exonérée d'impôt : min(montant, % du salaire de base, plafond). */
+  tax_exempt_pct?: number | null;
+  tax_exempt_cap?: number | null;
+  /** V150 — ordre de calcul, base nommée, formule contrôlée, barème. */
+  priority?: number;
+  base_code?: string | null;
+  formula?: string | null;
+  scale?: { up_to: number | null; value: number }[] | null;
+  scale_mode?: "amount" | "percent" | null;
 };
+
+/** V150 — base de calcul nommée = salaire de base (option) + somme de rubriques. */
+export type HrPayrollBase = {
+  id?: string;
+  code: string;
+  label: string;
+  include_base_salary: boolean;
+  component_codes: string[];
+  active: boolean;
+};
+
+export function useHrPayrollBases() {
+  const { data: tenantId } = useTenantId();
+  const source = isApiEnabled() ? "api" : "supabase";
+  return useQuery({
+    queryKey: ["hr-payroll-bases", tenantId, source],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      if (isApiEnabled()) return apiGet<HrPayrollBase[]>("/api/v1/hr/payroll/bases");
+      const { data, error } = await (supabase as any).rpc("list_payroll_bases");
+      if (error) throw error;
+      return (data ?? []) as HrPayrollBase[];
+    },
+  });
+}
+
+export function useSaveHrPayrollBase() {
+  const qc = useQueryClient();
+  const { data: tenantId } = useTenantId();
+  return useMutation({
+    mutationFn: async (input: HrPayrollBase) => {
+      if (isApiEnabled()) return apiPost<{ id: string }>("/api/v1/hr/payroll/bases", input);
+      const { data, error } = await (supabase as any).rpc("save_payroll_base", { _input: input });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["hr-payroll-bases", tenantId] });
+      toast.success("Base de calcul enregistrée.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+/** V150 — essai d'une formule (analyse et calcul par la base, comme en paie). */
+export async function tryPayrollFormula(formula: string, variables: Record<string, unknown>): Promise<number> {
+  if (isApiEnabled()) {
+    const result = await apiPost<{ result: number }>("/api/v1/hr/payroll/formula-test", { formula, variables });
+    return Number(result.result);
+  }
+  const { data, error } = await (supabase as any).rpc("payroll_formula_try", { _formula: formula, _vars: variables });
+  if (error) throw error;
+  return Number(data);
+}
 
 export function useHrPayrollComponents(includeInactive = true) {
   const { data: tenantId } = useTenantId();
@@ -220,7 +297,8 @@ export function useSaveHrPayrollComponent() {
   const qc = useQueryClient();
   const { data: tenantId } = useTenantId();
   return useMutation({
-    mutationFn: async (input: Omit<HrPayrollComponent, "id" | "tenant_id">) => {
+    // V148 : `id` présent = modification ; absent = création (un code existant est refusé, jamais écrasé).
+    mutationFn: async (input: Omit<HrPayrollComponent, "id" | "tenant_id"> & { id?: string }) => {
       if (isApiEnabled()) return apiPost<{ id: string }>("/api/v1/hr/payroll/components", input);
       const { data, error } = await (supabase as any).rpc("save_hr_payroll_component", { _input: input });
       if (error) throw error;
@@ -237,6 +315,8 @@ export function useSaveHrPayrollComponent() {
 export type HrEmployeePayrollComponent = Pick<HrPayrollComponent,
   "id" | "tenant_id" | "code" | "label" | "kind" | "calculation_method" | "cap" | "effective_from" | "effective_to" | "active"> & {
     employee_id: string; component_id: string; amount: number; amount_override: number | null;
+    /** V150 — quantité mensuelle (rubriques quantité × taux ou formule). */
+    quantity?: number | null;
   };
 
 export function useHrEmployeePayrollComponents(employeeId: string | null, enabled = true) {
@@ -258,7 +338,7 @@ export function useSaveHrEmployeePayrollComponent() {
   const qc = useQueryClient();
   const { data: tenantId } = useTenantId();
   return useMutation({
-    mutationFn: async (args: { employeeId: string; input: { component_id: string; amount_override: number | null; effective_from: string; effective_to: string | null; active: boolean } }) => {
+    mutationFn: async (args: { employeeId: string; input: { component_id: string; amount_override: number | null; quantity?: number | null; effective_from: string; effective_to: string | null; active: boolean } }) => {
       if (isApiEnabled()) return apiPost<{ id: string }>(`/api/v1/hr/employees/${encodeURIComponent(args.employeeId)}/payroll-components`, args.input);
       const { data, error } = await (supabase as any).rpc("save_hr_employee_payroll_component", {
         _employee: args.employeeId, _input: args.input,
@@ -302,7 +382,7 @@ export function useHrPayrollSettings() {
     queryFn: async () => {
       if (isApiEnabled()) return apiGet<HrPayrollSettings | null>("/api/v1/hr/payroll/settings");
       const { data, error } = await (supabase as any).from("hr_payroll_settings")
-        .select("country_code, currency_code, employee_contribution_pct, employee_contribution_cap, employer_contribution_pct, employer_contribution_cap, income_tax_bands, rules_effective_from, rules_reference, rules_validated_at, rules_validated_by")
+        .select("country_code, currency_code, employee_contribution_pct, employee_contribution_cap, employer_contribution_pct, employer_contribution_cap, income_tax_bands, rules_effective_from, rules_reference, rules_validated_at, rules_validated_by, proration_method")
         .eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
       return data as HrPayrollSettings | null;
@@ -567,8 +647,8 @@ export type PayrollLine = {
 export type PayrollComponentLine = {
   id: string; tenant_id: string; run_id: string; employee_id: string; component_id: string | null;
   code_snapshot: string; label_snapshot: string; kind: "earning" | "deduction" | "employer_charge";
-  calculation_method: "fixed" | "percent_base"; calculation_base: number; rate_snapshot: number | null;
-  amount: number; source_type: "base_salary" | "employee_assignment" | "payroll_variable";
+  calculation_method: "fixed" | "percent_base" | "contribution" | "quantity_rate" | "scale" | "formula"; calculation_base: number; rate_snapshot: number | null;
+  amount: number; source_type: "base_salary" | "employee_assignment" | "payroll_variable" | "contribution";
   source_id: string | null; definition_snapshot: Record<string, unknown>;
 };
 
@@ -856,6 +936,51 @@ export function usePostPayrollRun() {
       invalidatePayroll(qc);
       qc.invalidateQueries({ queryKey: ["journal-entries"] });
       toast.success("Cycle comptabilisé — écriture SYSCOHADA générée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** V151 — contrepassation d'un cycle comptabilisé (droit hr.reverse_payroll, motif obligatoire). */
+export function useReversePayrollRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { runId: string; reason: string; reverseDate: string }) => {
+      if (isApiEnabled()) {
+        return (await apiPost<{ reversal_entry_id: string }>(`/api/v1/hr/payroll/runs/${encodeURIComponent(args.runId)}/reverse`,
+          { reason: args.reason, reverse_date: args.reverseDate })).reversal_entry_id;
+      }
+      const { data, error } = await (supabase as any).rpc("reverse_payroll_run",
+        { _run_id: args.runId, _reason: args.reason, _reverse_date: args.reverseDate });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      invalidatePayroll(qc);
+      qc.invalidateQueries({ queryKey: ["journal-entries"] });
+      toast.success("Cycle contrepassé : l'écriture de paie est annulée par une écriture inverse.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** V151 — cycle de régularisation : recalcul de la période, seule la différence est payée. */
+export function useCreatePayrollRegularization() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { runId: string; payDate: string; reason: string }) => {
+      if (isApiEnabled()) {
+        return (await apiPost<{ id: string }>(`/api/v1/hr/payroll/runs/${encodeURIComponent(args.runId)}/regularization`,
+          { pay_date: args.payDate, reason: args.reason })).id;
+      }
+      const { data, error } = await (supabase as any).rpc("create_payroll_regularization",
+        { _run_id: args.runId, _pay_date: args.payDate, _reason: args.reason });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      invalidatePayroll(qc);
+      toast.success("Régularisation créée : générez ses lignes pour calculer la différence.");
     },
     onError: (e: Error) => toast.error(e.message),
   });

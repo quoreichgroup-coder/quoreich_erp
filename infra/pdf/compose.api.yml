@@ -1,0 +1,17 @@
+# Optional local integration: keep the renderer private and join the API to its
+# internal network. No host port is published and no external Docker network is
+# added to Gotenberg.
+services:
+  api:
+    environment:
+      QERP_DB_URL: jdbc:postgresql://postgres:5432/qerp_reel
+      QERP_PDF_URL: http://gotenberg:3000
+      QERP_API_CORS_ALLOWED_ORIGINS: "http://localhost:8080,http://localhost:8081,http://127.0.0.1:8080,http://127.0.0.1:8081"
+    networks:
+      - default
+      - renderer
+
+networks:
+  renderer:
+    external: true
+    name: qerp-pdf

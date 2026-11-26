@@ -29,6 +29,9 @@
 
 ## Lot 1 — Paiement effectif
 
+**Réalisé par V154 (26 nov. 2026)** — voir `docs/audit-erp/32-audit-rh-paie.md` § E septies. Reste à faire : import
+du fichier de retour bancaire, formats XML si une banque l'exige, validation du premier fichier avec chaque banque.
+
 ### Parcours attendu
 
 1. Créer un lot à partir d'un cycle comptabilisé et de son net à payer; contrôler la devise, les bénéficiaires, les coordonnées requises et la dette ouverte avant toute émission.
@@ -119,6 +122,15 @@ Ces références guident la séparation entre registre, analyse, paiement et bul
 - Les téléchargements attendent le chargement de l'employeur et des lignes et restent bloqués en cas d'erreur, d'identité absente ou de devise manquante. Un dialogue fermé ne demande plus les rubriques de tout le cycle.
 - Vérification : trois tests de régression du bulletin, cinq tests des exports et permissions, TypeScript et lint ciblé réussis. La mise en page réelle des fichiers reste à vérifier visuellement avant réception du lot documents.
 - Point restant : l'ordre d'affichage du référentiel n'est pas conservé dans `definition_snapshot` par V86. Sa conservation pour les futurs calculs nécessite une migration; les anciens cycles ne doivent pas être réordonnés selon un référentiel modifié depuis leur calcul.
+
+## Audit RH & Paie et V148 — 25 novembre 2026
+
+- Audit complet, diagnostic, causes, architecture cible et plan P0–P3 : `docs/audit-erp/32-audit-rh-paie.md`.
+- V148 corrige trois anomalies P0 démontrées : le salaire était calculé sur l'état du dernier jour du mois (embauche,
+  sortie, suspension ou augmentation en cours de mois mal payées, `hire_date` ignorée) ; un net négatif passait le
+  précontrôle ; « Ajouter » une rubrique avec un code existant la remplaçait. Prorata par segments de présence, méthode
+  par société (`calendar_days` / `thirty_days`), `prorated` par rubrique, photographie du détail de présence.
+- Test : `PaieProrataPresenceIT`. Non déployé sur `qerp_reel` ni Supabase.
 
 ## V99 et recette complète — 17 novembre 2026
 

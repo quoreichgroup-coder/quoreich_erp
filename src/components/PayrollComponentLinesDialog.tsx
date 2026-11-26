@@ -26,7 +26,8 @@ export function PayrollComponentLinesDialog({ runId, run, employee, open, onOpen
     code: line.code_snapshot, label: line.label_snapshot,
     type: line.kind === "earning" ? "Gain" : line.kind === "deduction" ? "Retenue" : "Charge employeur",
     base: Number(line.calculation_base), rate: line.rate_snapshot == null ? null : Number(line.rate_snapshot),
-    amount: Number(line.amount), source: line.source_type === "base_salary" ? "Salaire de base" : line.source_type === "employee_assignment" ? "Affectation périodique" : "Variable approuvée",
+    amount: Number(line.amount), source: line.source_type === "base_salary" ? "Salaire de base" : line.source_type === "employee_assignment" ? "Affectation périodique"
+      : line.source_type === "contribution" ? "Cotisation (règles de paie)" : "Variable approuvée",
   }));
   const file = `bulletin-${employee?.id.slice(0, 8)}-${runId.slice(0, 8)}`;
   const currency = run.payroll_currency_code || "Devise non enregistrée";

@@ -103,6 +103,19 @@ qerp:
     # Alimente `info.version` du contrat OpenAPI. Surchargé à la construction pour
     # que le document publié porte la version réellement déployée.
     version: @project.version@
+  # Service de conversion PDF isolé. Une URL vide laisse la demande visible en échec et relançable.
+  pdf:
+    url: ${QERP_PDF_URL:}
+    authorization: ${QERP_PDF_AUTHORIZATION:}
+    renderer-version: ${QERP_PDF_RENDERER_VERSION:9.2.0}
+  # Envoi manuel des relances (G-32). Les identifiants sont fournis uniquement par l'environnement du serveur.
+  smtp:
+    host: ${QERP_SMTP_HOST:}
+    port: ${QERP_SMTP_PORT:587}
+    username: ${QERP_SMTP_USERNAME:}
+    password: ${QERP_SMTP_PASSWORD:}
+    from: ${QERP_SMTP_FROM:}
+    starttls: ${QERP_SMTP_STARTTLS:true}
   # Fournisseur d'IA compatible OpenAI (sur site : LiteLLM devant Ollama ou vLLM). Vide = analyses IA refusées
   # avec un message explicite. Plusieurs modèles séparés par des virgules : essayés dans l'ordre.
   ai:

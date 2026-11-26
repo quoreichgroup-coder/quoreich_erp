@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { documentFooter, emptyDocLine, toLines, validateDocLines } from "../document-lines";
 
 describe("lignes et pied d'une pièce d'achat", () => {
+  it("conserve l'article ou service choisi lors de l'enregistrement", () => {
+    expect(toLines([{ description: "Maintenance", quantity: "1", unitPrice: "1200000", item_id: "service-1" }]))
+      .toEqual([{ description: "Maintenance", quantity: 1, unitPrice: 1200000, item_id: "service-1" }]);
+  });
   it("calcule le pied à partir des lignes, en ignorant les lignes vides", () => {
     const lignes = [
       { description: "Portable", quantity: "3", unitPrice: "450 000" },

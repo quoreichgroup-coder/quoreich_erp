@@ -20,10 +20,12 @@ import {
   usePeriodLocks, useTogglePeriodLock,
 } from "@/hooks/use-ar-data";
 import { useGLAuditLogs } from "@/hooks/use-gl-audit";
+import { ARDunningPanel } from "@/components/ARDunningPanel";
 
 const tabs = [
   { id: "credit", label: "Contrôle du crédit", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "dunning", label: "Relances clients", icon: Mail },
   { id: "audit", label: "Piste d'audit", icon: Eye },
   { id: "locks", label: "Verrouillage des périodes", icon: Lock },
 ];
@@ -253,6 +255,8 @@ export default function ARControl() {
           )}
         </div>
       )}
+
+      {activeTab === "dunning" && <ARDunningPanel />}
 
       {/* AUDIT */}
       {activeTab === "audit" && (

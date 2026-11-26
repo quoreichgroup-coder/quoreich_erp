@@ -33,6 +33,8 @@ import {
   usePostPayrollRun,
   usePayrollRunAudit,
   usePayrollPostingAccounts,
+  useReversePayrollRun,
+  useCreatePayrollRegularization,
   type PayrollRun,
   type PayrollLine,
 } from "@/hooks/use-hr-data";
@@ -46,11 +48,16 @@ import { exportPayrollRunRecapPDF } from "@/lib/payroll-recap-pdf";
 import { PayrollExportPreviewDialog } from "@/components/PayrollExportPreviewDialog";
 import { PayrollVariablesPanel } from "@/components/PayrollVariablesPanel";
 import { PayrollComponentLinesDialog } from "@/components/PayrollComponentLinesDialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { useTransferHrTimeToPayroll } from "@/hooks/use-hr-time";
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   draft:    { label: "Brouillon",                cls: "bg-muted text-muted-foreground border-muted" },
   approved: { label: "Approuvé (à comptabiliser)", cls: "bg-blue-500/15 text-blue-700 border-blue-500/20" },
   posted:   { label: "Comptabilisé (verrouillé)", cls: "bg-success/15 text-success border-success/20" },
+  reversed: { label: "Contrepassé",              cls: "bg-destructive/10 text-destructive border-destructive/20" },
 };
 
 const TIMELINE: { key: "draft" | "approved" | "posted"; label: string; icon: typeof Play }[] = [
@@ -68,6 +75,7 @@ const AUDIT_EVENT_LABEL: Record<string, string> = {
   posted: "Cycle comptabilisé",
   status_changed: "Statut modifié",
   deleted: "Cycle supprimé",
+  reversed: "Cycle contrepassé",
 };
 
 export function PayrollRunDialog({
@@ -89,6 +97,16 @@ export function PayrollRunDialog({
   const approve = useApprovePayrollRun();
   const precheck = usePrecheckPayrollRun();
   const post = usePostPayrollRun();
+  const reverse = useReversePayrollRun();
+  const regularize = useCreatePayrollRegularization();
+  const transferTime = useTransferHrTimeToPayroll();
+  const { data: access } = useMyAccess();
+  const canReverse = (access?.permissions ?? []).includes("hr.reverse_payroll");
+  const today = new Date().toISOString().slice(0, 10);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reverseDate, setReverseDate] = useState(today);
+  const [regularizationReason, setRegularizationReason] = useState("");
+  const [regularizationPayDate, setRegularizationPayDate] = useState(today);
 
   const computations: PayrollComputation[] = useMemo(
     () => lines.map((l) => ({ gross: +l.gross, deductions: +l.deductions, taxes: +l.taxes, net: +l.net, employerCharges: +l.employer_charges })),
@@ -126,8 +144,11 @@ export function PayrollRunDialog({
   // Séparation des fonctions (V89, V103) : le préparateur du cycle ne l'approuve pas.
   const isPreparer = !!user && run?.created_by === user.id;
   const canApprove = canDo(perms, "approve_payroll_run") && !isPreparer && status === "draft" && !payrollRuns.isError && !linesLoading && !linesError && lines.length > 0;
+  // V151 : une régularisation peut avoir un brut nul ou négatif (trop-perçu) ; elle doit contenir une différence.
+  const isRegularization = run.run_kind === "regularization";
+  const hasAmounts = isRegularization ? lines.length > 0 : Number(run.gross_total) > 0;
   const canPost = canDo(perms, "execute_payroll") && status === "approved" && !payrollRuns.isError && !linesLoading && !linesError
-    && !postingAccounts.isLoading && !postingAccounts.isError && Number(run.gross_total) > 0 && je.balanced;
+    && !postingAccounts.isLoading && !postingAccounts.isError && hasAmounts && je.balanced;
   const canExport = canDo(perms, "export");
 
   // ── Action handlers with explicit loading toasts ────────────
@@ -208,6 +229,8 @@ export function PayrollRunDialog({
               <Info label="Brut" value={`${maskAmount(perms, +run.gross_total)} ${run.payroll_currency_code ?? "—"}`} />
               <Info label="Net" value={`${maskAmount(perms, +run.net_total)} ${run.payroll_currency_code ?? "—"}`} />
               <Info label="Statut" value={meta.label} />
+              <Info label="Nature" value={isRegularization ? "Régularisation (différence avec la paie déjà comptabilisée)" : "Paie du mois"} />
+              {run.reversed_at && <Info label="Contrepassé le" value={`${run.reversed_at.slice(0, 16).replace("T", " ")} · ${run.reversal_reason ?? ""}`} />}
               {run.approved_by && <Info label="Approuvé le" value={run.approved_at?.slice(0, 16).replace("T", " ") ?? "—"} />}
               {run.executed_by && <Info label="Comptabilisé le" value={run.executed_at?.slice(0, 16).replace("T", " ") ?? "—"} />}
             </div>
@@ -230,6 +253,15 @@ export function PayrollRunDialog({
               >
                 {generate.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 {generate.isPending ? "Génération…" : "Générer les lignes"}
+              </Button>
+
+              <Button
+                size="sm" variant="outline" className="h-8 text-xs"
+                disabled={!canGenerate || transferTime.isPending}
+                title="Transmet au cycle les absences et heures approuvées du mois dont le type est lié à une rubrique"
+                onClick={() => transferTime.mutate(run.id)}
+              >
+                Reprendre les temps approuvés
               </Button>
 
               <ConfirmButton
@@ -261,7 +293,7 @@ export function PayrollRunDialog({
                   : status !== "approved" ? "Le cycle doit être approuvé"
                   : linesLoading || linesError ? "Le chargement des lignes doit être confirmé"
                   : postingAccounts.isLoading || postingAccounts.isError ? "Le paramétrage des comptes n’est pas disponible"
-                  : Number(run.gross_total) <= 0 ? "Le cycle est vide ou son brut est nul"
+                  : !hasAmounts ? (isRegularization ? "Aucune différence à comptabiliser" : "Le cycle est vide ou son brut est nul")
                   : !je.balanced ? `Écriture déséquilibrée — D ${maskAmount(perms, je.totalDebit)} / C ${maskAmount(perms, je.totalCredit)}`
                   : "Génère l'écriture de paie sur les comptes du paramétrage comptable (rôles de paie) et verrouille le cycle"
                 }
@@ -274,7 +306,41 @@ export function PayrollRunDialog({
               />
             </div>
 
-            {status === "approved" && !linesError && !postingAccounts.isLoading && !postingAccounts.isError && (!je.balanced || Number(run.gross_total) <= 0) && (
+            {status === "posted" && (canDo(perms, "create_payroll_run") || canReverse) && (
+              <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+                {canDo(perms, "create_payroll_run") && <div className="space-y-2">
+                  <h4 className="text-xs font-medium">Régulariser la période</h4>
+                  <p className="text-[11px] text-muted-foreground">Recalcule {run.period} avec les données et règles actuelles (mouvement rétroactif, rubrique oubliée…) et ne paie que la différence, sans modifier les bulletins comptabilisés.</p>
+                  <div className="space-y-1"><Label htmlFor="payroll-regularization-date" className="text-xs">Date de paiement de la régularisation</Label>
+                    <Input id="payroll-regularization-date" type="date" value={regularizationPayDate} onChange={(e) => setRegularizationPayDate(e.target.value)} className="h-8 text-xs" /></div>
+                  <div className="space-y-1"><Label htmlFor="payroll-regularization-reason" className="text-xs">Motif de la régularisation</Label>
+                    <Input id="payroll-regularization-reason" value={regularizationReason} onChange={(e) => setRegularizationReason(e.target.value)} className="h-8 text-xs" /></div>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" disabled={regularize.isPending || regularizationReason.trim().length < 3 || !regularizationPayDate}
+                    onClick={() => regularize.mutate({ runId: run.id, payDate: regularizationPayDate, reason: regularizationReason.trim() }, { onSuccess: () => setRegularizationReason("") })}>
+                    Créer une régularisation</Button>
+                </div>}
+                {canReverse && <div className="space-y-2">
+                  <h4 className="text-xs font-medium">Contrepasser le cycle</h4>
+                  <p className="text-[11px] text-muted-foreground">Annule l’écriture de paie par une écriture inverse ; le cycle reste consultable et la période peut être recalculée.</p>
+                  <div className="space-y-1"><Label htmlFor="payroll-reverse-date" className="text-xs">Date de contrepassation</Label>
+                    <Input id="payroll-reverse-date" type="date" value={reverseDate} onChange={(e) => setReverseDate(e.target.value)} className="h-8 text-xs" /></div>
+                  <div className="space-y-1"><Label htmlFor="payroll-reverse-reason" className="text-xs">Motif de la contrepassation</Label>
+                    <Input id="payroll-reverse-reason" value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} className="h-8 text-xs" /></div>
+                  <ConfirmButton
+                    disabled={reverse.isPending || reverseReason.trim().length < 3 || !reverseDate}
+                    loading={reverse.isPending}
+                    label="Contrepasser"
+                    icon={XCircle}
+                    title="Annule l’écriture de paie de ce cycle"
+                    confirmTitle="Contrepasser ce cycle ?"
+                    confirmDesc="Une écriture inverse sera comptabilisée à la date choisie. Le cycle passera à « Contrepassé »."
+                    onConfirm={() => runWithToast("Contrepassation…", () => reverse.mutateAsync({ runId: run.id, reason: reverseReason.trim(), reverseDate }))}
+                  />
+                </div>}
+              </div>
+            )}
+
+            {status === "approved" && !linesError && !postingAccounts.isLoading && !postingAccounts.isError && (!je.balanced || !hasAmounts) && (
               <Alert variant="destructive" className="mt-2">
                 <XCircle className="w-4 h-4" />
                 <AlertTitle className="text-xs">Comptabilisation bloquée</AlertTitle>

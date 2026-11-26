@@ -50,6 +50,9 @@ class TreasuryBudgetSalesApiIT {
     PostgresFixture.loadReferenceDatasetOnce(DATABASE);
     PostgresFixture.applySyscohada(DATABASE, A);
     PostgresFixture.grantRoles(DATABASE, ADMIN, "admin", A);
+    // Depuis le contrôle d'accès aux modules (V146–V147), un compte sans rôle dans sa propre société est refusé avant même
+    // l'isolation : BETA reçoit donc un rôle chez elle, et le test prouve toujours qu'elle ne voit rien d'ALPHA.
+    PostgresFixture.grantRoles(DATABASE, PostgresFixture.BETA_USER, "admin", PostgresFixture.BETA_TENANT);
     TenantContextHolder.clear();
   }
 

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import {
   useARCreditNotes, useARInvoiceLines, useCreateARCreditNote, type ARCreditNote, type ARInvoice,
@@ -17,7 +18,7 @@ import {
 const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 const today = () => new Date().toISOString().split("T")[0];
 
-export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open: boolean; onClose: () => void }) {
+export function CreditNoteDialog({ inv, open, onClose, returnFocusRef }: { inv: ARInvoice; open: boolean; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   const lines = useARInvoiceLines(open ? inv.id : undefined);
   const create = useCreateARCreditNote();
   const [reason, setReason] = useState("");
@@ -37,7 +38,7 @@ export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open:
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl max-sm:[&_input]:min-h-11 max-sm:[&_input]:text-base">
         <DialogHeader>
           <DialogTitle className="text-sm">Avoir sur la facture {inv.invoice_number}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -46,8 +47,8 @@ export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open:
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="col-span-1 space-y-1.5 sm:col-span-2">
               <Label className="text-xs" htmlFor="credit-reason">Motif (obligatoire)</Label>
               <Input id="credit-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder="Retour de marchandise, erreur de prix, geste commercial…" />
@@ -71,7 +72,8 @@ export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open:
                   Tout créditer
                 </Button>
               </div>
-              <table className="w-full text-xs">
+              <div role="region" aria-label="Lignes à créditer" tabIndex={0} className="overflow-x-auto rounded-md border border-border focus-visible:outline-2 focus-visible:outline-ring">
+              <table className="w-full min-w-[40rem] text-xs">
                 <thead><tr className="text-muted-foreground border-b border-border">
                   <th className="text-left py-1">Libellé</th><th className="text-right">P.U.</th><th className="text-right">Remise</th>
                   <th className="text-right">TVA</th><th className="text-right">Facturé</th><th className="text-right">Déjà crédité</th>
@@ -95,6 +97,7 @@ export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open:
                   ))}
                 </tbody>
               </table>
+              </div>
               <p className="text-xs text-right" data-testid="credit-preview">Montant HT crédité : <strong>{fmt(net)} XOF</strong> (TVA calculée par la base)</p>
             </div>
           )}
@@ -110,12 +113,12 @@ export function CreditNoteDialog({ inv, open, onClose }: { inv: ARInvoice; open:
   );
 }
 
-export function CreditNoteView({ note, onClose }: { note: ARCreditNote | null; onClose: () => void }) {
+export function CreditNoteView({ note, onClose, returnFocusRef }: { note: ARCreditNote | null; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   if (!note) return null;
   const title = `Avoir ${note.credit_note_number}`;
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
           title={title} fileName={documentFileName(title)} attachments={{ docType: "ar_credit_note", docId: note.id }}
@@ -136,6 +139,12 @@ export function CreditNoteView({ note, onClose }: { note: ARCreditNote | null; o
 export function CreditNotesList({ invoiceId, title = "Avoirs" }: { invoiceId?: string; title?: string }) {
   const { data: notes = [], isLoading } = useARCreditNotes(invoiceId);
   const [view, setView] = useState<ARCreditNote | null>(null);
+  const viewTrigger = useRef<HTMLButtonElement | null>(null);
+  const columns: MobileTableColumn[] = [
+    { label: "N° avoir", kind: "primary" }, { label: "Date" },
+    ...(!invoiceId ? [{ label: "Facture" }, { label: "Client", wide: true }] : []),
+    { label: "Motif", wide: true }, { label: "TTC" }, { label: "Non imputé" },
+  ];
   if (invoiceId && (isLoading || notes.length === 0)) return null;
   return (
     <section aria-label={title} className="space-y-2">
@@ -143,27 +152,29 @@ export function CreditNotesList({ invoiceId, title = "Avoirs" }: { invoiceId?: s
       {notes.length === 0 ? (
         <p className="text-xs text-muted-foreground">{isLoading ? "Chargement…" : "Aucun avoir."}</p>
       ) : (
-        <table className="w-full text-xs">
-          <thead><tr className="text-muted-foreground border-b border-border">
-            <th className="text-left py-1">N° avoir</th><th className="text-left">Date</th>
-            {!invoiceId && <><th className="text-left">Facture</th><th className="text-left">Client</th></>}
-            <th className="text-left">Motif</th><th className="text-right">TTC</th><th className="text-right">Non imputé</th>
-          </tr></thead>
-          <tbody>
+        <Table className="text-xs" mobileColumns={columns} aria-label={title}>
+          <TableHeader><TableRow>
+            <TableHead>N° avoir</TableHead><TableHead>Date</TableHead>
+            {!invoiceId && <TableHead>Facture</TableHead>}
+            {!invoiceId && <TableHead>Client</TableHead>}
+            <TableHead>Motif</TableHead><TableHead className="text-right">TTC</TableHead><TableHead className="text-right">Non imputé</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
             {notes.map((n) => (
-              <tr key={n.id} data-testid="credit-note-row" className="border-b border-border/50 cursor-pointer hover:bg-muted/40" onClick={() => setView(n)}>
-                <td className="py-1 font-mono">{n.credit_note_number}</td>
-                <td>{n.credit_date}</td>
-                {!invoiceId && <><td className="font-mono">{n.invoice_number}</td><td>{n.customer_name}</td></>}
-                <td className="truncate max-w-[16rem]">{n.reason}</td>
-                <td className="text-right tabular-nums">{fmt(n.total)}</td>
-                <td className="text-right tabular-nums">{fmt(n.total - n.amount_allocated)}</td>
-              </tr>
+              <TableRow key={n.id} data-testid="credit-note-row" className="cursor-pointer" onClick={event => { viewTrigger.current = event.currentTarget.querySelector<HTMLButtonElement>("button"); setView(n); }}>
+                <TableCell className="px-3 py-2 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full whitespace-normal break-words p-0 text-left font-mono md:min-h-0 md:whitespace-nowrap" onClick={event => { event.stopPropagation(); viewTrigger.current = event.currentTarget; setView(n); }}>{n.credit_note_number}</Button></TableCell>
+                <TableCell className="px-3 py-2 md:whitespace-nowrap">{n.credit_date}</TableCell>
+                {!invoiceId && <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{n.invoice_number}</TableCell>}
+                {!invoiceId && <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={n.customer_name}>{n.customer_name}</span></TableCell>}
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={n.reason}>{n.reason}</span></TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(n.total)}</TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(n.total - n.amount_allocated)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      <CreditNoteView note={view} onClose={() => setView(null)} />
+      <CreditNoteView note={view} onClose={() => setView(null)} returnFocusRef={viewTrigger} />
     </section>
   );
 }

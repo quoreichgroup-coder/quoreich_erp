@@ -18,6 +18,13 @@ export default defineConfig({
     // « Timeout waiting for worker ». Plafond local à 4 (VITEST_MAX_WORKERS le change) ; la CI
     // garde le défaut de Vitest.
     maxWorkers: process.env.VITEST_MAX_WORKERS ?? (process.env.CI ? undefined : 4),
+    // La CI n'a pas de `.env` : sans ces valeurs, tout test qui importe (même indirectement) le vrai client
+    // Supabase échouait au chargement (« supabaseUrl is required »), rouge sur main depuis le 20 nov. 2026.
+    // Valeurs factices, jamais contactées : les tests simulent le client ou n'appellent pas le réseau.
+    env: {
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "http://localhost:54321",
+      VITE_SUPABASE_PUBLISHABLE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "test-publishable-key",
+    },
   },
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppearanceProvider } from "@/contexts/AppearanceContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { queryClient } from "@/lib/query-client";
 import Login from "./pages/Login";
@@ -111,6 +112,9 @@ const PayrollRuns = lazy(() => import("./pages/PayrollRuns"));
 const HrSettings = lazy(() => import("./pages/HrSettings"));
 const HrDashboard = lazy(() => import("./pages/HrDashboard"));
 const HrTransactions = lazy(() => import("./pages/HrTransactions"));
+const HrTime = lazy(() => import("./pages/HrTime"));
+const HrSelfService = lazy(() => import("./pages/HrSelfService"));
+const HrPayments = lazy(() => import("./pages/HrPayments"));
 const HrReporting = lazy(() => import("./pages/HrReporting"));
 const HrControl = lazy(() => import("./pages/HrControl"));
 const CrmDashboard = lazy(() => import("./pages/CrmDashboard"));
@@ -139,6 +143,7 @@ const PageFallback = () => (
 );
 
 const App = () => (
+  <AppearanceProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -255,6 +260,9 @@ const App = () => (
               {/* HR / Payroll */}
               <Route path="/hr" element={<P><HrDashboard /></P>} />
               <Route path="/hr/transactions" element={<P><HrTransactions /></P>} />
+              <Route path="/hr/time" element={<P><HrTime /></P>} />
+              <Route path="/hr/me" element={<P><HrSelfService /></P>} />
+              <Route path="/hr/payments" element={<P><HrPayments /></P>} />
               <Route path="/hr/employees" element={<P><Employees /></P>} />
               <Route path="/hr/payroll" element={<P><PayrollRuns /></P>} />
               <Route path="/hr/reporting" element={<P><HrReporting /></P>} />
@@ -285,6 +293,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </AppearanceProvider>
 );
 
 export default App;

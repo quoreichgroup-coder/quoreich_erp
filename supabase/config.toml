@@ -8,3 +8,11 @@ verify_jwt = false
 
 [functions.tracking-webhook]
 verify_jwt = false
+
+[functions.document-render]
+# The handler verifies the end-user token through Auth before touching a document.
+verify_jwt = false
+
+[functions.ar-dunning]
+# The handler verifies the end-user token before service-role-only actor RPCs.
+verify_jwt = false

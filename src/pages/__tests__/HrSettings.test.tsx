@@ -6,6 +6,7 @@ import HrSettings from "@/pages/HrSettings";
 vi.mock("@/hooks/use-hr-data", () => ({ useMyHrRoles: () => ({ canManageMovementSettings: true }) }));
 vi.mock("@/hooks/use-my-access", () => ({ useMyAccess: () => ({ data: { permissions: ["hr.manage_employee_number_settings"] } }) }));
 vi.mock("@/components/PayrollSettingsCard", () => ({ PayrollSettingsCard: () => <div>Règles paie</div> }));
+vi.mock("@/components/PayrollRuleVersionsPanel", () => ({ PayrollRuleVersionsPanel: () => <div>Versions des règles</div> }));
 vi.mock("@/components/HrPayrollComponentsCard", () => ({ HrPayrollComponentsCard: () => <div>Rubriques paie</div> }));
 vi.mock("@/components/HrMovementSettingsCard", () => ({ HrMovementSettingsCard: () => <div>Références mouvements</div> }));
 vi.mock("@/components/HrEmployeeNumberSettingsCard", () => ({ HrEmployeeNumberSettingsCard: () => <div>Réglages matricules</div> }));
@@ -19,6 +20,7 @@ describe("HR settings tabs", () => {
     expect(screen.getByRole("tab", { name: "Matricules" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Référentiels et mouvements" })).toBeInTheDocument();
     expect(screen.getByText("Règles paie")).toBeInTheDocument();
+    expect(screen.getByText("Versions des règles")).toBeInTheDocument();
     expect(screen.queryByText("Réglages matricules")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Matricules" }));

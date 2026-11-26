@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -27,6 +27,7 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 };
 
 const SidebarContext = React.createContext<SidebarContext | null>(null);
@@ -50,6 +51,7 @@ const SidebarProvider = React.forwardRef<
 >(({ defaultOpen = true, open: openProp, onOpenChange: setOpenProp, className, style, children, ...props }, ref) => {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -101,6 +103,7 @@ const SidebarProvider = React.forwardRef<
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      triggerRef,
     }),
     [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
   );
@@ -136,7 +139,7 @@ const Sidebar = React.forwardRef<
     collapsible?: "offcanvas" | "icon" | "none";
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, triggerRef } = useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -163,7 +166,16 @@ const Sidebar = React.forwardRef<
             } as React.CSSProperties
           }
           side={side}
+          onCloseAutoFocus={(event) => {
+            // Ce Sheet est contrôlé hors d'un SheetTrigger Radix.
+            if (triggerRef.current?.isConnected) {
+              event.preventDefault();
+              triggerRef.current.focus();
+            }
+          }}
         >
+          <SheetTitle className="sr-only">Navigation QERP</SheetTitle>
+          <SheetDescription className="sr-only">Accéder aux modules et aux paramètres de votre société.</SheetDescription>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
@@ -191,6 +203,7 @@ const Sidebar = React.forwardRef<
         )}
       />
       <div
+        inert={state === "collapsed" && collapsible === "offcanvas"}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
           side === "left"
@@ -218,15 +231,20 @@ Sidebar.displayName = "Sidebar";
 
 const SidebarTrigger = React.forwardRef<React.ElementRef<typeof Button>, React.ComponentProps<typeof Button>>(
   ({ className, onClick, ...props }, ref) => {
-    const { toggleSidebar } = useSidebar();
+    const { toggleSidebar, isMobile, openMobile, open, triggerRef } = useSidebar();
 
     return (
       <Button
-        ref={ref}
+        ref={(node) => {
+          triggerRef.current = node;
+          if (typeof ref === "function") return ref(node);
+          if (ref) ref.current = node;
+        }}
         data-sidebar="trigger"
+        aria-expanded={isMobile ? openMobile : open}
         variant="ghost"
         size="icon"
-        className={cn("h-7 w-7", className)}
+        className={cn("size-10 shrink-0 sm:size-9", className)}
         onClick={(event) => {
           onClick?.(event);
           toggleSidebar();

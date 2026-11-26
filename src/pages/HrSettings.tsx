@@ -3,6 +3,7 @@ import { ModulePostingSettings } from "@/components/AccountSets";
 import { Link } from "react-router-dom";
 import { ArrowRight, BadgeCheck, Coins, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { PayrollSettingsCard } from "@/components/PayrollSettingsCard";
+import { PayrollRuleVersionsPanel } from "@/components/PayrollRuleVersionsPanel";
 import { HrMovementSettingsCard } from "@/components/HrMovementSettingsCard";
 import { HrPayrollComponentsCard } from "@/components/HrPayrollComponentsCard";
 import { HrEmployeeNumberSettingsCard } from "@/components/HrEmployeeNumberSettingsCard";
@@ -48,7 +49,7 @@ export default function HrSettings() {
         ))}
       </div>
       <div role="tabpanel" className="mt-4 space-y-4">
-        {activeTab === "payroll" && <PayrollSettingsCard />}
+        {activeTab === "payroll" && <><PayrollRuleVersionsPanel /><PayrollSettingsCard /></>}
         {activeTab === "components" && <HrPayrollComponentsCard />}
         {activeTab === "posting" && <ModulePostingSettings modules={["PAY"]} extra={
           <p className="text-xs text-muted-foreground">Un compte propre à une rubrique (prime, retenue…) se règle sur la rubrique, onglet « Rubriques » ; sinon le rôle ci-dessus s'applique.</p>} />}

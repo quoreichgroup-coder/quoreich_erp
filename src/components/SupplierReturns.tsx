@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
 import { useAPInvoices, type APInvoice } from "@/hooks/use-ap-data";
 import { useMyAccess } from "@/hooks/use-my-access";
@@ -32,7 +33,7 @@ function InvoicePicker({ id, invoices, value, onChange, allowNone }: {
   id: string; invoices: APInvoice[]; value: string; onChange: (v: string) => void; allowNone: boolean;
 }) {
   return (
-    <select id={id} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={value} onChange={(e) => onChange(e.target.value)}>
+    <select id={id} className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base sm:h-8 sm:text-xs" value={value} onChange={(e) => onChange(e.target.value)}>
       {allowNone && <option value="">Aucune — avoir à recevoir plus tard</option>}
       {!allowNone && <option value="">Choisir la facture…</option>}
       {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} — {fmt(i.total)} XOF</option>)}
@@ -40,9 +41,9 @@ function InvoicePicker({ id, invoices, value, onChange, allowNone }: {
   );
 }
 
-export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
+export function SupplierReturnDialog({ gr, poLines, open, onClose, returnFocusRef }: {
   gr: { id: string; gr_number: string; po_id: string; receipt_date: string; lines?: any[] | null; po?: any };
-  poLines: PoLineRef[]; open: boolean; onClose: () => void;
+  poLines: PoLineRef[]; open: boolean; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { data: returns = [] } = useSupplierReturns();
   const invoices = useCreditableInvoices(gr.po_id);
@@ -67,7 +68,7 @@ export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">Retour fournisseur sur la réception {gr.gr_number}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -76,18 +77,19 @@ export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="col-span-1 space-y-1.5 sm:col-span-2">
               <Label className="text-xs" htmlFor="return-reason">Motif (obligatoire)</Label>
-              <Input id="return-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)}
+              <Input id="return-reason" className="h-11 text-base sm:h-8 sm:text-xs" value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder="Articles défectueux, erreur de référence, excédent livré…" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="return-date">Date du retour</Label>
-              <Input id="return-date" type="date" className="h-8 text-xs" min={gr.receipt_date} value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="return-date" type="date" className="h-11 text-base sm:h-8 sm:text-xs" min={gr.receipt_date} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
-          <table className="w-full text-xs">
+          <div role="region" aria-label="Lignes à retourner" tabIndex={0} className="overflow-x-auto rounded-md border border-border focus-visible:outline-2 focus-visible:outline-ring">
+          <table className="w-full min-w-[40rem] text-xs">
             <thead><tr className="text-muted-foreground border-b border-border">
               <th className="text-left py-1">Article</th><th className="text-right">Reçu</th><th className="text-right">Déjà retourné</th>
               <th className="text-right">Retournable</th><th className="text-right">Coût unitaire</th><th className="text-right w-28">À retourner</th>
@@ -103,7 +105,7 @@ export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
                   <td className="text-right tabular-nums">{fmt(l.returnable)}</td>
                   <td className="text-right tabular-nums">{fmt(l.unit_cost)}</td>
                   <td className="text-right">
-                    <Input aria-label={`Quantité à retourner ligne ${i + 1}`} className="h-7 text-xs text-right" inputMode="decimal"
+                    <Input aria-label={`Quantité à retourner ligne ${i + 1}`} className="h-11 text-base text-right sm:h-8 sm:text-xs" inputMode="decimal"
                       disabled={l.returnable <= 0} value={qtys[l.id] ?? ""} onChange={(e) => setQtys({ ...qtys, [l.id]: e.target.value })} />
                   </td>
                 </tr>
@@ -112,18 +114,19 @@ export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
             <tfoot><tr className="font-medium"><td colSpan={5} className="text-right py-1">Valeur du retour (HT)</td>
               <td className="text-right tabular-nums" data-testid="return-value">{fmt(value)} XOF</td></tr></tfoot>
           </table>
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} />
+          </div>
+          <label className="flex min-h-11 items-start gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
+            <input type="checkbox" className="mt-0.5 size-5 shrink-0" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} />
             Remplacement attendu : les quantités retournées redeviennent à recevoir sur la commande
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="return-invoice">Facture fournisseur à créditer</Label>
               <InvoicePicker id="return-invoice" invoices={invoices} value={invoiceId} onChange={setInvoiceId} allowNone />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="return-reference">N° de l'avoir du fournisseur</Label>
-              <Input id="return-reference" className="h-8 text-xs" disabled={!invoiceId} value={reference} onChange={(e) => setReference(e.target.value)} />
+              <Input id="return-reference" className="h-11 text-base sm:h-8 sm:text-xs" disabled={!invoiceId} value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
           </div>
           {invoice && (
@@ -144,7 +147,7 @@ export function SupplierReturnDialog({ gr, poLines, open, onClose }: {
   );
 }
 
-function CreditReturnDialog({ ret, onClose }: { ret: SupplierReturn | null; onClose: () => void }) {
+function CreditReturnDialog({ ret, onClose, returnFocusRef, completedFocusRef }: { ret: SupplierReturn | null; onClose: () => void; returnFocusRef?: RefObject<HTMLElement | null>; completedFocusRef?: RefObject<HTMLButtonElement | null> }) {
   const invoices = useCreditableInvoices(ret?.po_id);
   const credit = useCreditSupplierReturn();
   const [invoiceId, setInvoiceId] = useState("");
@@ -154,7 +157,7 @@ function CreditReturnDialog({ ret, onClose }: { ret: SupplierReturn | null; onCl
   const invoice = invoices.find((i) => i.id === invoiceId);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm">Avoir du retour {ret.return_number}</DialogTitle>
           <DialogDescription className="text-xs">Valeur retournée : {fmt(ret.total_value)} XOF HT, TVA au taux de la facture choisie.</DialogDescription>
@@ -165,14 +168,14 @@ function CreditReturnDialog({ ret, onClose }: { ret: SupplierReturn | null; onCl
             <InvoicePicker id="credit-return-invoice" invoices={invoices} value={invoiceId} onChange={setInvoiceId} allowNone={false} />
             {invoices.length === 0 && <p className="text-xs text-muted-foreground">Aucune facture approuvée sur cette commande.</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="credit-return-reference">N° de l'avoir du fournisseur</Label>
-              <Input id="credit-return-reference" className="h-8 text-xs" value={reference} onChange={(e) => setReference(e.target.value)} />
+              <Input id="credit-return-reference" className="h-11 text-base sm:h-8 sm:text-xs" value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="credit-return-date">Date de l'avoir</Label>
-              <Input id="credit-return-date" type="date" className="h-8 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="credit-return-date" type="date" className="h-11 text-base sm:h-8 sm:text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
           {invoice && <p className="text-xs text-muted-foreground">TTC : {fmt(ret.total_value + creditTax(ret.total_value, invoice))} XOF</p>}
@@ -180,7 +183,11 @@ function CreditReturnDialog({ ret, onClose }: { ret: SupplierReturn | null; onCl
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
           <Button size="sm" disabled={!invoiceId || credit.isPending}
-            onClick={() => credit.mutate({ returnId: ret.id, invoiceId, supplierReference: reference.trim(), date }, { onSuccess: onClose })}>
+            onClick={() => credit.mutate({ returnId: ret.id, invoiceId, supplierReference: reference.trim(), date }, { onSuccess: () => {
+              // Le bouton d'avoir disparaît au succès ; la référence du retour reste.
+              if (returnFocusRef && completedFocusRef?.current?.isConnected) returnFocusRef.current = completedFocusRef.current;
+              onClose();
+            } })}>
             Comptabiliser l'avoir
           </Button>
         </DialogFooter>
@@ -189,12 +196,12 @@ function CreditReturnDialog({ ret, onClose }: { ret: SupplierReturn | null; onCl
   );
 }
 
-function SupplierReturnView({ ret, onClose }: { ret: SupplierReturn | null; onClose: () => void }) {
+function SupplierReturnView({ ret, onClose, returnFocusRef }: { ret: SupplierReturn | null; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   if (!ret) return null;
   const title = `Retour fournisseur ${ret.return_number}`;
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
           title={title} fileName={documentFileName(title)} attachments={{ docType: "supplier_return", docId: ret.id }}
@@ -217,45 +224,56 @@ export function SupplierReturnsList() {
   const canCredit = (access?.permissions ?? []).includes("ap.credit_note");
   const [view, setView] = useState<SupplierReturn | null>(null);
   const [credit, setCredit] = useState<SupplierReturn | null>(null);
+  const viewTrigger = useRef<HTMLButtonElement | null>(null);
+  const creditTrigger = useRef<HTMLElement | null>(null);
+  const creditedReturnTrigger = useRef<HTMLButtonElement | null>(null);
+  const columns: MobileTableColumn[] = [
+    { label: "N° retour", kind: "primary" }, { label: "Date" }, { label: "Réception" }, { label: "Commande" },
+    { label: "Fournisseur", wide: true }, { label: "Motif", wide: true }, { label: "Valeur HT", wide: true }, { label: "Avoir", wide: true },
+  ];
   return (
     <section aria-label="Retours fournisseurs" className="space-y-2">
       {returns.length === 0 ? (
         <p className="text-xs text-muted-foreground p-4">{isLoading ? "Chargement…" : "Aucun retour fournisseur. Un retour part d'une réception validée (bouton « Retour »)."}</p>
       ) : (
-        <table className="w-full text-xs">
-          <thead><tr className="text-muted-foreground border-b border-border">
-            <th className="text-left py-2 px-3">N° retour</th><th className="text-left">Date</th><th className="text-left">Réception</th>
-            <th className="text-left">Commande</th><th className="text-left">Fournisseur</th><th className="text-left">Motif</th>
-            <th className="text-right">Valeur HT</th><th className="text-left pl-3">Avoir</th>
-          </tr></thead>
-          <tbody>
+        <Table className="text-xs" mobileColumns={columns} aria-label="Retours fournisseurs">
+          <TableHeader><TableRow>
+            <TableHead>N° retour</TableHead><TableHead>Date</TableHead><TableHead>Réception</TableHead>
+            <TableHead>Commande</TableHead><TableHead>Fournisseur</TableHead><TableHead>Motif</TableHead>
+            <TableHead className="text-right">Valeur HT</TableHead><TableHead>Avoir</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
             {returns.map((r) => (
-              <tr key={r.id} data-testid="supplier-return-row" className="border-b border-border/50 cursor-pointer hover:bg-muted/40" onClick={() => setView(r)}>
-                <td className="py-2 px-3 font-mono">{r.return_number}</td>
-                <td>{r.return_date}</td>
-                <td className="font-mono">{r.gr_number}</td>
-                <td className="font-mono">{r.po_number}</td>
-                <td>{r.supplier_name}</td>
-                <td className="truncate max-w-[14rem]">{r.reason}{r.replacement_expected ? " · remplacement attendu" : ""}</td>
-                <td className="text-right tabular-nums">{fmt(r.total_value)}</td>
-                <td className="pl-3" onClick={(e) => e.stopPropagation()}>
+              <TableRow key={r.id} data-testid="supplier-return-row" className="cursor-pointer" onClick={event => { viewTrigger.current = event.currentTarget.querySelector<HTMLButtonElement>("button"); setView(r); }}>
+                <TableCell className="px-3 py-2 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full whitespace-normal break-words p-0 text-left font-mono md:min-h-0 md:whitespace-nowrap" onClick={event => { event.stopPropagation(); viewTrigger.current = event.currentTarget; setView(r); }}>{r.return_number}</Button></TableCell>
+                <TableCell className="px-3 py-2 md:whitespace-nowrap">{r.return_date}</TableCell>
+                <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{r.gr_number}</TableCell>
+                <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{r.po_number}</TableCell>
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={r.supplier_name}>{r.supplier_name}</span></TableCell>
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={`${r.reason}${r.replacement_expected ? " · remplacement attendu" : ""}`}>{r.reason}{r.replacement_expected ? " · remplacement attendu" : ""}</span></TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(r.total_value)}</TableCell>
+                <TableCell className="px-3 py-2 max-md:border-t max-md:pt-3" onClick={(e) => e.stopPropagation()}>
                   {r.credit_note_number ? <span className="font-mono">{r.credit_note_number}</span>
-                    : canCredit && r.total_value > 0 ? <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setCredit(r)}>Établir l'avoir</Button>
+                    : canCredit && r.total_value > 0 ? <Button size="sm" variant="outline" className="min-h-11 text-sm md:min-h-0 md:text-xs" onClick={event => {
+                      creditTrigger.current = event.currentTarget;
+                      creditedReturnTrigger.current = event.currentTarget.closest("tr")?.querySelector<HTMLButtonElement>("button") ?? null;
+                      setCredit(r);
+                    }}>Établir l'avoir</Button>
                     : <span className="text-muted-foreground">À recevoir</span>}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      <SupplierReturnView ret={view} onClose={() => setView(null)} />
-      <CreditReturnDialog ret={credit} onClose={() => setCredit(null)} />
+      <SupplierReturnView ret={view} onClose={() => setView(null)} returnFocusRef={viewTrigger} />
+      <CreditReturnDialog ret={credit} onClose={() => setCredit(null)} returnFocusRef={creditTrigger} completedFocusRef={creditedReturnTrigger} />
     </section>
   );
 }
 
 /** Avoir fournisseur saisi sur une facture approuvée (remise, erreur de prix, retour hors réception…). */
-export function APCreditNoteDialog({ inv, open, onClose }: { inv: APInvoice; open: boolean; onClose: () => void }) {
+export function APCreditNoteDialog({ inv, open, onClose, returnFocusRef }: { inv: APInvoice; open: boolean; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   const { data: notes = [] } = useAPCreditNotes(open ? inv.id : undefined);
   const create = useCreateAPCreditNote();
   const room = creditNoteRoom(inv, notes);
@@ -271,7 +289,7 @@ export function APCreditNoteDialog({ inv, open, onClose }: { inv: APInvoice; ope
     : t > room.tax ? `TVA au plus ${fmt(room.tax)}.` : null;
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg max-sm:[&_input]:min-h-11 max-sm:[&_input]:text-base">
         <DialogHeader>
           <DialogTitle className="text-sm">Avoir fournisseur sur la facture {inv.invoice_number}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -284,7 +302,7 @@ export function APCreditNoteDialog({ inv, open, onClose }: { inv: APInvoice; ope
             <Label className="text-xs" htmlFor="ap-credit-reason">Motif (obligatoire)</Label>
             <Input id="ap-credit-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Remise, erreur de prix, ristourne…" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="ap-credit-subtotal">Montant HT (reste {fmt(room.subtotal)})</Label>
               <Input id="ap-credit-subtotal" className="h-8 text-xs text-right" inputMode="decimal" value={sub}
@@ -319,12 +337,12 @@ export function APCreditNoteDialog({ inv, open, onClose }: { inv: APInvoice; ope
   );
 }
 
-function APCreditNoteView({ note, onClose }: { note: APCreditNote | null; onClose: () => void }) {
+function APCreditNoteView({ note, onClose, returnFocusRef }: { note: APCreditNote | null; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   if (!note) return null;
   const title = `Avoir fournisseur ${note.credit_note_number}`;
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-2xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail
           title={title} fileName={documentFileName(title)} attachments={{ docType: "ap_credit_note", docId: note.id }}
@@ -344,6 +362,12 @@ function APCreditNoteView({ note, onClose }: { note: APCreditNote | null; onClos
 export function APCreditNotesList({ invoiceId, title = "Avoirs fournisseurs" }: { invoiceId?: string; title?: string }) {
   const { data: notes = [], isLoading } = useAPCreditNotes(invoiceId);
   const [view, setView] = useState<APCreditNote | null>(null);
+  const viewTrigger = useRef<HTMLButtonElement | null>(null);
+  const columns: MobileTableColumn[] = [
+    { label: "N° avoir", kind: "primary" }, { label: "Date" },
+    ...(!invoiceId ? [{ label: "Facture" }, { label: "Fournisseur", wide: true }] : []),
+    { label: "Réf. fournisseur" }, { label: "Motif", wide: true }, { label: "TTC" }, { label: "Non imputé" },
+  ];
   if (invoiceId && (isLoading || notes.length === 0)) return null;
   return (
     <section aria-label={title} className="space-y-2">
@@ -351,28 +375,30 @@ export function APCreditNotesList({ invoiceId, title = "Avoirs fournisseurs" }: 
       {notes.length === 0 ? (
         <p className="text-xs text-muted-foreground">{isLoading ? "Chargement…" : "Aucun avoir fournisseur."}</p>
       ) : (
-        <table className="w-full text-xs">
-          <thead><tr className="text-muted-foreground border-b border-border">
-            <th className="text-left py-1">N° avoir</th><th className="text-left">Date</th>
-            {!invoiceId && <><th className="text-left">Facture</th><th className="text-left">Fournisseur</th></>}
-            <th className="text-left">Réf. fournisseur</th><th className="text-left">Motif</th><th className="text-right">TTC</th><th className="text-right">Non imputé</th>
-          </tr></thead>
-          <tbody>
+        <Table className="text-xs" mobileColumns={columns} aria-label={title}>
+          <TableHeader><TableRow>
+            <TableHead>N° avoir</TableHead><TableHead>Date</TableHead>
+            {!invoiceId && <TableHead>Facture</TableHead>}
+            {!invoiceId && <TableHead>Fournisseur</TableHead>}
+            <TableHead>Réf. fournisseur</TableHead><TableHead>Motif</TableHead><TableHead className="text-right">TTC</TableHead><TableHead className="text-right">Non imputé</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
             {notes.map((n) => (
-              <tr key={n.id} data-testid="ap-credit-note-row" className="border-b border-border/50 cursor-pointer hover:bg-muted/40" onClick={() => setView(n)}>
-                <td className="py-1 font-mono">{n.credit_note_number}</td>
-                <td>{n.credit_date}</td>
-                {!invoiceId && <><td className="font-mono">{n.invoice_number}</td><td>{n.supplier_name}</td></>}
-                <td>{n.supplier_reference ?? "—"}</td>
-                <td className="truncate max-w-[14rem]">{n.reason}</td>
-                <td className="text-right tabular-nums">{fmt(n.total)}</td>
-                <td className="text-right tabular-nums">{fmt(n.total - n.amount_allocated)}</td>
-              </tr>
+              <TableRow key={n.id} data-testid="ap-credit-note-row" className="cursor-pointer" onClick={event => { viewTrigger.current = event.currentTarget.querySelector<HTMLButtonElement>("button"); setView(n); }}>
+                <TableCell className="px-3 py-2 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full whitespace-normal break-words p-0 text-left font-mono md:min-h-0 md:whitespace-nowrap" onClick={event => { event.stopPropagation(); viewTrigger.current = event.currentTarget; setView(n); }}>{n.credit_note_number}</Button></TableCell>
+                <TableCell className="px-3 py-2 md:whitespace-nowrap">{n.credit_date}</TableCell>
+                {!invoiceId && <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{n.invoice_number}</TableCell>}
+                {!invoiceId && <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={n.supplier_name}>{n.supplier_name}</span></TableCell>}
+                <TableCell className="px-3 py-2 md:whitespace-nowrap">{n.supplier_reference ?? "—"}</TableCell>
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={n.reason}>{n.reason}</span></TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(n.total)}</TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(n.total - n.amount_allocated)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      <APCreditNoteView note={view} onClose={() => setView(null)} />
+      <APCreditNoteView note={view} onClose={() => setView(null)} returnFocusRef={viewTrigger} />
     </section>
   );
 }

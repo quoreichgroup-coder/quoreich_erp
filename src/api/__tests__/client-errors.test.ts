@@ -3,16 +3,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "jeton" } } }) } },
 }));
-vi.stubEnv("VITE_QERP_API_URL", "http://api.test");
+vi.hoisted(() => { vi.stubEnv("VITE_QERP_API_URL", "http://api.test"); });
 
-import { apiGet } from "../client";
+import { apiDownloadFile, apiGet } from "../client";
 
 const respond = (status: number, body?: unknown) =>
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
   );
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("client API — messages d'erreur", () => {
   it("affiche tel quel un refus rédigé par l'API", async () => {
@@ -36,4 +39,29 @@ describe("client API — messages d'erreur", () => {
     respond(500, { status: 500, error: "Internal Server Error", path: "/x" });
     await expect(apiGet("/x")).rejects.toMatchObject({ message: "Le serveur a rencontré une erreur : réessayez, ou contactez l'administrateur" });
   });
+});
+
+it("downloads a PDF with the session authorization and the requested filename", async () => {
+  const original = "%PDF-1.7\n";
+  const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(original, { headers: { "Content-Type": "application/pdf" } }),
+  );
+  const createObjectURL = vi.fn<(blob: Blob) => string>().mockReturnValue("blob:document-archive");
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL }));
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+  await apiDownloadFile("/document.pdf", "facture.pdf");
+  expect(fetch.mock.calls[0][0]).toBe("http://api.test/document.pdf");
+  expect(new Headers(fetch.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer jeton");
+  expect(createObjectURL.mock.calls[0][0].type).toBe("application/pdf");
+  const downloaded = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(createObjectURL.mock.calls[0][0]);
+  });
+  expect(downloaded).toBe(original);
+  expect(click.mock.contexts[0]).toMatchObject({ download: "facture.pdf", href: "blob:document-archive" });
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:document-archive");
 });

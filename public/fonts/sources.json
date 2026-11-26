@@ -1,0 +1,74 @@
+[
+  {
+    "family": "Montserrat",
+    "path": "fonts/montserrat-1.woff2",
+    "source": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459WRhyzbi.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
+    "bytes": 26368,
+    "sha256": "0f7f5f2fbb4eae126790fe6f01659ab3ee0806e8038a941908e893020569f51a"
+  },
+  {
+    "family": "Montserrat",
+    "path": "fonts/montserrat-2.woff2",
+    "source": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459W1hyzbi.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
+    "bytes": 23828,
+    "sha256": "a187b077090fe8ae3fd2d7496aabbeae604819c718a282e0afc92df72b450766"
+  },
+  {
+    "family": "Montserrat",
+    "path": "fonts/montserrat-3.woff2",
+    "source": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459WZhyzbi.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
+    "bytes": 12928,
+    "sha256": "26b2403f995ed65fb49037a6498c074d3ec3c36031a69fc368c4c2180e2c01fa"
+  },
+  {
+    "family": "Montserrat",
+    "path": "fonts/montserrat-4.woff2",
+    "source": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wdhyzbi.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
+    "bytes": 70688,
+    "sha256": "54d9a78b7ff60b689ad9f3017ffac8547b5d871afec733f6c1c3ae36577ee504"
+  },
+  {
+    "family": "Montserrat",
+    "path": "fonts/montserrat-5.woff2",
+    "source": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@300..700&display=swap",
+    "bytes": 37956,
+    "sha256": "06b16db7a969135d48d38c49183be7fb88d4452e2a3011957c7851941f4e4879"
+  },
+  {
+    "family": "Playfair Display",
+    "path": "fonts/playfair-display-1.woff2",
+    "source": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTjYgFE_.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500..700&display=swap",
+    "bytes": 21152,
+    "sha256": "c108681cba6a9820bff52f4a1a4a1d9edf356b347bd79b7c61e916028e8a8b54"
+  },
+  {
+    "family": "Playfair Display",
+    "path": "fonts/playfair-display-2.woff2",
+    "source": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTPYgFE_.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500..700&display=swap",
+    "bytes": 9112,
+    "sha256": "ef6446229b59773e671021650ef3882cf35806dae723ce047de87c0a6633039a"
+  },
+  {
+    "family": "Playfair Display",
+    "path": "fonts/playfair-display-3.woff2",
+    "source": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTLYgFE_.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500..700&display=swap",
+    "bytes": 21140,
+    "sha256": "42898ad49a6b23f32b109243e1df596edf831015ed685f429e4dafbb181d599d"
+  },
+  {
+    "family": "Playfair Display",
+    "path": "fonts/playfair-display-4.woff2",
+    "source": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2",
+    "cssSource": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500..700&display=swap",
+    "bytes": 38404,
+    "sha256": "e0c764a8e9e1cce92163c55bac4b2ad6cd4cf8c696ce2289ab5c41565e65b7e2"
+  }
+]

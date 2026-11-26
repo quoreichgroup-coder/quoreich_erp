@@ -3,7 +3,7 @@
  *
  * Module pur. Il reconstitue depuis les lectures Supabase exactement la vue que sert l'API Java
  * (`GET /api/v1/authorizations`), et porte les petits calculs de l'écran. Les règles (rôle
- * système intouchable, dernier administrateur, rôle à revoir) sont imposées par la base ; ce
+ * Administrateur protégé, dernier administrateur, rôle à revoir) sont imposées par la base ; ce
  * module ne fait que les annoncer avant l'envoi.
  */
 import type { ApiSchemas } from "@/api";

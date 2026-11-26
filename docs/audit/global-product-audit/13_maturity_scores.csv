@@ -1,0 +1,17 @@
+perimetre;dimension;poids_pct;note_0_5;pondere_pct;confiance
+ERP;Couverture fonctionnelle;20;3;12.0;elevee
+ERP;Integrite des processus;15;3;9.0;moyenne
+ERP;Securite et isolation;15;3;9.0;elevee
+ERP;Architecture et maintenabilite;10;3;6.0;elevee
+ERP;Integrite des donnees;10;3;6.0;moyenne
+ERP;Tests et qualite;10;3;6.0;elevee
+ERP;Infrastructure et exploitation;10;1;2.0;elevee
+ERP;UX/UI;5;3;3.0;moyenne
+ERP;Documentation et support;5;2;2.0;elevee
+ERP;TOTAL;100;;55.0;moyenne
+MVP_sans_apercu;TOTAL;100;;58.0;moyenne
+MVP_avec_apercu;TOTAL;100;;51.5;moyenne
+Commercial;TOTAL;100;;30.0;faible
+Mobile;TOTAL;100;0;0.0;elevee
+EAM_Downtime;TOTAL;100;0;0.0;elevee
+Business_AI;TOTAL;100;;15.0;moyenne

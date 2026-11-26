@@ -3491,6 +3491,7 @@ export type Database = {
           created_at: string
           default_warehouse_id: string | null
           id: string
+          item_type: string
           max_stock: number | null
           name: string
           quantity_on_hand: number
@@ -3511,6 +3512,7 @@ export type Database = {
           created_at?: string
           default_warehouse_id?: string | null
           id?: string
+          item_type?: string
           max_stock?: number | null
           name: string
           quantity_on_hand?: number
@@ -3531,6 +3533,7 @@ export type Database = {
           created_at?: string
           default_warehouse_id?: string | null
           id?: string
+          item_type?: string
           max_stock?: number | null
           name?: string
           quantity_on_hand?: number
@@ -4401,6 +4404,7 @@ export type Database = {
           id: string
           require_gr_before_ap: boolean
           require_pr_before_po: boolean
+          service_acceptance_second_person: boolean
           sla_color_critical: string
           sla_color_ok: string
           sla_color_warning: string
@@ -4420,6 +4424,7 @@ export type Database = {
           id?: string
           require_gr_before_ap?: boolean
           require_pr_before_po?: boolean
+          service_acceptance_second_person?: boolean
           sla_color_critical?: string
           sla_color_ok?: string
           sla_color_warning?: string
@@ -4439,6 +4444,7 @@ export type Database = {
           id?: string
           require_gr_before_ap?: boolean
           require_pr_before_po?: boolean
+          service_acceptance_second_person?: boolean
           sla_color_critical?: string
           sla_color_ok?: string
           sla_color_warning?: string

@@ -45,8 +45,11 @@ export function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          className="relative p-2 rounded-md hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="relative shrink-0"
           aria-label={`Notifications${unread ? ` (${unread} non lues)` : ""}`}
           data-testid="notification-bell"
         >
@@ -56,9 +59,9 @@ export function NotificationBell() {
               {unread > 99 ? "99+" : unread}
             </span>
           )}
-        </button>
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[380px] p-0">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-[min(380px,calc(100vw-1rem))] max-h-[calc(100dvh-5rem)] overflow-y-auto p-0">
         <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
           <span>Notifications</span>
           <Badge variant="outline" className="text-[10px]">{count}</Badge>

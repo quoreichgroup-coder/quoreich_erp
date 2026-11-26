@@ -173,7 +173,7 @@ function RuleDialog({ row, onClose }: { row: any | null | undefined; onClose: ()
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="rule-item">Article</Label>
             <select id="rule-item" className={sel} value={f.item_id} onChange={s("item_id")} disabled={!!row}>
-              <option value="">Choisir…</option>{items.map((x: any) => <option key={x.id} value={x.id}>{x.code} — {x.name}</option>)}
+              <option value="">Choisir…</option>{items.filter((i: any) => (i.item_type ?? "stock") === "stock").map((x: any) => <option key={x.id} value={x.id}>{x.code} — {x.name}</option>)}
             </select></div>
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="rule-warehouse">Dépôt</Label>
             <select id="rule-warehouse" className={sel} value={f.warehouse_id} onChange={s("warehouse_id")} disabled={!!row}>

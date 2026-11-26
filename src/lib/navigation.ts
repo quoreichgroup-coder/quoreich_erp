@@ -24,6 +24,8 @@ export const TRANSACTION_TABS: Record<string, NavItem[]> = {
   "/hr": [
     { title: "Saisie de paie", url: "/hr/transactions" },
     { title: "Cycles de paie", url: "/hr/payroll" },
+    { title: "Temps et absences", url: "/hr/time" },
+    { title: "Paiement des salaires", url: "/hr/payments" },
   ],
 };
 export interface NavModule {
@@ -124,7 +126,7 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         title: "RH et paie", icon: "UsersRound", basePath: "/hr",
         // Transactions = onglets Saisie de paie, Cycles de paie ; Données de base = employés.
-        items: standard("/hr", [], { masterData: "/hr/employees" }),
+        items: standard("/hr", [{ title: "Mon espace RH", url: "/hr/me" }], { masterData: "/hr/employees" }),
       },
     ],
   },

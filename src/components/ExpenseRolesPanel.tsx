@@ -1,3 +1,4 @@
+import { AuthorizationsPanel } from "@/components/AuthorizationsPanel";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +8,14 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Receipt, History, X, Download, FileText, Lock, Check, Minus, Grid3x3 } from "lucide-react";
+import { Receipt, History, X, Download, FileText, Lock } from "lucide-react";
 import {
   useTenantExpenseRoles, useAssignExpenseRole, useExpenseRoleAudit, useMyExpenseRoles,
 } from "@/hooks/use-expense-data";
 import { useTenantProfiles } from "@/hooks/use-rbac-data";
 import {
-  ROLE_LABELS, ACTION_LABELS, REQUIRED_ROLES,
-  ALL_EXPENSE_ACTIONS, ALL_EXPENSE_ROLES,
+  ROLE_LABELS,
+  ALL_EXPENSE_ROLES,
   canDo, actionTooltip, violatesExpenseSoD, type ExpenseRole,
 } from "@/lib/expense-roles";
 import { exportToCSV } from "@/lib/csv-export";
@@ -90,46 +91,7 @@ export function ExpenseRolesPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-          <Grid3x3 className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-medium text-foreground">Matrice des permissions</h3>
-          <span className="text-[11px] text-muted-foreground ml-2">
-            SoD : un même utilisateur ne peut pas être à la fois Saisie et Approbateur.
-          </span>
-        </div>
-        <div className="overflow-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground uppercase tracking-wider">Action</th>
-                {ALL_EXPENSE_ROLES.map((r) => (
-                  <th key={r} className="text-center px-3 py-2 font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                    {ROLE_LABELS[r]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ALL_EXPENSE_ACTIONS.map((action) => (
-                <tr key={action} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="px-3 py-2 font-medium text-foreground">{ACTION_LABELS[action]}</td>
-                  {ALL_EXPENSE_ROLES.map((role) => {
-                    const ok = REQUIRED_ROLES[action].includes(role);
-                    return (
-                      <td key={role} className="px-3 py-2 text-center">
-                        {ok
-                          ? <Check className="w-3.5 h-3.5 inline text-success" aria-label="Autorisé" />
-                          : <Minus className="w-3.5 h-3.5 inline text-muted-foreground/40" aria-label="Non autorisé" />}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AuthorizationsPanel permissionsOnly />
 
       <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
