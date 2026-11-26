@@ -75,8 +75,12 @@ export function canDo(perms: FixedAssetPerms | undefined, action: FixedAssetActi
 }
 
 export function missingRoleHint(action: FixedAssetAction): string {
-  const roles = REQUIRED_ROLES[action].map((r) => ROLE_LABELS[r]).join(", ");
-  return `Action verrouillée — rôle requis : ${roles}.`;
+  const rights: Record<FixedAssetAction, string> = {
+    create_asset: "assets.manage", edit_asset: "assets.manage", put_in_service: "assets.manage",
+    run_depreciation: "assets.depreciate", dispose: "assets.dispose", manage_categories: "assets.settings",
+    export: "assets.depreciate ou assets.dispose", view_sensitive: "un droit du module Immobilisations",
+  };
+  return `Action verrouillée — droit requis : ${rights[action]}. Contactez l'administrateur de la société pour adapter vos accès.`;
 }
 
 export function actionTooltip(

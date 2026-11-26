@@ -2,18 +2,22 @@ import { useSearchParams } from "react-router-dom";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { PageShell } from "@/components/PageShell";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, CheckCircle, Clock, BookOpen, Lock, Play } from "lucide-react";
+import { Download, BookOpen, Lock, Play } from "lucide-react";
 import { useTableFeatures } from "@/hooks/use-table-features";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { SortableHead, PaginationBar } from "@/components/DataTableControls";
@@ -33,6 +37,16 @@ import { apiGet, isApiEnabled } from "@/api/client";
 
 
 const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
+
+const assetTypeLabel: Record<string, string> = { Acquisition: "Acquisition", Depreciation: "Dotation", Disposal: "Cession" };
+const assetColumns = [
+  { label: "Référence", kind: "primary", sortable: true },
+  { label: "Date", sortable: true },
+  { label: "Type", sortable: true },
+  { label: "Actif", wide: true, sortable: true },
+  { label: "Montant", sortable: true },
+  { label: "Statut", sortable: true },
+] satisfies MobileTableColumn[];
 
 function useDepreciationEntries() {
   return useQuery({
@@ -57,6 +71,9 @@ export default function AssetsTransactions() {
   const { data: disposals = [], isLoading: ldis } = useAssetDisposals();
   const runDep = useRunMonthlyDepreciation();
   const reverseDep = useReverseLastDepreciation();
+  const reverseTrigger = useRef<HTMLButtonElement | null>(null);
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reversalReason, setReversalReason] = useState("");
   const [period, setPeriod] = usePersistentState<string>("fa-tx:period", new Date().toISOString().slice(0, 7));
   const [dateFrom, setDateFrom] = usePersistentState<string>("fa-tx:dateFrom", "");
   const [dateTo, setDateTo] = usePersistentState<string>("fa-tx:dateTo", "");
@@ -119,7 +136,7 @@ export default function AssetsTransactions() {
   return (
     <PageShell>
       <Breadcrumb items={[{ label: "Finance" }, { label: "Immobilisations", href: "/assets" }, { label: "Transactions" }]} />
-      <GuidanceBanner title="Transactions Immobilisations" description="Acquisitions, dotations et cessions live, avec filtres et contrôles RBAC SYSCOHADA." />
+      <GuidanceBanner title="Transactions Immobilisations" description="Acquisitions, dotations et cessions, avec suivi des écritures comptables." />
 
       {/* Une pièce par onglet, comme Approvisionnement (standard de présentation des modules). */}
       <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => { sp.set("tab", v); return sp; }, { replace: true })}>
@@ -129,13 +146,11 @@ export default function AssetsTransactions() {
         </TabsList>
         <TabsContent value="documents">
 
-      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-        <h1 className="text-lg font-semibold text-foreground">Transactions</h1>
-        <div className="flex gap-2 items-center">
-          <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="h-8 w-[140px] text-xs" />
+      <PageHeader className="mb-4" title="Transactions d’immobilisations" actions={<>
+          <Input type="month" aria-label="Mois des amortissements" value={period} onChange={(e) => setPeriod(e.target.value)} className="h-11 w-40 text-sm sm:h-8 sm:text-xs" />
           {canDo(perms, "run_depreciation") && (
-            <Button size="sm" variant="outline" className="gap-1.5" disabled={reverseDep.isPending}
-              onClick={() => { const r = window.prompt("Motif de la contre-passation du dernier calcul d'amortissements"); if (r && r.trim()) reverseDep.mutate(r.trim()); }}>
+            <Button ref={reverseTrigger} size="sm" variant="outline" className="gap-1.5" disabled={reverseDep.isPending}
+              onClick={() => { setReversalReason(""); setReverseOpen(true); }}>
               Contre-passer le dernier calcul
             </Button>
           )}
@@ -157,15 +172,14 @@ export default function AssetsTransactions() {
             {canDo(perms, "export") ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             Export CSV
           </ExportMenu>
-        </div>
-      </div>
+        </>} />
 
-      <Card className="border-border mb-2"><CardContent className="p-3 flex gap-2 flex-wrap items-center">
-        <span className="text-xs text-muted-foreground">Filtres :</span>
-        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[140px] text-xs" placeholder="Du" />
-        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[140px] text-xs" placeholder="Au" />
+      <Card className="border-border mb-2"><CardContent className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-5">
+        <span className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-5">Filtres :</span>
+        <Input type="date" aria-label="Date de début" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-11 w-full min-w-0 text-sm sm:h-8 sm:text-xs" placeholder="Du" />
+        <Input type="date" aria-label="Date de fin" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-11 w-full min-w-0 text-sm sm:h-8 sm:text-xs" placeholder="Au" />
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectTrigger aria-label="Type de mouvement" className="h-11 w-full min-w-0 text-sm sm:h-8 sm:text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous types</SelectItem>
             <SelectItem value="Acquisition">Acquisition</SelectItem>
@@ -174,7 +188,7 @@ export default function AssetsTransactions() {
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Statut" /></SelectTrigger>
+          <SelectTrigger aria-label="Statut du mouvement" className="h-11 w-full min-w-0 text-sm sm:h-8 sm:text-xs"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous statuts</SelectItem>
             <SelectItem value="Posted">Comptabilisé</SelectItem>
@@ -194,7 +208,7 @@ export default function AssetsTransactions() {
           <div className="p-4 space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
         ) : (
           <>
-            <Table>
+            <Table mobileColumns={assetColumns} aria-label="Mouvements d’immobilisations">
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <SortableHead label="Référence" sortKey="ref" sort={table.sort} onSort={table.toggleSort} />
@@ -212,15 +226,13 @@ export default function AssetsTransactions() {
                   </TableCell></TableRow>
                 ) : table.pagedData.map((t: any) => (
                   <TableRow key={t.id + t.type} className="text-xs">
-                    <TableCell className="font-mono text-primary">{t.ref}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{t.date}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{t.type}</Badge></TableCell>
-                    <TableCell className="font-medium max-w-[200px] truncate">{t.asset}</TableCell>
+                    <TableCell className="font-mono text-primary md:whitespace-nowrap">{t.ref}</TableCell>
+                    <TableCell className="font-mono text-muted-foreground md:whitespace-nowrap">{t.date}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{assetTypeLabel[t.type] ?? t.type}</Badge></TableCell>
+                    <TableCell className="font-medium max-w-[200px] truncate" title={t.asset}>{t.asset}</TableCell>
                     <TableCell className="text-right font-mono">{maskAmount(perms, t.amount)}</TableCell>
                     <TableCell>
-                      <Badge className={`text-[10px] ${t.status === "Posted" ? "bg-success/15 text-success border-success/20" : "bg-amber-500/15 text-amber-700 border-amber-500/20"}`} variant="outline">
-                        {t.status === "Posted" ? <CheckCircle className="w-3 h-3 mr-1" /> : <Clock className="w-3 h-3 mr-1" />}{t.status}
-                      </Badge>
+                      <StatusBadge status={t.status === "Posted" ? "success" : "warning"} label={t.status === "Posted" ? "Comptabilisé" : "En attente"} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -243,6 +255,26 @@ export default function AssetsTransactions() {
       </div>
         </TabsContent>
       </Tabs>
+      <Dialog open={reverseOpen} onOpenChange={open => { if (!reverseDep.isPending) setReverseOpen(open); }}>
+        <DialogContent returnFocusRef={reverseTrigger}>
+          <DialogHeader>
+            <DialogTitle>Contre-passer le dernier calcul</DialogTitle>
+            <DialogDescription>Indiquez le motif de la contre-passation du dernier calcul d’amortissements.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="fa-reversal-reason">Motif (obligatoire)</Label>
+            <Input id="fa-reversal-reason" value={reversalReason} onChange={event => setReversalReason(event.target.value)}
+              disabled={reverseDep.isPending} className="h-11 text-base" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={reverseDep.isPending} onClick={() => setReverseOpen(false)}>Annuler</Button>
+            <Button type="button" variant="destructive" disabled={!reversalReason.trim() || !canDo(perms, "run_depreciation") || reverseDep.isPending}
+              onClick={() => reverseDep.mutate(reversalReason.trim(), { onSuccess: () => setReverseOpen(false) })}>
+              {reverseDep.isPending ? "Contre-passation…" : "Contre-passer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

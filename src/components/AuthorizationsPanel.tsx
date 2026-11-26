@@ -19,12 +19,13 @@ type Tab = "roles" | "users" | "invitations" | "audit";
 /**
  * Rôles et autorisations de la société : le seul endroit où se décident les droits. La base les
  * applique à chaque opération (has_permission, has_role) et journalise chaque changement.
- * Rôles système : en lecture seule (on les copie pour les adapter). Rôles sur mesure : droits
- * cochés dans le catalogue. Seul l'administrateur modifie.
+ * Tous les droits sont personnalisables sauf ceux du rôle Administrateur. L'identité des rôles
+ * standard reste protégée. Seul l'administrateur de la société modifie.
  */
-export function AuthorizationsPanel() {
+export function AuthorizationsPanel({ permissionsOnly = false }: { permissionsOnly?: boolean } = {}) {
   const query = useAuthorizations();
-  const [tab, setTab] = useState<Tab>("roles");
+  const [selectedTab, setTab] = useState<Tab>("roles");
+  const tab = permissionsOnly ? "roles" : selectedTab;
 
   if (query.isLoading) {
     return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Chargement des autorisations…</p>;
@@ -40,8 +41,8 @@ export function AuthorizationsPanel() {
   const view = query.data;
   const tabs: { id: Tab; label: string; icon: typeof KeyRound }[] = [
     { id: "roles", label: "Rôles", icon: KeyRound },
-    { id: "users", label: "Utilisateurs", icon: Users },
-    ...(view.canManage ? [
+    ...(!permissionsOnly ? [{ id: "users" as Tab, label: "Utilisateurs", icon: Users }] : []),
+    ...(view.canManage && !permissionsOnly ? [
       { id: "invitations" as Tab, label: "Invitations", icon: MailPlus },
       { id: "audit" as Tab, label: "Journal", icon: History },
     ] : []),
@@ -52,9 +53,8 @@ export function AuthorizationsPanel() {
       <div className="bg-card border border-border rounded-lg p-5 space-y-2">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Rôles et autorisations</h3>
         <p className="text-xs text-muted-foreground max-w-3xl">
-          Un rôle est un ensemble de droits du catalogue. Les rôles système, en lecture seule, reprennent les rôles de chaque module ;
-          pour en adapter un, créez un rôle sur mesure en le copiant. Chaque droit est vérifié par la base à chaque opération, et
-          chaque changement est journalisé.
+          Un rôle est un ensemble de droits du catalogue. L'administrateur peut personnaliser les accès des rôles standard
+          et des rôles sur mesure de sa société. Le rôle Administrateur reste protégé. Chaque changement est journalisé.
         </p>
         {!view.canManage && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid="authorizations-readonly">
@@ -92,7 +92,7 @@ function RolesTab({ view }: { view: Authorizations }) {
       <div className="bg-card border border-border rounded-lg p-3 space-y-3 lg:max-h-[36rem] lg:overflow-y-auto" data-testid="roles-list">
         <RoleGroup title="Rôles sur mesure" roles={custom} selectedId={selected?.id} onSelect={setSelectedId}
           empty="Aucun rôle sur mesure." />
-        <RoleGroup title="Rôles système" roles={system} selectedId={selected?.id} onSelect={setSelectedId} />
+        <RoleGroup title="Rôles standard" roles={system} selectedId={selected?.id} onSelect={setSelectedId} />
       </div>
       <div className="space-y-4 min-w-0">
         {selected && <RoleDetail key={selected.id} role={selected} view={view} onDeleted={() => setSelectedId(null)} />}
@@ -126,6 +126,8 @@ function RoleDetail({ role, view, onDeleted }: { role: Role; view: Authorization
   const setPerms = useSetRolePermissions();
   const remove = useDeleteRole();
   const editable = view.canManage && !role.system;
+  const protectedAdmin = role.code === "admin";
+  const permissionsEditable = view.canManage && !protectedAdmin;
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description ?? "");
   const [checked, setChecked] = useState<Set<string>>(new Set(role.permissions));
@@ -140,7 +142,7 @@ function RoleDetail({ role, view, onDeleted }: { role: Role; view: Authorization
         <div className="space-y-1 min-w-0">
           <h4 className="text-sm font-semibold text-foreground">{role.name}</h4>
           <div className="flex flex-wrap gap-1.5">
-            <StatusBadge status="info" label={role.system ? "Rôle système" : "Rôle sur mesure"} />
+            <StatusBadge status="info" label={role.system ? "Rôle standard" : "Rôle sur mesure"} />
             {role.needsReview && <StatusBadge status="error" label="À revoir : sans effet" />}
             <StatusBadge status="info" label={`${role.memberCount} utilisateur(s)`} />
           </div>
@@ -181,21 +183,30 @@ function RoleDetail({ role, view, onDeleted }: { role: Role; view: Authorization
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Droits ({checked.size})</h5>
-          {editable && dirty && (
+          {permissionsEditable && dirty && (
             <Button size="sm" className="text-xs" data-testid="btn-save-permissions" disabled={setPerms.isPending}
               onClick={() => setPerms.mutate({ id: role.id, permissions: [...checked], current: role.permissions })}>
               Enregistrer les droits
             </Button>
           )}
         </div>
-        {role.system && <p className="text-xs text-muted-foreground">Rôle système : ses droits ne se modifient pas. Créez un rôle sur mesure en le copiant pour l'adapter.</p>}
+        {protectedAdmin ? (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 shrink-0" />
+            Le rôle Administrateur est protégé : ses accès ne peuvent pas être modifiés.
+          </p>
+        ) : permissionsEditable && (
+          <p className="text-xs text-muted-foreground">
+            Cochez ou décochez les accès, puis enregistrez. Les changements s'appliquent à tous les utilisateurs de ce rôle dans cette société.
+            Les droits accordés par leurs autres rôles restent cumulés.
+          </p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {groups.map((g) => (
             <fieldset key={g.module} className="border border-border rounded-md p-3 space-y-1.5 min-w-0">
               <legend className="text-xs font-medium text-foreground px-1">{g.label}</legend>
               {g.permissions.map((p) => (
                 <label key={p.code} className="flex items-start gap-2 text-xs">
-                  <input type="checkbox" checked={checked.has(p.code)} disabled={!editable} onChange={() => toggle(p.code)}
+                  <input type="checkbox" checked={checked.has(p.code)} disabled={!permissionsEditable || setPerms.isPending} onChange={() => toggle(p.code)}
                     aria-label={p.label} data-testid={`perm-${p.code}`} className="mt-0.5" />
                   <span className="min-w-0"><span className="text-foreground">{p.label}</span> <span className="font-mono text-muted-foreground">{p.code}</span></span>
                 </label>

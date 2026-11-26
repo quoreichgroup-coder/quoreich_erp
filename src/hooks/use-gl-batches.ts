@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { GLBatchHistory, GLPostingKPIs, GLAuditHistory, type GLBatch } from "@/components/GLPostingConfig";
 import { useGLAuditLogs } from "@/hooks/use-gl-audit";
 import { apiGet, isApiEnabled } from "@/api/client";
+import { AccountingAccess } from "@/components/AccountingAccess";
 
 // Lots réels du grand livre (V38) : un lot par société, journal et mois, alimenté à l'insertion de
 // chaque écriture des livres auxiliaires. Avant V38, ces écrans regroupaient dans le navigateur les
@@ -67,16 +68,25 @@ export function useGLBatchesByModule() {
 
 /** Live wrapper components */
 export function GLPostingKPIsLive({ module }: { module: string }) {
+  return React.createElement(AccountingAccess, { children: React.createElement(PostingKPIsContent, { module }) });
+}
+function PostingKPIsContent({ module }: { module: string }) {
   const { data: batches = [] } = useGLBatches(module);
   return React.createElement(GLPostingKPIs, { batches });
 }
 
 export function GLBatchHistoryLive({ module }: { module: string }) {
+  return React.createElement(AccountingAccess, { children: React.createElement(BatchHistoryContent, { module }) });
+}
+function BatchHistoryContent({ module }: { module: string }) {
   const { data: batches = [] } = useGLBatches(module);
   return React.createElement(GLBatchHistory, { batches, readOnly: true });
 }
 
 export function GLAuditHistoryLive({ module }: { module?: string }) {
+  return React.createElement(AccountingAccess, { children: React.createElement(AuditHistoryContent, { module }) });
+}
+function AuditHistoryContent({ module }: { module?: string }) {
   const { data: batches = [] } = useGLBatches(module);
   const { data: auditTrail = [] } = useGLAuditLogs();
   return React.createElement(GLAuditHistory, { batches, auditTrail });

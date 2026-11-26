@@ -74,8 +74,8 @@ public class AuthorizationController {
   }
 
   @PutMapping("/roles/{role}/permissions")
-  @Operation(operationId = "setRolePermissions", summary = "Fixer les droits d'un rôle sur mesure",
-      description = "Remplace la liste. 409 pour un rôle système, 422 si un droit est inconnu du catalogue.")
+  @Operation(operationId = "setRolePermissions", summary = "Fixer les droits d'un rôle standard ou sur mesure",
+      description = "Administrateur de la société. Remplace atomiquement la liste. 409 pour le rôle Administrateur protégé, 422 si un droit est inconnu du catalogue.")
   public ResponseEntity<?> setPermissions(@PathVariable UUID role, @RequestBody SetRolePermissions body) {
     return run(body.problem(), () -> query.setPermissions(role, body));
   }

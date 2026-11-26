@@ -1,13 +1,11 @@
 import { useState, useMemo } from "react";
 import { useRealtimeInvalidation } from "@/hooks/use-realtime-invalidation";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { PageShell } from "@/components/PageShell";
 import { useDashboardKpis } from "@/hooks/use-dashboard-data";
 import { useERPAlerts } from "@/hooks/use-alerts-data";
 import { useAccessibleTenants, useConsolidatedCfoKpis } from "@/hooks/use-consolidated-cfo";
 import { useFiscalCalendar } from "@/hooks/use-fiscal-calendar";
 import { useNavigate } from "react-router-dom";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
-import { TopNav } from "@/components/TopNav";
 import { RevenueChart } from "@/components/RevenueChart";
 import { RecentTransactions } from "@/components/RecentTransactions";
 import { UpcomingPayments } from "@/components/UpcomingPayments";
@@ -269,12 +267,7 @@ const Index = () => {
   ];
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col">
-          <TopNav />
-          <main className="flex-1 p-4 lg:p-6 space-y-5 overflow-auto">
+    <PageShell>
             {/* Header */}
             <div>
               <h1 className="text-lg font-semibold text-foreground">Tableau de bord</h1>
@@ -404,10 +397,7 @@ const Index = () => {
 
             {/* AI Insights */}
             <AiInsightsPanel />
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+    </PageShell>
   );
 };
 

@@ -1,7 +1,11 @@
 import { useFiscalCalendar } from "@/hooks/use-fiscal-calendar";
-import { Shield, Building2, LogOut } from "lucide-react";
+import { Shield, Building2, LogOut, Palette } from "lucide-react";
+import { useRef, useState } from "react";
+import { AppearanceDialog } from "@/components/AppearanceSettings";
+import { AppLogo } from "@/components/AppLogo";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -11,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useTenantId } from "@/hooks/use-tenant";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { apiGet, isApiEnabled } from "@/api/client";
@@ -21,16 +26,19 @@ function TopNavFiscalYear() {
   const today = new Date().toISOString().slice(0, 10);
   const fy = data?.years.find((y) => y.start_date <= today && today <= y.end_date);
   return (
-    <span className="hidden md:inline text-xs text-muted-foreground whitespace-nowrap">
+    <span className="hidden xl:inline text-xs text-muted-foreground whitespace-nowrap">
       · {fy ? `Exercice ${fy.code}` : "Aucun exercice en cours"}
     </span>
   );
 }
 
 export function TopNav() {
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const accountTrigger = useRef<HTMLButtonElement>(null);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { data: tenantId } = useTenantId();
+  const access = useMyAccess();
 
   const { data: tenant } = useQuery({
     queryKey: ["tenant-info", tenantId],
@@ -61,12 +69,13 @@ export function TopNav() {
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-3 sm:px-4 lg:px-6 gap-2 sm:gap-4 min-w-0">
       {/* Mobile : le nom de la société se tronque, la partie droite ne se comprime pas (pas de débordement). */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-        <SidebarTrigger className="lg:hidden shrink-0" />
+        <SidebarTrigger />
 
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border min-w-0">
-          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium text-foreground truncate">{tenant?.name || "—"}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0">{tenant?.currency || ""}</span>
+        <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2 sm:rounded-md sm:border sm:border-border sm:px-2.5 sm:py-1.5">
+          <AppLogo className="w-20 dark:brightness-0 dark:invert sm:hidden" />
+          <Building2 className="hidden w-3.5 h-3.5 text-muted-foreground shrink-0 sm:block" />
+          <span title={tenant?.name || undefined} className="truncate text-[10px] font-medium text-foreground sm:text-sm">{tenant?.name || "—"}</span>
+          <span className="hidden text-[10px] text-muted-foreground shrink-0 sm:block">{tenant?.currency || ""}</span>
         </div>
 
         <TopNavFiscalYear />
@@ -75,18 +84,26 @@ export function TopNav() {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <CommandPalette />
 
-        <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground border-border gap-1 hidden sm:flex">
-          <Shield className="w-3 h-3" />
-          Admin
-        </Badge>
+        {access.isSuccess && access.data.roles.includes("admin") && (
+          <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground border-border gap-1 hidden sm:flex">
+            <Shield className="w-3 h-3" />
+            Admin
+          </Badge>
+        )}
         <NotificationBell />
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="w-8 h-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
-            {initials}
+          <DropdownMenuTrigger asChild>
+            <Button ref={accountTrigger} type="button" size="icon" aria-label="Compte utilisateur" className="shrink-0 text-xs font-semibold">
+              {initials}
+            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-48" onCloseAutoFocus={event => { if (appearanceOpen) event.preventDefault(); }}>
             <DropdownMenuLabel className="text-xs truncate">{user?.email}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setAppearanceOpen(true)} className="min-h-11 cursor-pointer">
+              <Palette className="mr-2 size-3.5" aria-hidden="true" />Apparence
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
               <LogOut className="w-3.5 h-3.5 mr-2" />
@@ -94,6 +111,7 @@ export function TopNav() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <AppearanceDialog open={appearanceOpen} onOpenChange={setAppearanceOpen} returnFocusRef={accountTrigger} />
       </div>
     </header>
   );

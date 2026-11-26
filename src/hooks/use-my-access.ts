@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { apiGet, isApiEnabled } from "@/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Ce que l'utilisateur connecté peut faire, dit par la base (my_access, V27), dans SA société :
@@ -21,10 +22,11 @@ export interface MyAccess {
 export const NO_ACCESS: MyAccess = { roles: [], permissions: [] };
 
 export function useMyAccess() {
+  const { user } = useAuth();
   const { data: tenantId } = useTenantId();
   return useQuery({
-    queryKey: ["my-access", tenantId, isApiEnabled() ? "api" : "supabase"],
-    enabled: Boolean(tenantId),
+    queryKey: ["my-access", user?.id, tenantId, isApiEnabled() ? "api" : "supabase"],
+    enabled: Boolean(user?.id && tenantId),
     // Un refus ici verrouille les boutons : mieux vaut le savoir tout de suite.
     retry: false,
     staleTime: 60_000,

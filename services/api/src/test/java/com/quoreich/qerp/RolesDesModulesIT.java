@@ -131,6 +131,12 @@ class RolesDesModulesIT {
     assertThat(code).matches("[0-9A-F]{4}(-[0-9A-F]{4}){3}");
     assertThat(asUser(NOUVEAU, "SELECT join_tenant(lower('" + code + "'))::text")).isEqualTo(A);
     assertThat(asUser(NOUVEAU, "SELECT (my_access()->'roles')::text")).isEqualTo("[\"viewer\"]");
+    assertThat(asUser(NOUVEAU, "SELECT is_tenant_admin()::text")).isEqualTo("false");
+    assertThatThrownBy(() -> asUser(NOUVEAU, "SELECT create_tenant_invitation()::text"))
+        .hasMessageContaining("Seul un administrateur");
+    assertThatThrownBy(() -> asUser(NOUVEAU, "INSERT INTO user_role_assignments (user_id, role_id, tenant_id)"
+        + " SELECT auth.uid(), id, tenant_id FROM erp_roles WHERE tenant_id = '" + A + "' AND code = 'admin' RETURNING id::text"))
+        .hasMessageContaining("row-level security");
     assertThat(asUser(NOUVEAU, "SELECT count(*)::text FROM customers")).isEqualTo("3");
     // Usage unique, et une société déjà rejointe ne se quitte pas par une nouvelle création.
     assertThatThrownBy(() -> asUser(ADMIN_B, "SELECT join_tenant('" + code + "')::text")).hasMessageContaining("déjà rattaché");
@@ -142,6 +148,22 @@ class RolesDesModulesIT {
     asUser(ADMIN_A, "SELECT revoke_tenant_invitation('" + id + "')::text");
     assertThat(asUser(ADMIN_B, "SELECT count(*)::text FROM tenant_invitations")).isEqualTo("0");
     assertThat(asUser(ADMIN_A, "SELECT count(*)::text FROM tenant_invitations WHERE revoked_at IS NOT NULL")).isEqualTo("1");
+  }
+
+  @Test
+  @DisplayName("une invitation attribue exactement le rôle choisi par l'administrateur, sans promotion admin")
+  void invitationAvecRole() throws Exception {
+    String invite = "aaaaaaaa-0000-0000-0000-0000000000e3";
+    owner("INSERT INTO auth.users (id) VALUES ('" + invite + "');"
+        + "INSERT INTO profiles (id, full_name) VALUES ('" + invite + "', 'Comptable invité')");
+    String role = rows("SELECT id::text FROM erp_roles WHERE tenant_id = '" + A + "' AND code = 'accountant'");
+    String code = asUser(ADMIN_A, "SELECT create_tenant_invitation('" + role + "', 7, 'Comptable')->>'code'");
+
+    assertThat(asUser(invite, "SELECT join_tenant('" + code + "')::text")).isEqualTo(A);
+    assertThat(asUser(invite, "SELECT (my_access()->'roles')::text")).isEqualTo("[\"accountant\"]");
+    assertThat(asUser(invite, "SELECT is_tenant_admin()::text")).isEqualTo("false");
+    assertThat(count("SELECT count(*) FROM user_role_assignments WHERE user_id = '" + invite + "'"))
+        .as("seul le rôle de l'invitation est attribué").isEqualTo(1);
   }
 
   // ─── Outils ───

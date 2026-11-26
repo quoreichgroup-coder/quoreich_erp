@@ -43,8 +43,10 @@ export function PayrollSettingsCard() {
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [reference, setReference] = useState("");
   const [bands, setBands] = useState<TaxBandInput[]>([{ upTo: "", ratePct: "" }]);
+  const [proration, setProration] = useState<"calendar_days" | "thirty_days">("calendar_days");
 
   useEffect(() => {
+    setProration(data?.proration_method === "thirty_days" ? "thirty_days" : "calendar_days");
     setCountry(data?.country_code?.trim() ?? "");
     setCurrency(data?.currency_code?.trim() ?? "");
     setEmployeeRate(data?.employee_contribution_pct == null ? "" : String(data.employee_contribution_pct));
@@ -89,6 +91,7 @@ export function PayrollSettingsCard() {
         income_tax_bands: parsedBands,
         rules_effective_from: effectiveFrom,
         rules_reference: reference.trim(),
+        proration_method: proration,
       };
       if (isApiEnabled()) return apiPut("/api/v1/hr/payroll/settings", payload);
       const { data: row, error } = await (supabase as any).from("hr_payroll_settings").upsert({
@@ -102,6 +105,7 @@ export function PayrollSettingsCard() {
         income_tax_bands: parsedBands,
         rules_effective_from: effectiveFrom,
         rules_reference: reference.trim(),
+        proration_method: proration,
         updated_at: new Date().toISOString(),
       }, { onConflict: "tenant_id" }).select("tenant_id");
       if (error) throw error;
@@ -137,6 +141,7 @@ export function PayrollSettingsCard() {
     || effectiveFrom !== data.rules_effective_from
     || reference.trim() !== (data.rules_reference ?? "")
     || !sameTaxBands(parsedBands, data.income_tax_bands)
+    || proration !== (data.proration_method === "thirty_days" ? "thirty_days" : "calendar_days")
   );
   const ready = !!data?.rules_validated_at && !isDirty;
 
@@ -144,8 +149,8 @@ export function PayrollSettingsCard() {
     <section aria-label="Barèmes de paie par pays" className="bg-card border border-border rounded-lg p-4 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Règles de paie par pays</h2>
-          <p className="text-xs text-muted-foreground mt-1">Chaque cycle conserve une photographie des règles appliquées.</p>
+          <h2 className="text-sm font-semibold">Règles actuelles (format initial)</h2>
+          <p className="text-xs text-muted-foreground mt-1">Utilisées tant qu’aucune version datée n’est validée ci-dessus. Chaque cycle conserve une photographie des règles appliquées.</p>
         </div>
         {ready
           ? <Badge className="bg-success/10 text-success">Confirmés · {data?.country_code}</Badge>
@@ -165,6 +170,15 @@ export function PayrollSettingsCard() {
         <Field id="pay-employer-rate" label="Cotisation employeur (%)" value={employerRate} disabled={!canEdit || isLoading || isError} onChange={setEmployerRate} type="number" />
         <Field id="pay-employer-cap" label="Plafond employeur (facultatif)" value={employerCap} disabled={!canEdit || isLoading || isError} onChange={setEmployerCap} type="number" />
         <Field id="pay-effective-from" label="Date d’effet" value={effectiveFrom} disabled={!canEdit || isLoading || isError} onChange={setEffectiveFrom} type="date" />
+        <div className="space-y-1.5">
+          <Label htmlFor="pay-proration-method" className="text-xs">Prorata des entrées et sorties en cours de mois</Label>
+          <select id="pay-proration-method" value={proration} disabled={!canEdit || isLoading || isError}
+            onChange={(e) => setProration(e.target.value === "thirty_days" ? "thirty_days" : "calendar_days")}
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs">
+            <option value="calendar_days">Jours calendaires du mois</option>
+            <option value="thirty_days">Mois de 30 jours</option>
+          </select>
+        </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="pay-rules-reference" className="text-xs">Source officielle / référence juridique</Label>
           <Input id="pay-rules-reference" value={reference} disabled={!canEdit || isLoading || isError} onChange={(e) => setReference(e.target.value)} className="h-8 text-xs" placeholder="Autorité, texte et article ou URL officielle" />

@@ -24,6 +24,7 @@ export function ProcurementControlSettings() {
   const [lead, setLead] = useState("0");
   const [inclReq, setInclReq] = useState(true);
   const [inclRes, setInclRes] = useState(true);
+  const [serviceSecond, setServiceSecond] = useState(false);
 
   useEffect(() => {
     if (!s) return;
@@ -34,6 +35,7 @@ export function ProcurementControlSettings() {
     setInclReq(s.replenishment_include_requisitions ?? true);
     setInclRes(s.replenishment_include_reservations ?? true);
     setGrni(s.grni_on_receipt ?? false);
+    setServiceSecond(s.service_acceptance_second_person ?? false);
   }, [s]);
 
   const [grni, setGrni] = useState(false);
@@ -80,11 +82,14 @@ export function ProcurementControlSettings() {
           "Réserve le stock promis aux clients avant de calculer le besoin.", inclRes, setInclRes)}
         {row("set-grni", "Comptabiliser les réceptions en factures non parvenues (408)",
           "À la réception : achats / 408 au prix de la commande ; la facture solde le 408 et passe l'écart de prix en charge. À valider avec l'expert-comptable.", grni, setGrni)}
+        {row("set-service-second", "Service fait attesté par une autre personne",
+          "La réception d'un service doit être validée par une personne habilitée différente de l'auteur de la commande.", serviceSecond, setServiceSecond)}
         {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
         {canEdit && (
           <Button size="sm" disabled={!!error || update.isPending || !s?.id} onClick={() => update.mutate({
             id: s.id, bank_dual_control: dual, bank_control_methods: methods, followup_grace_days: g, default_lead_time_days: l,
             replenishment_include_requisitions: inclReq, replenishment_include_reservations: inclRes, grni_on_receipt: grni,
+            service_acceptance_second_person: serviceSecond,
           })}>Enregistrer</Button>
         )}
       </CardContent>

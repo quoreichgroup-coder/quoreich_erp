@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { BulkBar, SelectAllHead, SelectCell, useSelection } from "@/components/BulkSelection";
 import { DocumentPrintButtons } from "@/components/DocumentDetail";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable, type ExportFormat } from "@/lib/table-export";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageShell } from "@/components/PageShell";
+import { PageHeader } from "@/components/PageHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeftRight, BookOpen, ClipboardEdit, Download, Loader2 } from "lucide-react";
 import { useTableFeatures } from "@/hooks/use-table-features";
@@ -46,6 +47,19 @@ type Row = {
 };
 
 const rowId = (r: Row) => r.id;
+
+const movementColumns = [
+  { label: "Sélection", kind: "selection" },
+  { label: "Date", sortable: true },
+  { label: "Type", sortable: true },
+  { label: "Article", kind: "primary", sortable: true },
+  { label: "Dépôt", wide: true, sortable: true },
+  { label: "Quantité", sortable: true },
+  { label: "Coût unitaire", sortable: true },
+  { label: "Valeur", sortable: true },
+  { label: "Pièce comptable", wide: true, sortable: true },
+  { label: "Motif", wide: true, sortable: true },
+] satisfies MobileTableColumn[];
 
 /** Bon de mouvements de stock (ajustement, transfert, ou sélection mixte) : article, dépôt, quantités, valeurs, motif. */
 function movementSlip(rows: Row[]) {
@@ -85,7 +99,7 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
           { key: "piece", header: "Pièce comptable" }, { key: "motif", header: "Motif" }], "mouvements-selection", "Mouvements de stock")}>Exporter</ExportMenu>
       </BulkBar>
       <div className="overflow-x-auto">
-        <Table><TableHeader><TableRow className="bg-muted/30">
+        <Table mobileColumns={movementColumns} aria-label="Mouvements de stock"><TableHeader><TableRow className="bg-muted/30">
           <SelectAllHead sel={sel} pageIds={t.pagedData.map((r) => r.id)} label="Sélectionner les mouvements de la page" />
           <SortableHead label="Date" sortKey="date" sort={t.sort} onSort={t.toggleSort} />
           <SortableHead label="Type" sortKey="libelle" sort={t.sort} onSort={t.toggleSort} />
@@ -103,10 +117,10 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
           ) : t.pagedData.map((r) => (
             <TableRow key={r.id} className="text-xs" data-testid="stock-movement-row">
               <SelectCell sel={sel} id={r.id} label={`Sélectionner le mouvement du ${r.date} (${r.article})`} />
-              <TableCell className="tabular-nums">{r.date}</TableCell>
-              <TableCell>{r.libelle}</TableCell>
-              <TableCell><span className="font-mono text-muted-foreground mr-1">{r.code}</span>{r.article}</TableCell>
-              <TableCell>{r.depot || "—"}</TableCell>
+              <TableCell className="tabular-nums md:whitespace-nowrap">{r.date}</TableCell>
+              <TableCell className="md:whitespace-nowrap">{r.libelle}</TableCell>
+              <TableCell><span className="block md:max-w-64 md:truncate" title={`${r.code} — ${r.article}`}><span className="font-mono text-muted-foreground mr-1">{r.code}</span>{r.article}</span></TableCell>
+              <TableCell><span className="block md:max-w-48 md:truncate" title={r.depot || undefined}>{r.depot || "—"}</span></TableCell>
               <TableCell className={cn("text-right tabular-nums", r.quantite < 0 && "text-destructive")}>{fmt(r.quantite)}</TableCell>
               <TableCell className="text-right tabular-nums">{fmt(r.cout)}</TableCell>
               <TableCell className="text-right tabular-nums">{fmt(r.valeur)}</TableCell>
@@ -115,7 +129,7 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
                 {r.campaignId && canReview && <Link className="block text-primary underline"
                   to={`?tab=campaign-control&campaign=${encodeURIComponent(r.campaignId)}`}>Voir la campagne</Link>}
               </TableCell>
-              <TableCell className="truncate max-w-[14rem]">{r.motif || "—"}</TableCell>
+              <TableCell className="truncate max-w-[14rem]" title={r.motif || undefined}>{r.motif || "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody></Table>
@@ -125,7 +139,7 @@ function MovementsTable({ rows, empty, canReview }: { rows: Row[]; empty: string
   );
 }
 
-function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AdjustmentDialog({ open, onClose, returnFocusRef }: { open: boolean; onClose: () => void; returnFocusRef: React.RefObject<HTMLButtonElement | null> }) {
   const { data: items = [] } = useItems();
   const { data: warehouses = [] } = useWarehouses();
   const create = useCreateStockAdjustment();
@@ -143,7 +157,7 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const close = () => { setItemId(""); setQty(""); setCost(""); setReason(""); onClose(); };
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm">Ajustement de stock</DialogTitle>
           <DialogDescription className="text-xs">
@@ -154,36 +168,36 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="adj-item">Article</Label>
-            <select id="adj-item" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
+            <select id="adj-item" className="w-full h-11 sm:h-8 rounded-md border border-input bg-background px-2 text-base sm:text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
               <option value="">Choisir…</option>
-              {items.map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name} (stock {fmt(Number(i.quantity_on_hand ?? 0))})</option>)}
+              {items.filter((i: any) => (i.item_type ?? "stock") === "stock").map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name} (stock {fmt(Number(i.quantity_on_hand ?? 0))})</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="adj-warehouse">Dépôt</Label>
-              <select id="adj-warehouse" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+              <select id="adj-warehouse" className="w-full h-11 sm:h-8 rounded-md border border-input bg-background px-2 text-base sm:text-xs" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
                 <option value="">—</option>
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="adj-date">Date</Label>
-              <Input id="adj-date" type="date" className="h-8 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="adj-date" type="date" className="h-11 sm:h-8 text-base sm:text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="adj-qty">Quantité (±)</Label>
-              <Input id="adj-qty" className="h-8 text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+              <Input id="adj-qty" className="h-11 sm:h-8 text-base sm:text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="adj-cost">Coût unitaire (excédent)</Label>
-              <Input id="adj-cost" className="h-8 text-xs text-right" inputMode="decimal" disabled={!(q > 0)} value={cost}
+              <Input id="adj-cost" className="h-11 sm:h-8 text-base sm:text-xs text-right" inputMode="decimal" disabled={!(q > 0)} value={cost}
                 placeholder={item ? `coût moyen ${fmt(Number(item.average_cost ?? 0))}` : ""} onChange={(e) => setCost(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="adj-reason">{reasonRequired ? "Motif (obligatoire)" : "Motif"}</Label>
-            <Input id="adj-reason" className="h-8 text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, péremption, erreur de saisie…" />
+            <Input id="adj-reason" className="h-11 sm:h-8 text-base sm:text-xs" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Casse, péremption, erreur de saisie…" />
           </div>
           {error && (itemId || qty || reason) && <p className="text-xs text-destructive" role="alert">{error}</p>}
         </div>
@@ -200,7 +214,7 @@ function AdjustmentDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function TransferDialog({ open, onClose, returnFocusRef }: { open: boolean; onClose: () => void; returnFocusRef: React.RefObject<HTMLButtonElement | null> }) {
   const { data: items = [] } = useItems();
   const { data: warehouses = [] } = useWarehouses();
   const transfer = useTransferStock();
@@ -215,7 +229,7 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const close = () => { setItemId(""); setQty(""); setNotes(""); onClose(); };
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm">Transfert entre dépôts</DialogTitle>
           <DialogDescription className="text-xs">Deux mouvements (sortie puis entrée) au coût moyen ; aucune écriture comptable (même compte de stock).</DialogDescription>
@@ -223,16 +237,16 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="tr-item">Article</Label>
-            <select id="tr-item" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
+            <select id="tr-item" className="w-full h-11 sm:h-8 rounded-md border border-input bg-background px-2 text-base sm:text-xs" value={itemId} onChange={(e) => setItemId(e.target.value)}>
               <option value="">Choisir…</option>
-              {items.map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
+              {items.filter((i: any) => (i.item_type ?? "stock") === "stock").map((i: any) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[["tr-from", "Dépôt de départ", from, setFrom], ["tr-to", "Dépôt d'arrivée", to, setTo]].map(([id, label, value, set]) => (
               <div key={id as string} className="space-y-1.5">
                 <Label className="text-xs" htmlFor={id as string}>{label as string}</Label>
-                <select id={id as string} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={value as string}
+                <select id={id as string} className="w-full h-11 sm:h-8 rounded-md border border-input bg-background px-2 text-base sm:text-xs" value={value as string}
                   onChange={(e) => (set as (v: string) => void)(e.target.value)}>
                   <option value="">Choisir…</option>
                   {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
@@ -241,11 +255,11 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
             ))}
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="tr-qty">Quantité</Label>
-              <Input id="tr-qty" className="h-8 text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+              <Input id="tr-qty" className="h-11 sm:h-8 text-base sm:text-xs text-right" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="tr-notes">Note</Label>
-              <Input id="tr-notes" className="h-8 text-xs" value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Input id="tr-notes" className="h-11 sm:h-8 text-base sm:text-xs" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
           {error && (itemId || qty) && <p className="text-xs text-destructive" role="alert">{error}</p>}
@@ -263,6 +277,8 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 export default function InventoryTransactions() {
+  const adjustmentTrigger = useRef<HTMLButtonElement | null>(null);
+  const transferTrigger = useRef<HTMLButtonElement | null>(null);
   const { data: movements = [], isLoading } = useAllStockMovements();
   const { data: access } = useMyAccess();
   const { data: tenantId } = useTenantId();
@@ -308,19 +324,16 @@ export default function InventoryTransactions() {
       <GuidanceBanner title="Mouvements de stock"
         description="Réceptions, livraisons, retours, transferts et ajustements réels de la société, avec leur pièce comptable. Un mouvement naît d'une pièce : il ne se saisit ni ne se modifie directement." />
 
-      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-        <h1 className="text-lg font-semibold text-foreground">Stocks — Transactions</h1>
-        <div className="flex gap-2">
+      <PageHeader className="mb-4" title="Stocks — Transactions" actions={<>
           {perms.has("inventory.adjust") && (
-            <Button size="sm" className="gap-1.5" onClick={() => setAdjOpen(true)}><ClipboardEdit className="w-3.5 h-3.5" />Ajustement de stock</Button>
+            <Button size="sm" className="gap-1.5" ref={adjustmentTrigger} onClick={() => setAdjOpen(true)}><ClipboardEdit className="w-3.5 h-3.5" />Ajustement de stock</Button>
           )}
           {perms.has("inventory.transfer") && (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrOpen(true)}><ArrowLeftRight className="w-3.5 h-3.5" />Transfert</Button>
+            <Button size="sm" variant="outline" className="gap-1.5" ref={transferTrigger} onClick={() => setTrOpen(true)}><ArrowLeftRight className="w-3.5 h-3.5" />Transfert</Button>
           )}
           {["movements", "transfers", "adjustments", "posting"].includes(tab) &&
             <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exporter(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>}
-        </div>
-      </div>
+        </>} />
 
       <Tabs value={tab} onValueChange={(v) => setSearchParams((sp) => {
         sp.set("tab", v);
@@ -372,8 +385,8 @@ export default function InventoryTransactions() {
         </TabsContent>
       </Tabs>
 
-      <AdjustmentDialog open={adjOpen} onClose={() => setAdjOpen(false)} />
-      <TransferDialog open={trOpen} onClose={() => setTrOpen(false)} />
+      <AdjustmentDialog returnFocusRef={adjustmentTrigger} open={adjOpen} onClose={() => setAdjOpen(false)} />
+      <TransferDialog returnFocusRef={transferTrigger} open={trOpen} onClose={() => setTrOpen(false)} />
     </PageShell>
   );
 }

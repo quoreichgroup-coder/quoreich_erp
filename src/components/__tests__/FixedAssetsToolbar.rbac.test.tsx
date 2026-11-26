@@ -123,12 +123,11 @@ describe("Fixed Assets toolbar — RBAC integration", () => {
     }
   });
 
-  it("tooltip text reflects required roles when locked", () => {
+  it("tooltip text indicates customizable rights when locked", () => {
     render(<AssetsToolbar perms={permsFor(["asset_clerk"])} />);
     const exportBtn = screen.getByTestId("btn-export");
     const tip = exportBtn.getAttribute("aria-label")!;
-    expect(tip).toContain("Comptable Immobilisations");
-    expect(tip).toContain("Contrôleur Immobilisations");
-    expect(tip).toContain("Administrateur Immobilisations");
+    expect(tip).toContain("assets.depreciate ou assets.dispose");
+    expect(tip).toContain("administrateur de la société");
   });
 });

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Lock } from "lucide-react";
+import { AuthShell } from "@/components/AuthShell";
+import { PasswordInput } from "@/components/PasswordInput";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export default function ResetPassword() {
@@ -52,48 +54,42 @@ export default function ResetPassword() {
 
   if (!isRecovery) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="text-center">
-          <p className="text-muted-foreground">Lien de récupération invalide ou expiré.</p>
-          <Button variant="link" onClick={() => navigate("/login")} className="mt-2">
+      <AuthShell>
+        <Card><CardHeader>
+          <h1 className="text-xl font-semibold">Lien de récupération indisponible</h1>
+          <CardDescription>Ce lien est invalide ou a expiré. Demandez un nouveau lien depuis la connexion.</CardDescription>
+        </CardHeader><CardContent>
+          <Button variant="outline" onClick={() => navigate("/login")} className="h-auto min-h-11 w-full whitespace-normal py-2">
             Retour à la connexion
           </Button>
-        </div>
-      </div>
+        </CardContent></Card>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2 justify-center">
-            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            ComptaFlow
-          </h2>
-        </div>
-        <div className="bg-card rounded-xl shadow-lg border border-border p-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Lock className="w-5 h-5 text-primary" />
-            <h3 className="text-xl font-semibold text-card-foreground">Nouveau mot de passe</h3>
-          </div>
-          <form onSubmit={handleReset} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Nouveau mot de passe</label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Confirmer</label>
-              <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+    <AuthShell>
+      <Card><CardHeader className="p-6 sm:p-8">
+        <h1 className="text-2xl font-semibold">Nouveau mot de passe</h1>
+        <CardDescription>Choisissez un mot de passe d’au moins 6 caractères.</CardDescription>
+      </CardHeader><CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
+          <form onSubmit={handleReset} aria-label="Nouveau mot de passe" aria-busy={loading}>
+            <fieldset disabled={loading} className="grid min-w-0 gap-5">
+              <legend className="sr-only">Nouveau mot de passe</legend>
+              <div className="grid gap-2">
+                <Label htmlFor="reset-password">Nouveau mot de passe</Label>
+                <PasswordInput id="reset-password" name="password" autoComplete="new-password" minLength={6} value={password} onChange={e => setPassword(e.target.value)} required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="reset-confirm">Confirmer le mot de passe</Label>
+                <PasswordInput id="reset-confirm" name="confirm-password" autoComplete="new-password" minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+              </div>
+            <Button type="submit" className="h-auto min-h-12 w-full whitespace-normal py-3" disabled={loading}>
               {loading ? "Mise à jour..." : "Mettre à jour le mot de passe"}
             </Button>
+            </fieldset>
           </form>
-        </div>
-      </div>
-    </div>
+      </CardContent></Card>
+    </AuthShell>
   );
 }

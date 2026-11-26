@@ -80,6 +80,16 @@ services:
       # démarrage sur un refus de création de table.
       QERP_MIGRATION_DB_USER: postgres
       QERP_MIGRATION_DB_PASSWORD: postgres
+
+      # SMTP remains disabled unless supplied by the operator's environment or
+      # an ignored local env file; SMTP_USERNAME/SMTP_PASSWORD aliases are
+      # accepted for --env-file. Never commit mailbox credentials.
+      QERP_SMTP_HOST: ${QERP_SMTP_HOST:-smtp.gmail.com}
+      QERP_SMTP_PORT: ${QERP_SMTP_PORT:-587}
+      QERP_SMTP_USERNAME: ${QERP_SMTP_USERNAME:-${SMTP_USERNAME:-}}
+      QERP_SMTP_PASSWORD: ${QERP_SMTP_PASSWORD:-${SMTP_PASSWORD:-}}
+      QERP_SMTP_FROM: ${QERP_SMTP_FROM:-${QERP_SMTP_USERNAME:-${SMTP_USERNAME:-}}}
+      QERP_SMTP_STARTTLS: ${QERP_SMTP_STARTTLS:-true}
     ports:
       # 8090 plutôt que le 8080 de `SERVER_PORT`, pour la même raison : sur le
       # poste de développement, 8080 est tenu par un conteneur Frappe et 8081

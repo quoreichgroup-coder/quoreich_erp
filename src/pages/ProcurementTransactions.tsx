@@ -1,4 +1,4 @@
-import { useWarehouses } from "@/hooks/use-inventory-data";
+import { useInventoryItemCatalog, useWarehouses } from "@/hooks/use-inventory-data";
 import { RfqPanel } from "@/components/Rfqs";
 import { ImportFiles } from "@/components/ImportFiles";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
@@ -6,15 +6,16 @@ import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable, type ExportFormat } from "@/lib/table-export";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { PageShell } from "@/components/PageShell";
+import { PageHeader } from "@/components/PageHeader";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import { AnalyticSelectors } from "@/components/AnalyticSelectors";
 import { useDocumentAnalytics, useLineAnalytics, type LineAnalytics } from "@/hooks/use-document-analytics";
 import { LineAnalyticsEditor } from "@/components/LineAnalyticsEditor";
 import { DocumentDetail, documentFileName } from "@/components/DocumentDetail";
+import { PurchaseOrderEditions } from "@/components/DocumentEditions";
 import { ProcurementLifecycleActions } from "@/components/ProcurementLifecycleActions";
 import { SupplierReturnDialog, SupplierReturnsList } from "@/components/SupplierReturns";
 import { ReplenishmentProposalsPanel } from "@/components/Replenishment";
@@ -59,6 +61,24 @@ import { documentFooter, emptyDocLine, toLines, validateDocLines, type DraftDocL
 import { apiDelete, apiGet, apiPost, isApiEnabled } from "@/api/client";
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
+
+const mobileColumns = {
+  requisitions: [
+    { label: "Sélection", kind: "selection" }, { label: "N° demande", kind: "primary" },
+    { label: "Objet", wide: true }, { label: "Total estimé" }, { label: "Statut" },
+    { label: "Commande" }, { label: "Date" }, { label: "Actions", kind: "actions" },
+  ],
+  orders: [
+    { label: "Sélection", kind: "selection" }, { label: "N° commande", kind: "primary" },
+    { label: "Fournisseur", wide: true }, { label: "Total" }, { label: "Statut" },
+    { label: "Lignes" }, { label: "Date" }, { label: "Actions", kind: "actions" },
+  ],
+  receipts: [
+    { label: "N° réception", kind: "primary" }, { label: "Commande" },
+    { label: "Fournisseur", wide: true }, { label: "Date" }, { label: "Lignes" }, { label: "Statut" },
+    { label: "Actions", kind: "actions" },
+  ],
+} satisfies Record<string, MobileTableColumn[]>;
 
 const approvalWorkflow = [
   { level: "L1", label: "Manager Direct", threshold: "< 10 000 000 XOF", sla: "24h" },
@@ -94,7 +114,7 @@ function useMyTenantId() {
 
 const toDraftLines = (rows: any[] | undefined, price: string): DraftDocLine[] =>
   rows && rows.length
-    ? rows.map((l) => ({ description: l.description ?? "", quantity: String(l.quantity), unitPrice: String(l[price] ?? "") }))
+    ? rows.map((l) => ({ description: l.description ?? "", quantity: String(l.quantity), unitPrice: String(l[price] ?? ""), item_id: l.item_id }))
     : [emptyDocLine()];
 
 type LineWithAnalytics = DraftDocLine & { analytics?: LineAnalytics };
@@ -116,11 +136,12 @@ function useEditLineAnalytics(kind: "PR" | "PO", rows: any[] | undefined, setLin
   }, [data]);
 }
 
-function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any }) {
+function CreateRequisitionDialog({ open, onOpenChange, edit, returnFocusRef }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any; returnFocusRef?: React.RefObject<HTMLElement | null> }) {
   const { user } = useAuth();
   const tenantId = useMyTenantId();
   const createPR = useCreateRequisition();
   const updateDraft = useUpdateProcurementDraft();
+  const catalog = useInventoryItemCatalog();
   const [desc, setDesc] = useState(edit?.description ?? "");
   const [reqDate, setReqDate] = useState<string>(() => edit?.request_date ?? new Date().toISOString().slice(0, 10));
   const [lines, setLines] = useState<DraftDocLine[]>(() => toDraftLines(edit?.lines, "estimated_unit_cost"));
@@ -150,14 +171,14 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
       estimated_total: documentFooter(lines).total,
       tenant_id: tenantId,
       requested_by: user.id,
-      lines: rows.map((l) => ({ description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics })),
+      lines: rows.map((l) => ({ description: l.description, item_id: l.item_id, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics })),
       analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" returnFocusRef={returnFocusRef}>
         <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la demande " + edit.pr_number : "Nouvelle demande d'achat"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -166,7 +187,7 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
             <div><Label className="text-xs" htmlFor="pr-date">Date de la demande</Label>
               <Input id="pr-date" type="date" value={reqDate} onChange={e => setReqDate(e.target.value)} /></div>
           </div>
-          <DocumentLinesEditor lines={lines} onChange={setLines} priceLabel="Coût estimé" />
+          <DocumentLinesEditor items={catalog.data} lines={lines} onChange={setLines} priceLabel="Coût estimé" />
           <AnalyticSelectors date={reqDate} value={analytics} idPrefix="pr"
             onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
           <LineAnalyticsEditor lines={lines as LineWithAnalytics[]} onChange={(ls) => setLines(ls)} date={reqDate} idPrefix="pr" />
@@ -183,11 +204,12 @@ function CreateRequisitionDialog({ open, onOpenChange, edit }: { open: boolean; 
   );
 }
 
-function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any }) {
+function CreatePODialog({ open, onOpenChange, edit, returnFocusRef }: { open: boolean; onOpenChange: (v: boolean) => void; edit?: any; returnFocusRef?: React.RefObject<HTMLElement | null> }) {
   const { user } = useAuth();
   const tenantId = useMyTenantId();
   const createPO = useCreatePurchaseOrder();
   const updateDraft = useUpdateProcurementDraft();
+  const catalog = useInventoryItemCatalog();
   const { data: suppliers } = useSuppliers();
   const [supplierId, setSupplierId] = useState(edit?.supplier_id ?? "");
   const [orderDate, setOrderDate] = useState(() => edit?.order_date ?? new Date().toISOString().slice(0, 10));
@@ -232,17 +254,17 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
       total: documentFooter(lines).total,
       tenant_id: tenantId,
       created_by: user.id,
-      lines: withAnalytics(lines).map((l) => ({ description: l.description, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics })),
+      lines: withAnalytics(lines).map((l) => ({ description: l.description, item_id: l.item_id, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics })),
       analytics,
     }, { onSuccess: () => { onOpenChange(false); reset(); } });
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" returnFocusRef={returnFocusRef}>
         <DialogHeader><DialogTitle className="text-sm">{edit ? "Modifier la commande " + edit.po_number : "Nouvelle commande fournisseur"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div><Label className="text-xs" htmlFor="po-supplier">Fournisseur</Label>
               <select id="po-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                 value={supplierId} onChange={(e) => {
@@ -265,7 +287,7 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
                 {INCOTERMS.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}
               </select></div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="po-currency">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" data-testid="po-currency">
             <div><Label className="text-xs" htmlFor="po-currency-select">Devise</Label>
               <select id="po-currency-select" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                 value={currency || baseCurrency} onChange={(e) => setCurrency(e.target.value === baseCurrency ? "" : e.target.value)}>
@@ -273,9 +295,9 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
               </select></div>
             {foreign && <div><Label className="text-xs" htmlFor="po-rate">Cours (1 {currency} en {baseCurrency})</Label>
               <Input id="po-rate" inputMode="decimal" className="text-right" placeholder="vide = cours du jour" value={rate} onChange={(e) => setRate(e.target.value)} /></div>}
-            {foreign && <p className="col-span-2 text-[11px] text-muted-foreground self-end">Coûts saisis en {currency} ; la réception est valorisée au coût converti au cours de la commande.</p>}
+            {foreign && <p className="text-[11px] text-muted-foreground self-end sm:col-span-2">Coûts saisis en {currency} ; la réception est valorisée au coût converti au cours de la commande.</p>}
           </div>
-          <DocumentLinesEditor lines={lines} onChange={setLines} />
+          <DocumentLinesEditor items={catalog.data} lines={lines} onChange={setLines} />
           <AnalyticSelectors date={orderDate} value={analytics} idPrefix="po"
             onChange={(axis, value) => setAnalytics((a) => ({ ...a, [axis]: value }))} />
           <LineAnalyticsEditor lines={lines as LineWithAnalytics[]} onChange={(ls) => setLines(ls)} date={orderDate} idPrefix="po" />
@@ -298,9 +320,10 @@ function CreatePODialog({ open, onOpenChange, edit }: { open: boolean; onOpenCha
 // En-tête (commande, date) puis lignes (quantité reçue par ligne de commande, plafonnée au
 // restant) ; la base crée la réception en attente, ajoute les lignes et la valide (V34).
 
-function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refreshing = false }: {
+function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refreshing = false, returnFocusRef }: {
   returns?: { po_line_id: string; quantity: number; replacement_expected: boolean }[];
   open: boolean; onOpenChange: (v: boolean) => void; pos: any[]; grs: any[]; refreshing?: boolean;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }) {
   const { user } = useAuth();
   const createGR = useCreateGoodsReceipt();
@@ -322,7 +345,8 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
   const lines = po ? linesToReceive(po.id, po.lines ?? [], grs, returns) : [];
 
   // Pied de la réception : quantité et valeur (au coût de la ligne de commande) reçues maintenant.
-  const qtyOf = (id: string) => { const n = Number(String(qty[id] ?? "").replace(",", ".")); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const parsedQtyOf = (id: string) => Number(String(qty[id] ?? "").replace(",", "."));
+  const qtyOf = (id: string) => { const n = parsedQtyOf(id); return Number.isFinite(n) && n > 0 ? n : 0; };
   const receivedNow = lines.reduce((s, l) => s + qtyOf(l.id), 0);
   const receivedValue = lines.reduce((s, l) => s + qtyOf(l.id) * Number(l.unit_cost || 0), 0);
   const reset = () => { setSupplierId(""); setPoId(""); setQty({}); setError(null); };
@@ -351,7 +375,7 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
 
   const submit = (complete: boolean) => {
     if (!po || !user) return;
-    const entries = lines.map((l) => ({ po_line_id: l.id, item_id: l.item_id, quantity: Number(qty[l.id] ?? 0), remaining: l.remaining }));
+    const entries = lines.map((l) => ({ po_line_id: l.id, item_id: l.item_id, quantity: parsedQtyOf(l.id), remaining: l.remaining }));
     const problem = validateReceipt(entries);
     if (problem) { setError(problem); return; }
     createGR.mutate({
@@ -368,10 +392,11 @@ function CreateReceiptDialog({ open, onOpenChange, pos, grs, returns = [], refre
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" returnFocusRef={returnFocusRef}>
         <DialogHeader><DialogTitle className="text-sm">Nouvelle réception de marchandises</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Pour un service, la quantité représente l'avancement : 0,3 sur une commande de 1 correspond à 30 %. Aucun stock n'est créé.</p>
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="text-xs" htmlFor="gr-supplier">Fournisseur</Label>
               <select id="gr-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={supplierId}
@@ -504,9 +529,10 @@ function ProcurementBulkBar({ docType, sel, approvals }: { docType: "PR" | "PO";
 const rowId = (r: any) => r.id as string;
 type DocView = { kind: "pr" | "po" | "gr"; doc: any } | null;
 
-function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
+function ProcurementDocDialog({ view, onClose, pos, grs, returns = [], canIssuePO = false }: {
   view: DocView; onClose: () => void; pos: any[]; grs: any[];
   returns?: { po_line_id: string; quantity: number; replacement_expected: boolean }[];
+  canIssuePO?: boolean;
 }) {
   if (!view) return null;
   const { kind, doc } = view;
@@ -545,12 +571,13 @@ function ProcurementDocDialog({ view, onClose, pos, grs, returns = [] }: {
   }
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-3xl">
         <DialogHeader><DialogTitle className="text-sm">{title}</DialogTitle></DialogHeader>
         <DocumentDetail header={header} columns={columns} rows={rows} footer={footer} title={title}
           attachments={{ docType: kind === "pr" ? "purchase_requisition" : kind === "po" ? "purchase_order" : "goods_receipt", docId: doc.id }}
           fileName={documentFileName(title)} print={{ amountInWords: false,
             signatures: view.kind === "gr" ? ["Réceptionné par", "Contrôlé par"] : view.kind === "pr" ? ["Demandeur", "Approbateur"] : ["Émis par", "Approuvé par"] }} />
+        {kind === "po" && <PurchaseOrderEditions poId={doc.id} status={doc.status} canIssue={canIssuePO} />}
       </DialogContent>
     </Dialog>
   );
@@ -570,10 +597,14 @@ export default function ProcurementTransactions() {
   const { data: access } = useMyAccess();
   const canReturn = (access?.permissions ?? []).includes("procurement.return");
   const [returnGR, setReturnGR] = useState<any | null>(null);
+  const returnTrigger = useRef<HTMLButtonElement | null>(null);
 
   const [showCreatePR, setShowCreatePR] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
   const [showCreateGR, setShowCreateGR] = useState(false);
+  const createPRTrigger = useRef<HTMLButtonElement>(null);
+  const createPOTrigger = useRef<HTMLButtonElement>(null);
+  const createGRTrigger = useRef<HTMLButtonElement>(null);
   const [docView, setDocView] = useState<DocView>(null);
   const [tab, setTab] = useState("requisitions");
   // Export de l'onglet affiché, avec les mêmes lignes que l'écran.
@@ -582,6 +613,10 @@ export default function ProcurementTransactions() {
       [{ key: "numero", header: "N° commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "total", header: "Total" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "commandes");
     else if (tab === "gr") exportTable(f, grs.map((g: any) => ({ numero: g.gr_number, commande: g.po?.po_number ?? "", fournisseur: g.po?.supplier?.name ?? "", date: g.receipt_date, statut: g.status, lignes: g.lines?.length ?? 0 })),
       [{ key: "numero", header: "N° réception" }, { key: "commande", header: "Commande" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "statut", header: "Statut" }, { key: "lignes", header: "Lignes" }], "receptions");
+    else if (tab === "returns") exportTable(f, supplierReturns.map(r => ({ numero: r.return_number, date: r.return_date, reception: r.gr_number, commande: r.po_number,
+      fournisseur: r.supplier_name, motif: `${r.reason}${r.replacement_expected ? " · remplacement attendu" : ""}`, valeur_ht: r.total_value, avoir: r.credit_note_number ?? "À recevoir" })),
+      [{ key: "numero", header: "N° retour" }, { key: "date", header: "Date" }, { key: "reception", header: "Réception" }, { key: "commande", header: "Commande" },
+        { key: "fournisseur", header: "Fournisseur" }, { key: "motif", header: "Motif" }, { key: "valeur_ht", header: "Valeur HT" }, { key: "avoir", header: "Avoir" }], "retours-fournisseurs");
     else exportTable(f, prs.map((r: any) => ({ numero: r.pr_number, objet: r.description, total: r.estimated_total, statut: r.status, date: r.request_date, commande: r.po_id ? "oui" : "" })),
       [{ key: "numero", header: "N° demande" }, { key: "objet", header: "Objet" }, { key: "total", header: "Total estimé" }, { key: "statut", header: "Statut" }, { key: "date", header: "Date" }, { key: "commande", header: "Convertie" }], "demandes-achat");
   };
@@ -602,17 +637,14 @@ export default function ProcurementTransactions() {
   return (
     <PageShell>
       <Breadcrumb items={[{ label: "Finance" }, { label: "Approvisionnement", href: "/procurement" }, { label: "Transactions" }]} />
-      <GuidanceBanner title="Transactions d'achat" description="Full procurement cycle: Requisition → PO → Goods Receipt → Invoice Matching. All data is live from the database." />
+      <GuidanceBanner title="Transactions d'achat" description="Demandes → Commandes → Réceptions → Rapprochement des factures. Les données proviennent de votre société." />
 
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-foreground">Transactions d'achat</h1>
-        <div className="flex gap-2">
-          <Button size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />Nouvelle demande</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />Nouvelle commande</Button>
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canReceive} title={perms && !perms.canReceive ? "Droit requis : procurement.receive" : undefined} onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
+      <PageHeader title="Transactions d'achat" actions={<>
+          <Button ref={createPRTrigger} size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />Nouvelle demande</Button>
+          <Button ref={createPOTrigger} size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />Nouvelle commande</Button>
+          <Button ref={createGRTrigger} size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canReceive} title={perms && !perms.canReceive ? "Droit requis : procurement.receive" : undefined} onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
           <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>
-        </div>
-      </div>
+      </>} />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -623,9 +655,9 @@ export default function ProcurementTransactions() {
           { label: "En approbation", value: prs.filter((r: any) => r.status === "pending_approval").length + pos.filter((p: any) => p.status === "pending_approval").length, sub: "demandes et commandes soumises" },
         ].map(k => (
           <div key={k.label} className="bg-card rounded-lg border border-border p-3">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{k.label}</span>
+            <span className="text-xs text-muted-foreground font-medium">{k.label}</span>
             <div className="text-lg font-semibold text-foreground tabular-nums mt-0.5">{k.value}</div>
-            <span className="text-[10px] text-muted-foreground">{k.sub}</span>
+          <span className="text-xs text-muted-foreground">{k.sub}</span>
           </div>
         ))}
       </div>
@@ -651,7 +683,7 @@ export default function ProcurementTransactions() {
             ) : (
               <>
               <ProcurementBulkBar docType="PR" sel={selPR} approvals={approvals} />
-              <Table><TableHeader><TableRow className="bg-muted/30">
+              <Table mobileColumns={mobileColumns.requisitions} aria-label="Demandes d'achat"><TableHeader><TableRow className="bg-muted/30">
                 <SelectAllHead sel={selPR} pageIds={prs.map((r: any) => r.id)} label="Sélectionner toutes les demandes" />
                 <TableHead className="text-xs">N° demande</TableHead>
                 <TableHead className="text-xs">Objet</TableHead>
@@ -707,7 +739,7 @@ export default function ProcurementTransactions() {
             ) : (
               <>
               <ProcurementBulkBar docType="PO" sel={selPO} approvals={approvals} />
-              <Table><TableHeader><TableRow className="bg-muted/30">
+              <Table mobileColumns={mobileColumns.orders} aria-label="Commandes d'achat"><TableHeader><TableRow className="bg-muted/30">
                 <SelectAllHead sel={selPO} pageIds={pos.map((r: any) => r.id)} label="Sélectionner toutes les commandes" />
                 <TableHead className="text-xs">N° commande</TableHead>
                 <TableHead className="text-xs">Fournisseur</TableHead>
@@ -747,7 +779,7 @@ export default function ProcurementTransactions() {
             {loadingGR ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
             ) : (
-              <Table><TableHeader><TableRow className="bg-muted/30">
+              <Table mobileColumns={mobileColumns.receipts} aria-label="Réceptions d'achat"><TableHeader><TableRow className="bg-muted/30">
                 <TableHead className="text-xs">GR #</TableHead>
                 <TableHead className="text-xs">PO Ref</TableHead>
                 <TableHead className="text-xs">Fournisseur</TableHead>
@@ -770,7 +802,7 @@ export default function ProcurementTransactions() {
                     <TableCell className="space-x-1">
                       <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDocView({ kind: "gr", doc: gr })}>Voir</Button>
                       {gr.status === "completed" && canReturn && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setReturnGR(gr)}>Retour</Button>
+                        <Button size="sm" variant="ghost" className="text-xs" onClick={event => { returnTrigger.current = event.currentTarget; setReturnGR(gr); }}>Retour</Button>
                       )}
                       {gr.status === "pending" && (
                         <Button size="sm" variant="ghost" className="h-6 text-[10px] text-success"
@@ -839,16 +871,17 @@ export default function ProcurementTransactions() {
       </div>
 
       {/* Dialogs */}
-      <CreateRequisitionDialog open={showCreatePR} onOpenChange={setShowCreatePR} />
-      <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} />
+      <CreateRequisitionDialog open={showCreatePR} onOpenChange={setShowCreatePR} returnFocusRef={createPRTrigger} />
+      <CreatePODialog open={showCreatePO} onOpenChange={setShowCreatePO} returnFocusRef={createPOTrigger} />
       {editPR && <CreateRequisitionDialog open edit={editPR} onOpenChange={(o) => { if (!o) setEditPR(null); }} />}
       {editPO && <CreatePODialog open edit={editPO} onOpenChange={(o) => { if (!o) setEditPO(null); }} />}
-      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} returns={returnLines} refreshing={refreshingGR} />
+      <CreateReceiptDialog open={showCreateGR} onOpenChange={setShowCreateGR} pos={pos} grs={grs} returns={returnLines} refreshing={refreshingGR} returnFocusRef={createGRTrigger} />
       {returnGR && (
-        <SupplierReturnDialog open gr={returnGR} onClose={() => setReturnGR(null)}
+        <SupplierReturnDialog open gr={returnGR} onClose={() => setReturnGR(null)} returnFocusRef={returnTrigger}
           poLines={(pos.find((p: any) => p.id === returnGR.po_id)?.lines ?? []) as any[]} />
       )}
-      <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} returns={returnLines} />
+      <ProcurementDocDialog view={docView} onClose={() => setDocView(null)} pos={pos} grs={grs} returns={returnLines}
+        canIssuePO={access?.permissions.includes("procurement.order") ?? false} />
 
       <Dialog open={!!convertPR} onOpenChange={(o) => { if (!o) { setConvertPR(null); setConvertSupplier(""); } }}>
         <DialogContent>

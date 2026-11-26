@@ -51,7 +51,7 @@ export function surveiller(page: Page) {
   const incidents: Incident[] = [];
   let etape = "début";
   page.on("response", async (r) => {
-    if (r.status() < 400 || !/supabase\.co|:8090\//.test(r.url())) return;
+    if (r.status() < 400 || !(/supabase\.co/.test(r.url()) || r.url().startsWith(process.env.E2E_API_URL ?? "http://127.0.0.1:8090"))) return;
     let corps = "";
     try { corps = (await r.text()).slice(0, 400); } catch { /* corps indisponible */ }
     const u = new URL(r.url());

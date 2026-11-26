@@ -183,7 +183,7 @@ public class HrQuery {
     List<Map<String, Object>> rows = jdbc.query(
         "SELECT tenant_id, country_code, currency_code, employee_contribution_pct, employee_contribution_cap,"
             + " employer_contribution_pct, employer_contribution_cap, income_tax_bands::text AS income_tax_bands, rules_effective_from,"
-            + " rules_reference, rules_validated_at, rules_validated_by"
+            + " rules_reference, rules_validated_at, rules_validated_by, proration_method"
             + " FROM public.hr_payroll_settings WHERE tenant_id = public.get_user_tenant_id(auth.uid())", ROW);
     return rows.isEmpty() ? Map.of() : rows.getFirst();
   }
@@ -194,19 +194,24 @@ public class HrQuery {
     jdbc.update(
         "INSERT INTO public.hr_payroll_settings (tenant_id, country_code, currency_code, employee_contribution_pct,"
             + " employee_contribution_cap, employer_contribution_pct, employer_contribution_cap, income_tax_bands,"
-            + " rules_effective_from, rules_reference)"
-            + " VALUES (public.get_user_tenant_id(auth.uid()), ?, ?, ?, ?, ?, ?, ?::jsonb, ?::date, ?)"
+            + " rules_effective_from, rules_reference, proration_method)"
+            + " VALUES (public.get_user_tenant_id(auth.uid()), ?, ?, ?, ?, ?, ?, ?::jsonb, ?::date, ?,"
+            + " COALESCE(?::text, 'calendar_days'))"
             + " ON CONFLICT (tenant_id) DO UPDATE SET country_code = EXCLUDED.country_code,"
             + " currency_code = EXCLUDED.currency_code, employee_contribution_pct = EXCLUDED.employee_contribution_pct,"
             + " employee_contribution_cap = EXCLUDED.employee_contribution_cap,"
             + " employer_contribution_pct = EXCLUDED.employer_contribution_pct,"
             + " employer_contribution_cap = EXCLUDED.employer_contribution_cap,"
             + " income_tax_bands = EXCLUDED.income_tax_bands, rules_effective_from = EXCLUDED.rules_effective_from,"
-            + " rules_reference = EXCLUDED.rules_reference, updated_at = now()",
+            + " rules_reference = EXCLUDED.rules_reference,"
+            // V148 : une méthode de prorata absente de la requête ne remplace pas celle enregistrée.
+            + " proration_method = COALESCE(?::text, public.hr_payroll_settings.proration_method),"
+            + " updated_at = now()",
         input.get("country_code"), input.get("currency_code"), input.get("employee_contribution_pct"),
         input.get("employee_contribution_cap"), input.get("employer_contribution_pct"),
         input.get("employer_contribution_cap"), json(input.get("income_tax_bands")),
-        input.get("rules_effective_from"), input.get("rules_reference"));
+        input.get("rules_effective_from"), input.get("rules_reference"), input.get("proration_method"),
+        input.get("proration_method"));
     return payrollSettings();
   }
 
@@ -221,8 +226,22 @@ public class HrQuery {
     return jdbc.query("SELECT id, tenant_id, period, pay_date, status, gross_total, net_total, deductions_total,"
         + " taxes_total, employer_charges_total, employee_count, created_by, approved_by, executed_by,"
         + " approved_at, executed_at, notes, payroll_country_code, payroll_currency_code,"
-        + " payroll_rules_snapshot::text AS payroll_rules_snapshot, created_at, updated_at"
+        + " payroll_rules_snapshot::text AS payroll_rules_snapshot, created_at, updated_at,"
+        + " run_kind, regularizes_run_id, journal_entry_id, reversed_at, reversed_by, reversal_reason, reversal_entry_id"
         + " FROM public.payroll_runs ORDER BY pay_date DESC, id", ROW);
+  }
+
+  /** V151 — contrepassation d'un cycle comptabilisé ; renvoie l'écriture de contrepassation. */
+  @Transactional
+  public UUID reversePayrollRun(UUID runId, String reason, String reverseDate) {
+    return jdbc.queryForObject("SELECT public.reverse_payroll_run(?, ?, COALESCE(?::date, CURRENT_DATE))", UUID.class,
+        runId, reason, reverseDate);
+  }
+
+  /** V151 — cycle de régularisation d'une période comptabilisée. */
+  @Transactional
+  public UUID createPayrollRegularization(UUID runId, String payDate, String reason) {
+    return jdbc.queryForObject("SELECT public.create_payroll_regularization(?, ?::date, ?)", UUID.class, runId, payDate, reason);
   }
 
   @Transactional(readOnly = true)
@@ -314,6 +333,222 @@ public class HrQuery {
     return jdbc.queryForObject("SELECT public.post_payroll_run(?)", UUID.class, runId);
   }
 
+  /** Fonction SQL renvoyant du jsonb, restitué tel quel en JSON. */
+  private Object jsonResult(String sql, Object... args) {
+    String result = jdbc.queryForObject(sql, String.class, args);
+    try {
+      return JSON.readTree(result == null ? "null" : result);
+    } catch (Exception e) {
+      throw new IllegalStateException("Réponse RH illisible", e);
+    }
+  }
+
+  /** V152 — temps, absences et congés. */
+  @Transactional(readOnly = true)
+  public Object timeTypes() {
+    return jsonResult("SELECT public.list_hr_time_types()::text");
+  }
+
+  @Transactional
+  public UUID saveTimeType(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.save_hr_time_type(?::jsonb)", UUID.class, json(input));
+  }
+
+  @Transactional(readOnly = true)
+  public Object timeRequests(String from, String to) {
+    return jsonResult("SELECT public.list_hr_time_requests(?::date, ?::date)::text", from, to);
+  }
+
+  @Transactional
+  public UUID submitTimeRequest(Map<String, Object> input) {
+    Object quantity = input.get("quantity");
+    return jdbc.queryForObject("SELECT public.submit_hr_time_request(?::uuid, ?::uuid, ?::date, ?::date, ?::numeric, ?)", UUID.class,
+        input.get("employee_id"), input.get("type_id"), input.get("start_date"), input.get("end_date"),
+        quantity == null || String.valueOf(quantity).isBlank() ? null : String.valueOf(quantity), input.get("reason"));
+  }
+
+  @Transactional
+  public UUID decideTimeRequest(UUID id, boolean approve, String reason) {
+    return jdbc.queryForObject("SELECT public.decide_hr_time_request(?, ?, ?)", UUID.class, id, approve, reason);
+  }
+
+  @Transactional
+  public UUID cancelTimeRequest(UUID id, String reason) {
+    return jdbc.queryForObject("SELECT public.cancel_hr_time_request(?, ?)", UUID.class, id, reason);
+  }
+
+  /** V153 : la lecture des soldes rattrape d'abord les acquisitions automatiques (écriture). */
+  @Transactional
+  public Object leaveBalances() {
+    return jsonResult("SELECT public.list_hr_leave_balances()::text");
+  }
+
+  /** V154 — paiement des salaires : formats de fichier bancaire, lots, fichier, retours. */
+  @Transactional(readOnly = true)
+  public Object bankFileProfiles() {
+    return jsonResult("SELECT COALESCE(jsonb_agg(to_jsonb(p) - 'tenant_id' ORDER BY p.label), '[]'::jsonb)::text"
+        + " FROM public.payroll_bank_file_profiles p WHERE p.tenant_id = public.get_user_tenant_id(auth.uid())");
+  }
+
+  @Transactional
+  public UUID saveBankFileProfile(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.save_payroll_bank_file_profile(?::jsonb)", UUID.class, json(input));
+  }
+
+  @Transactional(readOnly = true)
+  public Object paymentBatches(UUID runId) {
+    return jsonResult("SELECT public.list_payroll_payment_batches(?)::text", runId);
+  }
+
+  @Transactional
+  public UUID createPaymentBatch(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.create_payroll_payment_batch(?::uuid, ?::uuid, ?::uuid, ?::date, ?)", UUID.class,
+        input.get("run_id"), input.get("bank_account_id"), input.get("profile_id"), input.get("payment_date"), input.get("reference"));
+  }
+
+  @Transactional
+  public UUID approvePaymentBatch(UUID id) {
+    return jdbc.queryForObject("SELECT public.approve_payroll_payment_batch(?)", UUID.class, id);
+  }
+
+  @Transactional
+  public UUID cancelPaymentBatch(UUID id, String reason) {
+    return jdbc.queryForObject("SELECT public.cancel_payroll_payment_batch(?, ?)", UUID.class, id, reason);
+  }
+
+  @Transactional
+  public Object paymentFile(UUID id) {
+    return jsonResult("SELECT public.generate_payroll_payment_file(?)::text", id);
+  }
+
+  @Transactional
+  public Object paymentResults(UUID id, Object results, String resultDate) {
+    return jsonResult("SELECT public.record_payroll_payment_results(?, ?::jsonb, ?::date)::text", id, json(results), resultDate);
+  }
+
+  @Transactional(readOnly = true)
+  public Object runPaymentStatus(UUID runId) {
+    return jsonResult("SELECT public.payroll_run_payment_status(?)::text", runId);
+  }
+
+  /** V153 — calendrier des jours fériés de la société. */
+  @Transactional(readOnly = true)
+  public Object publicHolidays(Integer year) {
+    return jsonResult("SELECT public.list_hr_public_holidays(?)::text", year);
+  }
+
+  @Transactional
+  public UUID savePublicHoliday(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.save_hr_public_holiday(?::jsonb)", UUID.class, json(input));
+  }
+
+  @Transactional
+  public UUID deletePublicHoliday(UUID id) {
+    return jdbc.queryForObject("SELECT public.delete_hr_public_holiday(?)", UUID.class, id);
+  }
+
+  /** V153 — libre-service salarié (sa fiche, ses demandes, ses soldes ; demandes à approuver comme responsable). */
+  @Transactional
+  public Object mySelfService() {
+    return jsonResult("SELECT public.my_hr_self_service()::text");
+  }
+
+  @Transactional
+  public UUID submitMyTimeRequest(Map<String, Object> input) {
+    Object quantity = input.get("quantity");
+    return jdbc.queryForObject("SELECT public.submit_my_time_request(?::uuid, ?::date, ?::date, ?::numeric, ?)", UUID.class,
+        input.get("type_id"), input.get("start_date"), input.get("end_date"),
+        quantity == null || String.valueOf(quantity).isBlank() ? null : String.valueOf(quantity), input.get("reason"));
+  }
+
+  @Transactional
+  public UUID cancelMyTimeRequest(UUID id, String reason) {
+    return jdbc.queryForObject("SELECT public.cancel_my_time_request(?, ?)", UUID.class, id, reason);
+  }
+
+  @Transactional(readOnly = true)
+  public Object selfServiceLinks() {
+    return jsonResult("SELECT public.list_hr_self_service_links()::text");
+  }
+
+  @Transactional
+  public UUID setSelfService(UUID employeeId, Object userId, Object approverId) {
+    return jdbc.queryForObject("SELECT public.set_hr_employee_self_service(?, ?::uuid, ?::uuid)", UUID.class, employeeId,
+        userId == null || String.valueOf(userId).isBlank() ? null : String.valueOf(userId),
+        approverId == null || String.valueOf(approverId).isBlank() ? null : String.valueOf(approverId));
+  }
+
+  @Transactional
+  public Integer accrueLeave(String period) {
+    return jdbc.queryForObject("SELECT public.accrue_hr_leave(?)", Integer.class, period);
+  }
+
+  @Transactional
+  public Long adjustLeave(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.adjust_hr_leave_balance(?::uuid, ?::uuid, ?::numeric, ?::date, ?)", Long.class,
+        input.get("employee_id"), input.get("type_id"), input.get("quantity") == null ? null : String.valueOf(input.get("quantity")),
+        input.get("entry_date"), input.get("note"));
+  }
+
+  @Transactional
+  public Integer transferTimeToPayroll(UUID runId) {
+    return jdbc.queryForObject("SELECT public.transfer_hr_time_to_payroll(?)", Integer.class, runId);
+  }
+
+  /** V150 — bases de calcul nommées (salaire de base + rubriques). */
+  @Transactional(readOnly = true)
+  public Object payrollBases() {
+    String result = jdbc.queryForObject("SELECT public.list_payroll_bases()::text", String.class);
+    try {
+      return JSON.readTree(result == null ? "[]" : result);
+    } catch (Exception e) {
+      throw new IllegalStateException("Bases de paie illisibles", e);
+    }
+  }
+
+  @Transactional
+  public UUID savePayrollBase(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.save_payroll_base(?::jsonb)", UUID.class, json(input));
+  }
+
+  /** V150 — essai d'une formule de rubrique avec des valeurs données. */
+  @Transactional(readOnly = true)
+  public Object tryPayrollFormula(String formula, Object variables) {
+    return jdbc.queryForObject("SELECT public.payroll_formula_try(?, ?::jsonb)", Object.class, formula,
+        variables == null ? "{}" : json(variables));
+  }
+
+  /** V149 — versions datées des règles légales de paie (cotisations comprises). */
+  @Transactional(readOnly = true)
+  public Object payrollRuleVersions() {
+    String result = jdbc.queryForObject("SELECT public.list_payroll_rule_versions()::text", String.class);
+    try {
+      return JSON.readTree(result == null ? "[]" : result);
+    } catch (Exception e) {
+      throw new IllegalStateException("Règles de paie illisibles", e);
+    }
+  }
+
+  @Transactional
+  public UUID savePayrollRuleVersion(Map<String, Object> input) {
+    return jdbc.queryForObject("SELECT public.save_payroll_rule_version(?::jsonb)", UUID.class, json(input));
+  }
+
+  @Transactional
+  public Object validatePayrollRuleVersion(UUID versionId) {
+    return jdbc.queryForObject("SELECT public.validate_payroll_rule_version(?)", Object.class, versionId);
+  }
+
+  @Transactional
+  public UUID archivePayrollRuleVersion(UUID versionId, String reason) {
+    return jdbc.queryForObject("SELECT public.archive_payroll_rule_version(?, ?)", UUID.class, versionId, reason);
+  }
+
+  @Transactional
+  public UUID deletePayrollRuleVersion(UUID versionId) {
+    return jdbc.queryForObject("SELECT public.delete_payroll_rule_version(?)", UUID.class, versionId);
+  }
+
   @Transactional(readOnly = true)
   public Map<String, Object> payrollRunAudit(UUID runId, String eventType, int page, int pageSize) {
     requirePermission("audit_payroll");
@@ -368,6 +603,16 @@ public class HrQuery {
     for (int column = 1; column <= metadata.getColumnCount(); column++) {
       Object value = rs.getObject(column);
       String label = metadata.getColumnLabel(column);
+      // jsonb renvoyé tel quel par une fonction (ex. barème d'une rubrique, V150) : le pilote rend un PGobject,
+      // que l'on restitue en JSON (classe lue par son nom : le pilote n'est qu'en portée d'exécution).
+      if (value != null && "org.postgresql.util.PGobject".equals(value.getClass().getName())
+          && "jsonb".equals(metadata.getColumnTypeName(column))) {
+        try {
+          value = JSON.readTree(value.toString());
+        } catch (Exception ignored) {
+          value = value.toString();
+        }
+      }
       if (value instanceof String json && Set.of("income_tax_bands", "payroll_rules_snapshot", "definition_snapshot", "employee", "details", "before_values", "after_values", "bulk_action_options").contains(label)) {
         try {
           value = JSON.readTree(json);

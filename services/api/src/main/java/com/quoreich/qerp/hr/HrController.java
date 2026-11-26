@@ -154,6 +154,57 @@ public class HrController {
     return Map.of("rules_validated_at", query.confirmPayrollRules());
   }
 
+  @GetMapping("/payroll/bases")
+  @Operation(operationId = "listHrPayrollBases", summary = "Lister les bases de calcul de paie")
+  public Object payrollBases() {
+    return query.payrollBases();
+  }
+
+  @PostMapping("/payroll/bases")
+  @Operation(operationId = "saveHrPayrollBase", summary = "Créer ou modifier une base de calcul de paie")
+  public ResponseEntity<Map<String, UUID>> savePayrollBase(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.savePayrollBase(input)));
+  }
+
+  @PostMapping("/payroll/formula-test")
+  @Operation(operationId = "tryHrPayrollFormula", summary = "Essayer une formule de rubrique avec des valeurs données")
+  public Map<String, Object> tryPayrollFormula(@RequestBody Map<String, Object> input) {
+    Object formula = input.get("formula");
+    Object result = query.tryPayrollFormula(formula == null ? null : String.valueOf(formula), input.get("variables"));
+    return java.util.Collections.singletonMap("result", result);
+  }
+
+  @GetMapping("/payroll/rule-versions")
+  @Operation(operationId = "listHrPayrollRuleVersions", summary = "Lister les versions datées des règles légales de paie")
+  public Object payrollRuleVersions() {
+    return query.payrollRuleVersions();
+  }
+
+  @PostMapping("/payroll/rule-versions")
+  @Operation(operationId = "saveHrPayrollRuleVersion", summary = "Créer ou modifier une version brouillon des règles de paie")
+  public ResponseEntity<Map<String, UUID>> savePayrollRuleVersion(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.savePayrollRuleVersion(input)));
+  }
+
+  @PostMapping("/payroll/rule-versions/{versionId}/validate")
+  @Operation(operationId = "validateHrPayrollRuleVersion", summary = "Valider une version de règles de paie")
+  public Map<String, Object> validatePayrollRuleVersion(@PathVariable UUID versionId) {
+    return Map.of("validated_at", query.validatePayrollRuleVersion(versionId));
+  }
+
+  @PostMapping("/payroll/rule-versions/{versionId}/archive")
+  @Operation(operationId = "archiveHrPayrollRuleVersion", summary = "Archiver une version validée des règles de paie")
+  public Map<String, UUID> archivePayrollRuleVersion(@PathVariable UUID versionId, @RequestBody Map<String, Object> input) {
+    Object reason = input.get("reason");
+    return Map.of("id", query.archivePayrollRuleVersion(versionId, reason == null ? null : String.valueOf(reason)));
+  }
+
+  @PostMapping("/payroll/rule-versions/{versionId}/delete")
+  @Operation(operationId = "deleteHrPayrollRuleVersion", summary = "Supprimer une version brouillon des règles de paie")
+  public Map<String, UUID> deletePayrollRuleVersion(@PathVariable UUID versionId) {
+    return Map.of("id", query.deletePayrollRuleVersion(versionId));
+  }
+
   @GetMapping("/payroll/runs")
   @Operation(operationId = "listHrPayrollRuns", summary = "Lister les cycles visibles de la société courante")
   public List<Map<String, Object>> payrollRuns() {
@@ -244,6 +295,185 @@ public class HrController {
   @Operation(operationId = "postHrPayrollRun", summary = "Comptabiliser un cycle approuvé")
   public Map<String, UUID> post(@PathVariable UUID id) {
     return Map.of("journal_entry_id", query.postPayrollRun(id));
+  }
+
+  @PostMapping("/payroll/runs/{id}/reverse")
+  @Operation(operationId = "reverseHrPayrollRun", summary = "Contrepasser un cycle comptabilisé (motif obligatoire)")
+  public Map<String, UUID> reverse(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("reversal_entry_id", query.reversePayrollRun(id, text(input.get("reason")), text(input.get("reverse_date"))));
+  }
+
+  @PostMapping("/payroll/runs/{id}/regularization")
+  @Operation(operationId = "createHrPayrollRegularization", summary = "Créer un cycle de régularisation d'une période comptabilisée")
+  public ResponseEntity<Map<String, UUID>> regularization(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id",
+        query.createPayrollRegularization(id, text(input.get("pay_date")), text(input.get("reason")))));
+  }
+
+  @PostMapping("/payroll/runs/{id}/transfer-time")
+  @Operation(operationId = "transferHrTimeToPayroll", summary = "Transmettre au cycle les absences et heures approuvées du mois")
+  public Map<String, Integer> transferTime(@PathVariable UUID id) {
+    return Map.of("count", query.transferTimeToPayroll(id));
+  }
+
+  @GetMapping("/time/types")
+  @Operation(operationId = "listHrTimeTypes", summary = "Lister les types d'absence, de congé et d'heures")
+  public Object timeTypes() {
+    return query.timeTypes();
+  }
+
+  @PostMapping("/time/types")
+  @Operation(operationId = "saveHrTimeType", summary = "Créer ou modifier un type d'absence, de congé ou d'heures")
+  public ResponseEntity<Map<String, UUID>> saveTimeType(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.saveTimeType(input)));
+  }
+
+  @GetMapping("/time/requests")
+  @Operation(operationId = "listHrTimeRequests", summary = "Lister les demandes d'absence, de congé et d'heures")
+  public Object timeRequests(@RequestParam(required = false) String from, @RequestParam(required = false) String to) {
+    return query.timeRequests(from, to);
+  }
+
+  @PostMapping("/time/requests")
+  @Operation(operationId = "submitHrTimeRequest", summary = "Saisir une demande d'absence, de congé ou d'heures")
+  public ResponseEntity<Map<String, UUID>> submitTimeRequest(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.submitTimeRequest(input)));
+  }
+
+  @PostMapping("/time/requests/{id}/decide")
+  @Operation(operationId = "decideHrTimeRequest", summary = "Approuver ou rejeter une demande (motif obligatoire pour un rejet)")
+  public Map<String, UUID> decideTimeRequest(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("id", query.decideTimeRequest(id, Boolean.TRUE.equals(input.get("approve")), text(input.get("reason"))));
+  }
+
+  @PostMapping("/time/requests/{id}/cancel")
+  @Operation(operationId = "cancelHrTimeRequest", summary = "Annuler une demande non transmise à la paie")
+  public Map<String, UUID> cancelTimeRequest(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("id", query.cancelTimeRequest(id, text(input.get("reason"))));
+  }
+
+  @GetMapping("/time/balances")
+  @Operation(operationId = "listHrLeaveBalances", summary = "Lire les soldes de congés")
+  public Object leaveBalances() {
+    return query.leaveBalances();
+  }
+
+  @PostMapping("/time/accrue")
+  @Operation(operationId = "accrueHrLeave", summary = "Acquérir les congés d'un mois (une fois par mois et par type)")
+  public Map<String, Integer> accrueLeave(@RequestBody Map<String, Object> input) {
+    return Map.of("count", query.accrueLeave(text(input.get("period"))));
+  }
+
+  @PostMapping("/time/adjustments")
+  @Operation(operationId = "adjustHrLeaveBalance", summary = "Ajuster un solde de congés (motif obligatoire)")
+  public Map<String, Long> adjustLeave(@RequestBody Map<String, Object> input) {
+    return Map.of("id", query.adjustLeave(input));
+  }
+
+  @GetMapping("/time/holidays")
+  @Operation(operationId = "listHrPublicHolidays", summary = "Lire le calendrier des jours fériés (définitions et dates de l'année)")
+  public Object publicHolidays(@RequestParam(required = false) Integer year) {
+    return query.publicHolidays(year);
+  }
+
+  @PostMapping("/time/holidays")
+  @Operation(operationId = "saveHrPublicHoliday", summary = "Créer ou modifier un jour férié (date ou jour/mois récurrent)")
+  public ResponseEntity<Map<String, UUID>> savePublicHoliday(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.savePublicHoliday(input)));
+  }
+
+  @PostMapping("/time/holidays/{id}/delete")
+  @Operation(operationId = "deleteHrPublicHoliday", summary = "Supprimer un jour férié du calendrier")
+  public Map<String, UUID> deletePublicHoliday(@PathVariable UUID id) {
+    return Map.of("id", query.deletePublicHoliday(id));
+  }
+
+  @GetMapping("/me")
+  @Operation(operationId = "getHrSelfService", summary = "Libre-service : ma fiche, mes demandes, mes soldes, demandes à approuver")
+  public Object mySelfService() {
+    return query.mySelfService();
+  }
+
+  @PostMapping("/me/time-requests")
+  @Operation(operationId = "submitMyHrTimeRequest", summary = "Libre-service : saisir ma demande d'absence ou de congé")
+  public ResponseEntity<Map<String, UUID>> submitMyTimeRequest(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.submitMyTimeRequest(input)));
+  }
+
+  @PostMapping("/me/time-requests/{id}/cancel")
+  @Operation(operationId = "cancelMyHrTimeRequest", summary = "Libre-service : annuler ma demande non transmise à la paie")
+  public Map<String, UUID> cancelMyTimeRequest(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("id", query.cancelMyTimeRequest(id, text(input.get("reason"))));
+  }
+
+  @GetMapping("/self-service/links")
+  @Operation(operationId = "listHrSelfServiceLinks", summary = "Comptes rattachés aux fiches salariés et approbateurs désignés")
+  public Object selfServiceLinks() {
+    return query.selfServiceLinks();
+  }
+
+  @PostMapping("/employees/{id}/self-service")
+  @Operation(operationId = "setHrEmployeeSelfService", summary = "Rattacher un compte et un approbateur à une fiche salarié")
+  public Map<String, UUID> setSelfService(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("id", query.setSelfService(id, input.get("user_id"), input.get("approver_user_id")));
+  }
+
+  @GetMapping("/payments/profiles")
+  @Operation(operationId = "listHrBankFileProfiles", summary = "Lister les formats de fichier de virement de la société")
+  public Object bankFileProfiles() {
+    return query.bankFileProfiles();
+  }
+
+  @PostMapping("/payments/profiles")
+  @Operation(operationId = "saveHrBankFileProfile", summary = "Créer ou modifier un format de fichier de virement")
+  public ResponseEntity<Map<String, UUID>> saveBankFileProfile(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.saveBankFileProfile(input)));
+  }
+
+  @GetMapping("/payments/batches")
+  @Operation(operationId = "listHrPaymentBatches", summary = "Lister les lots de virement des salaires")
+  public Object paymentBatches(@RequestParam(required = false) UUID runId) {
+    return query.paymentBatches(runId);
+  }
+
+  @PostMapping("/payments/batches")
+  @Operation(operationId = "createHrPaymentBatch", summary = "Préparer un lot de virement depuis un cycle comptabilisé")
+  public ResponseEntity<Map<String, UUID>> createPaymentBatch(@RequestBody Map<String, Object> input) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", query.createPaymentBatch(input)));
+  }
+
+  @PostMapping("/payments/batches/{id}/approve")
+  @Operation(operationId = "approveHrPaymentBatch", summary = "Approuver un lot de virement (autre personne que le préparateur)")
+  public Map<String, UUID> approvePaymentBatch(@PathVariable UUID id) {
+    return Map.of("id", query.approvePaymentBatch(id));
+  }
+
+  @PostMapping("/payments/batches/{id}/cancel")
+  @Operation(operationId = "cancelHrPaymentBatch", summary = "Annuler un lot dont le fichier n'est pas émis")
+  public Map<String, UUID> cancelPaymentBatch(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return Map.of("id", query.cancelPaymentBatch(id, text(input.get("reason"))));
+  }
+
+  @PostMapping("/payments/batches/{id}/file")
+  @Operation(operationId = "generateHrPaymentFile", summary = "Générer (ou rééditer) le fichier de virement du lot")
+  public Object paymentFile(@PathVariable UUID id) {
+    return query.paymentFile(id);
+  }
+
+  @PostMapping("/payments/batches/{id}/results")
+  @Operation(operationId = "recordHrPaymentResults", summary = "Saisir les retours bancaires (payé / rejeté) et comptabiliser les payés")
+  public Object paymentResults(@PathVariable UUID id, @RequestBody Map<String, Object> input) {
+    return query.paymentResults(id, input.get("results"), text(input.get("result_date")));
+  }
+
+  @GetMapping("/payroll/runs/{id}/payment-status")
+  @Operation(operationId = "getHrRunPaymentStatus", summary = "Net du cycle, payé, en cours, rejets à repayer")
+  public Object runPaymentStatus(@PathVariable UUID id) {
+    return query.runPaymentStatus(id);
+  }
+
+  private static String text(Object value) {
+    return value == null ? null : String.valueOf(value);
   }
 
   @GetMapping("/payroll/runs/{id}/audit")

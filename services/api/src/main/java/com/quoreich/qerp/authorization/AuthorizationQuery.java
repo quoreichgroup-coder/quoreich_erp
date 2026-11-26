@@ -14,8 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Matrice des autorisations (V23, V25). Aucun filtre société : la RLS le porte. Les règles
- * métier sont contrôlées ici pour des messages précis ; les gardes de la base (rôles système
- * intouchables, écriture réservée à l'administrateur) restent la barrière réelle. Le journal est
+ * métier sont contrôlées ici pour des messages précis ; les gardes de la base (Administrateur
+ * protégé, écriture réservée à l'administrateur) restent la barrière réelle. Le journal est
  * écrit par la base elle-même.
  */
 @Repository
@@ -130,7 +130,11 @@ public class AuthorizationQuery {
   @Transactional
   public AuthorizationsView setPermissions(UUID role, SetRolePermissions in) {
     requireAdmin();
-    requireCustom(role);
+    List<String> codes = jdbc.query("SELECT coalesce(code, '') FROM erp_roles WHERE id = ?", (rs, i) -> rs.getString(1), role);
+    if (codes.isEmpty()) throw new AuthorizationRefusal(404, "Rôle introuvable");
+    if (codes.getFirst().equals("admin")) {
+      throw new AuthorizationRefusal(409, "Le rôle Administrateur est protégé : ses accès ne peuvent pas être modifiés");
+    }
     Set<String> wanted = new LinkedHashSet<>(in.permissions());
     List<String> unknown = new ArrayList<>();
     for (String code : wanted) {
@@ -139,13 +143,8 @@ public class AuthorizationQuery {
     if (!unknown.isEmpty()) {
       throw new AuthorizationRefusal(422, "Droits inconnus du catalogue : " + String.join(", ", unknown));
     }
-    String[] codes = wanted.toArray(String[]::new);
-    jdbc.update(
-        "DELETE FROM erp_role_permissions WHERE role_id = ? AND NOT (permission_code = ANY (?::text[]))",
-        role, codes);
-    jdbc.update(
-        "INSERT INTO erp_role_permissions (role_id, permission_code) SELECT ?, unnest(?::text[]) ON CONFLICT DO NOTHING",
-        role, codes);
+    jdbc.queryForObject("SELECT public.set_erp_role_permissions(?, ?::text[])", Object.class,
+        role, wanted.toArray(String[]::new));
     return view();
   }
 

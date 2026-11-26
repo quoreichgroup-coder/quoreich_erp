@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { PageShell } from "@/components/PageShell";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,9 +42,9 @@ function Kpi({
     tone === "positive"
       ? "text-success"
       : tone === "negative"
-        ? "text-rose-600"
+        ? "text-destructive"
         : tone === "warning"
-          ? "text-amber-600"
+          ? "text-warning"
           : "text-foreground";
   const inner = (
     <Card className="hover:shadow-md transition-shadow">
@@ -65,21 +67,12 @@ export default function CfoCockpit() {
 
   return (
     <PageShell>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">CFO Cockpit</h1>
-          <p className="text-sm text-muted-foreground">
-            Vue consolidée temps réel — Trésorerie, AR/AP, Risques, Projets, Paie.
-          </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent"
-        >
+      <PageHeader title="CFO Cockpit" description="Vue consolidée temps réel — Trésorerie, AR/AP, Risques, Projets, Paie." actions={
+        <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           Rafraîchir
-        </button>
-      </div>
+        </Button>
+      } />
 
       {isLoading || !data ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

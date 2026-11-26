@@ -10,6 +10,7 @@ import { GuidanceBanner } from "@/components/GuidanceBanner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CalendarDays, BookOpen, Receipt, CreditCard, GitBranch, Users, ShieldCheck,
   Plus, Pencil, Search, ChevronDown, ChevronRight, Trash2, Check, X,
@@ -24,6 +25,9 @@ import { AiSchedulesSettings } from "@/components/AiSchedulesSettings";
 import { FiscalCalendarPanel } from "@/components/FiscalCalendarPanel";
 import { ApprovalCircuitsHub, AuditJournalsHub, ChartOfAccountsHub } from "@/components/SettingsHubs";
 import { PaymentTermsTab } from "@/pages/ARSettings";
+import { DocumentTemplatesPanel } from "@/components/DocumentTemplatesPanel";
+import { useMyAccess } from "@/hooks/use-my-access";
+import { canAccessPage } from "@/lib/module-access";
 
 import { cn } from "@/lib/utils";
 
@@ -38,6 +42,7 @@ const tabs = [
   { id: "tax", label: "Codes TVA", icon: Receipt },
   { id: "currency", label: "Devises et cours", icon: Coins },
   { id: "attachments", label: "Pièces jointes", icon: Paperclip },
+  { id: "document-templates", label: "Modèles de documents", icon: FileText },
   { id: "payment", label: "Conditions de paiement", icon: CreditCard },
   { id: "workflow", label: "Circuits d'approbation", icon: GitBranch },
   { id: "roles", label: "Rôles et autorisations", icon: Users },
@@ -49,7 +54,11 @@ const Settings = () => {
   // L'onglet suit l'URL (?tab=…) : la barre latérale et les modules y renvoient directement.
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("tab");
-  const [activeTab, setActiveTabState] = useState(tabs.some((t) => t.id === requested) ? requested! : "fiscal");
+  const [selectedTab, setActiveTabState] = useState(tabs.some((t) => t.id === requested) ? requested! : "fiscal");
+  const { data: access } = useMyAccess();
+  const canManageTemplates = access?.permissions.includes("reports.templates") ?? false;
+  const visibleTabs = tabs.filter((tab) => canAccessPage(`/settings?tab=${tab.id}`, access));
+  const activeTab = visibleTabs.some((tab) => tab.id === selectedTab) ? selectedTab : visibleTabs[0]?.id;
   useEffect(() => {
     if (requested && tabs.some((t) => t.id === requested)) setActiveTabState(requested);
   }, [requested]);
@@ -72,26 +81,34 @@ const Settings = () => {
       <div className="flex flex-col lg:flex-row gap-5">
         {/* Left Navigation */}
         <div className="lg:w-52 shrink-0">
-          <nav className="space-y-0.5">
-            {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors rounded-md ${
-                  activeTab === tab.id ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-muted"
-                }`}>
+          <div className="lg:hidden">
+            <Select value={activeTab ?? ""} onValueChange={setActiveTab}>
+              <SelectTrigger aria-label="Rubrique des paramètres"><SelectValue placeholder="Choisir une rubrique" /></SelectTrigger>
+              <SelectContent>
+                {visibleTabs.map((tab) => <SelectItem key={tab.id} value={tab.id}>{tab.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <nav aria-label="Rubriques des paramètres" className="hidden lg:flex lg:flex-col lg:gap-0.5">
+            {visibleTabs.map((tab) => (
+              <Button key={tab.id} variant={activeTab === tab.id ? "default" : "ghost"} onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                className="h-auto min-h-10 w-full justify-start gap-2.5 whitespace-normal px-3 py-2 text-left text-xs">
                 <tab.icon className="w-3.5 h-3.5" />
                 {tab.label}
-              </button>
+              </Button>
             ))}
           </nav>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           {/* ── Exercices et périodes (calendrier fiscal central, V33) ── */}
           {activeTab === "company" && <CompanyIdentityPanel />}
           {activeTab === "fiscal" && <div className="max-w-6xl"><FiscalCalendarPanel /></div>}
           {activeTab === "currency" && <div className="max-w-5xl"><ExchangeRatesPanel /></div>}
           {activeTab === "attachments" && <div className="max-w-5xl"><AttachmentSettingsPanel /></div>}
+          {activeTab === "document-templates" && <DocumentTemplatesPanel />}
 
           {/* ── Chart of Accounts ── */}
           {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}

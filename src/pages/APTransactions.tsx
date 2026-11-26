@@ -1,3 +1,6 @@
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
+import { PageHeader } from "@/components/PageHeader";
+import { DocumentDrawer } from "@/components/DocumentDrawer";
 import { InvoiceSupplierAdvances, SupplierAdvanceDialog, SupplierAdvancesList } from "@/components/SupplierAdvances";
 import { WithholdingSelect } from "@/components/Withholding";
 import { currencyChoices, useBaseCurrency, useExchangeRates } from "@/hooks/use-exchange-rates";
@@ -5,7 +8,7 @@ import { exportToCSV } from "@/lib/csv-export";
 import { BulkBar, BulkButton, SelectAllHead, SelectCell, check, useBulkRun, useSelection, type Selection } from "@/components/BulkSelection";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportTable } from "@/lib/table-export";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +50,116 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { apiDelete, apiGet, apiPost, isApiEnabled } from "@/api/client";
 
+
+const financeMobileColumns = {
+  "invoices": [
+    {
+      "label": "Sélection",
+      "kind": "selection"
+    },
+    {
+      "label": "N° facture",
+      "kind": "primary"
+    },
+    {
+      "label": "Fournisseur",
+      "wide": true
+    },
+    {
+      "label": "Date"
+    },
+    {
+      "label": "Échéance"
+    },
+    {
+      "label": "Total"
+    },
+    {
+      "label": "Restant"
+    },
+    {
+      "label": "Statut"
+    },
+    {
+      "label": "Approbation"
+    },
+    {
+      "label": "Actions",
+      "kind": "actions"
+    }
+  ],
+  "payments": [
+    {
+      "label": "Date"
+    },
+    {
+      "label": "Référence",
+      "kind": "primary"
+    },
+    {
+      "label": "Fournisseur",
+      "wide": true
+    },
+    {
+      "label": "Facture",
+      "wide": true
+    },
+    {
+      "label": "Mode"
+    },
+    {
+      "label": "Montant"
+    },
+    {
+      "label": "État",
+      "wide": true
+    },
+    {
+      "label": "Actions",
+      "kind": "actions"
+    }
+  ],
+  "pending": [
+    {
+      "label": "Facture",
+      "kind": "primary"
+    },
+    {
+      "label": "Fournisseur",
+      "wide": true
+    },
+    {
+      "label": "Date"
+    },
+    {
+      "label": "TTC"
+    },
+    {
+      "label": "Niveau et actions",
+      "kind": "actions"
+    }
+  ],
+  "decisions": [
+    {
+      "label": "Facture",
+      "kind": "primary"
+    },
+    {
+      "label": "Niveau"
+    },
+    {
+      "label": "Décision"
+    },
+    {
+      "label": "Date"
+    },
+    {
+      "label": "Commentaire",
+      "wide": true
+    }
+  ]
+} satisfies Record<string, MobileTableColumn[]>;
+
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 const fmtCurrency = (n: number) => `${fmt(n)} XOF`;
 
@@ -71,7 +184,7 @@ function approvalType(s: string) {
 // Facture à lignes (V72) : lignes libres ou reprises de la commande (reçu non facturé, au prix commandé),
 // pied calculé, montant TTC de contrôle (celui de la facture papier) vérifié à la soumission.
 type APDraftLine = DraftLine & { poLineId: string | null; analytics?: LineAnalytics };
-function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: () => void; edit?: APInvoice }) {
+function CreateInvoiceDialog({ open, onClose, edit, returnFocusRef }: { open: boolean; onClose: () => void; edit?: APInvoice; returnFocusRef?: React.RefObject<HTMLButtonElement | null> }) {
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchaseOrders = [] } = usePurchaseOrders();
   const { data: taxCodes = [] } = useTaxCodes();
@@ -157,15 +270,15 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-sm">{edit ? "Modifier la facture " + edit.invoice_number : "Nouvelle facture fournisseur"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Fournisseur *</Label>
-              <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => {
+              <Label htmlFor="ap-invoice-field-1" className="text-xs">Fournisseur *</Label>
+              <select id="ap-invoice-field-1" className="w-full h-11 sm:h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.supplier_id} onChange={e => {
                 const sup = (suppliers as any[]).find((s) => s.id === e.target.value);
                 const cur = sup?.currency ?? "";
                 setForm(f => ({ ...f, supplier_id: e.target.value, po_id: "", currency: edit ? f.currency : (cur && cur !== baseCurrency ? cur : ""),
@@ -177,7 +290,7 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="ap-po">Commande d'origine</Label>
-              <select id="ap-po" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
+              <select id="ap-po" className="w-full h-11 sm:h-9 px-3 rounded-md border border-input bg-background text-sm" value={form.po_id}
                 onChange={e => {
                   const po = supplierOrders.find((p: any) => p.id === e.target.value);
                   setForm(f => ({ ...f, po_id: e.target.value, ...(po && !edit ? { currency: po.currency ?? "", exchange_rate: "" } : {}) }));
@@ -188,29 +301,29 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">N° Facture</Label>
-              <Input className="h-8 text-xs" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
+              <Label htmlFor="ap-invoice-field-2" className="text-xs">N° Facture</Label>
+              <Input id="ap-invoice-field-2" className="h-11 sm:h-8 text-base sm:text-xs" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Date</Label>
-              <Input type="date" className="h-8 text-xs" value={form.invoice_date} onChange={e => setForm(f => ({ ...f, invoice_date: e.target.value }))} />
+              <Label htmlFor="ap-invoice-field-3" className="text-xs">Date</Label>
+              <Input id="ap-invoice-field-3" type="date" className="h-11 sm:h-8 text-base sm:text-xs" value={form.invoice_date} onChange={e => setForm(f => ({ ...f, invoice_date: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Échéance</Label>
-              <Input type="date" className="h-8 text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
+              <Label htmlFor="ap-invoice-field-4" className="text-xs">Échéance</Label>
+              <Input id="ap-invoice-field-4" type="date" className="h-11 sm:h-8 text-base sm:text-xs" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="ap-control">Montant TTC de la facture</Label>
-              <Input id="ap-control" inputMode="decimal" className="h-8 text-xs text-right" placeholder="contrôle" value={form.control_total} onChange={e => setForm(f => ({ ...f, control_total: e.target.value }))} />
+              <Input id="ap-control" inputMode="decimal" className="h-11 sm:h-8 text-base sm:text-xs text-right" placeholder="contrôle" value={form.control_total} onChange={e => setForm(f => ({ ...f, control_total: e.target.value }))} />
             </div>
             <WithholdingSelect id="ap-withholding" value={form.withholding_rate_id} onChange={(v) => setForm((f) => ({ ...f, withholding_rate_id: v ?? "" }))} />
           </div>
-          <div className="grid grid-cols-4 gap-3" data-testid="ap-invoice-currency">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="ap-invoice-currency">
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="ap-currency">Devise</Label>
-              <select id="ap-currency" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+              <select id="ap-currency" className="w-full h-11 sm:h-8 px-2 rounded-md border border-input bg-background text-base sm:text-xs"
                 value={form.currency || baseCurrency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value === baseCurrency ? "" : e.target.value }))}>
                 {currencies.map((c) => <option key={c} value={c}>{c === baseCurrency ? `${c} (devise de la société)` : c}</option>)}
               </select>
@@ -218,12 +331,12 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
             {foreign && (
               <div className="space-y-1.5">
                 <Label className="text-xs" htmlFor="ap-rate">Cours (1 {form.currency} en {baseCurrency})</Label>
-                <Input id="ap-rate" inputMode="decimal" className="h-8 text-xs text-right" placeholder="vide = cours du jour de la facture"
+                <Input id="ap-rate" inputMode="decimal" className="h-11 sm:h-8 text-base sm:text-xs text-right" placeholder="vide = cours du jour de la facture"
                   value={form.exchange_rate} onChange={(e) => setForm((f) => ({ ...f, exchange_rate: e.target.value }))} />
               </div>
             )}
             {foreign && (
-              <p className="col-span-2 text-[11px] text-muted-foreground self-end">Prix et montant TTC saisis en {form.currency}. Chaque ligne est convertie
+              <p className="col-span-1 sm:col-span-2 text-[11px] text-muted-foreground self-end">Prix et montant TTC saisis en {form.currency}. Chaque ligne est convertie
                 en {baseCurrency} au cours de la facture, figé à l'approbation{rateN ? ` (≈ ${fmt(Math.round(totals.total * rateN))} ${baseCurrency})` : ""}.</p>
             )}
           </div>
@@ -255,28 +368,27 @@ function CreateInvoiceDialog({ open, onClose, edit }: { open: boolean; onClose: 
 
 /* ──────── PAYMENT DIALOG ──────── */
 /* ──────── SIDE PANEL ──────── */
-function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClose: () => void; onCreatePayment: () => void }) {
+function InvoicePanel({ inv, onClose, onCreatePayment, returnFocusRef }: { inv: APInvoice; onClose: () => void; onCreatePayment: () => void; returnFocusRef: React.RefObject<HTMLButtonElement | null> }) {
   const outstanding = inv.total - inv.amount_paid;
   const { data: panelLines = [] } = useAPInvoiceLines(inv.id);
   const { data: access } = useMyAccess();
   const canPay = (access?.permissions ?? []).includes("ap.pay");
   const canCredit = (access?.permissions ?? []).includes("ap.credit_note");
   const [creditOpen, setCreditOpen] = useState(false);
+  const creditTrigger = useRef<HTMLButtonElement | null>(null);
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/30" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={`Facture ${inv.invoice_number}`} className="w-full max-w-lg bg-card border-l border-border shadow-xl flex flex-col animate-in slide-in-from-right">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{inv.invoice_number}</p>
-            <p className="text-xs text-muted-foreground">{inv.supplier?.name}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} />
-            <button type="button" onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"><X className="w-4 h-4" /></button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-auto p-4 space-y-5">
+    <DocumentDrawer title={`Facture ${inv.invoice_number}`} description={inv.supplier?.name} status={<StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} />} onClose={onClose} returnFocusRef={returnFocusRef} footer={<>
+
+          {inv.status !== "paid" && inv.approval_status === "approved" && canPay && (
+            <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Payer</Button>
+          )}
+          {inv.approval_status === "approved" && canCredit && (
+            <Button ref={creditTrigger} size="sm" variant="outline" className="text-xs" onClick={() => setCreditOpen(true)}>Créer un avoir</Button>
+          )}
+          <APCreditNoteDialog inv={inv} open={creditOpen} onClose={() => setCreditOpen(false)} returnFocusRef={creditTrigger} />
+
+        </>}>
+
           <DocumentDetail
             title={`Facture fournisseur ${inv.invoice_number}`}
             attachments={{ docType: "ap_invoice", docId: inv.id }}
@@ -309,18 +421,8 @@ function InvoicePanel({ inv, onClose, onCreatePayment }: { inv: APInvoice; onClo
           <JournalEntryPreview entryId={(inv as any).journal_entry_id} />
           <APCreditNotesList invoiceId={inv.id} title="Avoirs sur cette facture" />
           <InvoiceSupplierAdvances invoice={inv as any} canApply={canPay} />
-        </div>
-        <div className="p-4 border-t border-border flex items-center gap-2">
-          {inv.status !== "paid" && inv.approval_status === "approved" && canPay && (
-            <Button size="sm" className="text-xs gap-1.5" onClick={onCreatePayment}><CreditCard className="w-3.5 h-3.5" /> Payer</Button>
-          )}
-          {inv.approval_status === "approved" && canCredit && (
-            <Button size="sm" variant="outline" className="text-xs" onClick={() => setCreditOpen(true)}>Créer un avoir</Button>
-          )}
-          <APCreditNoteDialog inv={inv} open={creditOpen} onClose={() => setCreditOpen(false)} />
-        </div>
-      </div>
-    </div>
+
+      </DocumentDrawer>
   );
 }
 
@@ -366,7 +468,8 @@ function APBulkBar({ sel, approvals }: { sel: Selection<APInvoice>; approvals: A
 
 // Brouillon / rejetée → Modifier, Soumettre, Supprimer ; soumise → niveau en cours, et pour un tiers
 // habilité Approuver / Rejeter. La base applique paramètres, seuils, ordre et séparation des tâches.
-function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approvals: APInvoiceApproval[]; onEdit: () => void }) {
+function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approvals: APInvoiceApproval[]; onEdit: (trigger: HTMLButtonElement) => void }) {
+  const rejectTrigger = useRef<HTMLButtonElement | null>(null);
   const { user } = useAuth();
   const { data: access } = useMyAccess();
   const submit = useSubmitAPInvoice();
@@ -385,7 +488,7 @@ function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approval
     <>
       {(s === "draft" || s === "pending" || s === "rejected") && (
         <>
-          <Button size="sm" variant="ghost" className={b} onClick={onEdit}>Modifier</Button>
+          <Button size="sm" variant="ghost" className={b} onClick={event => onEdit(event.currentTarget)}>Modifier</Button>
           <Button size="sm" variant="outline" className={b} disabled={submit.isPending} onClick={() => submit.mutate(inv.id)}>Soumettre</Button>
           <Button size="sm" variant="ghost" className={`${b} text-destructive`} disabled={remove.isPending}
             onClick={() => { if (window.confirm("Supprimer cette facture ?")) remove.mutate(inv.id); }}>Supprimer</Button>
@@ -402,13 +505,13 @@ function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approval
                 onClick={() => decide.mutate({ approvalId: pending.id, approve: true })}>
                 <CheckCircle className="w-3 h-3 mr-1" /> Approuver
               </Button>
-              <Button size="sm" variant="ghost" className={`${b} text-destructive`} onClick={() => { setMotif(""); setRejet(true); }}>Rejeter</Button>
+              <Button ref={rejectTrigger} size="sm" variant="ghost" className={`${b} text-destructive`} onClick={() => { setMotif(""); setRejet(true); }}>Rejeter</Button>
             </>
           )}
         </>
       )}
       <Dialog open={rejet} onOpenChange={setRejet}>
-        <DialogContent className="max-w-md">
+        <DialogContent returnFocusRef={rejectTrigger} className="max-w-md">
           <DialogHeader><DialogTitle className="text-sm">Rejeter la facture {inv.invoice_number}</DialogTitle></DialogHeader>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="ap-reject-reason">Motif (obligatoire)</Label>
@@ -431,12 +534,13 @@ function APInvoiceActions({ inv, approvals, onEdit }: { inv: APInvoice; approval
 /* ──────── RÈGLEMENTS (onglet) ──────── */
 const METHOD_LABELS: Record<string, string> = { bank_transfer: "Virement", cash: "Espèces", check: "Chèque", mobile_money: "Mobile money" };
 
-function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => void }) {
+function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string, trigger?: HTMLButtonElement) => void }) {
   const qc = useQueryClient();
   const { data: access } = useMyAccess();
   const canReverse = (access?.permissions ?? []).includes("ap.reverse_payment");
   const [search, setSearch] = useState("");
   const [target, setTarget] = useState<any | null>(null);
+  const reversalTrigger = useRef<HTMLButtonElement | null>(null);
   const [reason, setReason] = useState("");
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["ap-payments", "all"],
@@ -470,7 +574,7 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
   return (
     <div className="space-y-3">
       <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-0 basis-60">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text" aria-label="Rechercher un paiement" placeholder="Rechercher par référence, facture ou fournisseur..."
             className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -487,35 +591,35 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
       </div>
       <div className="card-elevated overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead><tr><th>Date</th><th>Référence</th><th>Fournisseur</th><th>Facture</th><th>Mode</th><th className="text-right">Montant</th><th>État</th><th /></tr></thead>
-            <tbody>
+          <Table className="data-table" mobileColumns={financeMobileColumns.payments} aria-label="Paiements fournisseurs">
+            <TableHeader><TableRow><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Date</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Référence</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Fournisseur</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Facture</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Mode</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case text-right">Montant</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">État</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case"/></TableRow></TableHeader>
+            <TableBody>
               {isLoading ? (
-                <tr><td colSpan={8} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+                <TableRow><TableCell colSpan={8} className="max-md:border-b-0 px-4 py-2.5 text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
               ) : shown.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">Aucun paiement</td></tr>
+                <TableRow><TableCell colSpan={8} className="max-md:border-b-0 px-4 py-2.5 text-center py-8 text-muted-foreground">Aucun paiement</TableCell></TableRow>
               ) : shown.map((r) => (
-                <tr key={r.id} data-testid="ap-payment-row" className="cursor-pointer" title="Ouvrir la facture" onClick={() => r.ap_invoice_id && onOpenInvoice(r.ap_invoice_id)}>
-                  <td className="tabular-nums">{r.payment_date}</td>
-                  <td>{r.reference || "—"}</td>
-                  <td>{r.invoice?.supplier?.name ?? "—"}</td>
-                  <td className="font-mono">{r.invoice?.invoice_number ?? "—"}</td>
-                  <td>{METHOD_LABELS[r.payment_method] ?? r.payment_method}</td>
-                  <td className={cn("text-right tabular-nums", Number(r.amount) < 0 && "text-destructive")}>{fmt(Number(r.amount))}</td>
-                  <td className="text-xs text-muted-foreground">{r.reversal_of ? `Annulation${r.reversal_reason ? ` · ${r.reversal_reason}` : ""}` : reversed.has(r.id) ? "Annulé" : "Enregistré"}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                <TableRow key={r.id} data-testid="ap-payment-row" className="cursor-pointer" title="Ouvrir la facture" onClick={() => r.ap_invoice_id && onOpenInvoice(r.ap_invoice_id)}>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 tabular-nums md:whitespace-nowrap">{r.payment_date}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 md:whitespace-nowrap">{r.reference || "—"}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5"><span className="block md:max-w-64 md:truncate" title={r.invoice?.supplier?.name ?? "—"}>{r.invoice?.supplier?.name ?? "—"}</span></TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 font-mono"><Button type="button" variant="link" disabled={!r.ap_invoice_id} className="h-auto min-h-11 max-w-full md:min-h-0 md:whitespace-nowrap whitespace-normal break-words p-0 text-left font-mono" onClick={event => { event.stopPropagation(); if (r.ap_invoice_id) onOpenInvoice(r.ap_invoice_id, event.currentTarget); }}>{r.invoice?.invoice_number ?? "—"}</Button></TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5">{METHOD_LABELS[r.payment_method] ?? r.payment_method}</TableCell>
+                  <TableCell className={cn("max-md:border-b-0 px-4 py-2.5", cn("text-right tabular-nums", Number(r.amount) < 0 && "text-destructive"))}>{fmt(Number(r.amount))}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 text-xs text-muted-foreground">{r.reversal_of ? `Annulation${r.reversal_reason ? ` · ${r.reversal_reason}` : ""}` : reversed.has(r.id) ? "Annulé" : "Enregistré"}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()} className="max-md:border-b-0 px-4 py-2.5">
                     {canReverse && !r.reversal_of && !reversed.has(r.id) && (
-                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" onClick={() => { setTarget(r); setReason(""); }}>Annuler</Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-destructive" onClick={event => { reversalTrigger.current = event.currentTarget; setTarget(r); setReason(""); }}>Annuler</Button>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
       <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent returnFocusRef={reversalTrigger} className="max-w-md">
           <DialogHeader><DialogTitle className="text-sm">Annuler le paiement {target?.reference || ""}</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">L'écriture fournisseur / banque est contre-passée et la facture redevient à payer. Le paiement d'origine reste visible.</p>
           <div className="space-y-1.5">
@@ -535,7 +639,7 @@ function PaymentsTab({ onOpenInvoice }: { onOpenInvoice: (invoiceId: string) => 
 
 /* ──────── APPROBATIONS (onglet) : factures soumises, niveau en cours, historique ──────── */
 function ApprovalsTab({ invoices, approvals, onOpenInvoice, onEdit }: {
-  invoices: APInvoice[]; approvals: APInvoiceApproval[]; onOpenInvoice: (inv: APInvoice) => void; onEdit: (inv: APInvoice) => void;
+  invoices: APInvoice[]; approvals: APInvoiceApproval[]; onOpenInvoice: (inv: APInvoice, trigger?: HTMLButtonElement) => void; onEdit: (inv: APInvoice, trigger: HTMLButtonElement) => void;
 }) {
   const soumises = invoices.filter((i) => i.approval_status === "submitted");
   const byId = new Map(invoices.map((i) => [i.id, i]));
@@ -547,43 +651,43 @@ function ApprovalsTab({ invoices, approvals, onOpenInvoice, onEdit }: {
       <div className="card-elevated overflow-hidden">
         <div className="px-4 py-2 border-b border-border text-xs font-semibold">À approuver ({soumises.length})</div>
         <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead><tr><th>Facture</th><th>Fournisseur</th><th>Date</th><th className="text-right">TTC</th><th>Niveau et actions</th></tr></thead>
-            <tbody>
+          <Table className="data-table" mobileColumns={financeMobileColumns.pending} aria-label="Factures à approuver">
+            <TableHeader><TableRow><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Facture</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Fournisseur</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Date</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case text-right">TTC</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Niveau et actions</TableHead></TableRow></TableHeader>
+            <TableBody>
               {soumises.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Aucune facture en attente d'approbation</td></tr>
+                <TableRow><TableCell colSpan={5} className="max-md:border-b-0 px-4 py-2.5 text-center py-6 text-muted-foreground">Aucune facture en attente d'approbation</TableCell></TableRow>
               ) : soumises.map((inv) => (
-                <tr key={inv.id} data-testid="ap-approval-row" className="cursor-pointer" onClick={() => onOpenInvoice(inv)}>
-                  <td className="font-mono">{inv.invoice_number}</td>
-                  <td>{inv.supplier?.name ?? "—"}</td>
-                  <td className="tabular-nums">{inv.invoice_date}</td>
-                  <td className="text-right tabular-nums">{fmt(inv.total)}</td>
-                  <td onClick={(e) => e.stopPropagation()}><div className="flex items-center gap-1"><APInvoiceActions inv={inv} approvals={approvals} onEdit={() => onEdit(inv)} /></div></td>
-                </tr>
+                <TableRow key={inv.id} data-testid="ap-approval-row" className="cursor-pointer" onClick={() => onOpenInvoice(inv)}>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full md:min-h-0 md:whitespace-nowrap whitespace-normal break-words p-0 text-left font-medium" onClick={event => { event.stopPropagation(); onOpenInvoice(inv, event.currentTarget); }}>{inv.invoice_number}</Button></TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5"><span className="block md:max-w-64 md:truncate" title={inv.supplier?.name ?? "—"}>{inv.supplier?.name ?? "—"}</span></TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 tabular-nums md:whitespace-nowrap">{inv.invoice_date}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 text-right tabular-nums">{fmt(inv.total)}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()} className="max-md:border-b-0 px-4 py-2.5"><div className="flex items-center gap-1"><APInvoiceActions inv={inv} approvals={approvals} onEdit={trigger => onEdit(inv, trigger)} /></div></TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
       <div className="card-elevated overflow-hidden">
         <div className="px-4 py-2 border-b border-border text-xs font-semibold">Dernières décisions</div>
         <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead><tr><th>Facture</th><th>Niveau</th><th>Décision</th><th>Date</th><th>Commentaire</th></tr></thead>
-            <tbody>
+          <Table className="data-table" mobileColumns={financeMobileColumns.decisions} aria-label="Décisions d’approbation">
+            <TableHeader><TableRow><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Facture</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Niveau</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Décision</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Date</TableHead><TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Commentaire</TableHead></TableRow></TableHeader>
+            <TableBody>
               {decisions.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Aucune décision enregistrée</td></tr>
+                <TableRow><TableCell colSpan={5} className="max-md:border-b-0 px-4 py-2.5 text-center py-6 text-muted-foreground">Aucune décision enregistrée</TableCell></TableRow>
               ) : decisions.map((a) => (
-                <tr key={a.id}>
-                  <td className="font-mono">{byId.get(a.invoice_id)?.invoice_number ?? "—"}</td>
-                  <td>{a.level_label}</td>
-                  <td>{STATUT[a.status] ?? a.status}</td>
-                  <td className="tabular-nums">{a.decided_at ? String(a.decided_at).slice(0, 10) : "—"}</td>
-                  <td className="text-muted-foreground">{a.comment ?? ""}</td>
-                </tr>
+                <TableRow key={a.id}>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 font-mono">{byId.get(a.invoice_id)?.invoice_number ?? "—"}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5">{a.level_label}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5">{STATUT[a.status] ?? a.status}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 tabular-nums md:whitespace-nowrap">{a.decided_at ? String(a.decided_at).slice(0, 10) : "—"}</TableCell>
+                  <TableCell className="max-md:border-b-0 px-4 py-2.5 text-muted-foreground">{a.comment ?? ""}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>
@@ -591,6 +695,13 @@ function ApprovalsTab({ invoices, approvals, onOpenInvoice, onEdit }: {
 }
 
 export default function APTransactions() {
+  const editTrigger = useRef<HTMLButtonElement | null>(null);
+  const openEditInvoice = (inv: APInvoice, trigger: HTMLButtonElement) => { editTrigger.current = trigger; setEditInv(inv); };
+  const invoiceTrigger = useRef<HTMLButtonElement | null>(null);
+  const createTrigger = useRef<HTMLButtonElement | null>(null);
+  const settlementTrigger = useRef<HTMLButtonElement | null>(null);
+  const advanceTrigger = useRef<HTMLButtonElement | null>(null);
+  const openInvoice = (inv: APInvoice, trigger: HTMLButtonElement | null = null) => { invoiceTrigger.current = trigger; setSelectedInv(inv); };
   const { data: invoices = [], isLoading } = useAPInvoices();
   const { data: suppliers = [] } = useSuppliers();
   const [search, setSearch] = useState("");
@@ -630,27 +741,20 @@ export default function APTransactions() {
     <PageShell>
       <Breadcrumb items={[{ label: "Achats et fournisseurs", href: "/" }, { label: "Comptes fournisseurs", href: "/payables" }, { label: "Transactions" }]} />
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Comptes fournisseurs — Transactions</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Factures fournisseurs, règlements, approbations, comptabilisation</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Nouvelle facture fournisseur</Button>
-          {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
-          {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}>Avance fournisseur</Button>}
-          <SupplierAdvanceDialog open={advanceOpen} onClose={() => setAdvanceOpen(false)} suppliers={(suppliersForAdvance ?? []) as any[]} />
-          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => exportTable(f, 
+      <PageHeader title="Comptes fournisseurs — Transactions" description="Factures fournisseurs, règlements, approbations, comptabilisation" actions={<>
+          <Button size="sm" className="text-xs gap-1.5" ref={createTrigger} onClick={() => setShowCreateInvoice(true)}><Plus className="w-3.5 h-3.5" /> Nouvelle facture fournisseur</Button>
+          {canPay && <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={event => { settlementTrigger.current = event.currentTarget; setPaymentInv(null); setSettlementOpen(true); }}><CreditCard className="w-3.5 h-3.5" /> Règlement fournisseur</Button>}
+          {canPay && <Button ref={advanceTrigger} variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAdvanceOpen(true)}>Avance fournisseur</Button>}
+          <SupplierAdvanceDialog open={advanceOpen} onClose={() => setAdvanceOpen(false)} suppliers={(suppliersForAdvance ?? []) as any[]} returnFocusRef={advanceTrigger} />
+          <ExportMenu variant="outline" size="sm" className="text-xs gap-1.5" data-testid="btn-export-csv" onPick={(f) => exportTable(f,
             filtered.map(i => ({ numero: i.invoice_number, fournisseur: i.supplier?.name ?? "", date: i.invoice_date, echeance: i.due_date,
               ht: i.subtotal, tva: i.tax_amount, ttc: i.total, paye: i.amount_paid, reste: i.total - i.amount_paid, statut: i.status, approbation: i.approval_status })),
             [{ key: "numero", header: "N° facture" }, { key: "fournisseur", header: "Fournisseur" }, { key: "date", header: "Date" }, { key: "echeance", header: "Échéance" },
              { key: "ht", header: "HT" }, { key: "tva", header: "TVA" }, { key: "ttc", header: "TTC" }, { key: "paye", header: "Payé" }, { key: "reste", header: "Reste" },
-             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Exporter</ExportMenu>
-        </div>
-      </div>
+             { key: "statut", header: "Statut" }, { key: "approbation", header: "Approbation" }], "factures-fournisseurs")}><Download className="w-3.5 h-3.5" /> Exporter</ExportMenu></>} />
 
       {/* KPI Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Reste à payer", value: fmtCurrency(totalPayable), color: "text-foreground" },
           { label: "En attente d'approbation", value: invoices.filter(i => i.approval_status === "submitted").length.toString(), color: "text-amber-600" },
@@ -677,9 +781,9 @@ export default function APTransactions() {
         <TabsContent value="invoices" className="space-y-3">
       {/* Toolbar */}
       <div className="card-elevated p-3 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-0 basis-60">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Rechercher par facture ou fournisseur..." className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="text" aria-label="Rechercher une facture fournisseur" placeholder="Rechercher par facture ou fournisseur..." className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button onClick={() => setShowFilters(!showFilters)} className={cn("btn-outline text-xs flex items-center gap-1.5 px-3 py-2 rounded-md border border-input hover:bg-muted", showFilters && "bg-muted")}>
           <Filter className="w-3.5 h-3.5" /> Filters
@@ -708,65 +812,65 @@ export default function APTransactions() {
       <div className="card-elevated overflow-hidden">
         <APBulkBar sel={selAP} approvals={approvals} />
         <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
+          <Table className="data-table" mobileColumns={financeMobileColumns.invoices} aria-label="Factures fournisseurs">
+            <TableHeader>
+              <TableRow>
                 <SelectAllHead sel={selAP} pageIds={filtered.map((i) => i.id)} label="Sélectionner toutes les factures" />
-                <th>N° Facture</th>
-                <th>Fournisseur</th>
-                <th>Date</th>
-                <th>Échéance</th>
-                <th className="text-right">Total</th>
-                <th className="text-right">Restant</th>
-                <th>Statut</th>
-                <th>Approbation</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">N° Facture</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Fournisseur</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Date</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Échéance</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case text-right">Total</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case text-right">Restant</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Statut</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Approbation</TableHead>
+                <TableHead className="h-auto bg-muted/50 py-2.5 text-xs uppercase tracking-wider max-md:normal-case">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {isLoading ? (
-                <tr><td colSpan={10} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+                <TableRow><TableCell colSpan={10} className="max-md:border-b-0 px-4 py-2.5 text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableRow><TableCell colSpan={10} className="max-md:border-b-0 px-4 py-2.5 text-center py-8 text-muted-foreground">
                   {invoices.length === 0 ? "Aucune facture — créez votre première facture AP" : "Aucun résultat"}
-                </td></tr>
+                </TableCell></TableRow>
               ) : (
                 filtered.map(inv => {
                   const outstanding = inv.total - inv.amount_paid;
                   return (
-                    <tr key={inv.id} className="cursor-pointer" onClick={() => setSelectedInv(inv)}>
+                    <TableRow key={inv.id} className="cursor-pointer" onClick={() => openInvoice(inv)}>
                       <SelectCell sel={selAP} id={inv.id} label={`Sélectionner ${inv.invoice_number}`} />
-                      <td className="font-medium text-foreground tabular-nums">{inv.invoice_number}</td>
-                      <td>{inv.supplier?.name || "—"}</td>
-                      <td className="tabular-nums text-muted-foreground">{inv.invoice_date}</td>
-                      <td className="tabular-nums text-muted-foreground">{inv.due_date}</td>
-                      <td className="text-right tabular-nums font-medium">{fmt(inv.total)}</td>
-                      <td className={cn("text-right tabular-nums font-medium", outstanding === 0 ? "text-success" : "text-foreground")}>{fmt(outstanding)}</td>
-                      <td><StatusBadge status={statusType(inv.status)} label={statusLabel(inv.status)} /></td>
-                      <td><StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} /></td>
-                      <td onClick={e => e.stopPropagation()}>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5 font-medium text-foreground tabular-nums"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full md:min-h-0 md:whitespace-nowrap whitespace-normal break-words p-0 text-left font-medium" onClick={event => { event.stopPropagation(); openInvoice(inv, event.currentTarget); }}>{inv.invoice_number}</Button></TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5"><span className="block md:max-w-64 md:truncate" title={inv.supplier?.name || "—"}>{inv.supplier?.name || "—"}</span></TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5 tabular-nums text-muted-foreground md:whitespace-nowrap">{inv.invoice_date}</TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5 tabular-nums text-muted-foreground md:whitespace-nowrap">{inv.due_date}</TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5 text-right tabular-nums font-medium">{fmt(inv.total)}</TableCell>
+                      <TableCell className={cn("max-md:border-b-0 px-4 py-2.5", cn("text-right tabular-nums font-medium", outstanding === 0 ? "text-success" : "text-foreground"))}>{fmt(outstanding)}</TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5"><StatusBadge status={statusType(inv.status)} label={statusLabel(inv.status)} /></TableCell>
+                      <TableCell className="max-md:border-b-0 px-4 py-2.5"><StatusBadge status={approvalType(inv.approval_status)} label={approvalLabel(inv.approval_status)} /></TableCell>
+                      <TableCell onClick={e => e.stopPropagation()} className="max-md:border-b-0 px-4 py-2.5">
                         <div className="flex items-center gap-1">
-                          <APInvoiceActions inv={inv} approvals={approvals} onEdit={() => setEditInv(inv)} />
+                          <APInvoiceActions inv={inv} approvals={approvals} onEdit={trigger => openEditInvoice(inv, trigger)} />
                           {inv.approval_status === "approved" && inv.status !== "paid" && canPay && (
-                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setPaymentInv(inv); setSettlementOpen(true); }}>
+                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={event => { settlementTrigger.current = event.currentTarget; setPaymentInv(inv); setSettlementOpen(true); }}>
                               <CreditCard className="w-3 h-3 mr-1" /> Pay
                             </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
 
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-3">
-          <PaymentsTab onOpenInvoice={(id) => { const inv = invoices.find((i) => i.id === id); if (inv) setSelectedInv(inv); }} />
+          <PaymentsTab onOpenInvoice={(id, trigger) => { const inv = invoices.find((i) => i.id === id); if (inv) openInvoice(inv, trigger); }} />
           <h3 className="text-xs font-semibold text-foreground pt-2">Avances fournisseurs</h3>
           <SupplierAdvancesList />
         </TabsContent>
@@ -778,7 +882,7 @@ export default function APTransactions() {
         </TabsContent>
 
         <TabsContent value="approvals">
-          <ApprovalsTab invoices={invoices} approvals={approvals} onOpenInvoice={setSelectedInv} onEdit={setEditInv} />
+          <ApprovalsTab invoices={invoices} approvals={approvals} onOpenInvoice={openInvoice} onEdit={openEditInvoice} />
         </TabsContent>
 
         <TabsContent value="posting" className="space-y-4">
@@ -792,18 +896,20 @@ export default function APTransactions() {
       </Tabs>
 
       {/* Dialogs */}
-      {showCreateInvoice && <CreateInvoiceDialog open onClose={() => setShowCreateInvoice(false)} />}
-      {editInv && <CreateInvoiceDialog open edit={editInv} onClose={() => setEditInv(null)} />}
+      {showCreateInvoice && <CreateInvoiceDialog returnFocusRef={createTrigger} open onClose={() => setShowCreateInvoice(false)} />}
+      {editInv && <CreateInvoiceDialog returnFocusRef={editTrigger} open edit={editInv} onClose={() => setEditInv(null)} />}
 
       {selectedInv && (
         <InvoicePanel
+          returnFocusRef={invoiceTrigger}
           inv={invoices.find((i) => i.id === selectedInv.id) ?? selectedInv}
           onClose={() => setSelectedInv(null)}
-          onCreatePayment={() => { setPaymentInv(selectedInv); setSettlementOpen(true); setSelectedInv(null); }}
+          onCreatePayment={() => { settlementTrigger.current = invoiceTrigger.current; invoiceTrigger.current = null; setPaymentInv(selectedInv); setSettlementOpen(true); setSelectedInv(null); }}
         />
       )}
 
       <SettlementDialog
+        returnFocusRef={settlementTrigger}
         kind="ap"
         open={settlementOpen}
         onClose={() => { setSettlementOpen(false); setPaymentInv(null); }}

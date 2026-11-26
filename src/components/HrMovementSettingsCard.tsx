@@ -9,8 +9,8 @@ import { hrErrorMessage } from "@/lib/hr-error-message";
 
 type Kind = HrMovementReference["kind"];
 /* Référentiels RH de la société (V83, V102) : la fiche salarié et les mouvements n'acceptent que ces valeurs. */
-const KIND_LABELS: [Kind, string][] = [["movement_type", "Type de mouvement"], ["reason_code", "Code motif"], ["contract_type", "Type de contrat"], ["department", "Service"], ["job_title", "Poste"]];
-const KIND_TITLES: Record<Kind, string> = { movement_type: "Types de mouvement", reason_code: "Motifs", contract_type: "Types de contrat", department: "Services", job_title: "Postes" };
+const KIND_LABELS: [Kind, string][] = [["movement_type", "Type de mouvement"], ["reason_code", "Code motif"], ["contract_type", "Type de contrat"], ["department", "Service"], ["job_title", "Poste"], ["payroll_category", "Catégorie de paie"]];
+const KIND_TITLES: Record<Kind, string> = { movement_type: "Types de mouvement", reason_code: "Motifs", contract_type: "Types de contrat", department: "Services", job_title: "Postes", payroll_category: "Catégories de paie (abattement IUTS, cadres / non-cadres…)" };
 const fields = [
   ["department", "Service"], ["job_title", "Poste"], ["contract_type", "Type de contrat"], ["status", "Statut"], ["end_date", "Date de fin"],
 ] as const;

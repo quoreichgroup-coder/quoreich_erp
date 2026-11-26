@@ -1,0 +1,38 @@
+name: qerp-pdf
+
+services:
+  gotenberg:
+    build: .
+    networks:
+      - renderer
+    environment:
+      API_BODY_LIMIT: 5MB
+      API_TIMEOUT: 25s
+      API_DISABLE_DOWNLOAD_FROM: 'true'
+      CHROMIUM_AUTO_START: 'true'
+      CHROMIUM_DISABLE_JAVASCRIPT: 'true'
+      CHROMIUM_DENY_LIST: '^https?:,^file:(?!//\/tmp/).*'
+      CHROMIUM_DENY_PRIVATE_IPS: 'true'
+      CHROMIUM_DENY_PUBLIC_IPS: 'true'
+      CHROMIUM_MAX_CONCURRENCY: '1'
+      CHROMIUM_MAX_QUEUE_SIZE: '2'
+      PDF_DENY_LIST: '.*'
+      WEBHOOK_DISABLE: 'true'
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /home/gotenberg:size=32m,uid=1001,gid=1001,mode=0700
+    shm_size: 128m
+    mem_limit: 1g
+    cpus: 1.5
+    pids_limit: 256
+    restart: unless-stopped
+
+networks:
+  renderer:
+    name: qerp-pdf
+    internal: true

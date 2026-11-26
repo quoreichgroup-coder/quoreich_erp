@@ -9,16 +9,17 @@ const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 
  * Zone « lignes » et « pied » d'une pièce d'achat : grille libellé / quantité / prix / montant,
  * puis pied calculé (nombre de lignes, quantité, total) en lecture seule.
  */
-export function DocumentLinesEditor({ lines, onChange, priceLabel = "Prix unitaire" }: {
+export function DocumentLinesEditor({ lines, onChange, priceLabel = "Prix unitaire", items }: {
   lines: DraftDocLine[];
   onChange: (lines: DraftDocLine[]) => void;
   priceLabel?: string;
+  items?: { id: string; code: string; name: string; item_type?: string }[];
 }) {
   const set = (i: number, patch: Partial<DraftDocLine>) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const footer = documentFooter(lines);
   return (
-    <div className="border border-border rounded-md overflow-hidden">
-      <table className="w-full text-xs">
+    <div className="max-w-full overflow-x-auto rounded-md border border-border">
+      <table className="w-full min-w-[36rem] text-sm">
         <thead className="bg-muted/30 text-muted-foreground">
           <tr>
             <th className="text-left p-2">Libellé</th>
@@ -31,7 +32,16 @@ export function DocumentLinesEditor({ lines, onChange, priceLabel = "Prix unitai
         <tbody>
           {lines.map((l, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="p-1.5"><Input aria-label={`Libellé ligne ${i + 1}`} className="h-8 text-xs" value={l.description}
+              <td className="p-1.5">{items && <select aria-label={`Article ligne ${i + 1}`}
+                className="w-full h-8 mb-1 rounded-md border border-input bg-background px-2 text-xs"
+                value={l.item_id ?? ""} onChange={(e) => {
+                  const item = items.find((x) => x.id === e.target.value);
+                  set(i, { item_id: item?.id ?? null, ...(item ? { description: item.name } : {}) });
+                }}>
+                <option value="">Ligne libre — sans article</option>
+                {l.item_id && !items.some((x) => x.id === l.item_id) && <option value={l.item_id}>Article associé</option>}
+                {items.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}{item.item_type === "service" ? " (service)" : item.item_type === "non_stock" ? " (non stocké)" : ""}</option>)}
+              </select>}<Input aria-label={`Libellé ligne ${i + 1}`} className="h-8 text-xs" value={l.description}
                 onChange={(e) => set(i, { description: e.target.value })} /></td>
               <td className="p-1.5"><Input aria-label={`Quantité ligne ${i + 1}`} inputMode="decimal" className="h-8 text-xs text-right"
                 value={l.quantity} onChange={(e) => set(i, { quantity: e.target.value })} /></td>

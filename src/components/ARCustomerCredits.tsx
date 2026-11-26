@@ -1,10 +1,11 @@
 import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { useCustomers, type ARInvoice } from "@/hooks/use-ar-data";
 import { useSalesOrders } from "@/hooks/use-sales-data";
 import { useApplyCredit, useCustomerCredits, useRecordAdvance, useRefundCredit, type CustomerCredit } from "@/hooks/use-ar-credits";
@@ -19,7 +20,7 @@ const today = () => new Date().toISOString().split("T")[0];
 const num = (s: string) => Number(String(s).replace(",", ".").replace(/\s/g, "")) || 0;
 const METHODS = [["bank_transfer", "Virement"], ["cash", "Espèces"], ["check", "Chèque"], ["mobile_money", "Mobile money"]];
 
-export function AdvanceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AdvanceDialog({ open, onClose, returnFocusRef }: { open: boolean; onClose: () => void; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   const { data: customers = [] } = useCustomers();
   const { data: orders = [] } = useSalesOrders();
   const record = useRecordAdvance();
@@ -27,15 +28,15 @@ export function AdvanceDialog({ open, onClose }: { open: boolean; onClose: () =>
   const ordersOf = orders.filter((o) => o.customer_id === f.customerId && !["cancelled", "draft"].includes(o.status));
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg max-sm:[&_input]:min-h-11 max-sm:[&_input]:text-base max-sm:[&_select]:min-h-11 max-sm:[&_select]:text-base">
         <DialogHeader>
           <DialogTitle className="text-sm">Acompte client</DialogTitle>
           <DialogDescription className="text-xs">
             Somme reçue avant facturation : banque au débit, avances clients (4191) au crédit. Elle s'imputera sur une facture du client.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1.5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="col-span-1 space-y-1.5 sm:col-span-2">
             <Label className="text-xs" htmlFor="advance-customer">Client *</Label>
             <select id="advance-customer" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={f.customerId}
               onChange={(e) => setF({ ...f, customerId: e.target.value, salesOrderId: "" })}>
@@ -63,7 +64,7 @@ export function AdvanceDialog({ open, onClose }: { open: boolean; onClose: () =>
             <Input id="advance-reference" className="h-8 text-xs" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} />
           </div>
           {f.customerId && (
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-1 space-y-1.5 sm:col-span-2">
               <Label className="text-xs" htmlFor="advance-order">Commande concernée (facultatif)</Label>
               <select id="advance-order" className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs" value={f.salesOrderId} onChange={(e) => setF({ ...f, salesOrderId: e.target.value })}>
                 <option value="">— Aucune —</option>
@@ -97,13 +98,13 @@ export function InvoiceCredits({ inv, canApply }: { inv: ARInvoice; canApply: bo
       {credits.map((c) => {
         const def = Math.min(c.available, reste);
         return (
-          <div key={c.id} className="flex items-center gap-2 text-xs" data-testid="invoice-credit-row">
-            <span className="flex-1 truncate">{c.number} · {c.label} · disponible {fmt(c.available)}</span>
+          <div key={c.id} className="flex min-w-0 flex-wrap items-center gap-2 text-xs" data-testid="invoice-credit-row">
+            <span className="min-w-0 basis-full break-words sm:basis-auto sm:flex-1">{c.number} · {c.label} · disponible {fmt(c.available)}</span>
             {canApply && (
               <>
-                <Input aria-label={`Montant à imputer ${c.number}`} inputMode="decimal" className="h-7 w-28 text-xs text-right"
+                <Input aria-label={`Montant à imputer ${c.number}`} inputMode="decimal" className="h-11 w-28 text-base text-right sm:h-7 sm:text-xs"
                   value={amounts[c.id] ?? String(def)} onChange={(e) => setAmounts({ ...amounts, [c.id]: e.target.value })} />
-                <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={apply.isPending}
+                <Button size="sm" variant="outline" className="text-xs" disabled={apply.isPending}
                   onClick={() => apply.mutate({ invoiceId: inv.id, kind: c.kind, sourceId: c.id, amount: num(amounts[c.id] ?? String(def)), date: today() })}>
                   Imputer
                 </Button>
@@ -120,46 +121,54 @@ export function InvoiceCredits({ inv, canApply }: { inv: ARInvoice; canApply: bo
 export function CustomerCreditsList({ canRefund }: { canRefund: boolean }) {
   const { data: credits = [], isLoading } = useCustomerCredits();
   const [target, setTarget] = useState<CustomerCredit | null>(null);
+  const refundTrigger = useRef<HTMLElement | null>(null);
+  const listHeading = useRef<HTMLHeadingElement | null>(null);
+  const columns: MobileTableColumn[] = [
+    { label: "Pièce", kind: "primary" }, { label: "Date" }, { label: "Client", wide: true }, { label: "Nature", wide: true },
+    { label: "Montant" }, { label: "Disponible" }, ...(canRefund ? [{ label: "Actions", kind: "actions" as const }] : []),
+  ];
   return (
     <section aria-label="Acomptes et crédits clients" className="space-y-2">
-      <h3 className="text-xs font-semibold text-foreground">Acomptes et crédits clients non imputés</h3>
+      <h3 ref={listHeading} tabIndex={-1} className="text-xs font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Acomptes et crédits clients non imputés</h3>
       {credits.length === 0 ? (
         <p className="text-xs text-muted-foreground">{isLoading ? "Chargement…" : "Aucun crédit client en attente."}</p>
       ) : (
-        <table className="w-full text-xs">
-          <thead><tr className="text-muted-foreground border-b border-border">
-            <th className="text-left py-1">Pièce</th><th className="text-left">Date</th><th className="text-left">Client</th><th className="text-left">Nature</th>
-            <th className="text-right">Montant</th><th className="text-right">Disponible</th><th />
-          </tr></thead>
-          <tbody>
+        <Table className="text-xs" mobileColumns={columns} aria-label="Acomptes et crédits clients">
+          <TableHeader><TableRow>
+            <TableHead>Pièce</TableHead><TableHead>Date</TableHead><TableHead>Client</TableHead><TableHead>Nature</TableHead>
+            <TableHead className="text-right">Montant</TableHead><TableHead className="text-right">Disponible</TableHead>{canRefund && <TableHead><span className="sr-only">Actions</span></TableHead>}
+          </TableRow></TableHeader>
+          <TableBody>
             {credits.map((c) => (
-              <tr key={c.id} className="border-b border-border/50" data-testid="customer-credit-row">
-                <td className="py-1 font-mono">{c.number}</td><td>{c.date}</td><td>{c.customer_name}</td><td className="truncate max-w-[14rem]">{c.label}</td>
-                <td className="text-right tabular-nums">{fmt(c.total)}</td><td className="text-right tabular-nums">{fmt(c.available)}</td>
-                <td className="text-right">{canRefund && <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setTarget(c)}>Rembourser</Button>}</td>
-              </tr>
+              <TableRow key={c.id} data-testid="customer-credit-row">
+                <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{c.number}</TableCell><TableCell className="px-3 py-2 md:whitespace-nowrap">{c.date}</TableCell>
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={c.customer_name}>{c.customer_name}</span></TableCell>
+                <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={c.label}>{c.label}</span></TableCell>
+                <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(c.total)}</TableCell><TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(c.available)}</TableCell>
+                {canRefund && <TableCell className="px-3 py-2 text-right"><Button size="sm" variant="outline" className="text-xs" onClick={event => { refundTrigger.current = event.currentTarget; setTarget(c); }}>Rembourser</Button></TableCell>}
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
-      <RefundDialog credit={target} onClose={() => setTarget(null)} />
+      <RefundDialog credit={target} onClose={() => setTarget(null)} returnFocusRef={refundTrigger} fallbackFocusRef={listHeading} />
     </section>
   );
 }
 
-function RefundDialog({ credit, onClose }: { credit: CustomerCredit | null; onClose: () => void }) {
+function RefundDialog({ credit, onClose, returnFocusRef, fallbackFocusRef }: { credit: CustomerCredit | null; onClose: () => void; returnFocusRef?: RefObject<HTMLElement | null>; fallbackFocusRef?: RefObject<HTMLElement | null> }) {
   const refund = useRefundCredit();
   const [f, setF] = useState({ amount: "", date: today(), method: "bank_transfer", reference: "", bankAccountId: "" });
   if (!credit) return null;
   const amount = f.amount === "" ? credit.available : num(f.amount);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-md max-sm:[&_input]:min-h-11 max-sm:[&_input]:text-base max-sm:[&_select]:min-h-11 max-sm:[&_select]:text-base">
         <DialogHeader>
           <DialogTitle className="text-sm">Rembourser {credit.number}</DialogTitle>
           <DialogDescription className="text-xs">{credit.customer_name} · disponible {fmt(credit.available)} XOF. Écriture : {credit.kind === "advance" ? "avances clients (4191)" : "clients (411)"} au débit, banque au crédit.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="refund-amount">Montant</Label>
             <Input id="refund-amount" inputMode="decimal" className="h-8 text-xs" placeholder={String(credit.available)} value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>
           <div className="space-y-1.5"><Label className="text-xs" htmlFor="refund-date">Date</Label>
@@ -175,7 +184,11 @@ function RefundDialog({ credit, onClose }: { credit: CustomerCredit | null; onCl
         <DialogFooter>
           <Button size="sm" variant="outline" onClick={onClose}>Retour</Button>
           <Button size="sm" disabled={amount <= 0 || refund.isPending}
-            onClick={() => refund.mutate({ kind: credit.kind, sourceId: credit.id, amount, date: f.date, method: f.method, reference: f.reference, bankAccountId: f.bankAccountId }, { onSuccess: onClose })}>
+            onClick={() => refund.mutate({ kind: credit.kind, sourceId: credit.id, amount, date: f.date, method: f.method, reference: f.reference, bankAccountId: f.bankAccountId }, { onSuccess: () => {
+              // Un remboursement total retire sa ligne : revenir au titre stable.
+              if (amount >= credit.available && returnFocusRef && fallbackFocusRef?.current) returnFocusRef.current = fallbackFocusRef.current;
+              onClose();
+            } })}>
             Rembourser {fmt(amount)} XOF
           </Button>
         </DialogFooter>

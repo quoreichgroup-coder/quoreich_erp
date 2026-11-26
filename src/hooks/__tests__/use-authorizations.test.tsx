@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const mocks = vi.hoisted(() => ({
   calls: [] as { table: string; op: string; args: unknown[] }[],
   result: [{ id: "x" }] as unknown,
+  rpc: vi.fn(),
 }));
 
 function builder(table: string) {
@@ -18,7 +19,7 @@ function builder(table: string) {
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (t: string) => builder(t), rpc: vi.fn(), auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } },
+  supabase: { from: (t: string) => builder(t), rpc: mocks.rpc, auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } },
 }));
 vi.mock("@/hooks/use-tenant", () => ({ useTenantId: () => ({ data: "tenant-a" }), fetchTenantId: async () => "tenant-a" }));
 vi.mock("@/api/client", () => ({ isApiEnabled: () => false, apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn(), apiDelete: vi.fn() }));
@@ -27,15 +28,21 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { useAssignRole, useRevokeRole, useSetRolePermissions, useUpdateRole } from "../use-authorizations";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
-beforeEach(() => { mocks.calls = []; mocks.result = [{ id: "x" }]; });
+beforeEach(() => { mocks.calls = []; mocks.result = [{ id: "x" }]; mocks.rpc.mockReset().mockResolvedValue({ data: null, error: null }); });
 afterEach(cleanup);
 
 describe("autorisations — chemin Supabase", () => {
-  it("droits d'un rôle : seuls les écarts sont écrits (retraits puis ajouts)", async () => {
+  it("droits d'un rôle : remplacement atomique vérifié par la base, sans dépendre d'une ancienne liste locale", async () => {
     const { result } = renderHook(() => useSetRolePermissions(), { wrapper });
     await result.current.mutateAsync({ id: "r1", permissions: ["a", "c"], current: ["a", "b"] });
-    expect(mocks.calls.filter((c) => c.op === "in")).toEqual([{ table: "erp_role_permissions", op: "in", args: ["permission_code", ["b"]] }]);
-    expect(mocks.calls.find((c) => c.op === "insert")!.args[0]).toEqual([{ role_id: "r1", permission_code: "c" }]);
+    expect(mocks.rpc).toHaveBeenCalledWith("set_erp_role_permissions", { _role: "r1", _permissions: ["a", "c"] });
+    expect(mocks.calls).toEqual([]);
+  });
+
+  it("refus de la base : le remplacement des accès échoue et le message est conservé", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("Le rôle Administrateur est protégé") });
+    const { result } = renderHook(() => useSetRolePermissions(), { wrapper });
+    await expect(result.current.mutateAsync({ id: "admin", permissions: [], current: ["a"] })).rejects.toThrow("Administrateur est protégé");
   });
 
   it("affectation dans la société courante, auteur renseigné", async () => {

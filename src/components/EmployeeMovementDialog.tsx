@@ -29,7 +29,11 @@ export function EmployeeMovementDialog({ employee, open, onOpenChange, canCreate
   const [jobTitle, setJobTitle] = useState("");
   const [contractType, setContractType] = useState("");
   const [status, setStatus] = useState("");
+  const [payrollCategory, setPayrollCategory] = useState("");
+  const [dependents, setDependents] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
+  const hasValues = !!(salary.trim() || department.trim() || jobTitle.trim() || contractType.trim() || status.trim()
+    || payrollCategory || dependents.trim());
 
   const pending = useMemo(() => (history.data ?? []).filter((movement) => movement.status === "pending"), [history.data]);
   const submit = async () => {
@@ -40,6 +44,8 @@ export function EmployeeMovementDialog({ employee, open, onOpenChange, canCreate
     if (jobTitle.trim()) afterValues.job_title = jobTitle.trim();
     if (contractType.trim()) afterValues.contract_type = contractType.trim();
     if (status.trim()) afterValues.status = status.trim();
+    if (payrollCategory) afterValues.payroll_category = payrollCategory;
+    if (dependents.trim()) afterValues.tax_dependents = Number(dependents);
     if (!Object.keys(afterValues).length) return;
     await create.mutateAsync({
       employeeId,
@@ -50,7 +56,7 @@ export function EmployeeMovementDialog({ employee, open, onOpenChange, canCreate
       after_values: afterValues,
     });
     setMovementType(""); setReasonCode(""); setReason(""); setSalary("");
-    setDepartment(""); setJobTitle(""); setContractType(""); setStatus("");
+    setDepartment(""); setJobTitle(""); setContractType(""); setStatus(""); setPayrollCategory(""); setDependents("");
   };
 
   return (
@@ -74,9 +80,11 @@ export function EmployeeMovementDialog({ employee, open, onOpenChange, canCreate
               <Field label="Nouveau département" value={department} onChange={setDepartment} />
               <Field label="Nouveau contrat" value={contractType} onChange={setContractType} />
               <Field label="Nouveau statut (facultatif)" value={status} onChange={setStatus} placeholder="actif, suspendu…" />
+              <div className="space-y-1"><Label htmlFor="movement-payroll-category" className="text-xs">Nouvelle catégorie de paie</Label><select id="movement-payroll-category" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={payrollCategory} onChange={(event) => setPayrollCategory(event.target.value)}><option value="">Inchangée</option>{(references.data ?? []).filter((ref) => ref.kind === "payroll_category").map((ref) => <option key={ref.id} value={ref.code}>{ref.label}</option>)}</select></div>
+              <Field label="Charges de famille (nombre, pour l’impôt)" value={dependents} onChange={setDependents} type="number" placeholder={employee.tax_dependents == null ? "" : `Actuel : ${employee.tax_dependents}`} />
             </div>
             <div className="flex justify-end">
-              <Button size="sm" disabled={create.isPending || !movementType.trim() || !effectiveDate || !reasonCode.trim() || reason.trim().length < 3 || (!salary.trim() && !department.trim() && !jobTitle.trim() && !contractType.trim() && !status.trim())}
+              <Button size="sm" disabled={create.isPending || !movementType.trim() || !effectiveDate || !reasonCode.trim() || reason.trim().length < 3 || !hasValues}
                 onClick={() => void submit()}>
                 {create.isPending ? "Soumission…" : "Soumettre pour approbation"}
               </Button>

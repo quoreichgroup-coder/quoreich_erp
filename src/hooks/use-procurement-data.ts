@@ -652,14 +652,14 @@ export function useUpdateProcurementDraft() {
   return useMutation({
     mutationFn: async (input: {
       docType: ProcurementDocType; id: string; header: Record<string, unknown>;
-      lines: { description: string; quantity: number; unitPrice: number; analytics?: LineAnalytics }[];
+      lines: { description: string; quantity: number; unitPrice: number; item_id?: string; analytics?: LineAnalytics }[];
       analytics?: Record<string, string>;
     }) => {
       const db = supabase as any;
       if (isApiEnabled()) {
         await apiPut(`${P}/documents/${input.docType}/${input.id}`, { ...input.header, analytics: input.analytics ?? null, lines: input.lines.map((l) => input.docType === "PR"
-          ? { description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics ?? null }
-          : { description: l.description, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics ?? null }) });
+          ? { description: l.description, item_id: l.item_id || null, quantity: l.quantity, estimated_unit_cost: l.unitPrice, analytics: l.analytics ?? null }
+          : { description: l.description, item_id: l.item_id || null, quantity: l.quantity, unit_cost: l.unitPrice, analytics: l.analytics ?? null }) });
         return;
       }
       const { data, error } = await db.from(TABLE[input.docType]).update(input.header).eq("id", input.id).select("id");
@@ -670,8 +670,8 @@ export function useUpdateProcurementDraft() {
       const { error: delErr } = await db.from(lineTable).delete().eq(parent, input.id);
       if (delErr) throw delErr;
       const rows = input.lines.map((l) => input.docType === "PR"
-        ? { requisition_id: input.id, description: l.description, quantity: l.quantity, estimated_unit_cost: l.unitPrice }
-        : { po_id: input.id, description: l.description, quantity: l.quantity, unit_cost: l.unitPrice });
+        ? { requisition_id: input.id, description: l.description, item_id: l.item_id || null, quantity: l.quantity, estimated_unit_cost: l.unitPrice }
+        : { po_id: input.id, description: l.description, item_id: l.item_id || null, quantity: l.quantity, unit_cost: l.unitPrice });
       const { data: inserted, error: insErr } = await db.from(lineTable).insert(rows).select("id");
       if (insErr) throw insErr;
       await saveDocumentAnalytics(input.docType, input.id, input.analytics);

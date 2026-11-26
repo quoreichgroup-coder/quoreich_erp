@@ -96,7 +96,7 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
   return (
     <div className="space-y-4" data-testid="document-detail">
       {title && fileName && (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" data-testid="btn-document-csv"
             onClick={() => exporter("csv", title, fileName, header, columns, rows, footer, print)}>
             <Download className="w-3 h-3" /> CSV
@@ -111,17 +111,17 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
           </Button>
         </div>
       )}
-      <section aria-label="En-tête" className="grid grid-cols-2 gap-x-6 gap-y-2">
+      <section aria-label="En-tête" className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
         {header.map(([label, value]) => (
-          <div key={label}>
+          <div key={label} className="min-w-0 break-words">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
             <p className="text-sm text-foreground">{value ?? "—"}</p>
           </div>
         ))}
       </section>
 
-      <section aria-label="Lignes" className="border border-border rounded-md overflow-hidden">
-        <table className="w-full text-xs">
+      <section aria-label="Lignes" tabIndex={0} className="overflow-x-auto rounded-md border border-border focus-visible:outline-2 focus-visible:outline-ring">
+        <table className={`w-full text-xs ${columns.length > 4 ? "min-w-[36rem]" : ""}`}>
           <thead className="bg-muted/30 text-muted-foreground">
             <tr>{columns.map((c) => <th key={c.label} className={`p-2 ${c.align === "right" ? "text-right" : "text-left"}`}>{c.label}</th>)}</tr>
           </thead>
@@ -141,9 +141,9 @@ export function DocumentDetail({ header, columns, rows, footer, emptyLines = "Au
 
       <section aria-label="Pied" className="ml-auto w-full max-w-xs space-y-1 text-xs">
         {footer.map(([label, value, strong]) => (
-          <div key={label} className={`flex justify-between ${strong ? "font-semibold border-t border-border pt-1" : ""}`}>
-            <span className={strong ? "" : "text-muted-foreground"}>{label}</span>
-            <span className="tabular-nums">{value}</span>
+          <div key={label} className={`flex justify-between gap-3 ${strong ? "font-semibold border-t border-border pt-1" : ""}`}>
+            <span className={`min-w-0 break-words ${strong ? "" : "text-muted-foreground"}`}>{label}</span>
+            <span className="min-w-0 break-words text-right tabular-nums">{value}</span>
           </div>
         ))}
       </section>

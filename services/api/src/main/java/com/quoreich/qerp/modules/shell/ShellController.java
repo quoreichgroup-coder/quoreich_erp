@@ -36,6 +36,8 @@ public class ShellController {
   private static final Set<String> ALERT_SORT = Set.of("created_at", "severity", "module", "title", "alert_type");
   private static final Set<String> PREFS = Set.of("user_id", "modules", "severities", "include_resolved", "updated_at");
   private static final ObjectMapper JSON = new ObjectMapper();
+  // Notifications use the same permission namespaces as their source modules.
+  private static final String ALERT_ACCESS = "public.can_access_alert_module(erp_alerts.module)";
 
   private final Sql sql;
   private final BceaoRates bceaoRates;
@@ -80,7 +82,7 @@ public class ShellController {
   @Operation(operationId = "listAlerts", summary = "Alertes (200 dernières ; filtres modules / gravités séparés par des virgules)")
   public JsonNode alerts(@RequestParam(defaultValue = "false") boolean includeResolved, @RequestParam(required = false) String modules,
       @RequestParam(required = false) String severities) {
-    return sql.list("SELECT * FROM public.erp_alerts WHERE (? OR NOT is_resolved) AND (?::text[] IS NULL OR module = ANY (?::text[]))"
+    return sql.list("SELECT * FROM public.erp_alerts WHERE " + ALERT_ACCESS + " AND (? OR NOT is_resolved) AND (?::text[] IS NULL OR module = ANY (?::text[]))"
         + " AND (?::text[] IS NULL OR severity = ANY (?::text[])) ORDER BY created_at DESC LIMIT 200",
         includeResolved, csv(modules), csv(modules), csv(severities), csv(severities));
   }
@@ -94,7 +96,7 @@ public class ShellController {
     String sort = ALERT_SORT.contains(sortBy) ? sortBy : "created_at";
     String dir = "asc".equalsIgnoreCase(sortDir) ? "ASC" : "DESC";
     int size = Math.min(Math.max(pageSize, 1), 200);
-    String where = " WHERE (? OR NOT is_resolved) AND (?::text = 'all' OR module = ?::text) AND (?::text <> 'all' OR ?::text[] IS NULL OR module = ANY (?::text[]))"
+    String where = " WHERE " + ALERT_ACCESS + " AND (? OR NOT is_resolved) AND (?::text = 'all' OR module = ?::text) AND (?::text <> 'all' OR ?::text[] IS NULL OR module = ANY (?::text[]))"
         + " AND (?::text = 'all' OR severity = ?::text) AND (?::text <> 'all' OR ?::text[] IS NULL OR severity = ANY (?::text[]))"
         + " AND (?::text = '' OR title ILIKE '%' || ?::text || '%' OR message ILIKE '%' || ?::text || '%')";
     String s = search.trim();
@@ -117,7 +119,7 @@ public class ShellController {
   @GetMapping("/alerts/unread-count")
   @Operation(operationId = "countUnreadAlerts", summary = "Nombre d'alertes non lues et non résolues")
   public long unread(@RequestParam(required = false) String modules, @RequestParam(required = false) String severities) {
-    return sql.value(Long.class, "SELECT count(*) FROM public.erp_alerts WHERE NOT is_resolved AND read_at IS NULL"
+    return sql.value(Long.class, "SELECT count(*) FROM public.erp_alerts WHERE " + ALERT_ACCESS + " AND NOT is_resolved AND read_at IS NULL"
         + " AND (?::text[] IS NULL OR module = ANY (?::text[])) AND (?::text[] IS NULL OR severity = ANY (?::text[]))",
         csv(modules), csv(modules), csv(severities), csv(severities));
   }

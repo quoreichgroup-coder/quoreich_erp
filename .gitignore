@@ -70,3 +70,10 @@ test-results-*/
 
 # Fichiers déposés sur site (justificatifs), jamais versionnés
 services/api/data/
+
+# Fichiers locaux (clé de signature de l'API sur site, sorties et brouillons de travail)
+/data/
+/output/
+/tmp/
+supabase/.temp/
+.tmp-*

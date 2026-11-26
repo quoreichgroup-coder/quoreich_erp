@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type MobileTableColumn } from "@/components/ui/table";
 import { TreasuryAccountSelect } from "@/components/TreasuryAccountSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { apiGet, apiPost, isApiEnabled } from "@/api/client";
@@ -76,7 +77,7 @@ export function useApplySupplierAdvance() {
 }
 
 /** Versement d'une avance : fournisseur, date, mode, compte de trésorerie, montant (en devise si choisie). */
-export function SupplierAdvanceDialog({ open, onClose, suppliers }: { open: boolean; onClose: () => void; suppliers: { id: string; name: string; currency?: string | null }[] }) {
+export function SupplierAdvanceDialog({ open, onClose, suppliers, returnFocusRef }: { open: boolean; onClose: () => void; suppliers: { id: string; name: string; currency?: string | null }[]; returnFocusRef?: RefObject<HTMLButtonElement | null> }) {
   const record = useRecordSupplierAdvance();
   const base = useBaseCurrency();
   const { data: rates = [] } = useExchangeRates();
@@ -93,13 +94,13 @@ export function SupplierAdvanceDialog({ open, onClose, suppliers }: { open: bool
   const supplierCurrency = suppliers.find((s) => s.id === f.supplier)?.currency ?? null;
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent returnFocusRef={returnFocusRef} className="max-w-lg max-sm:[&_input]:min-h-11 max-sm:[&_input]:text-base max-sm:[&_select]:min-h-11 max-sm:[&_select]:text-base">
         <DialogHeader>
           <DialogTitle className="text-sm">Avance fournisseur</DialogTitle>
           <DialogDescription className="text-xs">Acompte versé avant la facture (compte 4091) ; il s'impute ensuite sur une facture approuvée du fournisseur.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1.5"><Label className="text-xs" htmlFor="adv-supplier">Fournisseur *</Label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="col-span-1 space-y-1.5 sm:col-span-2"><Label className="text-xs" htmlFor="adv-supplier">Fournisseur *</Label>
             <select id="adv-supplier" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" value={f.supplier}
               onChange={(e) => { const c = suppliers.find((s) => s.id === e.target.value)?.currency ?? ""; setF((x) => ({ ...x, supplier: e.target.value, currency: c && c !== base ? c : "" })); }}>
               <option value="">— Sélectionner —</option>
@@ -137,25 +138,30 @@ export function SupplierAdvanceDialog({ open, onClose, suppliers }: { open: bool
 /** Registre des avances : versé, imputé, disponible. */
 export function SupplierAdvancesList() {
   const { data = [], isLoading } = useSupplierAdvances();
+  const columns: MobileTableColumn[] = [
+    { label: "N°", kind: "primary" }, { label: "Fournisseur", wide: true }, { label: "Date" },
+    { label: "Versé" }, { label: "Imputé" }, { label: "Disponible" },
+  ];
   if (isLoading) return <Loader2 className="w-4 h-4 animate-spin" />;
   return (
-    <div className="rounded-md border border-border bg-card overflow-x-auto" data-testid="supplier-advances">
-      <table className="w-full text-xs">
-        <thead className="bg-muted/30 text-muted-foreground"><tr>
-          <th className="text-left p-2">N°</th><th className="text-left">Fournisseur</th><th className="text-left">Date</th>
-          <th className="text-right">Versé</th><th className="text-right">Imputé</th><th className="text-right pr-2">Disponible</th></tr></thead>
-        <tbody>
-          {data.length === 0 && <tr><td colSpan={6} className="p-3 text-muted-foreground">Aucune avance fournisseur.</td></tr>}
+    <div className="rounded-lg border border-border bg-card" data-testid="supplier-advances">
+      <Table className="text-xs" mobileColumns={columns} aria-label="Avances fournisseurs">
+        <TableHeader className="bg-muted/30"><TableRow>
+          <TableHead>N°</TableHead><TableHead>Fournisseur</TableHead><TableHead>Date</TableHead>
+          <TableHead className="text-right">Versé</TableHead><TableHead className="text-right">Imputé</TableHead><TableHead className="text-right">Disponible</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {data.length === 0 && <TableRow><TableCell colSpan={6} className="p-3 text-muted-foreground">Aucune avance fournisseur.</TableCell></TableRow>}
           {data.map((a) => (
-            <tr key={a.id} className="border-t border-border/50" data-testid="supplier-advance-row">
-              <td className="p-2 font-mono">{a.advance_number}</td><td>{a.supplier_name}</td><td>{a.paid_date}</td>
-              <td className="text-right tabular-nums">{fmt(a.amount)} XOF{a.currency ? ` (${fmt(Number(a.fx_amount))} ${a.currency})` : ""}</td>
-              <td className="text-right tabular-nums">{fmt(a.amount_applied)}</td>
-              <td className="text-right pr-2 tabular-nums font-medium">{fmt(a.available)}</td>
-            </tr>
+            <TableRow key={a.id} data-testid="supplier-advance-row">
+              <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{a.advance_number}</TableCell>
+              <TableCell className="px-3 py-2"><span className="block md:max-w-64 md:truncate" title={a.supplier_name}>{a.supplier_name}</span></TableCell><TableCell className="px-3 py-2 md:whitespace-nowrap">{a.paid_date}</TableCell>
+              <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(a.amount)} XOF{a.currency ? ` (${fmt(Number(a.fx_amount))} ${a.currency})` : ""}</TableCell>
+              <TableCell className="px-3 py-2 text-right tabular-nums md:whitespace-nowrap">{fmt(a.amount_applied)}</TableCell>
+              <TableCell className="px-3 py-2 text-right tabular-nums font-medium md:whitespace-nowrap">{fmt(a.available)}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -173,9 +179,9 @@ export function InvoiceSupplierAdvances({ invoice, canApply }: { invoice: { id: 
       {open.map((a) => {
         const proposed = Math.min(Number(a.available), outstanding);
         return (
-          <div key={a.id} className="flex items-center justify-between gap-2 text-xs">
-            <span>{a.advance_number} · {a.paid_date} · disponible {fmt(a.available)} XOF</span>
-            {canApply && <Button size="sm" variant="outline" className="h-7 text-xs" disabled={apply.isPending || proposed <= 0}
+          <div key={a.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="min-w-0 break-words">{a.advance_number} · {a.paid_date} · disponible {fmt(a.available)} XOF</span>
+            {canApply && <Button size="sm" variant="outline" className="text-xs" disabled={apply.isPending || proposed <= 0}
               onClick={() => apply.mutate({ advance_id: a.id, invoice_id: invoice.id, amount: proposed })}>Imputer {fmt(proposed)} XOF</Button>}
           </div>
         );

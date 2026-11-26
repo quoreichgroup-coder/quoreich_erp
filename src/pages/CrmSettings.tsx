@@ -1,3 +1,4 @@
+import { AuthorizationsPanel } from "@/components/AuthorizationsPanel";
 import { useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -6,15 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ShieldAlert, UserPlus, Trash2 } from "lucide-react";
 import {
   useMyCrmRoles, useTenantCrmRoles, useAssignCrmRole,
 } from "@/hooks/use-crm-data";
 import {
-  ALL_CRM_ROLES, ROLE_LABELS, REQUIRED_ROLES, ALL_CRM_ACTIONS, ACTION_LABELS,
+  ALL_CRM_ROLES, ROLE_LABELS,
   violatesCrmSoD, type CrmRole,
 } from "@/lib/crm-roles";
 
@@ -36,6 +35,7 @@ export default function CrmSettings() {
             <ShieldAlert className="w-5 h-5 mx-auto mb-2 text-amber-500" />
             Réservé à l'« Administrateur CRM ».
           </CardContent></Card>
+          <AuthorizationsPanel permissionsOnly />
         </div>
       </PageShell>
     );
@@ -99,33 +99,7 @@ export default function CrmSettings() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="py-2"><CardTitle className="text-xs">Matrice rôle × action</CardTitle></CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-            <Table className="min-w-[620px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[11px]">Action</TableHead>
-                  {ALL_CRM_ROLES.map((r) => <TableHead key={r} className="text-[11px] text-center">{ROLE_LABELS[r]}</TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ALL_CRM_ACTIONS.map((a) => (
-                  <TableRow key={a} className="text-xs">
-                    <TableCell>{ACTION_LABELS[a]}</TableCell>
-                    {ALL_CRM_ROLES.map((r) => (
-                      <TableCell key={r} className="text-center">
-                        {REQUIRED_ROLES[a].includes(r) ? <Badge className="text-[10px]">✓</Badge> : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <AuthorizationsPanel permissionsOnly />
       </div>
     </PageShell>
   );

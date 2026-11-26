@@ -37,7 +37,7 @@ public class ProcurementController {
   static final Set<String> SETTINGS = Set.of("three_way_tolerance_pct", "three_way_tolerance_amount", "require_pr_before_po", "require_gr_before_ap",
       "sla_pr_hours", "sla_pr_to_po_hours", "sla_po_to_gr_days", "sla_gr_to_ap_days", "sla_warning_pct", "sla_critical_pct", "sla_color_ok",
       "sla_color_warning", "sla_color_critical", "bank_dual_control", "bank_control_methods", "followup_grace_days", "default_lead_time_days",
-      "replenishment_include_requisitions", "replenishment_include_reservations", "grni_on_receipt", "updated_at");
+      "replenishment_include_requisitions", "replenishment_include_reservations", "grni_on_receipt", "service_acceptance_second_person", "updated_at");
   static final Set<String> SUPPLIER_ITEM = Set.of("supplier_id", "item_id", "supplier_ref", "unit_price", "currency", "lead_time_days",
       "min_order_qty", "order_multiple", "is_preferred", "valid_from", "valid_to", "active", "updated_at");
   static final Set<String> RULE = Set.of("item_id", "warehouse_id", "method", "reorder_point", "safety_stock", "order_qty", "max_qty", "active",

@@ -14,6 +14,7 @@ export function EmployeePayrollComponentsDialog({ employee, open, onOpenChange, 
 }) {
   const [componentId, setComponentId] = useState("");
   const [amountOverride, setAmountOverride] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [effectiveTo, setEffectiveTo] = useState("");
   const [active, setActive] = useState(true);
@@ -21,6 +22,8 @@ export function EmployeePayrollComponentsDialog({ employee, open, onOpenChange, 
   const { data: assignments = [], isLoading, isError, error, refetch } = useHrEmployeePayrollComponents(employee?.id ?? null, open);
   const { data: components = [] } = useHrPayrollComponents(false);
   const save = useSaveHrEmployeePayrollComponent();
+  const selected = components.find((c) => c.id === componentId);
+  const usesQuantity = selected?.calculation_method === "quantity_rate" || selected?.calculation_method === "formula";
 
   useEffect(() => {
     if (!open) {
@@ -34,11 +37,13 @@ export function EmployeePayrollComponentsDialog({ employee, open, onOpenChange, 
     save.mutate({
       employeeId: employee.id,
       input: { component_id: componentId, amount_override: amountOverride ? Number(amountOverride) : null,
+        quantity: usesQuantity && quantity ? Number(quantity) : null,
         effective_from: effectiveFrom, effective_to: effectiveTo || null, active },
-    }, { onSuccess: () => { setComponentId(""); setAmountOverride(""); setEffectiveTo(""); setActive(true); setEditingAssignment(null); } });
+    }, { onSuccess: () => { setComponentId(""); setAmountOverride(""); setQuantity(""); setEffectiveTo(""); setActive(true); setEditingAssignment(null); } });
   };
   const editAssignment = (row: (typeof assignments)[number]) => {
     setEditingAssignment(row.id); setComponentId(row.component_id); setAmountOverride(row.amount_override == null ? "" : String(row.amount_override));
+    setQuantity(row.quantity == null ? "" : String(row.quantity));
     setEffectiveFrom(row.effective_from); setEffectiveTo(row.effective_to ?? ""); setActive(row.active);
   };
 
@@ -50,6 +55,7 @@ export function EmployeePayrollComponentsDialog({ employee, open, onOpenChange, 
       {canManage && <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
         <div className="space-y-1"><Label className="text-xs">Rubrique active</Label><select aria-label="Rubrique active" value={componentId} onChange={(e) => setComponentId(e.target.value)} className="h-8 w-full rounded-md border bg-background px-2 text-xs"><option value="">Choisir…</option>{components.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.label}</option>)}</select></div>
         <div className="space-y-1"><Label htmlFor="hr-payroll-override" className="text-xs">Montant de remplacement (facultatif)</Label><Input id="hr-payroll-override" type="number" min="0" step="0.01" value={amountOverride} onChange={(e) => setAmountOverride(e.target.value)} className="h-8 text-xs" /></div>
+        {usesQuantity && <div className="space-y-1"><Label htmlFor="hr-payroll-quantity" className="text-xs">Quantité mensuelle (heures, jours, unités)</Label><Input id="hr-payroll-quantity" type="number" min="0" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-8 text-xs" /></div>}
         <div className="space-y-1"><Label htmlFor="hr-payroll-assignment-from" className="text-xs">Date d’effet</Label><Input id="hr-payroll-assignment-from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className="h-8 text-xs" /></div>
         <div className="space-y-1"><Label htmlFor="hr-payroll-assignment-to" className="text-xs">Fin d’effet (facultatif)</Label><Input id="hr-payroll-assignment-to" type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} className="h-8 text-xs" /></div>
         <div className="flex items-center gap-2 text-xs"><input id="hr-payroll-assignment-active" type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /><Label htmlFor="hr-payroll-assignment-active">Affectation active</Label></div>

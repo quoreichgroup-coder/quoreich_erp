@@ -1,6 +1,8 @@
 # QUOREICH ERP — Audit des processus métier (14 novembre 2026)
 
-Audit fonctionnel, métier, technique et documentaire demandé par le propriétaire. **Aucune correction n'a été faite** : ce dossier est un rapport à valider avant toute implémentation.
+Audit fonctionnel, métier, technique et documentaire demandé par le propriétaire. Les constats du 14 novembre sont
+conservés comme historique. Les corrections réalisées depuis et les étapes restantes sont consolidées dans
+[le bilan des lots et écarts](28-bilan-lots-et-ecarts.md) ; ne pas relancer un écart ancien sans vérifier ce bilan et le code.
 
 ## Méthode et niveau de preuve
 
@@ -24,6 +26,8 @@ Légende utilisée dans tous les livrables :
 
 ## Livrables
 
+Suite en cours : [31 — relances clients exécutées](31-relances-clients-executees.md), intégration cloud de G-32 (V145).
+
 | # | Fichier | Contenu |
 |---|---|---|
 | 01 | [01-cartographie-processus.md](01-cartographie-processus.md) | Modules, processus, dépendances, ce qui est réel ou simulé |
@@ -36,6 +40,8 @@ Légende utilisée dans tous les livrables :
 | 08 | [08-plan-de-tests-e2e.md](08-plan-de-tests-e2e.md) | Scénarios, données, résultats attendus, preuves |
 | 09 | [09-feuille-de-route.md](09-feuille-de-route.md) | Recommandations classées P0 → P3, plan progressif |
 | 10 | [10-inventaire-ventes-clients.md](10-inventaire-ventes-clients.md) | CRUD et actions groupées, écran par écran, ventes et comptes clients |
+| 30 | [30-documents-modeles-et-archives.md](30-documents-modeles-et-archives.md) | Modèles versionnés et éditions de factures archivées |
+| 31 | [31-relances-clients-executees.md](31-relances-clients-executees.md) | Relances manuelles par courriel, aperçu, historique et idempotence |
 | 11 | [11-stocks-achats-international.md](11-stocks-achats-international.md) | Stocks, réapprovisionnement, inventaires, achats et achats internationaux comparés aux références ; lots S / R / A / I proposés |
 | 12 | [12-plan-comptable-multi-referentiels.md](12-plan-comptable-multi-referentiels.md) | Plan comptable multi-référentiels : audit de l'existant, diagnostic ROXGOLD, architecture, modèle de données, droits et rôles, écrans, plan PC-0 à PC-6 |
 | 13 | [13-tresorerie-reglements.md](13-tresorerie-reglements.md) | Trésorerie reliée aux règlements (lot T1, V70) : audit, références SAP / Sage / SYSCOHADA, livré, restant |

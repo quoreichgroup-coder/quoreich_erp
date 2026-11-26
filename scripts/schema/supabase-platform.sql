@@ -39,6 +39,26 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Lot 6 : PDF émis, conservés sans écrasement. Seul le service de rendu dépose un objet ;
+-- un utilisateur ne peut lire que le PDF enregistré et prêt de sa société. Aucun droit
+-- d'INSERT / UPDATE / DELETE utilisateur pour ce compartiment, même pour l'auteur.
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NULL OR to_regclass('public.issued_documents') IS NULL THEN
+    RAISE NOTICE 'storage ou editions archivees absents : compartiment issued-documents ignore';
+    RETURN;
+  END IF;
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES ('issued-documents', 'issued-documents', false, 26214400, ARRAY['application/pdf'])
+  ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+  DROP POLICY IF EXISTS "Editions archivees : lecture" ON storage.objects;
+  CREATE POLICY "Editions archivees : lecture" ON storage.objects FOR SELECT TO authenticated
+    USING (bucket_id = 'issued-documents'
+      AND (storage.foldername(name))[1] = public.get_user_tenant_id(auth.uid())::text
+      AND EXISTS (SELECT 1 FROM public.issued_documents d WHERE d.storage_path = name AND d.status = 'ready'));
+END $$;
+
 DO $$
 BEGIN
   IF to_regclass('auth.users') IS NULL OR to_regprocedure('public.handle_new_user()') IS NULL THEN

@@ -31,10 +31,10 @@ const num = (s: string) => Number(String(s).replace(",", "."));
 
 type ItemForm = {
   code: string; name: string; category: string; unit: string; unit_cost: string; selling_price: string;
-  reorder_level: string; safety_stock: string; default_warehouse_id: string; status: string; account_set_id: string;
+  reorder_level: string; safety_stock: string; default_warehouse_id: string; status: string; account_set_id: string; item_type: string;
 };
 const EMPTY: ItemForm = { code: "", name: "", category: "", unit: "unité", unit_cost: "", selling_price: "", reorder_level: "",
-  safety_stock: "", default_warehouse_id: "", status: "active", account_set_id: "" };
+  safety_stock: "", default_warehouse_id: "", status: "active", account_set_id: "", item_type: "stock" };
 
 function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; onClose: () => void }) {
   const { data: warehouses = [] } = useWarehouses();
@@ -49,6 +49,7 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
       code: item.code ?? "", name: item.name ?? "", category: item.category ?? "", unit: item.unit ?? "", unit_cost: String(item.unit_cost ?? ""),
       selling_price: String(item.selling_price ?? ""), reorder_level: String(item.reorder_level ?? ""), safety_stock: String(item.safety_stock ?? ""),
       default_warehouse_id: item.default_warehouse_id ?? "", status: item.status ?? "active", account_set_id: item.account_set_id ?? "",
+      item_type: item.item_type ?? "stock",
     } : EMPTY);
   }
   const close = () => { setLoadedFor(null); onClose(); };
@@ -57,7 +58,11 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
   const payload = {
     code: f.code.trim(), name: f.name.trim(), category: f.category.trim() || undefined, unit: f.unit.trim() || undefined,
     unit_cost: f.unit_cost ? num(f.unit_cost) : undefined, selling_price: f.selling_price ? num(f.selling_price) : undefined,
-    reorder_level: f.reorder_level ? num(f.reorder_level) : undefined, safety_stock: f.safety_stock ? num(f.safety_stock) : undefined,
+    // Article non stocké (V140) : pas de seuil ni de stock de sécurité.
+    reorder_level: f.item_type !== "stock" ? 0 : f.reorder_level ? num(f.reorder_level) : undefined,
+    safety_stock: f.item_type !== "stock" ? 0 : f.safety_stock ? num(f.safety_stock) : undefined,
+    max_stock: f.item_type !== "stock" ? 0 : undefined,
+    item_type: f.item_type,
     default_warehouse_id: f.default_warehouse_id || undefined,
     account_set_id: f.account_set_id || undefined,
   };
@@ -86,8 +91,15 @@ function ItemDialog({ item, open, onClose }: { item: any | null; open: boolean; 
           {field("unit", "Unité")}
           {field("unit_cost", "Prix d'achat de référence", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
           {field("selling_price", "Prix de vente", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
-          {field("reorder_level", "Seuil de réapprovisionnement", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
-          {field("safety_stock", "Stock de sécurité", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="item-type">Type d'article</Label>
+            <select id="item-type" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.item_type} onChange={set("item_type")}>
+              <option value="stock">Stocké</option><option value="non_stock">Non stocké (acheté en charge)</option><option value="service">Service</option>
+            </select>
+            {f.item_type !== "stock" && <p className="text-[11px] text-muted-foreground">Pas de mouvement de stock : réceptions et livraisons suivent leur cours sans toucher au stock{f.item_type === "service" ? " ; la réception d'un service peut être partielle (avancement)" : ""}.</p>}
+          </div>
+          {f.item_type === "stock" && field("reorder_level", "Seuil de réapprovisionnement", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
+          {f.item_type === "stock" && field("safety_stock", "Stock de sécurité", { inputMode: "decimal", className: "h-8 text-xs text-right" })}
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="item-warehouse">Dépôt par défaut</Label>
             <select id="item-warehouse" className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" value={f.default_warehouse_id} onChange={set("default_warehouse_id")}>
@@ -190,6 +202,7 @@ export default function InventoryMasterData() {
   const warehouseCodes = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.code]));
   const rows = items.map((i) => ({
     ...i, stock: Number(i.quantity_on_hand ?? 0), cmp: Number(i.average_cost ?? 0),
+    typeLabel: i.item_type === "service" ? "Service" : i.item_type === "non_stock" ? "Non stocké" : "Stocké",
     depot: i.default_warehouse_id ? warehouseCodes.get(i.default_warehouse_id) ?? "" : "",
     valeur: Math.round(Number(i.quantity_on_hand ?? 0) * Number(i.average_cost ?? 0) * 100) / 100,
     alerte: Number(i.reorder_level ?? 0) > 0 && Number(i.quantity_on_hand ?? 0) <= Number(i.reorder_level ?? 0),
@@ -209,6 +222,7 @@ export default function InventoryMasterData() {
     } else if (tab === "items") {
       const columns: XlsxColumn<typeof rows[number]>[] = [
       { key: "code", header: "Code article" }, { key: "name", header: "Désignation" }, { key: "category", header: "Catégorie" }, { key: "unit", header: "Unité" },
+      { key: "typeLabel", header: "Type d'article" },
       { key: "depot", header: "Dépôt par défaut" },
       { key: "stock", header: "Stock" }, { key: "cmp", header: "Coût moyen" }, { key: "valeur", header: "Valeur" },
       { key: "reorder_level", header: "Seuil de réapprovisionnement" }, { key: "safety_stock", header: "Stock de sécurité" },
@@ -265,6 +279,7 @@ export default function InventoryMasterData() {
                 <SortableHead label="Code" sortKey="code" sort={t.sort} onSort={t.toggleSort} />
                 <SortableHead label="Libellé" sortKey="name" sort={t.sort} onSort={t.toggleSort} />
                 <SortableHead label="Catégorie" sortKey="category" sort={t.sort} onSort={t.toggleSort} />
+                <SortableHead label="Type" sortKey="typeLabel" sort={t.sort} onSort={t.toggleSort} />
                 <SortableHead label="Stock" sortKey="stock" sort={t.sort} onSort={t.toggleSort} className="text-right" />
                 <SortableHead label="Coût moyen" sortKey="cmp" sort={t.sort} onSort={t.toggleSort} className="text-right" />
                 <SortableHead label="Valeur" sortKey="valeur" sort={t.sort} onSort={t.toggleSort} className="text-right" />
@@ -273,16 +288,17 @@ export default function InventoryMasterData() {
               </TableRow></TableHeader>
               <TableBody>
                 {t.pagedData.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">Aucun article.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-xs text-muted-foreground py-8">Aucun article.</TableCell></TableRow>
                 ) : t.pagedData.map((r: any) => (
                   <TableRow key={r.id} data-testid="item-row" className={canEdit ? "text-xs cursor-pointer" : "text-xs"}
                     onClick={() => canEdit && setItemDialog({ item: r })}>
                     <TableCell className="font-mono">{r.code}</TableCell>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell>{r.category || "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.stock)} {r.unit ?? ""}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.cmp)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.valeur)}</TableCell>
+                    <TableCell>{r.typeLabel}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.typeLabel === "Stocké" ? `${fmt(r.stock)} ${r.unit ?? ""}` : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.typeLabel === "Stocké" ? fmt(r.cmp) : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.typeLabel === "Stocké" ? fmt(r.valeur) : "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.reorder_level ? fmt(Number(r.reorder_level)) : "—"}</TableCell>
                     <TableCell>
                       {r.status === "inactive" ? <StatusBadge status="neutral" label="Inactif" />
