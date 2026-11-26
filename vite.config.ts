@@ -15,6 +15,10 @@ export default defineConfig(() => ({
     hmr: {
       overlay: false,
     },
+    // Dans le conteneur `web` (infra/compose.dev.yml), les sources viennent
+    // d'un montage Windows : les événements de fichiers n'y traversent pas, d'où
+    // la scrutation, activée seulement par VITE_WATCH_POLLING.
+    watch: process.env.VITE_WATCH_POLLING ? { usePolling: true, interval: 300 } : undefined,
   },
   // `lovable-tagger` a été retiré : outil de l'éditeur Lovable, il déclare un
   // pair `vite < 8` et bloquait la montée de Vite.

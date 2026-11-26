@@ -29,6 +29,7 @@ Au plus **3 agents en même temps** (mémoire du poste).
 | 1. Références | Agent | Audit de l'existant puis comparaison SAP / Sage / OHADA ou norme utile, sources citées |
 | 2. Plan | Agent | PR **brouillon** : périmètre, fichiers, migrations, tests, questions ouvertes |
 | 3. Code | Agent | Migration Flyway + jumelle Supabase (même SQL), API Java, écrans, tests |
+| 3 bis. Lancer le projet | Agent | Tout le projet sous Docker (`docker compose -f infra/compose.dev.yml up -d --build`, voir `CLAUDE.md`) ; une pile par agent : `-p qerp-<nom>`, ports distincts, noms de conteneurs renommés |
 | 4. Tests locaux | Agent | **Ciblés** : Vitest des fichiers touchés, ITs du module, `tsc`, lint des fichiers touchés, `db:check-twins` ; les suites complètes tournent en CI |
 | 5. Prête | Agent | PR passée en « prête », CI verte, case à cocher du modèle remplies |
 | 6. Revue | Principal | Commentaires sur la PR (sécurité, isolation, droits, jumelles, tests, conventions) |

@@ -64,6 +64,12 @@ FROM eclipse-temurin:25-jre-alpine
 # embarquer `curl` pour cela ajouterait un paquet et sa surface de vulnérabilités.
 RUN addgroup -S qerp && adduser -S -G qerp -h /app qerp
 
+# `/app/data` (clé de signature de l'identité sur site, pièces jointes) existe
+# dans l'image et appartient à `qerp` : un volume nommé monté là hérite de ce
+# propriétaire. Absent de l'image, Docker le créerait au nom de root et l'API ne
+# pourrait pas y écrire.
+RUN mkdir -p /app/data && chown qerp:qerp /app/data
+
 WORKDIR /app
 
 COPY --from=construction --chown=qerp:qerp /build/target/qerp-api-*.jar app.jar

@@ -1,4 +1,5 @@
-# Environnement de développement QERP : PostgreSQL 18.6 + l'API Java.
+# Environnement de développement QERP, entièrement sous Docker : PostgreSQL
+# 18.6, l'API Java, le moteur PDF (Gotenberg) et le client web (Vite).
 #
 # Ce fichier ne décrit PAS la production. Le VPS reçoit un déploiement distinct
 # (plan de bascule §7) : là-bas, le propriétaire des tables est le rôle
@@ -13,7 +14,7 @@
 # les lectures sans jamais exercer la RLS : les 157 politiques seraient alors
 # vérifiées nulle part avant la production.
 #
-#   docker compose -f infra/compose.dev.yml up -d --build
+#   docker compose -f infra/compose.dev.yml up -d --build   # http://localhost:8081
 #   docker compose -f infra/compose.dev.yml logs -f api
 #   docker compose -f infra/compose.dev.yml down          # garde les données
 #   docker compose -f infra/compose.dev.yml down -v       # repart de zéro
@@ -67,7 +68,8 @@ services:
       # Profil `dev` : journal lisible et interface Swagger ouverte.
       SPRING_PROFILES_ACTIVE: dev
 
-      QERP_DB_URL: jdbc:postgresql://postgres:5432/qerp
+      # QERP_DEV_DB_NAME=qerp_reel pour la copie de données réelles.
+      QERP_DB_URL: jdbc:postgresql://postgres:5432/${QERP_DEV_DB_NAME:-qerp}
       QERP_DB_USER: qerp_api
       QERP_DB_PASSWORD: qerp_api_dev
 
@@ -90,6 +92,18 @@ services:
       QERP_SMTP_PASSWORD: ${QERP_SMTP_PASSWORD:-${SMTP_PASSWORD:-}}
       QERP_SMTP_FROM: ${QERP_SMTP_FROM:-${QERP_SMTP_USERNAME:-${SMTP_USERNAME:-}}}
       QERP_SMTP_STARTTLS: ${QERP_SMTP_STARTTLS:-true}
+
+      # Moteur PDF joint par le réseau interne `renderer` (sans Internet).
+      QERP_PDF_URL: http://gotenberg:3000
+    networks:
+      - default
+      - renderer
+    volumes:
+      # Clé de signature des jetons (`data/identity`) et pièces jointes
+      # (`data/files`). Sans volume, chaque reconstruction de l'API changeait la
+      # clé (toutes les sessions tombaient) et perdait les fichiers déposés.
+      # La clé reste un secret : ne pas copier ce volume hors du poste.
+      - api-donnees:/app/data
     ports:
       # 8090 plutôt que le 8080 de `SERVER_PORT`, pour la même raison : sur le
       # poste de développement, 8080 est tenu par un conteneur Frappe et 8081
@@ -97,5 +111,56 @@ services:
       # l'API écoute bien sur 8080 — seul le port publié change.
       - "127.0.0.1:${QERP_API_PORT:-8090}:8080"
 
+  gotenberg:
+    # Même durcissement que la pile autonome `infra/pdf/compose.yml` (lecture
+    # seule, sans capacité, JavaScript et téléchargements coupés) ; seuls les
+    # réseaux sont redéclarés ici, `extends` ne les reprend pas.
+    extends:
+      file: ./pdf/compose.yml
+      service: gotenberg
+    container_name: qerp-dev-gotenberg
+    networks:
+      - renderer
+
+  web:
+    # Client web en mode développement : sources montées depuis le dépôt,
+    # rechargement à chaud, branché sur l'API locale (mode sur site). Aucun
+    # appel à Supabase : la valeur publiable ci-dessous est factice et
+    # `VITE_QERP_API_URL` fait passer connexion et données par l'API (V114).
+    image: node:26.13.0-bookworm-slim
+    container_name: qerp-dev-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    working_dir: /app
+    environment:
+      VITE_QERP_API_URL: http://localhost:${QERP_API_PORT:-8090}
+      VITE_SUPABASE_URL: http://localhost:${QERP_API_PORT:-8090}
+      VITE_SUPABASE_PUBLISHABLE_KEY: valeur-publiable-locale
+      VITE_WATCH_POLLING: "1"
+    # `npm ci` seulement quand package-lock.json a changé : l'empreinte du
+    # dernier verrou installé est gardée dans le volume `node_modules`.
+    command:
+      - sh
+      - -c
+      - >-
+        sum=$$(sha256sum package-lock.json | cut -d' ' -f1);
+        [ "$$(cat node_modules/.qerp-lock 2>/dev/null)" = "$$sum" ] ||
+        { npm ci --no-audit --no-fund && echo "$$sum" > node_modules/.qerp-lock; };
+        exec npx vite --host 0.0.0.0 --port 8081 --strictPort
+    volumes:
+      - ..:/app
+      # node_modules Linux, distinct de celui de Windows (binaires natifs).
+      - web-node-modules:/app/node_modules
+    ports:
+      - "127.0.0.1:${QERP_WEB_PORT:-8081}:8081"
+
+networks:
+  renderer:
+    internal: true
+
 volumes:
   donnees:
+  api-donnees:
+  web-node-modules:
