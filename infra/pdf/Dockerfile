@@ -1,4 +1,4 @@
-FROM gotenberg/gotenberg:9.2.0-chromium@sha256:1b37aa0a4407b204ee810c64a4daf8c36c9a7c12115f2680c363530c3dd27d6c
+FROM gotenberg/gotenberg:9.9.3-chromium@sha256:22bfa8b9abf2597aa4665df6d910040007146083eec240159256c8ba1d0cc341
 
 USER root
 COPY fonts/ /usr/local/share/fonts/qerp/
