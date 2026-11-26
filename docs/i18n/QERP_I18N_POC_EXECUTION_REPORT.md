@@ -128,10 +128,10 @@ l'approbateur sans aucun droit de trésorerie reçoit la page « Accès refusé 
 alors que le parcours attend la page avec montants masqués — **question produit** (quel droit minimal ouvre la
 page en lecture masquée ?), non tranchée ici.
 
-**Suite Java complète (`./mvnw verify`)** : **NOT RUN jusqu'au bout**. Deux lancements ont été arrêtés par Claude
-Code faute de mémoire sur la machine (environ 25 conteneurs Docker sans lien avec QERP). Avant l'arrêt, 12 classes
-(52 tests, tous les tests unitaires compris) avaient fini, sans échec. Le lot ciblé de 14 classes d'intégration
-(§5) est vert. À rejouer après `scripts/dev/liberer-memoire.ps1`, ou en CI (`ubuntu-latest`).
+**Suite Java complète (`./mvnw verify`)** : **PASS en CI** (GitHub Actions, run `45879254777`, commit `0938fac`,
+PR #12 en brouillon) : 40 tests unitaires et 302 tests d'intégration, 0 échec, 0 erreur. Les jobs « Client web »,
+« E2E simulés » et « Image de l'API » sont verts aussi. Sur le poste, deux lancements avaient été arrêtés faute
+de mémoire.
 
 ## 6. Critères d'acceptation
 
