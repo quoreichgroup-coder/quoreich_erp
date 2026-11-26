@@ -25,7 +25,8 @@
     "test:e2e:parcours": "playwright test -c playwright.parcours.config.ts",
     "test:e2e:sur-site": "playwright test -c playwright.sur-site.config.ts",
     "test:e2e:report": "playwright show-report",
-    "dev:cloud": "vite --mode cloud"
+    "dev:cloud": "vite --mode cloud",
+    "security:check": "node --test scripts/security/*.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -111,6 +112,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.7",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "js-yaml": "4.3.2"
   }
 }

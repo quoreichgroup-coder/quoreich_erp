@@ -1,0 +1,49 @@
+# Read-only trust boundary. Candidate source is never executed in this job.
+name: Autorisation CI/CD
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+      target:
+        default: staging
+        type: string
+    outputs:
+      sha:
+        description: Exact authorized source commit
+        value: ${{ jobs.authorize.outputs.sha }}
+      attempt:
+        description: Caller run attempt that performed this authorization
+        value: ${{ jobs.authorize.outputs.attempt }}
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.provenance.outputs.sha }}
+      attempt: ${{ github.run_attempt }}
+    steps:
+      - name: Politique depuis main uniquement
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: quoreichgroup-coder/quoreich_erp
+          ref: main
+          persist-credentials: false
+          sparse-checkout: scripts/security
+          sparse-checkout-cone-mode: false
+
+      - name: Provenance, quatre contrôles et protections
+        id: provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTHORIZATION_MODE: ${{ inputs.mode }}
+          AUTHORIZATION_TARGET: ${{ inputs.target }}
+        run: node scripts/security/authorize-workflow.mjs

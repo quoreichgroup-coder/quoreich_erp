@@ -1,13 +1,5 @@
-# Déploiement des fonctions edge Supabase, à la demande seulement.
-#
-# Les fonctions ne partent jamais automatiquement : certaines exigent des secrets (SMTP, hôte de rendu PDF,
-# fournisseur d'IA) qui doivent être posés dans le projet AVANT leur mise en service. On choisit la cible et la
-# liste des fonctions ; chaque fonction garde sa configuration de `supabase/config.toml` (verify_jwt…).
-#
-# Secrets de l'environnement GitHub choisi (supabase-staging ou supabase-production) :
-#   SUPABASE_ACCESS_TOKEN  jeton personnel Supabase (Account → Access Tokens), droit sur le projet ;
-#   SUPABASE_PROJECT_REF   référence du projet (ex. ymomubgdhufwtbsqqnas pour la production actuelle).
-
+# Manual main-only deployment. The authorization job verifies CI and environment
+# protections before the job containing Supabase credentials can start.
 name: Déploiement des fonctions edge
 
 on:
@@ -23,36 +15,53 @@ on:
         type: string
         required: true
 
-concurrency:
-  group: deploy-fonctions-${{ inputs.cible }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
 
 env:
-  # Version épinglée du CLI Supabase (npm « supabase », vérifiée le 26/11/2026).
   SUPABASE_CLI_VERSION: "3.4.0"
 
 jobs:
+  authorize:
+    if: >-
+      github.repository == 'quoreichgroup-coder/quoreich_erp' &&
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      (inputs.cible == 'staging' || inputs.cible == 'production')
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/authorize.yml
+    with:
+      mode: functions
+      target: ${{ inputs.cible }}
+
   deploy:
     name: Fonctions (${{ inputs.cible }})
+    needs: authorize
+    if: needs.authorize.result == 'success' && needs.authorize.outputs.attempt == github.run_attempt
+    concurrency:
+      group: deploy-fonctions-${{ inputs.cible }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: supabase-${{ inputs.cible }}
     steps:
-      - name: Récupération du dépôt
+      - name: Récupération du commit autorisé
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
 
       - name: Fonctions connues du dépôt
         env:
           FONCTIONS: ${{ inputs.fonctions }}
         run: |
-          for f in $FONCTIONS; do
-            case "$f" in
-              _shared|*[!a-z0-9-]*) echo "::error::Nom de fonction refusé : $f"; exit 1 ;;
-            esac
-            test -f "supabase/functions/$f/index.ts" || { echo "::error::Fonction inconnue : $f"; exit 1; }
+          read -r -a fonctions <<< "$FONCTIONS"
+          test "${#fonctions[@]}" -gt 0 || { echo "::error::Liste de fonctions vide."; exit 1; }
+          for f in "${fonctions[@]}"; do
+            [[ "$f" =~ ^[a-z][a-z0-9-]*$ ]] || { echo "::error::Nom de fonction refusé."; exit 1; }
+            test -f "supabase/functions/$f/index.ts" || { echo "::error::Fonction inconnue."; exit 1; }
           done
 
       - name: Déploiement
@@ -62,10 +71,11 @@ jobs:
           FONCTIONS: ${{ inputs.fonctions }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
-            echo "::error::Secrets SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF absents de l'environnement supabase-${{ inputs.cible }}."
+            echo "::error::Secrets de déploiement absents."
             exit 1
           fi
-          for f in $FONCTIONS; do
+          read -r -a fonctions <<< "$FONCTIONS"
+          for f in "${fonctions[@]}"; do
             npx --yes "supabase@${SUPABASE_CLI_VERSION}" functions deploy "$f" --project-ref "$SUPABASE_PROJECT_REF"
             echo "Fonction déployée : $f" >> "$GITHUB_STEP_SUMMARY"
           done

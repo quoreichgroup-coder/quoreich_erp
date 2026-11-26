@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-11-26T20:36:24.350Z",
+  "pr_url": "https://github.com/quoreichgroup-coder/quoreich_erp/pull/13",
+  "head_sha": "1340c2262e0e558471a997079a2ee6d8b72d6193",
+  "base_sha": "a7e32882a307c379dd1f7efbb0f9c1a3c56d680b",
+  "ci_run_url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418",
+  "ci_run_id": 45889716418,
+  "ci_status": "completed",
+  "ci_conclusion": "success",
+  "required": [
+    {
+      "name": "Client web",
+      "status": "completed",
+      "conclusion": "success",
+      "job_id": 140149176019,
+      "check_conclusion": "success",
+      "check_app_id": 15368,
+      "url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418/job/140149176019"
+    },
+    {
+      "name": "E2E simulés",
+      "status": "completed",
+      "conclusion": "success",
+      "job_id": 140149175739,
+      "check_conclusion": "success",
+      "check_app_id": 15368,
+      "url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418/job/140149175739"
+    },
+    {
+      "name": "API Java",
+      "status": "completed",
+      "conclusion": "success",
+      "job_id": 140149175998,
+      "check_conclusion": "success",
+      "check_app_id": 15368,
+      "url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418/job/140149175998"
+    },
+    {
+      "name": "Image de l'API",
+      "status": "completed",
+      "conclusion": "success",
+      "job_id": 140156853621,
+      "check_conclusion": "success",
+      "check_app_id": 15368,
+      "url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45889716418/job/140156853621"
+    }
+  ],
+  "ruleset_preserved": true,
+  "functional_files_changed": "",
+  "merged": false,
+  "merge_approval": "explicit human approval still required",
+  "complete": true
+}

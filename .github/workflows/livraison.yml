@@ -1,19 +1,5 @@
-# Livraison continue QUOREICH : ce qui part d'un commit vérifié.
-#
-#   - Après une CI verte sur main : l'image de l'API est publiée sur le registre GitHub
-#     (ghcr.io/<propriétaire>/qerp-api) avec les étiquettes `main` et `sha-<commit>`.
-#   - Sur une étiquette `vX.Y.Z` : on vérifie que la CI a réussi sur ce commit, puis on publie
-#     l'image `vX.Y.Z` + `latest`, le front construit pour le nuage de production, le contrat OpenAPI
-#     et les migrations, dans une version GitHub.
-#
-# Le front n'est PAS un paquet universel : Vite écrit `VITE_*` dans le code à la compilation.
-#   - nuage : construit ici avec les variables de l'environnement GitHub « supabase-production »
-#     (adresse et clé PUBLIABLE seulement, jamais de clé secrète) ;
-#   - sur site : chaque client a l'adresse de son API ; le front y est construit à l'installation
-#     (`VITE_QERP_API_URL=… npm run build`) à partir des sources de la version.
-#
-# Aucun secret n'est nécessaire hors du jeton GitHub fourni par la plateforme.
-
+# Publication from authorized push/main CI only. Release tags require main ancestry,
+# the same four gates and the protected supabase-production environment.
 name: Livraison
 
 on:
@@ -24,75 +10,107 @@ on:
   push:
     tags: ["v*.*.*"]
 
-concurrency:
-  group: livraison-${{ github.ref }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  authorize-main:
+    if: >-
+      github.repository == 'quoreichgroup-coder/quoreich_erp' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.id == github.repository_id
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/authorize.yml
+    with:
+      mode: image
+
   image-main:
     name: Image de l'API (main)
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    needs: authorize-main
+    if: needs.authorize-main.result == 'success' && needs.authorize-main.outputs.attempt == github.run_attempt
+    concurrency:
+      group: livraison-main
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Récupération du commit validé par la CI
+      - name: Récupération du commit autorisé
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.authorize-main.outputs.sha }}
+          persist-credentials: false
 
-      - name: Construction et publication
+      - name: Construction et contrôle non-root
         env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ needs.authorize-main.outputs.sha }}
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
-          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker build \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$SHA" \
             --tag "$image:sha-${SHA::12}" --tag "$image:main" services/api
           test "$(docker run --rm --entrypoint id "$image:main" -u)" -ne 0
+
+      - name: Publication GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.authorize-main.outputs.sha }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
+          trap 'docker logout ghcr.io >/dev/null 2>&1' EXIT
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker push "$image:sha-${SHA::12}"
           docker push "$image:main"
           echo "Image publiée : $image:sha-${SHA::12}" >> "$GITHUB_STEP_SUMMARY"
 
+  authorize-release:
+    if: >-
+      github.repository == 'quoreichgroup-coder/quoreich_erp' &&
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
+      github.event.deleted == false
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/authorize.yml
+    with:
+      mode: release
+      target: production
+
   version:
     name: Version ${{ github.ref_name }}
-    if: github.event_name == 'push'
+    needs: authorize-release
+    if: needs.authorize-release.result == 'success' && needs.authorize-release.outputs.attempt == github.run_attempt
+    concurrency:
+      group: livraison-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: supabase-production
     permissions:
       contents: write
       packages: write
-      actions: read
     steps:
-      - name: Récupération du dépôt
+      - name: Récupération du commit autorisé
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Une version ne se publie que depuis un commit dont la CI complète a réussi.
-      - name: CI réussie sur ce commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ok="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$GITHUB_SHA" \
-                --status success --json databaseId --jq 'length')"
-          if [ "$ok" = "0" ]; then
-            echo "::error::Aucune CI réussie sur $GITHUB_SHA : poussez d'abord ce commit sur main ou une PR, attendez le vert, puis étiquetez."
-            exit 1
-          fi
+        with:
+          ref: ${{ needs.authorize-release.outputs.sha }}
+          persist-credentials: false
 
       - name: Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
 
       - name: Front pour le nuage de production
         env:
@@ -101,25 +119,47 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
-            echo "::error::Variables VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY absentes de l'environnement supabase-production."
+            echo "::error::Variables publiques de supabase-production absentes."
             exit 1
           fi
           npm ci
           npm run build
           tar -czf "qerp-front-nuage-${GITHUB_REF_NAME}.tar.gz" -C dist .
 
-      - name: Image de l'API
+      - name: Construction et contrôle non-root
         env:
-          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.authorize-release.outputs.sha }}
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
-          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker build \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.version=$GITHUB_REF_NAME" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.revision=$SHA" \
             --tag "$image:$GITHUB_REF_NAME" --tag "$image:latest" services/api
           test "$(docker run --rm --entrypoint id "$image:latest" -u)" -ne 0
+
+      - name: Publication GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTHORIZED_SHA: ${{ needs.authorize-release.outputs.sha }}
+        run: |
+          # BEGIN TAG CHECK
+          object="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object | [.type, .sha] | @tsv')"
+          read -r object_type object_sha <<< "$object"
+          for ((depth=0; depth<8; depth++)); do
+            [[ "$object_type" == "tag" ]] || break
+            [[ "$object_sha" =~ ^[a-f0-9]{40}$ ]] || exit 1
+            object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$object_sha" --jq '.object | [.type, .sha] | @tsv')"
+            read -r object_type object_sha <<< "$object"
+          done
+          if [[ "$object_type" != "commit" || "$object_sha" != "$AUTHORIZED_SHA" ]]; then
+            echo "::error::Release tag changed after authorization."
+            exit 1
+          fi
+          # END TAG CHECK
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api"
+          trap 'docker logout ghcr.io >/dev/null 2>&1' EXIT
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           docker push "$image:$GITHUB_REF_NAME"
           docker push "$image:latest"
 
@@ -128,19 +168,31 @@ jobs:
           cp services/api/openapi/qerp-api.json "qerp-api-openapi-${GITHUB_REF_NAME}.json"
           tar -czf "qerp-migrations-${GITHUB_REF_NAME}.tar.gz" \
             services/api/src/main/resources/db/migration supabase/migrations
-          sha256sum qerp-*-"${GITHUB_REF_NAME}"* > "SHA256SUMS-${GITHUB_REF_NAME}.txt"
+          sha256sum qerp-*-${GITHUB_REF_NAME}* > "SHA256SUMS-${GITHUB_REF_NAME}.txt"
 
       - name: Version GitHub
         env:
           GH_TOKEN: ${{ github.token }}
+          AUTHORIZED_SHA: ${{ needs.authorize-release.outputs.sha }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "${{ github.repository }}" --verify-tag \
+          # BEGIN TAG CHECK
+          object="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object | [.type, .sha] | @tsv')"
+          read -r object_type object_sha <<< "$object"
+          for ((depth=0; depth<8; depth++)); do
+            [[ "$object_type" == "tag" ]] || break
+            [[ "$object_sha" =~ ^[a-f0-9]{40}$ ]] || exit 1
+            object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$object_sha" --jq '.object | [.type, .sha] | @tsv')"
+            read -r object_type object_sha <<< "$object"
+          done
+          if [[ "$object_type" != "commit" || "$object_sha" != "$AUTHORIZED_SHA" ]]; then
+            echo "::error::Release tag changed after authorization."
+            exit 1
+          fi
+          # END TAG CHECK
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "QUOREICH $GITHUB_REF_NAME" --generate-notes \
             "qerp-front-nuage-${GITHUB_REF_NAME}.tar.gz" \
             "qerp-api-openapi-${GITHUB_REF_NAME}.json" \
             "qerp-migrations-${GITHUB_REF_NAME}.tar.gz" \
             "SHA256SUMS-${GITHUB_REF_NAME}.txt"
-          {
-            echo "Image : ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api:${GITHUB_REF_NAME}"
-            echo "Les migrations de cette version s'appliquent sur Supabase par le workflow « Déploiement Supabase »."
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Image : ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/qerp-api:${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"

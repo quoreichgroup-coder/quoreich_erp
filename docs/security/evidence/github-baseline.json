@@ -1,0 +1,163 @@
+{
+  "observed_at": "2026-11-26T20:11:15.056Z",
+  "base_sha": "a7e32882a307c379dd1f7efbb0f9c1a3c56d680b",
+  "repository": {
+    "full_name": "quoreichgroup-coder/quoreich_erp",
+    "id": 1451852155,
+    "visibility": "public"
+  },
+  "ruleset": {
+    "id": 28181257,
+    "name": "QERP - Main Branch Protection",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "quoreichgroup-coder/quoreich_erp",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "refs/heads/main"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": false,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": false,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "Client web",
+              "integration_id": 15368
+            },
+            {
+              "context": "E2E simulés",
+              "integration_id": 15368
+            },
+            {
+              "context": "API Java",
+              "integration_id": 15368
+            },
+            {
+              "context": "Image de l'API",
+              "integration_id": 15368
+            }
+          ]
+        }
+      }
+    ],
+    "node_id": "RRS_lACqUmVwb3NpdG9yec5WiYF7zgGuAwk",
+    "created_at": "2026-11-26T17:14:08.793+00:00",
+    "updated_at": "2026-11-26T17:22:03.597+00:00",
+    "bypass_actors": [],
+    "current_user_can_bypass": "never",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/quoreichgroup-coder/quoreich_erp/rulesets/28181257"
+      },
+      "html": {
+        "href": "https://github.com/quoreichgroup-coder/quoreich_erp/rules/28181257"
+      }
+    }
+  },
+  "environments": {
+    "total_count": 1,
+    "environments": [
+      {
+        "id": 28676535278,
+        "node_id": "EN_kwDOVomBe88AAAAGrUEz7g",
+        "name": "supabase-staging",
+        "url": "https://api.github.com/repos/quoreichgroup-coder/quoreich_erp/environments/supabase-staging",
+        "html_url": "https://github.com/quoreichgroup-coder/quoreich_erp/deployments/activity_log?environments_filter=supabase-staging",
+        "created_at": "2026-11-26T17:56:41Z",
+        "updated_at": "2026-11-26T17:56:41Z",
+        "can_admins_bypass": true,
+        "protection_rules": [],
+        "deployment_branch_policy": null
+      }
+    ]
+  },
+  "workflowPermissions": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "actionPolicy": {
+    "enabled": true,
+    "allowed_actions": "all",
+    "sha_pinning_required": false
+  },
+  "live_image_provenance": {
+    "authorized_sha": "a7e32882a307c379dd1f7efbb0f9c1a3c56d680b",
+    "ci_run_id": 45865682082,
+    "ci_run_url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45865682082",
+    "event": "push",
+    "head_branch": "main",
+    "head_repository": "quoreichgroup-coder/quoreich_erp",
+    "run_attempt": 2
+  },
+  "live_staging_provenance": "refused: Explicit environment branch policy required",
+  "historical_ghcr": {
+    "run_id": 45871922000,
+    "url": "https://github.com/quoreichgroup-coder/quoreich_erp/actions/runs/45871922000",
+    "jobs": [
+      {
+        "id": 140089230046,
+        "name": "Image de l'API (main)",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Récupération du commit validé par la CI",
+            "conclusion": "success"
+          },
+          {
+            "name": "Construction et publication",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Récupération du commit validé par la CI",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 140089231735,
+        "name": "Version ${{ github.ref_name }}",
+        "conclusion": "skipped",
+        "steps": []
+      }
+    ]
+  }
+}
