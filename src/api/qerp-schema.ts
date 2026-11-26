@@ -219,6 +219,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Langue et format résolus pour l'utilisateur, avec les langues et formats disponibles */
+        get: operations["getMyLanguage"];
+        /** Enregistrer sa langue et son format (null = hériter de la société) */
+        put: operations["setMyLanguage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/languages/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Langue, format, fuseau par défaut et langues autorisées de la société */
+        put: operations["setCompanyLanguages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/settings": {
         parameters: {
             query?: never;
@@ -8332,26 +8367,36 @@ export interface components {
             object?: boolean;
             float?: boolean;
             container?: boolean;
-            number?: boolean;
             string?: boolean;
-            long?: boolean;
-            binary?: boolean;
-            int?: boolean;
-            double?: boolean;
-            boolean?: boolean;
             pojo?: boolean;
+            number?: boolean;
+            short?: boolean;
+            int?: boolean;
+            long?: boolean;
+            double?: boolean;
             /** @deprecated */
             textual?: boolean;
-            short?: boolean;
+            boolean?: boolean;
+            binary?: boolean;
             floatingPointNumber?: boolean;
+            integralNumber?: boolean;
+            missingNode?: boolean;
+            bigDecimal?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             valueNode?: boolean;
-            missingNode?: boolean;
-            bigDecimal?: boolean;
             bigInteger?: boolean;
-            integralNumber?: boolean;
             embeddedValue?: boolean;
+        };
+        MyLanguage: {
+            language?: string;
+            locale?: string;
+        };
+        CompanyLanguages: {
+            default_language?: string;
+            default_locale?: string;
+            timezone?: string;
+            languages?: string[];
         };
         CustomerInput: {
             name?: string;
@@ -8411,6 +8456,7 @@ export interface components {
             name?: string;
             layout?: components["schemas"]["JsonNode"];
             reason?: string;
+            language?: string;
         };
         Publication: {
             reason?: string;
@@ -8425,6 +8471,7 @@ export interface components {
             /** Format: uuid */
             replace_id?: string;
             reason?: string;
+            language?: string;
         };
         CreateRole: {
             name?: string;
@@ -9793,6 +9840,140 @@ export interface operations {
                 "application/json": {
                     [key: string]: unknown;
                 };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMyLanguage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setMyLanguage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyLanguage"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JsonNode"];
+                };
+            };
+            /** @description Jeton absent, expiré ou invalide. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+            /** @description Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setCompanyLanguages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyLanguages"];
             };
         };
         responses: {

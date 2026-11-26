@@ -163,11 +163,11 @@ public class ArInvoiceController {
    * est bien formée, mais le paramétrage de la société ne permet pas de la traiter.
    */
   @ExceptionHandler(DataAccessException.class)
-  public ResponseEntity<Map<String, String>> refused(DataAccessException e) {
+  public ResponseEntity<Map<String, ?>> refused(DataAccessException e) {
     LOG.warn("Opération AR refusée : {}", e.getMostSpecificCause().getMessage());
     for (Throwable t = e; t != null; t = t.getCause()) {
       if (t instanceof SQLException sql && REFUS_METIER.contains(sql.getSQLState())) {
-        return ResponseEntity.status(422).body(Map.of("error", premiereLigne(sql)));
+        return ResponseEntity.status(422).body(com.quoreich.qerp.platform.PublicErrorDetails.body(sql.getSQLState(), premiereLigne(sql), sql));
       }
     }
     for (Throwable t = e; t != null; t = t.getCause()) {

@@ -1,0 +1,8 @@
+{
+  "errors:posting.account_missing": ["roles", "document"],
+  "errors:i18n.language_not_allowed": ["language"],
+  "errors:i18n.locale_invalid": ["locale"],
+  "errors:i18n.timezone_invalid": ["timezone"],
+  "errors:documents.template_missing_language": ["language"],
+  "errors:documents.template_language_frozen": ["language"]
+}

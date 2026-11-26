@@ -92,7 +92,7 @@ class AuthorizationsApiIT {
     mockMvc.perform(get("/api/v1/authorizations").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canManage").value(true))
-        .andExpect(jsonPath("$.catalog.length()").value(153)); // V149 hr.payroll_rules_validate, V151 hr.reverse_payroll, V152 hr.time_*, V153 hr.self_service, V154 hr.payroll_payment*
+        .andExpect(jsonPath("$.catalog.length()").value(154)); // V149 hr.payroll_rules_validate, V151 hr.reverse_payroll, V152 hr.time_*, V153 hr.self_service, V154 hr.payroll_payment*, V155 languages.settings
     long systeme = 0;
     for (JsonNode r : view().get("roles")) if (r.get("system").asBoolean()) systeme++;
     assertThat(systeme).isEqualTo(50);
@@ -174,7 +174,7 @@ class AuthorizationsApiIT {
         .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.containsInAnyOrder("budget.manage", "budget.forecast", "documents.attach", "hr.self_service", "treasury.match"))); // budget_planner : budget.manage (V73), budget.forecast (V78), documents.attach (V138), hr.self_service (V153)
     mockMvc.perform(get("/api/v1/authorizations/me").with(jwt().jwt(b -> b.subject(ADMIN))))
         .andExpect(jsonPath("$.roles").value(org.hamcrest.Matchers.hasItem("admin")))
-        .andExpect(jsonPath("$.permissions.length()").value(153)); // V149 hr.payroll_rules_validate, V151 hr.reverse_payroll, V152 hr.time_*, V153 hr.self_service, V154 hr.payroll_payment*
+        .andExpect(jsonPath("$.permissions.length()").value(154)); // V149 hr.payroll_rules_validate, V151 hr.reverse_payroll, V152 hr.time_*, V153 hr.self_service, V154 hr.payroll_payment*, V155 languages.settings
   }
 
   @Test

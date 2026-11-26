@@ -106,6 +106,9 @@
     "name" : "Approvisionnement",
     "description" : "Demandes, commandes, réceptions, approbations, suivi et réapprovisionnement"
   }, {
+    "name" : "Langues",
+    "description" : "Langue, format régional et fuseau de l'utilisateur et de la société"
+  }, {
     "name" : "Pilotage",
     "description" : "Tableaux de bord, cockpit CFO, consolidation et échéanciers"
   }, {
@@ -1249,6 +1252,159 @@
               "schema" : {
                 "type" : "object",
                 "additionalProperties" : { }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/language" : {
+      "get" : {
+        "tags" : [ "Langues" ],
+        "summary" : "Langue et format résolus pour l'utilisateur, avec les langues et formats disponibles",
+        "operationId" : "getMyLanguage",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Langues" ],
+        "summary" : "Enregistrer sa langue et son format (null = hériter de la société)",
+        "operationId" : "setMyLanguage",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MyLanguage"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JsonNode"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Jeton absent, expiré ou invalide.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Jeton authentifié mais inexploitable : le porteur n'a pas d'identifiant utilisable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { }
+                  },
+                  "required" : [ "error" ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/languages/settings" : {
+      "put" : {
+        "tags" : [ "Langues" ],
+        "summary" : "Langue, format, fuseau par défaut et langues autorisées de la société",
+        "operationId" : "setCompanyLanguages",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompanyLanguages"
               }
             }
           },
@@ -32423,38 +32579,47 @@
           "container" : {
             "type" : "boolean"
           },
-          "number" : {
-            "type" : "boolean"
-          },
           "string" : {
             "type" : "boolean"
           },
-          "long" : {
+          "pojo" : {
             "type" : "boolean"
           },
-          "binary" : {
+          "number" : {
+            "type" : "boolean"
+          },
+          "short" : {
             "type" : "boolean"
           },
           "int" : {
             "type" : "boolean"
           },
+          "long" : {
+            "type" : "boolean"
+          },
           "double" : {
-            "type" : "boolean"
-          },
-          "boolean" : {
-            "type" : "boolean"
-          },
-          "pojo" : {
             "type" : "boolean"
           },
           "textual" : {
             "type" : "boolean",
             "deprecated" : true
           },
-          "short" : {
+          "boolean" : {
+            "type" : "boolean"
+          },
+          "binary" : {
             "type" : "boolean"
           },
           "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
             "type" : "boolean"
           },
           "nodeType" : {
@@ -32464,20 +32629,42 @@
           "valueNode" : {
             "type" : "boolean"
           },
-          "missingNode" : {
-            "type" : "boolean"
-          },
-          "bigDecimal" : {
-            "type" : "boolean"
-          },
           "bigInteger" : {
-            "type" : "boolean"
-          },
-          "integralNumber" : {
             "type" : "boolean"
           },
           "embeddedValue" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "MyLanguage" : {
+        "type" : "object",
+        "properties" : {
+          "language" : {
+            "type" : "string"
+          },
+          "locale" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CompanyLanguages" : {
+        "type" : "object",
+        "properties" : {
+          "default_language" : {
+            "type" : "string"
+          },
+          "default_locale" : {
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "languages" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }
       },
@@ -32630,6 +32817,9 @@
           },
           "reason" : {
             "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
           }
         }
       },
@@ -32661,6 +32851,9 @@
             "format" : "uuid"
           },
           "reason" : {
+            "type" : "string"
+          },
+          "language" : {
             "type" : "string"
           }
         }

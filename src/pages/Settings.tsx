@@ -28,6 +28,9 @@ import { PaymentTermsTab } from "@/pages/ARSettings";
 import { DocumentTemplatesPanel } from "@/components/DocumentTemplatesPanel";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { canAccessPage } from "@/lib/module-access";
+import { useTranslation } from "react-i18next";
+import { LanguageSettingsPanel } from "@/components/LanguageSettingsPanel";
+import { Languages } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -43,6 +46,7 @@ const tabs = [
   { id: "currency", label: "Devises et cours", icon: Coins },
   { id: "attachments", label: "Pièces jointes", icon: Paperclip },
   { id: "document-templates", label: "Modèles de documents", icon: FileText },
+  { id: "languages", label: "Langues et formats", icon: Languages },
   { id: "payment", label: "Conditions de paiement", icon: CreditCard },
   { id: "workflow", label: "Circuits d'approbation", icon: GitBranch },
   { id: "roles", label: "Rôles et autorisations", icon: Users },
@@ -56,6 +60,8 @@ const Settings = () => {
   const requested = searchParams.get("tab");
   const [selectedTab, setActiveTabState] = useState(tabs.some((t) => t.id === requested) ? requested! : "fiscal");
   const { data: access } = useMyAccess();
+  const { t } = useTranslation("settings");
+  const tabLabel = (tab: (typeof tabs)[number]) => t(`tabs.${tab.id}`, { defaultValue: tab.label });
   const canManageTemplates = access?.permissions.includes("reports.templates") ?? false;
   const visibleTabs = tabs.filter((tab) => canAccessPage(`/settings?tab=${tab.id}`, access));
   const activeTab = visibleTabs.some((tab) => tab.id === selectedTab) ? selectedTab : visibleTabs[0]?.id;
@@ -70,12 +76,12 @@ const Settings = () => {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Administration" }, { label: "Paramètres" }]} />
-      <GuidanceBanner message="Paramètres centraux de la société : identité, exercices et périodes, plan comptable, comptabilisation, analytique, codes TVA, conditions de paiement, circuits d'approbation, rôles et autorisations, journaux d'audit, planification des analyses IA. Chaque modification exige le droit correspondant." />
+      <Breadcrumb items={[{ label: t("page.breadcrumb_admin") }, { label: t("page.title") }]} />
+      <GuidanceBanner message={t("page.banner")} />
 
       <div className="flex items-center gap-2">
-        <h1 className="text-lg font-semibold text-foreground">Paramètres</h1>
-        <HelpIcon text="La configuration est centralisée ici ; les paramètres propres à un module restent dans son menu « Paramètres »." />
+        <h1 className="text-lg font-semibold text-foreground">{t("page.title")}</h1>
+        <HelpIcon text={t("page.help")} />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-5">
@@ -83,19 +89,19 @@ const Settings = () => {
         <div className="lg:w-52 shrink-0">
           <div className="lg:hidden">
             <Select value={activeTab ?? ""} onValueChange={setActiveTab}>
-              <SelectTrigger aria-label="Rubrique des paramètres"><SelectValue placeholder="Choisir une rubrique" /></SelectTrigger>
+              <SelectTrigger aria-label={t("page.section_select")}><SelectValue placeholder={t("page.section_placeholder")} /></SelectTrigger>
               <SelectContent>
-                {visibleTabs.map((tab) => <SelectItem key={tab.id} value={tab.id}>{tab.label}</SelectItem>)}
+                {visibleTabs.map((tab) => <SelectItem key={tab.id} value={tab.id}>{tabLabel(tab)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <nav aria-label="Rubriques des paramètres" className="hidden lg:flex lg:flex-col lg:gap-0.5">
+          <nav aria-label={t("page.sections")} className="hidden lg:flex lg:flex-col lg:gap-0.5">
             {visibleTabs.map((tab) => (
               <Button key={tab.id} variant={activeTab === tab.id ? "default" : "ghost"} onClick={() => setActiveTab(tab.id)}
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className="h-auto min-h-10 w-full justify-start gap-2.5 whitespace-normal px-3 py-2 text-left text-xs">
                 <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
+                {tabLabel(tab)}
               </Button>
             ))}
           </nav>
@@ -109,6 +115,7 @@ const Settings = () => {
           {activeTab === "currency" && <div className="max-w-5xl"><ExchangeRatesPanel /></div>}
           {activeTab === "attachments" && <div className="max-w-5xl"><AttachmentSettingsPanel /></div>}
           {activeTab === "document-templates" && <DocumentTemplatesPanel />}
+          {activeTab === "languages" && <div className="max-w-4xl"><LanguageSettingsPanel /></div>}
 
           {/* ── Chart of Accounts ── */}
           {activeTab === "posting" && <ModulePostingSettings kinds={["customer", "supplier", "item"]} lock />}

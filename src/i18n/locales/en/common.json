@@ -1,0 +1,107 @@
+{
+  "language": {
+    "fr": "Français",
+    "en": "English",
+    "label": "Language",
+    "switch_to": "Switch to {{language}}",
+    "saved": "Language saved",
+    "inherit": "Same as the company"
+  },
+  "untranslated": {
+    "notice": "This screen is not available in {{language}} yet: it is shown in French."
+  },
+  "actions": {
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done"
+  },
+  "account": {
+    "menu": "User account",
+    "appearance": "Appearance",
+    "sign_out": "Sign out",
+    "admin": "Admin"
+  },
+  "fiscal": {
+    "current": "Fiscal year {{code}}",
+    "current_status": "Fiscal year {{code}} · {{status}}",
+    "none": "No current fiscal year"
+  },
+  "search": {
+    "open": "Search for a page",
+    "button": "Search…",
+    "placeholder": "Search for a page or a module…",
+    "empty": "No results found.",
+    "group_navigation": "Navigation",
+    "group_finance": "Finance",
+    "group_general": "General"
+  },
+  "palette": {
+    "home": "CFO dashboard",
+    "receivables": "Accounts receivable (AR)",
+    "receivables__transactions": "Accounts receivable — Transactions",
+    "receivables__aging": "AR — Ageing analysis",
+    "customers": "Customers",
+    "payables": "Accounts payable (AP)",
+    "payables__transactions": "AP — Supplier invoices",
+    "payables__payment_planning": "AP — Payment planning",
+    "suppliers": "Suppliers",
+    "journal": "General ledger (GL)",
+    "journal__transactions": "General ledger — Transactions",
+    "journal__master_data": "GL — Chart of accounts",
+    "treasury": "Treasury",
+    "assets": "Fixed assets",
+    "budget": "Budget and forecasts",
+    "projects": "Project management",
+    "procurement": "Procurement",
+    "inventory": "Inventory management",
+    "sales": "Sales orders",
+    "expenses": "Expense management",
+    "reports": "Report centre",
+    "compliance": "Compliance",
+    "risk": "Risk management",
+    "admin__modules": "Module management",
+    "settings__tab_audit": "Audit and logs",
+    "settings": "Administration",
+    "settings__tab_roles": "Users and roles",
+    "docs": "Documentation"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bell": "Notifications",
+    "bell_unread_one": "Notifications ({{count}} unread)",
+    "bell_unread_other": "Notifications ({{count}} unread)",
+    "mark_all_read": "Mark all as read",
+    "resolve_all": "Resolve all",
+    "admins_only": "Administrators only",
+    "load_error": "Alerts could not be loaded.",
+    "empty": "No active alerts.",
+    "resolve": "Resolve",
+    "see_all": "See all alerts →"
+  },
+  "appearance": {
+    "title": "Your appearance",
+    "description": "Choose the layout that suits you.",
+    "theme": "Application theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "Device",
+    "theme_hint": "“Device” follows your system theme automatically.",
+    "layout": "Sign-in page layout",
+    "layout_essential": "Essential",
+    "layout_essential_hint": "A centred form, straight to the point.",
+    "layout_enterprise": "Enterprise",
+    "layout_enterprise_hint": "A presentation panel on large screens.",
+    "persisted": "Your choices apply immediately and are kept on this device.",
+    "button": "Appearance"
+  },
+  "posting_role": {
+    "AR_RECEIVABLE": "Receivables",
+    "SALES_REVENUE": "Sales",
+    "VAT_OUTPUT": "Output VAT",
+    "BANK": "Bank",
+    "AP_PAYABLE": "Payables",
+    "VAT_INPUT": "Input VAT",
+    "PURCHASES": "Purchases"
+  }
+}

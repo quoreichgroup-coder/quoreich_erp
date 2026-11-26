@@ -1,0 +1,14 @@
+{
+  "posting": {
+    "account_missing": "Incomplete accounting setup: {{roles}}. Link an active account to each role in the accounting setup."
+  },
+  "i18n": {
+    "language_not_allowed": "Language not allowed for this company: {{language}}.",
+    "locale_invalid": "Unsupported regional format: {{locale}}.",
+    "timezone_invalid": "Unknown time zone: {{timezone}}."
+  },
+  "documents": {
+    "template_missing_language": "No invoice template is published in “{{language}}”: publish one in Settings → Document templates, or choose another language.",
+    "template_language_frozen": "A template’s language cannot change ({{language}}): create a template in the other language."
+  }
+}

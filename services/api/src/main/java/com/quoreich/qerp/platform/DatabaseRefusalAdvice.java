@@ -35,13 +35,15 @@ public class DatabaseRefusalAdvice {
   }
 
   @ExceptionHandler(DataAccessException.class)
-  public ResponseEntity<Map<String, String>> database(DataAccessException error) {
+  public ResponseEntity<Map<String, ?>> database(DataAccessException error) {
     String state = null;
     String message = null;
+    SQLException source = null;
     for (Throwable c = error; c != null && state == null; c = c.getCause()) {
       if (c instanceof SQLException sql) {
         state = sql.getSQLState();
         message = serverMessage(sql.getMessage());
+        source = sql;
       }
     }
     String s = state == null ? "" : state;
@@ -53,10 +55,9 @@ public class DatabaseRefusalAdvice {
     }
     // Le code SQLSTATE accompagne le message (comme dans la réponse de Supabase) : les écrans et les
     // parcours reconnaissent un refus métier attendu (QG007, QG008…) sans dépendre de la formulation.
-    Map<String, String> body = new java.util.LinkedHashMap<>();
-    body.put("code", s);
-    body.put("error", message);
-    return ResponseEntity.status(status).body(body);
+    // Une clé de traduction et ses paramètres publics s'y ajoutent quand le refus en porte (V155) ;
+    // « error » reste le message français d'origine, compris par tous les écrans existants.
+    return ResponseEntity.status(status).body(PublicErrorDetails.body(s, message, source));
   }
 
   /** Message du serveur sans le préfixe de gravité ni les lignes de contexte (Where, Detail…). */

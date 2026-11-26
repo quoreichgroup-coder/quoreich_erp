@@ -13,10 +13,12 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
 vi.mock("@/api/client", () => ({ isApiEnabled: () => false, apiGet: vi.fn() }));
 vi.mock("@/hooks/use-tenant", () => ({ useTenantId: () => ({ data: "tenant-a" }) }));
 vi.mock("@/hooks/use-fiscal-calendar", () => ({ useFiscalCalendar: () => ({ data: { years: [] } }) }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({
+const session = vi.hoisted(() => ({
   user: { id: "invite", email: "invite@example.test", user_metadata: { full_name: "Compte invité", role: "admin" } },
-  signOut: vi.fn(),
-}) }));
+  signOut: () => undefined,
+}));
+// useOptionalAuth : lu par le sélecteur de langue de la barre (V155), même session que useAuth.
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => session, useOptionalAuth: () => session }));
 vi.mock("@/components/CommandPalette", () => ({ CommandPalette: () => null }));
 vi.mock("@/components/NotificationBell", () => ({ NotificationBell: () => null }));
 

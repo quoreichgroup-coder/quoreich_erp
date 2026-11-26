@@ -202,7 +202,8 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(suivi).toContainText(`AR-${RUN}`);
   await expect(suivi).toContainText(`${dans7} (confirmée)`);
   await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
-  await expect(bc.locator("td").nth(4), "accusé de réception : commande « commandée »").toHaveText("Commandée");
+  // Les cellules portent leur étiquette mobile (« Statut »), présente dans le texte même masquée.
+  await expect(bc.locator("td").nth(4), "accusé de réception : commande « commandée »").toHaveText(/^(Statut)?Commandée$/);
 
   obs.etape("réception partielle : fournisseur d'abord, sur-réception refusée");
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
@@ -224,7 +225,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   testInfo.annotations.push({ type: "réception 1", description: m1 });
   await expect(r, `réception partielle : ${m1}`).toBeHidden();
   await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
-  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText("Reçue partiellement");
+  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText(/^(Statut)?Reçue partiellement$/);
 
   obs.etape("réception du solde");
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
@@ -235,7 +236,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(r.getByLabel("Quantité reçue ligne 2"), "ligne soldée").toBeDisabled();
   await r.getByRole("button", { name: "Enregistrer et valider" }).click();
   await expect(r).toBeHidden();
-  await expect(ligne(page, fournisseur).locator("td").nth(4), "commande entièrement reçue").toHaveText("Reçue");
+  await expect(ligne(page, fournisseur).locator("td").nth(4), "commande entièrement reçue").toHaveText(/^(Statut)?Reçue$/);
 
   obs.etape("détail d'une réception et export");
   await page.getByRole("tab", { name: /Réceptions/ }).click();
@@ -277,7 +278,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(page.getByRole("dialog").getByRole("region", { name: "Pied" })).toContainText("3 500");
   await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
-  await expect(ligne(page, fournisseur).locator("td").nth(4), "remplacement attendu : la commande se réceptionne de nouveau").toHaveText("Reçue partiellement");
+  await expect(ligne(page, fournisseur).locator("td").nth(4), "remplacement attendu : la commande se réceptionne de nouveau").toHaveText(/^(Statut)?Reçue partiellement$/);
 
   obs.etape("réception du remplacement");
   await page.getByRole("button", { name: "Nouvelle réception" }).click();
@@ -287,7 +288,7 @@ test("commande directe : refusée tant que la demande est obligatoire, puis appr
   await expect(r.getByLabel("Quantité reçue ligne 1"), "le retourné à remplacer").toHaveValue("1");
   await r.getByRole("button", { name: "Enregistrer et valider" }).click();
   await expect(r).toBeHidden();
-  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText("Reçue");
+  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText(/^(Statut)?Reçue$/);
 
   await obs.joindre(testInfo);
   expect(obs.inattendus(), JSON.stringify(obs.inattendus(), null, 1)).toEqual([]);

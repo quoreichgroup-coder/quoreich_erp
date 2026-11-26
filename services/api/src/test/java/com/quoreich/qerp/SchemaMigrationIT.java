@@ -52,7 +52,7 @@ class SchemaMigrationIT {
   private static final ManifestReference MANIFESTE = ManifestReference.charger();
 
   /** Dernière migration attendue. V1..V15 = base de référence (dump) ; au-delà, évolutions. */
-  private static final String DERNIERE_MIGRATION = "154";
+  private static final String DERNIERE_MIGRATION = "155";
 
   /**
    * Écarts <b>voulus</b> au manifeste de référence, introduits après V15 et déclarés un par un.
@@ -171,6 +171,8 @@ class SchemaMigrationIT {
           "hr_public_holidays",
           // V154 — paiement des salaires.
           "payroll_bank_file_profiles", "payroll_payment_batches", "payroll_payment_lines",
+          // V155 — langues et formats.
+          "languages", "supported_locales", "tenant_languages",
           // V142 — relances clients.
           "ar_dunning_events",
           // V141 — modèles et éditions de factures clients.
@@ -346,6 +348,9 @@ class SchemaMigrationIT {
           "save_payroll_bank_file_profile", "create_payroll_payment_batch", "approve_payroll_payment_batch", "cancel_payroll_payment_batch",
           "payroll_file_value", "generate_payroll_payment_file", "record_payroll_payment_results", "list_payroll_payment_batches",
           "payroll_run_payment_status",
+          // V155 — langues et formats.
+          "guard_source_language", "guard_tenant_language_settings", "guard_profile_language", "is_known_timezone",
+          "language_allowed", "my_language_context", "set_my_language_preferences", "set_company_language_settings",
           // V145 — façade de service des relances cloud.
           "dunning_actor_tenant", "ar_dunning_candidates_actor", "ar_dunning_history_actor",
           "prepare_ar_dunning_event_actor", "claim_ar_dunning_event_actor", "finish_ar_dunning_event_actor",
@@ -700,6 +705,8 @@ class SchemaMigrationIT {
 
   private static final Set<String> POLITIQUES_AJOUTEES =
       Set.of(
+          // V155 — référentiels de langues et langues autorisées par société (lecture seule).
+          "languages/languages_read", "supported_locales/supported_locales_read", "tenant_languages/tenant_languages_read",
           "erp_alerts/alert_module_select",
           // V149 — règles de paie lisibles par la paie et le paramétrage.
           "payroll_rule_versions/payroll_rule_versions_read", "payroll_contributions/payroll_contributions_read",
@@ -1006,6 +1013,9 @@ class SchemaMigrationIT {
   /** V19 — contrôle analytique à la comptabilisation et gardes des imputations. */
   private static final Set<String> DECLENCHEURS_AJOUTES =
       Set.of(
+          // V155 — langue source protégée, fuseau et langue de profil contrôlés.
+          "languages/trg_guard_source_language", "tenants/trg_guard_tenant_language_settings",
+          "profiles/trg_guard_profile_language",
           // V149 — versions de règles validées figées.
           "payroll_rule_versions/trg_guard_payroll_rule_version", "payroll_contributions/trg_guard_payroll_contribution",
           "hr_leave_ledger/trg_hr_leave_ledger_immutable",

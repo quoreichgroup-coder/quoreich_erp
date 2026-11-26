@@ -1,0 +1,32 @@
+{
+  "dashboard": {
+    "breadcrumb_finance": "Finance",
+    "breadcrumb_sales": "Sales",
+    "breadcrumb_dashboard": "Dashboard",
+    "banner_title": "Sales order management",
+    "banner_text": "From quotation to collection: follow orders and revenue.",
+    "title": "Sales dashboard",
+    "open_quotes": "Open quotations",
+    "open_quotes_change": "{{amount}} quoted",
+    "pending_orders": "Orders in progress",
+    "issued_invoices": "Issued invoices",
+    "invoices_count_one": "{{count}} invoice",
+    "invoices_count_other": "{{count}} invoices",
+    "delivery_rate": "Delivery rate",
+    "delivery_rate_change": "{{delivered}}/{{total}} delivered",
+    "average_basket": "Average order value",
+    "orders_total_one": "{{count}} order in total",
+    "orders_total_other": "{{count}} orders in total",
+    "all_quotes": "All quotations",
+    "accepted_one": "{{count}} accepted",
+    "accepted_other": "{{count}} accepted",
+    "monthly_billing": "Monthly invoicing (thousands of {{currency}})",
+    "thousands": "{{amount}} thousand {{currency}}",
+    "no_revenue": "No revenue yet",
+    "top_customers": "Top customers (revenue)",
+    "no_customers": "No customers yet",
+    "customer_stats_one": "{{count}} invoice · average {{amount}}",
+    "customer_stats_other": "{{count}} invoices · average {{amount}}",
+    "unknown_customer": "Unknown customer"
+  }
+}

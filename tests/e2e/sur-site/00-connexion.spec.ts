@@ -19,7 +19,7 @@ test("connexion et API sur site joignable", async ({ page }) => {
     .then((w) => w.waitForEvent("framereceived", { predicate: (f) => String(f.payload).includes('"ready"'), timeout: 30_000 }));
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(ids!.email);
-  await page.getByPlaceholder("••••••••").fill(ids!.password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(ids!.password);
   const jeton = page.waitForResponse((r) => r.url().startsWith(api) && r.url().includes("/auth/v1/token"));
   await page.locator("button[type=submit]").click();
   expect((await jeton).status(), "connexion par l'identité sur site").toBe(200);

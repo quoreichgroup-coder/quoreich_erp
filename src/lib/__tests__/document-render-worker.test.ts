@@ -62,7 +62,11 @@ describe("archived document render worker", () => {
     expect(editionRequestRpc(parseEditionRequest({ po_id: ID, template_id: TENANT, replace_id: ID, reason: "Correction" })))
       .toEqual({ name: "request_purchase_order_edition", params: { _po: ID, _template: TENANT, _replace: ID, _reason: "Correction" } });
     expect(editionRequestRpc(parseEditionRequest({ invoice_id: ID })))
-      .toEqual({ name: "request_document_edition", params: { _invoice: ID, _template: null, _replace: null, _reason: null } });
+      .toEqual({ name: "request_document_edition", params: { _invoice: ID, _template: null, _replace: null, _reason: null, _language: null } });
+    // V155 : langue documentaire transmise à la base, qui la valide ; jamais pour un bon de commande.
+    expect(editionRequestRpc(parseEditionRequest({ invoice_id: ID, language: "en" })).params).toMatchObject({ _language: "en" });
+    for (const input of [{ invoice_id: ID, language: "EN" }, { invoice_id: ID, language: "en-GB" }, { invoice_id: ID, language: 1 },
+      { po_id: ID, language: "en" }]) expect(() => parseEditionRequest(input)).toThrow();
     expect(editionRequestRpc(parseEditionRequest({ id: ID })))
       .toEqual({ name: "retry_document_edition", params: { _id: ID } });
   });
@@ -79,6 +83,17 @@ describe("archived document render worker", () => {
     expect(w.fail).not.toHaveBeenCalled();
     const form = vi.mocked(w.fetcher!).mock.calls[0][1]!.body as FormData;
     expect(String(form.get("stages"))).toContain("PDF/A-2b");
+    expect(JSON.parse(String(form.get("stages")))[0].language).toBe("fr"); // édition sans langue figée : français
+  });
+
+  it("declares the frozen document language in the PDF/A metadata", async () => {
+    const w = worker();
+    const claim = vi.mocked(w.claim);
+    const job = await claim();
+    claim.mockResolvedValueOnce({ ...job!, language: "en" });
+    await renderEdition(ID, w);
+    const form = vi.mocked(w.fetcher!).mock.calls[0][1]!.body as FormData;
+    expect(JSON.parse(String(form.get("stages")))[0].language).toBe("en");
   });
 
   it("recovers its existing immutable file without another conversion or overwrite", async () => {

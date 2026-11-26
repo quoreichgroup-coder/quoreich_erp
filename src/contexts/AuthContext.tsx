@@ -86,3 +86,8 @@ export function useAuth() {
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }
+
+/** Session courante, ou `null` hors AuthProvider (composants partagés utilisables sans session). */
+export function useOptionalAuth() {
+  return useContext(AuthContext) ?? null;
+}

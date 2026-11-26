@@ -38,8 +38,8 @@ class DocumentEditionsService implements AutoCloseable {
     this.rendererVersion = rendererVersion;
   }
 
-  JsonNode request(UUID invoice, UUID po, UUID template, UUID replace, String reason) {
-    return schedule(query.request(invoice, po, template, replace, reason));
+  JsonNode request(UUID invoice, UUID po, UUID template, UUID replace, String reason, String language) {
+    return schedule(query.request(invoice, po, template, replace, reason, language));
   }
 
   JsonNode retry(UUID id) {
@@ -109,7 +109,7 @@ class DocumentEditionsService implements AutoCloseable {
         if (html.isBlank()) throw new IOException("L’édition n’a pas de HTML à convertir");
         byte[] pdf;
         try {
-          pdf = renderer.render(html);
+          pdf = renderer.render(html, claim.path("language").asString("fr"));
         } catch (IOException e) {
           recordFailure(id, actor, e.getMessage(), e);
           return;

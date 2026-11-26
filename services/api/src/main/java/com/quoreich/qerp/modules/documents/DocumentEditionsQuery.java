@@ -26,8 +26,8 @@ class DocumentEditionsQuery {
     return sql.call("install_purchase_order_templates");
   }
 
-  JsonNode saveTemplate(UUID id, String name, JsonNode layout, String reason) {
-    return sql.call("save_document_template", Sql.args("_id", id, "_name", name, "_layout", layout, "_reason", reason));
+  JsonNode saveTemplate(UUID id, String name, JsonNode layout, String reason, String language) {
+    return sql.call("save_document_template", Sql.args("_id", id, "_name", name, "_layout", layout, "_reason", reason, "_language", language));
   }
 
   JsonNode publishTemplate(UUID version, String reason) {
@@ -49,9 +49,9 @@ class DocumentEditionsQuery {
         """, invoiceId);
   }
 
-  JsonNode request(UUID invoice, UUID po, UUID template, UUID replace, String reason) {
+  JsonNode request(UUID invoice, UUID po, UUID template, UUID replace, String reason, String language) {
     if (po != null) return sql.call("request_purchase_order_edition", Sql.args("_po", po, "_template", template, "_replace", replace, "_reason", reason));
-    return sql.call("request_document_edition", Sql.args("_invoice", invoice, "_template", template, "_replace", replace, "_reason", reason));
+    return sql.call("request_document_edition", Sql.args("_invoice", invoice, "_template", template, "_replace", replace, "_reason", reason, "_language", language));
   }
 
   JsonNode retry(UUID id) {

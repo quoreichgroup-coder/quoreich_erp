@@ -112,8 +112,15 @@ class DocumentEditionsControllerTest {
     mvc.perform(post("/api/v1/document-editions").contentType(MediaType.APPLICATION_JSON)
         .content("{\"invoice_id\":\"" + SOURCE + "\"}"))
         .andExpect(status().isOk());
+    // V155 : la langue documentaire est transmise (null = proposée par la base depuis le client).
     verify(sql).call("request_document_edition", Sql.args("_invoice", SOURCE, "_template", null,
-        "_replace", null, "_reason", null));
+        "_replace", null, "_reason", null, "_language", null));
+
+    mvc.perform(post("/api/v1/document-editions").contentType(MediaType.APPLICATION_JSON)
+        .content("{\"invoice_id\":\"" + SOURCE + "\",\"language\":\"en\"}"))
+        .andExpect(status().isOk());
+    verify(sql).call("request_document_edition", Sql.args("_invoice", SOURCE, "_template", null,
+        "_replace", null, "_reason", null, "_language", "en"));
   }
 
   @Test

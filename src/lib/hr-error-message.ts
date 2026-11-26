@@ -1,3 +1,5 @@
+import { isTranslationKey } from "@/i18n/errors";
+
 export function hrErrorMessage(error: unknown): string | null {
   if (error instanceof Error) return error.message;
   if (!error || typeof error !== "object") return null;
@@ -13,6 +15,7 @@ export function hrErrorMessage(error: unknown): string | null {
   }
   if (detail.code === "42501") return "Accès refusé par PostgreSQL : attribuer le droit RH requis au rôle central de l’utilisateur";
   const code = typeof detail.code === "string" && detail.code ? ` (${detail.code})` : "";
-  const hint = typeof detail.hint === "string" && detail.hint.trim() ? ` — ${detail.hint}` : "";
+  // Une clé de traduction (V155, ex. « errors:posting.account_missing ») n'est pas un conseil à afficher.
+  const hint = typeof detail.hint === "string" && detail.hint.trim() && !isTranslationKey(detail.hint) ? ` — ${detail.hint}` : "";
   return `${detail.message}${code}${hint}`;
 }
