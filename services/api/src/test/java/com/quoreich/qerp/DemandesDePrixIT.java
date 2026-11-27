@@ -96,8 +96,12 @@ class DemandesDePrixIT {
         + " {\"line_id\": \"" + l2 + "\", \"unit_price\": 95000, \"lead_time_days\": 3}]'::jsonb)::text");
     asUser("SELECT record_rfq_quote('" + rfq + "', '" + F2 + "', '[{\"line_id\": \"" + l1 + "\", \"unit_price\": 580, \"lead_time_days\": 30},"
         + " {\"line_id\": \"" + l2 + "\", \"unit_price\": 150, \"lead_time_days\": 30}]'::jsonb, 'EUR', NULL, 60, 'CIF')::text");
-    assertThat(asUser("SELECT string_agg(line_no || ':' || supplier_name || ':' || price_rank, ' ' ORDER BY line_no, price_rank) FROM rfq_comparison WHERE rfq_id = '" + rfq + "'"))
-        .isEqualTo("1:Fournisseur européen:1 1:Fournisseur local:2 2:Fournisseur local:1 2:Fournisseur européen:2");
+    // Lignes désignées par leur identifiant, pas par leur numéro : create_rfq numérote dans un ordre non garanti
+    // (requisition_lines n'a pas de position ; défaut suivi au backlog). Le test porte sur le classement des prix.
+    assertThat(asUser("SELECT string_agg(supplier_name || ':' || price_rank, ' ' ORDER BY price_rank) FROM rfq_comparison WHERE rfq_line_id = '" + l1 + "'"))
+        .as("ordinateur : 580 EUR = 380 455 XOF, moins-disant").isEqualTo("Fournisseur européen:1 Fournisseur local:2");
+    assertThat(asUser("SELECT string_agg(supplier_name || ':' || price_rank, ' ' ORDER BY price_rank) FROM rfq_comparison WHERE rfq_line_id = '" + l2 + "'"))
+        .as("écran : 95 000 XOF contre 150 EUR = 98 393 XOF").isEqualTo("Fournisseur local:1 Fournisseur européen:2");
 
     String awards = "'[{\"line_id\": \"" + l1 + "\", \"supplier_id\": \"" + F1 + "\"}, {\"line_id\": \"" + l2 + "\", \"supplier_id\": \"" + F1 + "\"}]'::jsonb";
     assertThatThrownBy(() -> asUser("SELECT award_rfq('" + rfq + "', " + awards + ")::text")).as("l'auteur n'attribue pas").hasMessageContaining("Droit insuffisant");
@@ -108,7 +112,7 @@ class DemandesDePrixIT {
     assertThatThrownBy(() -> asUser("SELECT award_rfq('" + rfq + "', " + motive + ")::text")).hasMessageContaining("en exige 3");
     owner("UPDATE rfq_settings SET min_quotes = 2 WHERE tenant_id = '" + T + "'");
     assertThat(asUser("SELECT award_rfq('" + rfq + "', " + motive + ")::text")).contains("purchase_orders");
-    assertThat(texte("SELECT string_agg(l.description || ':' || pl.quantity::int || ':' || pl.unit_cost::int, ' ' ORDER BY l.line_no) FROM rfq_awards a JOIN rfq_lines l ON l.id = a.rfq_line_id"
+    assertThat(texte("SELECT string_agg(l.description || ':' || pl.quantity::int || ':' || pl.unit_cost::int, ' ' ORDER BY pl.unit_cost DESC) FROM rfq_awards a JOIN rfq_lines l ON l.id = a.rfq_line_id"
         + " JOIN po_lines pl ON pl.po_id = a.po_id AND pl.requisition_line_id = l.requisition_line_id WHERE a.rfq_id = '" + rfq + "'"))
         .isEqualTo("Ordinateur portable:10:390000 Écran:10:95000");
     assertThat(texte("SELECT string_agg(cheapest::text || ':' || COALESCE(reason, '-'), ' ' ORDER BY awarded_at, rfq_line_id) FROM rfq_awards WHERE rfq_id = '" + rfq + "'"))

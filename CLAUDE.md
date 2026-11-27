@@ -178,8 +178,18 @@ Two things CI deliberately cannot do. It does not run `verify-lot0.sh`: that com
 migrations to the production dump, which contains real PII and lives outside the repo, so CI
 covers "the migrations still produce the frozen manifest" (`SchemaMigrationIT`) while "the
 migrations still match the dump" stays a local check before any delivery touching `db/migration`.
-And `npm run build` runs without any `VITE_*` variable, because the build genuinely needs none —
-they are read in the browser at runtime.
+And `npm run build` runs without any `VITE_*` variable: it only proves the code compiles. Vite **inlines**
+`import.meta.env.VITE_*` at build time (corrected 26 Nov 2026 — they are not read at runtime), so a deliverable
+front is built per environment: `livraison.yml` builds the cloud one from the `supabase-production` environment's
+variables, and an on-premise client builds it at install time with its own `VITE_QERP_API_URL`.
+
+**CI/CD since 26 Nov 2026** (`docs/CI-CD.md`): `ci.yml` adds the simulated Playwright suite (`e2e-simule`, dummy
+`VITE_SUPABASE_*`) and blocks on critical npm advisories; `livraison.yml` publishes the API image to GHCR after a green
+CI on `main` (`main`, `sha-…`) and, on a `vX.Y.Z` tag whose commit passed CI, the versioned image, the cloud front,
+the OpenAPI contract, the migrations and a GitHub release; `deploy-supabase.yml` updates the **staging** project
+automatically and **production only on demand** behind the environment's required reviewers; `deploy-fonctions.yml`
+deploys chosen edge functions on demand; `parcours-nocturnes.yml` runs the business journeys every night against
+**staging only**; Dependabot proposes weekly updates. `main` is protected (CI green required).
 
 ## Architecture
 
