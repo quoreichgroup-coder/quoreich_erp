@@ -24,6 +24,7 @@ Premier lot appliqué le 21 novembre 2026. Le socle reste React, Tailwind et les
 - En thème clair, la navigation utilise le bleu exact de la charte et du texte blanc. L'entrée active a un fond blanc, du texte bleu et un repère orange. Les titres de `PageHeader` associent le bleu à un trait orange ; les tableaux gardent leurs surfaces neutres. En thème sombre, les surfaces et le bleu des textes s'adaptent au contraste.
 - Les inversions texte/fond au survol du menu sont immédiates : une interpolation simultanée du blanc vers le bleu et du bleu vers le blanc crée une phase de contraste insuffisant. Les transitions de dimensions et de chevrons peuvent rester animées.
 - Le logo QERP reste en couleurs dans un bandeau blanc de 56 px occupant toute la largeur du menu, sans marge bleue. Le logo est centré, large de 128 px, avec son ratio d'origine. Le bandeau garde uniquement un arrondi inférieur gauche de 12 px ; le côté droit reste à angle droit, conformément au rendu validé. Sur téléphone, le logo apparaît aussi dans la barre du haut, avec le nom de la société active visible et tronqué si nécessaire.
+- Le favicon utilise une version vectorielle allégée du symbole QERP, en bleu/orange sur blanc : `public/branding/qerp-favicon.svg`. Le logo complet reste identique. `npm run branding:icons` génère depuis ce SVG l'ICO de 16/32/48/64 px et l'icône Apple Touch de 180 px, avec Chromium Playwright installé. `index.html` déclare ces actifs ; la version du lien ICO évite de reprendre l'ancien favicon en cache.
 
 ## Composants et densité
 
@@ -108,3 +109,27 @@ Les cinq formulaires concernés — avoir client, avoir fournisseur, acompte cli
 `DocumentDetail` utilise une colonne pour l'en-tête sur téléphone et deux à partir de `sm`, des actions repliables et des totaux qui peuvent revenir à la ligne. Les lignes défilent dans une région nommée ; une grille de plus de quatre colonnes conserve au moins 36 rem, pour que ses dernières colonnes restent consultables. La construction des exports reste inchangée.
 
 Régression : `tests/e2e/credits-advances-responsive.spec.ts` vérifie les quatre registres, les avoirs intégrés, les détails et leur CSV, les formulaires, les remboursements partiel et total (y compris après erreur), les restrictions de droits, les états vides et le bandeau du logo validé.
+
+## Retours fournisseurs
+
+Le registre des retours reprend les huit colonnes de la même source de données en cartes sous 768 px et en tableau au-delà. Les noms, motifs et références restent complets sur téléphone ; une référence non sécable peut se replier dans le bouton. Le détail est accessible par sa référence au clavier ou par la ligne, et revient à la référence du même retour à sa fermeture.
+
+Les formulaires de retour et d'avoir du retour commencent sur une colonne, avec des contrôles de 44 px et du texte de 16 px sous `sm`. Les quantités gardent une grille large dans une région nommée défilante ; la case de remplacement garde un carré de 20 px dans une cible d'au moins 44 px. Les règles de quantités retournables, lignes épuisées, remplacement et calculs de TVA restent celles du module.
+
+L'annulation de l'avoir revient au bouton d'origine ; son succès revient à la référence stable du retour, car l'action d'avoir disparaît. Le changement de retour réinitialise facture, référence et date ; seule une facture encore approuvée de la commande concernée peut être validée. Les erreurs conservent la saisie dans la même ouverture.
+
+L'export de l'en-tête, lorsque l'onglet Retours est actif, utilise les mêmes retours que le registre. Les autres branches restent distinctes. Le fil d'Ariane et les contrôles de l'en-tête des lots comptables peuvent se replier à 320 px, sans masquer globalement un débordement.
+
+Régressions : `tests/e2e/supplier-returns-responsive.spec.ts` contrôle le registre, les deux formulaires, les erreurs/succès, les factures éligibles, les détails/CSV, la lecture seule et les états vides dans les deux thèmes ; `tests/e2e/brand-favicon.spec.ts` vérifie le chargement/décodage des trois formats d'icônes et leur palette.
+
+## Demandes de prix et comparatif fournisseurs
+
+Le registre, les lignes demandées, les fournisseurs consultés et le comparatif utilisent `Table.mobileColumns`. Sous 768 px, les mêmes cellules deviennent des cartes avec les désignations complètes ; les montants, devises et délais restent ceux du comparatif. Les références sont des boutons accessibles au clavier qui indiquent le détail sélectionné. Le clic sur la ligne reste disponible.
+
+La création et les conditions de l'offre commencent sur une colonne, avec des champs de 44 px et du texte de 16 px sous `sm`. Les cases fournisseurs et les radios d'attribution ont une cible d'au moins 44 px. La grille de prix conserve une largeur utile dans une région nommée défilante ; une indication mobile explique ce défilement. Les choix et les saisies survivent au redimensionnement ; changer de demande réinitialise les brouillons du détail. La saisie d'offre attend les lignes et le comparatif avant de s'ouvrir.
+
+L'annulation utilise un `Dialog` avec motif obligatoire. Les erreurs conservent la saisie ; la fermeture des formulaires rend le focus à leur initiateur. Après annulation, envoi ou attribution réussis, le titre stable du détail reçoit le focus puisque l'action peut disparaître. Le moins-disant proposé, les offres expirées exclues et le motif hors moins-disant conservent les règles existantes.
+
+L'export CSV, Excel ou PDF est placé dans le panneau et utilise la même liste chargée que le registre. L'export global de l'écran Achats est masqué pour cet onglet. Une erreur de lecture donne un message et une action de récupération, sans apparaître comme une liste vide.
+
+Régression : `tests/e2e/rfq-responsive.spec.ts` contrôle les quatre listes de 320 à 1440 px, les contrats de mutation, le scope CSV, les droits, le chargement retardé des lignes, les erreurs, les retours de focus et les états vides dans les deux thèmes.

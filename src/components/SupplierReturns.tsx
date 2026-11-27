@@ -182,12 +182,15 @@ function CreditReturnDialog({ ret, onClose, returnFocusRef, completedFocusRef }:
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Annuler</Button>
-          <Button size="sm" disabled={!invoiceId || credit.isPending}
-            onClick={() => credit.mutate({ returnId: ret.id, invoiceId, supplierReference: reference.trim(), date }, { onSuccess: () => {
+          <Button size="sm" disabled={!invoice || credit.isPending}
+            onClick={() => {
+              if (!invoice) return;
+              credit.mutate({ returnId: ret.id, invoiceId: invoice.id, supplierReference: reference.trim(), date }, { onSuccess: () => {
               // Le bouton d'avoir disparaît au succès ; la référence du retour reste.
               if (returnFocusRef && completedFocusRef?.current?.isConnected) returnFocusRef.current = completedFocusRef.current;
               onClose();
-            } })}>
+              } });
+            }}>
             Comptabiliser l'avoir
           </Button>
         </DialogFooter>
@@ -245,7 +248,7 @@ export function SupplierReturnsList() {
           <TableBody>
             {returns.map((r) => (
               <TableRow key={r.id} data-testid="supplier-return-row" className="cursor-pointer" onClick={event => { viewTrigger.current = event.currentTarget.querySelector<HTMLButtonElement>("button"); setView(r); }}>
-                <TableCell className="px-3 py-2 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full whitespace-normal break-words p-0 text-left font-mono md:min-h-0 md:whitespace-nowrap" onClick={event => { event.stopPropagation(); viewTrigger.current = event.currentTarget; setView(r); }}>{r.return_number}</Button></TableCell>
+                <TableCell className="px-3 py-2 font-mono"><Button type="button" variant="link" className="h-auto min-h-11 max-w-full whitespace-normal p-0 text-left font-mono md:min-h-0 md:whitespace-nowrap" onClick={event => { event.stopPropagation(); viewTrigger.current = event.currentTarget; setView(r); }}><span className="min-w-0 break-words">{r.return_number}</span></Button></TableCell>
                 <TableCell className="px-3 py-2 md:whitespace-nowrap">{r.return_date}</TableCell>
                 <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{r.gr_number}</TableCell>
                 <TableCell className="px-3 py-2 font-mono md:whitespace-nowrap">{r.po_number}</TableCell>
@@ -267,7 +270,7 @@ export function SupplierReturnsList() {
         </Table>
       )}
       <SupplierReturnView ret={view} onClose={() => setView(null)} returnFocusRef={viewTrigger} />
-      <CreditReturnDialog ret={credit} onClose={() => setCredit(null)} returnFocusRef={creditTrigger} completedFocusRef={creditedReturnTrigger} />
+      {credit && <CreditReturnDialog ret={credit} onClose={() => setCredit(null)} returnFocusRef={creditTrigger} completedFocusRef={creditedReturnTrigger} />}
     </section>
   );
 }

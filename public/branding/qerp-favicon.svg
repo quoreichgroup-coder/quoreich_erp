@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+  <title id="title">QERP</title>
+  <rect width="64" height="64" rx="12" fill="#ffffff"/>
+  <path d="M22 8h21l12 12v17l-5 6-9-9V20H26l-5 5v16L8 30V20Z" fill="#0062db"/>
+  <path d="M8 33l13 11h10l11 12H19L8 44Z" fill="#ff8a51"/>
+  <path d="M27 37h15l17 19H44Z" fill="#0062db"/>
+</svg>

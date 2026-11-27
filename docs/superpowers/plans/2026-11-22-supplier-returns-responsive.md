@@ -23,18 +23,32 @@
 
 **Fichiers :** `src/components/SupplierReturns.tsx`, `src/pages/ProcurementTransactions.tsx`, `tests/e2e/supplier-returns-responsive.spec.ts`.
 
-- [ ] Écrire et observer les échecs initiaux des cartes, du focus et de l'export sur données non vides.
-- [ ] Migrer les huit colonnes vers les primitives `Table`, références accessibles, textes longs et retour de focus explicite.
-- [ ] Ajouter la branche d'export Retours avec les données du même hook, sans nouvelle lecture ni modification d'accès.
-- [ ] Vérifier tailles téléphone/tablette/bureau, détails et CSV, lecture seule, états vides et deux thèmes.
+- [x] Écrire et observer les échecs initiaux des cartes, du focus et de l'export sur données non vides.
+- [x] Migrer les huit colonnes vers les primitives `Table`, références accessibles, textes longs et retour de focus explicite.
+- [x] Ajouter la branche d'export Retours avec les données du même hook, sans nouvelle lecture ni modification d'accès.
+- [x] Vérifier tailles téléphone/tablette/bureau, détails et CSV, lecture seule, états vides et deux thèmes.
 
 ## Tâche 2 — Retour et avoir du retour
 
 **Interfaces :** `SupplierReturnDialog` reçoit un `returnFocusRef` optionnel ; son parent conserve le bouton de réception. Les fenêtres locales de détail et d'avoir reçoivent leurs références, avec une cible stable de succès pour l'avoir.
 
-- [ ] Observer l'échec initial de la géométrie des champs sur téléphone.
-- [ ] Appliquer les grilles sur une colonne, contrôles tactiles, région de lignes défilante et case de remplacement lisible ; garder validations et paramètres métier.
-- [ ] Vérifier saisie au redimensionnement, erreur puis succès, plafond retournable, ligne épuisée, facture approuvée de la même commande et focus après disparition d'une action.
-- [ ] Exécuter compilation, TypeScript, lint, tests métier/UI ciblés et régressions pertinentes ; revue indépendante ; consigner preuves et conventions.
+- [x] Observer l'échec initial de la géométrie des champs sur téléphone.
+- [x] Appliquer les grilles sur une colonne, contrôles tactiles, région de lignes défilante et case de remplacement lisible ; garder validations et paramètres métier.
+- [x] Vérifier saisie au redimensionnement, erreur puis succès, plafond retournable, ligne épuisée, facture approuvée de la même commande et focus après disparition d'une action.
+- [x] Exécuter compilation, TypeScript, lint, tests métier/UI ciblés et régressions pertinentes ; revue indépendante ; consigner preuves et conventions.
 
 **Exécution :** continuation dans le checkout existant autorisé, sauvegardes dans `output/design-system-supplier-returns/baseline/`, aucun commit ou déploiement. Configurations temporaires de contrôle avec transformation intégrée de Vite, SWC étant bloqué par les permissions locales. Le périmètre ne requiert pas de nouvelle décision graphique : il suit les composants et la charte validés.
+
+## Reprise et décisions du 26 novembre
+
+- Demandes ajoutées par l'utilisateur : aligner le favicon sur la marque et mettre à jour le README complet. Le README est traité en parallèle dans un fichier séparé, depuis les configurations actuelles du dépôt.
+- Favicon : symbole QERP vectoriel allégé, bleu #0062db et orange #ff8a51, déclinaisons ICO 16/32/48/64 et Apple Touch 180 depuis le SVG ; le logo complet existant reste identique.
+- Le diagnostic à 320 px identifie une référence non sécable de 70 chiffres débordant dans un enfant flex, le fil d'Ariane débordant de 5 px et les contrôles des lots comptables ne se repliant pas. Corrections ciblées dans `SupplierReturns.tsx`, `Breadcrumb.tsx` et `GLPostingConfig.tsx`, sans masquer globalement le débordement. Les deux fichiers partagés sont sauvegardés avant modification.
+- La revue indépendante a identifié une facture/référence conservée en changeant de retour. Le huitième scénario reproduit l'envoi encore possible d'une facture d'une autre commande. Le dialogue est désormais monté à l'ouverture, et une facture encore éligible est requise avant mutation.
+
+## Clôture du 27 novembre
+
+- Retours et favicon : 59 scénarios navigateur réussis sur les neuf suites, puis 18 tests métier/UI ciblés réussis. TypeScript, compilation de contrôle, ESLint et cohérence i18n : sorties 0. ESLint conserve 60 avertissements dans les fichiers contrôlés, sans erreur.
+- Revue indépendante du correctif de facture et du delta partagé/favicon : aucun défaut supplémentaire confirmé.
+- README réécrit depuis les sources actuelles : modes local/Supabase, configuration, architecture, modules et limites, droits/CFO, documents, i18n, design system, tests, migrations et exploitation. Relecture principale contre manifestes/configurations ; 87 liens locaux, 15 ancres et 21 commandes npm vérifiés.
+- Journaux et captures : `output/design-system-supplier-returns/`. Aperçu favicon : `output/branding-favicon/qerp-favicon-sizes.png`. Aucun commit ni déploiement.

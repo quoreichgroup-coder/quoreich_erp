@@ -28,7 +28,8 @@
     "dev:cloud": "vite --mode cloud",
     "i18n:check": "node scripts/i18n/verifier-i18n.mjs",
     "i18n:menu": "npx tsx scripts/i18n/generer-catalogue-menu.ts",
-    "i18n:budget": "node scripts/i18n/verifier-budget-entree.mjs"
+    "i18n:budget": "node scripts/i18n/verifier-budget-entree.mjs",
+    "branding:icons": "node scripts/branding/generate-favicons.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
