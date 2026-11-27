@@ -67,7 +67,7 @@ export default function Onboarding() {
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
             <BarChart3 className="w-7 h-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Bienvenue sur ComptaFlow</h1>
+          <h1 className="text-2xl font-bold text-foreground">Bienvenue sur QERP</h1>
           <p className="text-muted-foreground mt-1">Configurez votre espace de travail pour commencer</p>
         </div>
 
