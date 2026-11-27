@@ -1,0 +1,14 @@
+{
+  "posting": {
+    "account_missing": "Paramétrage comptable incomplet : {{roles}}. Associez un compte actif à chaque rôle dans le paramétrage comptable."
+  },
+  "i18n": {
+    "language_not_allowed": "Langue non autorisée pour cette société : {{language}}.",
+    "locale_invalid": "Format régional non pris en charge : {{locale}}.",
+    "timezone_invalid": "Fuseau horaire inconnu : {{timezone}}."
+  },
+  "documents": {
+    "template_missing_language": "Aucun modèle de facture publié dans la langue « {{language}} » : publiez-en un dans Paramètres → Modèles de documents, ou choisissez une autre langue.",
+    "template_language_frozen": "La langue d’un modèle ne change pas ({{language}}) : créez un modèle dans l’autre langue."
+  }
+}

@@ -65,7 +65,7 @@ test("budget : paramètres, scénario, comptes budgétables, rapports et exports
 
     obs.etape("comptes budgétables : l'actif est proposé");
     await page.goto("/budget/master-data?tab=accounts");
-    await page.getByLabel("Rechercher").fill("52");
+    await page.getByLabel("Rechercher", { exact: true }).fill("52");
     await expect(page.getByTestId("md-account-row").filter({ hasText: "Actif" }).first()).toBeVisible();
 
     obs.etape("deux budgets : référence (approuvé) et hypothèse haute");

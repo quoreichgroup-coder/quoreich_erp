@@ -18,6 +18,8 @@ import { NAV_SECTIONS, isLinkActive, visibleModules, type NavLinkEntry, type Nav
 import { FISCAL_YEAR_STATUS_LABELS } from "@/lib/fiscal-calendar";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { canAccessPage } from "@/lib/module-access";
+import { useTranslation } from "react-i18next";
+import { navItemKey, navModuleKey, navSectionKey } from "@/i18n/nav-keys";
 
 const ICONS: Record<string, React.ElementType> = {
   AlertTriangle, ArrowDownLeft, ArrowUpRight, BarChart3, Bell, Blocks, BookOpen, Building2, CalendarDays,
@@ -31,6 +33,7 @@ function CollapsibleModule({ module }: { module: NavModule }) {
   const isActive = location.pathname.startsWith(module.basePath) || module.items.some((s) => s.url === location.pathname);
   const [open, setOpen] = useState(isActive);
   const Icon = iconOf(module.icon);
+  const { t } = useTranslation("nav");
   return (
     <div>
       <button
@@ -43,7 +46,7 @@ function CollapsibleModule({ module }: { module: NavModule }) {
         )}
       >
         <Icon className="w-3.5 h-3.5 shrink-0" />
-        <span className="flex-1 text-left">{module.title}</span>
+        <span className="flex-1 text-left">{t(navModuleKey(module.basePath), { defaultValue: module.title })}</span>
         <ChevronDown className={cn("w-3 h-3 shrink-0 transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
@@ -58,7 +61,7 @@ function CollapsibleModule({ module }: { module: NavModule }) {
                 item.also?.includes(location.pathname) && "brand-nav-active text-sidebar-accent-foreground bg-sidebar-accent font-medium")}
               activeClassName="brand-nav-active text-sidebar-accent-foreground bg-sidebar-accent font-medium"
             >
-              {item.title}
+              {t(navItemKey(item.url), { defaultValue: item.title })}
             </NavLink>
           ))}
         </div>
@@ -71,13 +74,14 @@ function SimpleLink({ link }: { link: NavLinkEntry }) {
   const location = useLocation();
   const active = isLinkActive(link.url, location.pathname, location.search);
   const Icon = iconOf(link.icon);
+  const { t } = useTranslation("nav");
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild>
         <Link to={link.url} aria-current={active ? "page" : undefined}
           className={cn("flex items-center gap-3 px-4 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             active && "brand-nav-active bg-sidebar-accent text-sidebar-accent-foreground font-medium")}>
-          <Icon className="w-4 h-4 shrink-0" /><span>{link.title}</span>
+          <Icon className="w-4 h-4 shrink-0" /><span>{t(navItemKey(link.url), { defaultValue: link.title })}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -87,11 +91,12 @@ function SimpleLink({ link }: { link: NavLinkEntry }) {
 /** Exercice en cours, lu dans le calendrier fiscal (plus de libellé figé). */
 function CurrentFiscalYear() {
   const { data } = useFiscalCalendar();
+  const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
   const fy = data?.years.find((y) => y.start_date <= today && today <= y.end_date);
   return (
     <Link to="/settings?tab=fiscal" className="rounded text-[11px] text-sidebar-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring">
-      {fy ? `Exercice ${fy.code} · ${FISCAL_YEAR_STATUS_LABELS[fy.status].toLowerCase()}` : "Aucun exercice en cours"}
+      {fy ? t("fiscal.current_status", { code: fy.code, status: FISCAL_YEAR_STATUS_LABELS[fy.status].toLowerCase() }) : t("fiscal.none")}
     </Link>
   );
 }
@@ -101,6 +106,7 @@ export function DashboardSidebar() {
   const { data: activeModules } = useActiveModules();
   const access = useMyAccess();
   const canOpen = (url: string) => access.isSuccess && canAccessPage(url, access.data);
+  const { t } = useTranslation("nav");
 
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
@@ -120,7 +126,7 @@ export function DashboardSidebar() {
           return (
             <SidebarGroup key={section.id} data-testid={`nav-section-${section.id}`}>
               <SidebarGroupLabel className="text-sidebar-foreground text-[10px] uppercase tracking-widest font-semibold px-4 mb-1">
-                {section.label}
+                {t(navSectionKey(section.id), { defaultValue: section.label })}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 {modules.map((m) => <CollapsibleModule key={m.basePath} module={m} />)}

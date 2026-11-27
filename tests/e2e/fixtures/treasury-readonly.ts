@@ -10,7 +10,7 @@ export async function loginLecture(page: Page, base: string, email: string, pass
   verifierIdentiteE2E(email);
   await page.goto(`${base}/login`);
   await page.getByPlaceholder("vous@entreprise.com").fill(email);
-  await page.getByPlaceholder("••••••••").fill(password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
   await verifierSocieteE2E(page, 75_000);

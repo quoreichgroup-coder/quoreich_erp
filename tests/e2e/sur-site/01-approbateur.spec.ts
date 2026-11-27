@@ -13,7 +13,7 @@ test("connexion de l'approbateur sur site", async ({ page }) => {
   const api = process.env.E2E_API_URL!;
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(ids!.email);
-  await page.getByPlaceholder("••••••••").fill(ids!.password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(ids!.password);
   const moi = page.waitForResponse((r) => r.url().startsWith(api) && r.url().endsWith("/api/v1/me"));
   await page.locator("button[type=submit]").click();
   const r = await moi;

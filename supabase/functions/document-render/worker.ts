@@ -1,7 +1,7 @@
 /** Shared, transport-independent archive worker; the HTML and path come only from the trusted claim RPC. */
-type EditionChoices = { template_id?: string; replace_id?: string; reason?: string };
+type EditionChoices = { template_id?: string; replace_id?: string; reason?: string; language?: string };
 export type EditionRequest = { id: string } | (EditionChoices & ({ invoice_id: string } | { po_id: string }));
-export type EditionClaim = { id: string; tenant_id: string; storage_path: string; html: string };
+export type EditionClaim = { id: string; tenant_id: string; storage_path: string; html: string; language?: string | null };
 export type EditionCompletion = { path: string; sha256: string; renderer: string; rendererVersion: string };
 export interface EditionWorker {
   claim(): Promise<EditionClaim | null>;
@@ -26,7 +26,7 @@ const messages: Record<string, string> = {
 export function parseEditionRequest(value: unknown): EditionRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Demande d'édition invalide.");
   const v = value as Record<string, unknown>;
-  const allowed = v.id !== undefined ? ["id"] : ["invoice_id", "po_id", "template_id", "replace_id", "reason"];
+  const allowed = v.id !== undefined ? ["id"] : ["invoice_id", "po_id", "template_id", "replace_id", "reason", "language"];
   if (Object.keys(v).some((key) => !allowed.includes(key))) throw new Error("Champ d'édition non autorisé.");
   if (["id", "invoice_id", "po_id"].filter((key) => Object.prototype.hasOwnProperty.call(v, key)).length !== 1) {
     throw new Error("Une seule facture ou commande source est obligatoire.");
@@ -47,6 +47,12 @@ export function parseEditionRequest(value: unknown): EditionRequest {
   if (v.reason != null && (typeof v.reason !== "string" || v.reason.length > 1000)) throw new Error("Motif invalide (1 000 caractères maximum).");
   if (typeof v.reason === "string") result.reason = v.reason.trim();
   if (result.replace_id && !result.reason) throw new Error("Le motif du remplacement est obligatoire.");
+  // Langue documentaire (V155) : sous-étiquette BCP 47 ; la base vérifie qu'elle est active et autorisée.
+  if (v.language != null) {
+    if (typeof v.language !== "string" || !/^[a-z]{2,3}$/.test(v.language)) throw new Error("Langue du document invalide.");
+    if (source === "po_id") throw new Error("Champ d'édition non autorisé.");
+    result.language = v.language;
+  }
   return result;
 }
 
@@ -55,7 +61,7 @@ export function editionRequestRpc(input: EditionRequest): { name: string; params
   const choices = { _template: input.template_id ?? null, _replace: input.replace_id ?? null, _reason: input.reason ?? null };
   return "po_id" in input
     ? { name: "request_purchase_order_edition", params: { _po: input.po_id, ...choices } }
-    : { name: "request_document_edition", params: { _invoice: input.invoice_id, ...choices } };
+    : { name: "request_document_edition", params: { _invoice: input.invoice_id, ...choices, _language: input.language ?? null } };
 }
 
 export async function readEditionRequest(request: Request): Promise<EditionRequest> {
@@ -110,7 +116,8 @@ export async function renderEdition(id: string, worker: EditionWorker): Promise<
       const form = new FormData();
       form.append("files", new Blob([job.html], { type: "text/html;charset=utf-8" }), "index.html");
       form.append("paperSize", "A4"); form.append("preferCssPageSize", "true"); form.append("printBackground", "true");
-      form.append("stages", JSON.stringify([{ op: "remediate", profile: "PDF/A-2b", language: "fr" }]));
+      const language = typeof job.language === "string" && /^[a-z]{2,3}$/.test(job.language) ? job.language : "fr";
+      form.append("stages", JSON.stringify([{ op: "remediate", profile: "PDF/A-2b", language }]));
       const response = await (worker.fetcher ?? fetch)(`${worker.rendererUrl.replace(/\/$/, "")}/forms/chromium/convert/html`, {
         method: "POST", body: form, signal: AbortSignal.timeout(30_000), redirect: "error",
         headers: worker.authorization ? { authorization: worker.authorization } : {},

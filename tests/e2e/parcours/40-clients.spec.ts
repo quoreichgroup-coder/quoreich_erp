@@ -28,7 +28,7 @@ async function facturer(page: Page, client: string, lignes: [string, string, str
 
 async function fermerPanneau(page: Page) {
   const panneau = page.getByRole("dialog", { name: /^Facture / });
-  if (await panneau.count()) await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
+  if (await panneau.count()) await panneau.getByRole("button", { name: /^Fermer( la fenêtre)?$/ }).first().click();
   await expect(panneau).toHaveCount(0);
 }
 
@@ -232,7 +232,7 @@ test("facture client à lignes → émission → encaissements par client", asyn
   await enc.getByRole("button", { name: "Enregistrer le règlement" }).click();
   await expect(enc).toBeHidden();
   await fermerPanneau(page);
-  await expect(ligne(page, numeroAutre).getByTestId("ar-lettering"), "facture soldée : code de lettrage").toHaveText(/^[A-Z]{2,}$/);
+  await expect(ligne(page, numeroAutre).getByTestId("ar-lettering"), "facture soldée : code de lettrage").toHaveText(/^(Lettrage)?[A-Z]{2,}$/); // étiquette mobile incluse dans le texte de la cellule
 
   // Standard de présentation : chaque pièce a son onglet dans Transactions.
   await page.getByRole("tab", { name: "Encaissements" }).click();

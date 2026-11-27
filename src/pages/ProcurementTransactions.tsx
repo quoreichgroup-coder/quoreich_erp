@@ -643,7 +643,7 @@ export default function ProcurementTransactions() {
           <Button ref={createPRTrigger} size="sm" className="gap-1.5" disabled={!perms?.canRequisition} title={perms && !perms.canRequisition ? "Droit requis : procurement.requisition" : undefined} onClick={() => setShowCreatePR(true)}><Plus className="w-3.5 h-3.5" />Nouvelle demande</Button>
           <Button ref={createPOTrigger} size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canOrder} title={perms && !perms.canOrder ? "Droit requis : procurement.order" : undefined} onClick={() => setShowCreatePO(true)}><Package className="w-3.5 h-3.5" />Nouvelle commande</Button>
           <Button ref={createGRTrigger} size="sm" variant="outline" className="gap-1.5" disabled={!perms?.canReceive} title={perms && !perms.canReceive ? "Droit requis : procurement.receive" : undefined} onClick={() => setShowCreateGR(true)}><Truck className="w-3.5 h-3.5" />Nouvelle réception</Button>
-          <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>
+          {tab !== "rfq" && <ExportMenu size="sm" variant="outline" className="gap-1.5" data-testid="btn-export-csv" onPick={(f) => void exportTab(f)}><Download className="w-3.5 h-3.5" />Exporter</ExportMenu>}
       </>} />
 
       {/* KPIs */}

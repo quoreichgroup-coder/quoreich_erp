@@ -18,3 +18,7 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// Langue de l'interface : français, catalogues embarqués et synchrones (tests existants inchangés).
+import { initI18nForTests } from "@/i18n/test-utils";
+initI18nForTests();

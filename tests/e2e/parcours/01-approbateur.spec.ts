@@ -24,7 +24,7 @@ test("l'approbateur rejoint la société de test par invitation", async ({ brows
   obs.etape("connexion de l'approbateur");
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(approbateur!.email);
-  await page.getByPlaceholder("••••••••").fill(approbateur!.password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(approbateur!.password);
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });

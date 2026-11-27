@@ -49,7 +49,7 @@ public class DocumentEditionsController {
   @PostMapping("/document-templates")
   @Operation(operationId = "saveDocumentTemplate", summary = "Enregistrer une nouvelle version de modèle")
   public JsonNode saveTemplate(@RequestBody SaveTemplate request) {
-    return query.saveTemplate(request.id(), request.name(), request.layout(), request.reason());
+    return query.saveTemplate(request.id(), request.name(), request.layout(), request.reason(), request.language());
   }
 
   @PostMapping("/document-templates/{version}/publish")
@@ -77,7 +77,7 @@ public class DocumentEditionsController {
     if (request == null || (request.invoiceId() == null) == (request.poId() == null)) {
       throw new ApiRefusal(422, "Indiquez une seule facture ou commande");
     }
-    return editions.request(request.invoiceId(), request.poId(), request.templateId(), request.replaceId(), request.reason());
+    return editions.request(request.invoiceId(), request.poId(), request.templateId(), request.replaceId(), request.reason(), request.language());
   }
 
   @PostMapping("/document-editions/{id}/retry")
@@ -95,11 +95,12 @@ public class DocumentEditionsController {
         .contentType(MediaType.APPLICATION_PDF).contentLength(pdf.bytes().length).body(pdf.bytes());
   }
 
-  public record SaveTemplate(UUID id, String name, JsonNode layout, String reason) {}
+  /** {@code language} : langue d'un nouveau modèle (fixée à la création), {@code null} = langue source. */
+  public record SaveTemplate(UUID id, String name, JsonNode layout, String reason, String language) {}
 
   public record Publication(String reason) {}
 
   public record IssueDocument(@JsonProperty("invoice_id") UUID invoiceId, @JsonProperty("po_id") UUID poId,
       @JsonProperty("template_id") UUID templateId,
-      @JsonProperty("replace_id") UUID replaceId, String reason) {}
+      @JsonProperty("replace_id") UUID replaceId, String reason, String language) {}
 }

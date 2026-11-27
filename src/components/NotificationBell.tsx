@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AlertCircle, AlertTriangle, Bell, CheckCheck, CheckCircle2, MailOpen, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -28,6 +29,7 @@ const sevTone: Record<string, string> = {
 };
 
 export function NotificationBell() {
+  const { t } = useTranslation();
   useRealtimeAlerts();
   const { data: prefs } = useNotificationPreferences();
   const { data: alerts = [], isLoading, isError, refetch, isFetching } = useERPAlerts({
@@ -50,7 +52,7 @@ export function NotificationBell() {
           variant="ghost"
           size="icon"
           className="relative shrink-0"
-          aria-label={`Notifications${unread ? ` (${unread} non lues)` : ""}`}
+          aria-label={unread ? t("notifications.bell_unread", { count: unread }) : t("notifications.bell")}
           data-testid="notification-bell"
         >
           <Bell className="w-4 h-4 text-muted-foreground" />
@@ -63,7 +65,7 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" collisionPadding={8} className="w-[min(380px,calc(100vw-1rem))] max-h-[calc(100dvh-5rem)] overflow-y-auto p-0">
         <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
-          <span>Notifications</span>
+          <span>{t("notifications.title")}</span>
           <Badge variant="outline" className="text-[10px]">{count}</Badge>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -76,7 +78,7 @@ export function NotificationBell() {
             disabled={markAllRead.isPending || unread === 0}
           >
             <MailOpen className="h-3 w-3 mr-1" />
-            Tout marquer lu
+            {t("notifications.mark_all_read")}
           </Button>
           <Button
             size="sm"
@@ -84,10 +86,10 @@ export function NotificationBell() {
             className="h-7 text-[11px] flex-1 text-destructive hover:text-destructive"
             onClick={() => resolveAll.mutate({})}
             disabled={resolveAll.isPending || count === 0}
-            title="Réservé aux administrateurs"
+            title={t("notifications.admins_only")}
           >
             <CheckCheck className="h-3 w-3 mr-1" />
-            Tout résoudre
+            {t("notifications.resolve_all")}
           </Button>
         </div>
         <DropdownMenuSeparator />
@@ -99,15 +101,15 @@ export function NotificationBell() {
           ) : isError ? (
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">
               <AlertCircle className="h-5 w-5 mx-auto mb-2 text-destructive" />
-              <p>Impossible de charger les alertes.</p>
+              <p>{t("notifications.load_error")}</p>
               <Button size="sm" variant="ghost" className="mt-2 h-7" onClick={() => refetch()} disabled={isFetching}>
-                <RefreshCw className="h-3 w-3 mr-1" /> Réessayer
+                <RefreshCw className="h-3 w-3 mr-1" /> {t("actions.retry")}
               </Button>
             </div>
           ) : alerts.length === 0 ? (
             <div className="px-3 py-8 text-center text-xs text-muted-foreground">
               <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-success opacity-70" />
-              Aucune alerte active.
+              {t("notifications.empty")}
             </div>
           ) : (
 
@@ -133,7 +135,7 @@ export function NotificationBell() {
                           onClick={() => resolve.mutate(a.id)}
                           disabled={resolve.isPending}
                         >
-                          Résoudre
+                          {t("notifications.resolve")}
                         </Button>
                       </div>
                     </div>
@@ -149,7 +151,7 @@ export function NotificationBell() {
             to="/alerts"
             className="block text-center text-xs text-primary hover:underline py-1"
           >
-            Voir toutes les alertes →
+            {t("notifications.see_all")}
           </Link>
         </div>
       </DropdownMenuContent>

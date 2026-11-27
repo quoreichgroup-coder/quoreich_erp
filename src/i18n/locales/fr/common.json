@@ -1,0 +1,107 @@
+{
+  "language": {
+    "fr": "Français",
+    "en": "English",
+    "label": "Langue",
+    "switch_to": "Passer en {{language}}",
+    "saved": "Langue enregistrée",
+    "inherit": "Comme la société"
+  },
+  "untranslated": {
+    "notice": "Cet écran n’est pas encore disponible en {{language}} : il s’affiche en français."
+  },
+  "actions": {
+    "retry": "Réessayer",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "done": "Terminer"
+  },
+  "account": {
+    "menu": "Compte utilisateur",
+    "appearance": "Apparence",
+    "sign_out": "Déconnexion",
+    "admin": "Admin"
+  },
+  "fiscal": {
+    "current": "Exercice {{code}}",
+    "current_status": "Exercice {{code}} · {{status}}",
+    "none": "Aucun exercice en cours"
+  },
+  "search": {
+    "open": "Rechercher une page",
+    "button": "Rechercher…",
+    "placeholder": "Rechercher une page, un module…",
+    "empty": "Aucun résultat trouvé.",
+    "group_navigation": "Navigation",
+    "group_finance": "Finance",
+    "group_general": "Général"
+  },
+  "palette": {
+    "home": "Tableau de bord CFO",
+    "receivables": "Comptes clients (AR)",
+    "receivables__transactions": "Comptes clients — Transactions",
+    "receivables__aging": "AR — Analyse d'âge",
+    "customers": "Clients",
+    "payables": "Comptes fournisseurs (AP)",
+    "payables__transactions": "AP — Factures fournisseurs",
+    "payables__payment_planning": "AP — Planification paiements",
+    "suppliers": "Fournisseurs",
+    "journal": "Grand Livre (GL)",
+    "journal__transactions": "Grand livre — Transactions",
+    "journal__master_data": "GL — Plan comptable",
+    "treasury": "Trésorerie",
+    "assets": "Immobilisations",
+    "budget": "Budget & Prévisions",
+    "projects": "Gestion de projets",
+    "procurement": "Approvisionnement",
+    "inventory": "Gestion des stocks",
+    "sales": "Commandes de vente",
+    "expenses": "Gestion des dépenses",
+    "reports": "Centre de rapports",
+    "compliance": "Conformité",
+    "risk": "Gestion des risques",
+    "admin__modules": "Gestion des modules",
+    "settings__tab_audit": "Audit & Journaux",
+    "settings": "Administration",
+    "settings__tab_roles": "Utilisateurs & Rôles",
+    "docs": "Documentation"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bell": "Notifications",
+    "bell_unread_one": "Notifications ({{count}} non lue)",
+    "bell_unread_other": "Notifications ({{count}} non lues)",
+    "mark_all_read": "Tout marquer lu",
+    "resolve_all": "Tout résoudre",
+    "admins_only": "Réservé aux administrateurs",
+    "load_error": "Impossible de charger les alertes.",
+    "empty": "Aucune alerte active.",
+    "resolve": "Résoudre",
+    "see_all": "Voir toutes les alertes →"
+  },
+  "appearance": {
+    "title": "Votre apparence",
+    "description": "Choisissez une présentation qui vous convient.",
+    "theme": "Thème de l’application",
+    "theme_light": "Clair",
+    "theme_dark": "Sombre",
+    "theme_system": "Appareil",
+    "theme_hint": "« Appareil » suit automatiquement le thème de votre système.",
+    "layout": "Présentation de l’accueil",
+    "layout_essential": "Essentiel",
+    "layout_essential_hint": "Un formulaire centré, pour aller à l’essentiel.",
+    "layout_enterprise": "Entreprise",
+    "layout_enterprise_hint": "Un panneau de présentation sur grand écran.",
+    "persisted": "Vos choix s’appliquent immédiatement et sont conservés sur cet appareil.",
+    "button": "Apparence"
+  },
+  "posting_role": {
+    "AR_RECEIVABLE": "Clients",
+    "SALES_REVENUE": "Ventes",
+    "VAT_OUTPUT": "TVA collectée",
+    "BANK": "Banque",
+    "AP_PAYABLE": "Fournisseurs",
+    "VAT_INPUT": "TVA déductible",
+    "PURCHASES": "Achats"
+  }
+}

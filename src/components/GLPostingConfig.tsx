@@ -84,14 +84,15 @@ export function GLBatchHistory({ batches, onPost, onCancel, readOnly = false }: 
   return (
     <Card className="border-border">
       <CardHeader className="p-4 pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-primary" />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-sm">
+            <BookOpen className="size-4 shrink-0 text-primary" />
             Lots comptables
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             <select
-              className="h-7 px-2 rounded border border-input bg-background text-[10px]"
+              aria-label="Filtrer les lots comptables par statut"
+              className="h-11 max-w-full rounded border border-input bg-background px-3 text-base sm:h-7 sm:px-2 sm:text-[10px]"
               value={filter}
               onChange={e => setFilter(e.target.value)}
             >

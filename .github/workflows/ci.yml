@@ -90,6 +90,10 @@ jobs:
       # la chaîne avant tout déploiement.
       - name: Migrations synchronisées (sur site / nuage)
         run: npm run db:check-twins
+      # Langues (C-06) : clés et variables FR/EN cohérentes, registre d'erreurs partagé avec l'API,
+      # aucune locale ni aucun texte en dur dans les fichiers pilotes, cliquet sur les "fr-FR".
+      - name: Catalogues de traduction
+        run: npm run i18n:check
 
       # Aucune variable `VITE_*` n'est fournie : ce contrôle prouve seulement que le
       # code se compile. Attention, Vite remplace `import.meta.env.VITE_*` à la
@@ -97,6 +101,10 @@ jobs:
       # `livraison.yml`), jamais à partir de ce paquet.
       - name: Construction
         run: npm run build
+      # Budget du premier écran (D-I18N-011) : référence avant i18n + 22 Ko gzip, mesuré sur les ressources
+      # réellement chargées par dist/index.html.
+      - name: Budget du premier écran
+        run: npm run i18n:budget
 
       # Bloque seulement une faille critique d'une dépendance livrée au navigateur ;
       # les autres niveaux arrivent par Dependabot et sont traités en revue.

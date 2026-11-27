@@ -17,7 +17,7 @@ test("connexion et société de test", async ({ page }, testInfo) => {
   obs.etape("connexion");
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(ids!.email);
-  await page.getByPlaceholder("••••••••").fill(ids!.password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(ids!.password);
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
   // La garde de route lit d'abord le profil (« Chargement… ») puis redirige vers l'accueil si

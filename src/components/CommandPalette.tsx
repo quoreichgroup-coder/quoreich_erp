@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { canAccessPage } from "@/lib/module-access";
+import { useTranslation } from "react-i18next";
+import { navPathKey } from "@/i18n/nav-keys";
 import { Button } from "@/components/ui/button";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
@@ -60,7 +62,12 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const access = useMyAccess();
-  const pages = access.isSuccess ? allPages.filter((p) => canAccessPage(p.url, access.data)) : [];
+  const { t } = useTranslation();
+  const groupLabel: Record<string, string> = {
+    Navigation: t("search.group_navigation"), Finance: t("search.group_finance"), "Général": t("search.group_general"),
+  };
+  const pages = (access.isSuccess ? allPages.filter((p) => canAccessPage(p.url, access.data)) : [])
+    .map((p) => ({ ...p, title: t(`palette.${navPathKey(p.url)}`, { defaultValue: p.title }) }));
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -89,23 +96,23 @@ export function CommandPalette() {
         type="button"
         variant="outline"
         size="sm"
-        aria-label="Rechercher une page"
+        aria-label={t("search.open")}
         onClick={() => setOpen(true)}
         className="size-10 shrink-0 p-0 text-muted-foreground lg:h-9 lg:w-auto lg:px-3"
       >
         <Search className="w-3.5 h-3.5" />
-        <span className="hidden lg:inline">Rechercher…</span>
+        <span className="hidden lg:inline">{t("search.button")}</span>
         <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
           ⌘K
         </kbd>
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Rechercher une page, un module…" />
+        <CommandInput placeholder={t("search.placeholder")} />
         <CommandList>
-          <CommandEmpty>Aucun résultat trouvé.</CommandEmpty>
+          <CommandEmpty>{t("search.empty")}</CommandEmpty>
           {groups.map((group) => (
-            <CommandGroup key={group} heading={group}>
+            <CommandGroup key={group} heading={groupLabel[group] ?? group}>
               {pages
                 .filter((p) => p.group === group)
                 .map((page) => (

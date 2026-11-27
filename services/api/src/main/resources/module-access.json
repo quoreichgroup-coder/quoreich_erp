@@ -30,6 +30,8 @@
   {"web":["/settings?tab=currency"],"api":[],"permissions":["currency."]},
   {"web":["/settings?tab=attachments"],"api":[],"permissions":["documents."]},
   {"web":["/settings?tab=document-templates"],"api":[],"permissions":["reports.templates"]},
+  {"web":["/settings?tab=languages"],"api":[],"permissions":[""]},
+  {"web":[],"api":["/api/v1/languages"],"permissions":["languages."]},
   {"web":["/settings?tab=workflow"],"api":["/api/v1/admin/workflow-rules"],"permissions":["workflow."]},
   {"web":[],"api":[],"exactApi":["/api/v1/customers","/api/v1/customers/account-sets"],"methods":["GET"],"permissions":["sales.","projects."]},
   {"web":[],"api":[],"exactApi":["/api/v1/ap/suppliers","/api/v1/inventory/items","/api/v1/inventory/warehouses"],"methods":["GET"],"permissions":["procurement."]},

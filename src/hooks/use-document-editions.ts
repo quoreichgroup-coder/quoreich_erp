@@ -49,6 +49,8 @@ type TemplateIdentity = {
   name: string;
   current_version_id: string | null;
   is_default: boolean;
+  /** Langue du gabarit (V155), fixée à la création du modèle. */
+  language?: string;
   created_at: string;
   created_by: string;
 };
@@ -76,16 +78,20 @@ export type IssuedDocument = {
   error: string | null;
   replaces_id: string | null;
   replacement_reason: string | null;
+  /** Langue et format figés à l'émission (V155) ; null = édition antérieure (française). */
+  language?: string | null;
+  locale?: string | null;
 };
 
 type SaveTemplate = { id?: string; name: string; layout: DocumentLayout; reason: string };
 type SavedTemplate = { template: TemplateIdentity; version: DocumentTemplateVersion };
 type RequestEdition = ({ invoice_id: string; po_id?: never } | { po_id: string; invoice_id?: never })
-  & { template_id?: string; replace_id?: string; reason?: string };
+  & { template_id?: string; replace_id?: string; reason?: string; language?: string };
 
 async function readResult<T>(request: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await request;
-  if (error) throw new Error(error.message);
+  // L'erreur d'origine (code, hint, details) est gardée : errorText() en tire la clé de traduction.
+  if (error) throw Object.assign(new Error(error.message), error);
   return data;
 }
 
@@ -203,7 +209,9 @@ async function invokeDocumentRender(body: RequestEdition | { id: string }) {
   if (error) {
     const response: unknown = "context" in error ? error.context : null;
     const payload = response instanceof Response ? await response.json().catch(() => null) : null;
-    throw new Error(typeof payload?.error === "string" ? payload.error : error.message);
+    throw Object.assign(new Error(typeof payload?.error === "string" ? payload.error : error.message), {
+      code: payload?.code, key: payload?.key, params: payload?.params,
+    });
   }
   if (!data) throw new Error("Le serveur n’a renvoyé aucune édition.");
   return data;

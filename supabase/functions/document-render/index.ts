@@ -33,8 +33,15 @@ Deno.serve(async (request: Request) => {
   const operation = editionRequestRpc(input);
   const result = await userClient.rpc(operation.name, operation.params);
   if (result.error) {
-    const business = result.error.code === "QG038" || result.error.code === "42501";
-    return response({ error: business ? result.error.message : "La demande d'édition a échoué." }, business ? 400 : 500);
+    const business = result.error.code === "QG038" || result.error.code === "QG039" || result.error.code === "42501";
+    // Clé de traduction (V155) transmise seulement si elle a la forme canonique ; l'écran la revalide
+    // contre le registre partagé et retombe sur le message français sinon.
+    const keyed = business && typeof result.error.hint === "string" && /^errors:[a-z0-9_]+(\.[a-z0-9_]+)+$/.test(result.error.hint);
+    let params: unknown = undefined;
+    if (keyed) { try { params = JSON.parse(result.error.details ?? "{}"); } catch { params = undefined; } }
+    return response({ error: business ? result.error.message : "La demande d'édition a échoué.",
+      ...(business && { code: result.error.code }), ...(keyed && params && typeof params === "object" && { key: result.error.hint, params }) },
+      business ? 400 : 500);
   }
   const edition = result.data;
   if (!edition?.id) return response({ error: "L'édition n'a pas pu être créée." }, 500);

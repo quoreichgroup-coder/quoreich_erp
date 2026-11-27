@@ -24,7 +24,11 @@ import org.springframework.stereotype.Component;
 @Component
 class GotenbergPdfClient {
   private static final String HTML_ROUTE = "/forms/chromium/convert/html";
-  private static final String PDF_A_STAGES = "[{\"op\":\"remediate\",\"profile\":\"PDF/A-2b\",\"language\":\"fr\"}]";
+  /** Langue déclarée dans les métadonnées PDF/A : celle figée sur l'édition (V155), « fr » pour les éditions antérieures. */
+  private static String pdfAStages(String language) {
+    String lang = language != null && language.matches("[a-z]{2,3}") ? language : "fr";
+    return "[{\"op\":\"remediate\",\"profile\":\"PDF/A-2b\",\"language\":\"" + lang + "\"}]";
+  }
 
   private final HttpClient client;
   private final URI endpoint;
@@ -49,6 +53,10 @@ class GotenbergPdfClient {
   }
 
   byte[] render(String html) throws IOException, InterruptedException {
+    return render(html, "fr");
+  }
+
+  byte[] render(String html, String language) throws IOException, InterruptedException {
     if (endpoint == null) throw new IOException("Le moteur de rendu PDF n’est pas configuré");
 
     String boundary = "qerp-" + UUID.randomUUID();
@@ -57,7 +65,7 @@ class GotenbergPdfClient {
         + "Content-Type: text/html; charset=UTF-8\r\n\r\n"
         + html + "\r\n"
         + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"stages\"\r\n\r\n"
-        + PDF_A_STAGES + "\r\n"
+        + pdfAStages(language) + "\r\n"
         + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"preferCssPageSize\"\r\n\r\ntrue\r\n"
         + "--" + boundary + "--\r\n";
     var request = HttpRequest.newBuilder(endpoint).timeout(timeout)

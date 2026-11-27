@@ -72,7 +72,7 @@ test("jeu de comptes client : facture sur le compte du jeu, changement refusé t
   const ecriture = detail.getByTestId("journal-entry-preview");
   await expect(ecriture, "créance au compte du jeu").toContainText(compte);
   await expect(ecriture).not.toContainText(/\b411\b/);
-  await detail.getByRole("button", { name: "Fermer", exact: true }).click();
+  await detail.getByRole("button", { name: /^Fermer( la fenêtre)?$/ }).first().click();
 
   obs.etape("jeu du client verrouillé tant que la facture est ouverte");
   obs.refusAttendu(/postes ouverts/);

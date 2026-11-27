@@ -1,0 +1,32 @@
+{
+  "dashboard": {
+    "breadcrumb_finance": "Finance",
+    "breadcrumb_sales": "Ventes",
+    "breadcrumb_dashboard": "Tableau de bord",
+    "banner_title": "Gestion des commandes de vente",
+    "banner_text": "Du devis à l'encaissement : suivi des commandes et du chiffre d'affaires.",
+    "title": "Tableau de bord des ventes",
+    "open_quotes": "Devis ouverts",
+    "open_quotes_change": "{{amount}} en devis",
+    "pending_orders": "Commandes en cours",
+    "issued_invoices": "Factures émises",
+    "invoices_count_one": "{{count}} facture",
+    "invoices_count_other": "{{count}} factures",
+    "delivery_rate": "Taux de livraison",
+    "delivery_rate_change": "{{delivered}}/{{total}} livrées",
+    "average_basket": "Panier moyen",
+    "orders_total_one": "{{count}} commande au total",
+    "orders_total_other": "{{count}} commandes au total",
+    "all_quotes": "Devis au total",
+    "accepted_one": "{{count}} accepté",
+    "accepted_other": "{{count}} acceptés",
+    "monthly_billing": "Facturation mensuelle (milliers {{currency}})",
+    "thousands": "{{amount}} milliers {{currency}}",
+    "no_revenue": "Pas encore de chiffre d'affaires",
+    "top_customers": "Meilleurs clients (chiffre d'affaires)",
+    "no_customers": "Pas encore de clients",
+    "customer_stats_one": "{{count}} facture · moyenne {{amount}}",
+    "customer_stats_other": "{{count}} factures · moyenne {{amount}}",
+    "unknown_customer": "Client inconnu"
+  }
+}

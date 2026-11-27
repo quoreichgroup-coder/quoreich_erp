@@ -1,0 +1,5 @@
+{
+  "reference_gzip_ko": 256.3,
+  "marge_ko": 22,
+  "note": "Référence : premier écran mesuré avant le PoC i18n (commit 7392c6c, 26 nov. 2026). Marge validée par le PO (D-I18N-011) : i18next doit être chargé au premier rendu. Modifier ces valeurs exige une décision consignée au registre."
+}

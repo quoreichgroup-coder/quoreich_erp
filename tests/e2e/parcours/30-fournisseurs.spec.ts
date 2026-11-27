@@ -175,7 +175,7 @@ test("chaîne complète : commande → réception → facture hors tolérance re
     await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText(/AVF-\d{4}-\d{4}/);
     await expect(avoirs.getByTestId("ap-credit-note-row")).toContainText("11 800");
     await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("59 000");
-    await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
+    await panneau.getByRole("button", { name: /^Fermer( la fenêtre)?$/ }).first().click();
     await page.getByRole("tab", { name: /^Avoirs/ }).click();
     await expect(page.getByTestId("ap-credit-note-row").filter({ hasText: numero })).toContainText(`AVF-EXT-${RUN}`);
     await page.getByRole("tab", { name: /^Factures/ }).click();
@@ -245,7 +245,7 @@ test("règlements par fournisseur : seules SES factures, répartition (paramètr
     await ligne(page, ff1).locator("td").nth(1).click();
     const panneau = page.getByRole("dialog", { name: `Facture ${ff1}` });
     await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Reste à payer");
-    await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
+    await panneau.getByRole("button", { name: /^Fermer( la fenêtre)?$/ }).first().click();
     const telechargement = page.waitForEvent("download");
     await page.getByTestId("btn-export-csv").click();
     expect((await telechargement).suggestedFilename()).toMatch(/^factures-fournisseurs.*\.csv$/);
@@ -356,7 +356,7 @@ test("retenue à la source : catégorie du fournisseur, déduite du décaissemen
   await ligne(page, numero).locator("td").nth(1).click();
   const panneau = page.getByRole("dialog", { name: `Facture ${numero}` });
   await expect(panneau.getByRole("region", { name: "Pied" })).toContainText("Retenue à la source (5 %)");
-  await panneau.getByRole("button", { name: "Fermer", exact: true }).click();
+  await panneau.getByRole("button", { name: /^Fermer( la fenêtre)?$/ }).first().click();
   await page.getByRole("button", { name: "Règlement fournisseur" }).click();
   const r = page.getByRole("dialog");
   await r.getByLabel("Fournisseur *").selectOption({ label: fournisseur });

@@ -9,7 +9,7 @@ async function seConnecter(page: Page, ids: NonNullable<typeof auteur>) {
   verifierIdentiteE2E(ids.email);
   await page.goto("/login");
   await page.getByPlaceholder("vous@entreprise.com").fill(ids.email);
-  await page.getByPlaceholder("••••••••").fill(ids.password);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(ids.password);
   await page.locator("button[type=submit]").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
   await verifierSocieteE2E(page, 75_000);

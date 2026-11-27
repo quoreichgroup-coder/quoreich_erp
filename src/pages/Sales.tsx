@@ -12,10 +12,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantId } from "@/hooks/use-tenant";
 import { apiGet, isApiEnabled } from "@/api/client";
-
-const fmt = (n: number) => n.toLocaleString("fr-FR");
+import { useTranslation } from "react-i18next";
+import { useLocaleFormat } from "@/hooks/use-locale-format";
+import { useTenantCurrency } from "@/hooks/use-tenant-currency";
 
 export default function Sales() {
+  const { t } = useTranslation("sales");
+  const f = useLocaleFormat();
+  const currency = useTenantCurrency(); // montants en devise de la société (C-02)
+  const fmt = (n: number) => f.number(n, { maximumFractionDigits: 0 });
   const { data: tenantId } = useTenantId();
   const { data: quotes = [], isLoading: lq } = useQuotations();
   const { data: orders = [], isLoading: lo } = useSalesOrders();
@@ -41,12 +46,12 @@ export default function Sales() {
   const avgOrderValue = orders.length > 0 ? Math.round(orders.reduce((s, o) => s + Number(o.total), 0) / orders.length) : 0;
 
   const kpis = [
-    { label: "Devis ouverts", value: String(openQuotes.length), icon: FileText, color: "text-primary", change: `${fmt(quotePipeline)} XOF pipeline` },
-    { label: "Commandes en cours", value: String(pendingOrders.length), icon: ShoppingBag, color: "text-amber-600", change: `${fmt(orderPipeline)} XOF` },
-    { label: "Factures émises", value: fmt(totalRevenue), sub: "XOF", icon: TrendingUp, color: "text-success", change: `${issuedInvoices.length} factures` },
-    { label: "Taux de livraison", value: `${fulfillmentRate}%`, icon: Truck, color: "text-primary", change: `${deliveredOrders}/${orders.length} delivered` },
-    { label: "Panier moyen", value: fmt(avgOrderValue), sub: "XOF", icon: CreditCard, color: "text-success", change: `${orders.length} orders total` },
-    { label: "Total Quotes", value: String(quotes.length), icon: Clock, color: "text-amber-600", change: `${quotes.filter(q => q.status === "accepted" || q.status === "converted").length} accepted` },
+    { label: t("dashboard.open_quotes"), value: String(openQuotes.length), icon: FileText, color: "text-primary", change: t("dashboard.open_quotes_change", { amount: f.money(quotePipeline, currency) }) },
+    { label: t("dashboard.pending_orders"), value: String(pendingOrders.length), icon: ShoppingBag, color: "text-amber-600", change: f.money(orderPipeline, currency) },
+    { label: t("dashboard.issued_invoices"), value: fmt(totalRevenue), sub: currency, icon: TrendingUp, color: "text-success", change: t("dashboard.invoices_count", { count: issuedInvoices.length }) },
+    { label: t("dashboard.delivery_rate"), value: `${f.number(fulfillmentRate)} %`, icon: Truck, color: "text-primary", change: t("dashboard.delivery_rate_change", { delivered: deliveredOrders, total: orders.length }) },
+    { label: t("dashboard.average_basket"), value: fmt(avgOrderValue), sub: currency, icon: CreditCard, color: "text-success", change: t("dashboard.orders_total", { count: orders.length }) },
+    { label: t("dashboard.all_quotes"), value: String(quotes.length), icon: Clock, color: "text-amber-600", change: t("dashboard.accepted", { count: quotes.filter(q => q.status === "accepted" || q.status === "converted").length }) },
   ];
 
   // Revenue by month from AR invoices
@@ -62,17 +67,17 @@ export default function Sales() {
       date.setMonth(date.getMonth() - 5 + index);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       return {
-        month: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date),
+        month: f.month(key),
         revenue: Math.round((monthTotals[key] || 0) / 1000),
       };
     });
-  }, [issuedInvoices]);
+  }, [issuedInvoices, f.locale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Top customers
   const topCustomers = useMemo(() => {
     const map: Record<string, { revenue: number; orders: number }> = {};
     for (const inv of issuedInvoices as any[]) {
-      const name = inv.customer?.name || "Unknown";
+      const name = inv.customer?.name || t("dashboard.unknown_customer");
       if (!map[name]) map[name] = { revenue: 0, orders: 0 };
       map[name].revenue += Number(inv.total);
       map[name].orders++;
@@ -81,12 +86,12 @@ export default function Sales() {
       .map(([name, d]) => ({ name, ...d, avgValue: Math.round(d.revenue / d.orders) }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-  }, [issuedInvoices]);
+  }, [issuedInvoices, t]);
 
   if (isLoading) {
     return (
       <PageShell>
-        <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes" }, { label: "Tableau de bord" }]} />
+        <Breadcrumb items={[{ label: t("dashboard.breadcrumb_finance") }, { label: t("dashboard.breadcrumb_sales") }, { label: t("dashboard.breadcrumb_dashboard") }]} />
         <Skeleton className="h-96" />
       </PageShell>
     );
@@ -94,10 +99,10 @@ export default function Sales() {
 
   return (
     <PageShell>
-      <Breadcrumb items={[{ label: "Finance" }, { label: "Ventes", href: "/sales" }, { label: "Tableau de bord" }]} />
-      <GuidanceBanner title="Gestion des commandes de vente" description="Du devis à l'encaissement : suivi des commandes et du chiffre d'affaires." />
+      <Breadcrumb items={[{ label: t("dashboard.breadcrumb_finance") }, { label: t("dashboard.breadcrumb_sales"), href: "/sales" }, { label: t("dashboard.breadcrumb_dashboard") }]} />
+      <GuidanceBanner title={t("dashboard.banner_title")} description={t("dashboard.banner_text")} />
 
-      <h1 className="text-lg font-semibold text-foreground">Tableau de bord des ventes</h1>
+      <h1 className="text-lg font-semibold text-foreground">{t("dashboard.title")}</h1>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpis.map(k => (
@@ -116,7 +121,7 @@ export default function Sales() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">Facturation mensuelle (milliers XOF)</h3>
+          <h3 className="text-sm font-medium text-foreground mb-3">{t("dashboard.monthly_billing", { currency })}</h3>
           <div className="h-52">
             {revenueByMonth.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -126,28 +131,28 @@ export default function Sales() {
                   <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                   <Tooltip
                     contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid hsl(var(--border))" }}
-                    formatter={(value: number) => [`${fmt(value)} milliers XOF`, "Factures émises"]}
+                    formatter={(value: number) => [t("dashboard.thousands", { amount: fmt(value), currency }), t("dashboard.issued_invoices")]}
                   />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Factures émises" />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name={t("dashboard.issued_invoices")} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Pas encore de chiffre d'affaires</div>
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">{t("dashboard.no_revenue")}</div>
             )}
           </div>
         </div>
 
         <Card className="border-border">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Meilleurs clients (chiffre d'affaires)</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">{t("dashboard.top_customers")}</CardTitle></CardHeader>
           <CardContent className="p-4 pt-2 space-y-2.5">
             {topCustomers.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-4">Pas encore de clients</div>
+              <div className="text-sm text-muted-foreground text-center py-4">{t("dashboard.no_customers")}</div>
             ) : topCustomers.map((c, i) => (
               <div key={c.name} className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{i + 1}</div>
                 <div className="flex-1">
                   <div className="text-xs font-medium">{c.name}</div>
-                  <div className="text-[10px] text-muted-foreground">{c.orders} invoices · avg {fmt(c.avgValue)} XOF</div>
+                  <div className="text-[10px] text-muted-foreground">{t("dashboard.customer_stats", { count: c.orders, amount: f.money(c.avgValue, currency) })}</div>
                 </div>
                 <span className="text-xs font-mono font-medium">{fmt(c.revenue)}</span>
               </div>

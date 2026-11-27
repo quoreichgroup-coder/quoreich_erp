@@ -125,7 +125,8 @@ test("demande → approuvée par un tiers → commande → réception, tout par 
   const m = await dernierToast(page);
   await expect(r, `réception : ${m}`).toBeHidden();
   await page.getByRole("tab", { name: /Commandes fournisseurs/ }).click();
-  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText("Reçue partiellement");
+  // La cellule porte aussi son étiquette mobile (« Statut »), masquée sur grand écran mais présente dans le texte.
+  await expect(ligne(page, fournisseur).locator("td").nth(4)).toHaveText(/^(Statut)?Reçue partiellement$/);
 
   expect(nuage, `accès du périmètre partis vers Supabase : ${nuage.join(", ")}`).toEqual([]);
   await obs.joindre(testInfo);

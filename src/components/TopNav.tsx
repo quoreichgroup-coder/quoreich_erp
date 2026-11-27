@@ -14,20 +14,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
-import { useTenantId } from "@/hooks/use-tenant";
 import { useMyAccess } from "@/hooks/use-my-access";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { apiGet, isApiEnabled } from "@/api/client";
+import { useTenantInfo } from "@/hooks/use-tenant-currency";
+import { useTranslation } from "react-i18next";
+import { AccountLanguageSwitch } from "@/components/LanguageSwitcher";
 
 /** Exercice en cours, lu dans le calendrier fiscal (remplace le libellé figé « AF 2025–2026 »). */
 function TopNavFiscalYear() {
   const { data } = useFiscalCalendar();
+  const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
   const fy = data?.years.find((y) => y.start_date <= today && today <= y.end_date);
   return (
     <span className="hidden xl:inline text-xs text-muted-foreground whitespace-nowrap">
-      · {fy ? `Exercice ${fy.code}` : "Aucun exercice en cours"}
+      · {fy ? t("fiscal.current", { code: fy.code }) : t("fiscal.none")}
     </span>
   );
 }
@@ -35,26 +35,12 @@ function TopNavFiscalYear() {
 export function TopNav() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const accountTrigger = useRef<HTMLButtonElement>(null);
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { data: tenantId } = useTenantId();
   const access = useMyAccess();
 
-  const { data: tenant } = useQuery({
-    queryKey: ["tenant-info", tenantId],
-    queryFn: async () => {
-      if (!tenantId) return null;
-      if (isApiEnabled()) return apiGet<{ name: string; currency: string } | null>("/api/v1/tenant");
-      const { data } = await supabase
-        .from("tenants")
-        .select("name, currency")
-        .eq("id", tenantId)
-        .single();
-      return data;
-    },
-    enabled: !!tenantId,
-    staleTime: Infinity,
-  });
+  const { data: tenant } = useTenantInfo();
 
   const initials = user?.user_metadata?.full_name
     ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -87,14 +73,15 @@ export function TopNav() {
         {access.isSuccess && access.data.roles.includes("admin") && (
           <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground border-border gap-1 hidden sm:flex">
             <Shield className="w-3 h-3" />
-            Admin
+            {t("account.admin")}
           </Badge>
         )}
+        <AccountLanguageSwitch className="hidden sm:inline-flex" />
         <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button ref={accountTrigger} type="button" size="icon" aria-label="Compte utilisateur" className="shrink-0 text-xs font-semibold">
+            <Button ref={accountTrigger} type="button" size="icon" aria-label={t("account.menu")} className="shrink-0 text-xs font-semibold">
               {initials}
             </Button>
           </DropdownMenuTrigger>
@@ -102,12 +89,13 @@ export function TopNav() {
             <DropdownMenuLabel className="text-xs truncate">{user?.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setAppearanceOpen(true)} className="min-h-11 cursor-pointer">
-              <Palette className="mr-2 size-3.5" aria-hidden="true" />Apparence
+              <Palette className="mr-2 size-3.5" aria-hidden="true" />{t("account.appearance")}
             </DropdownMenuItem>
+            <div className="px-2 py-1.5 sm:hidden"><AccountLanguageSwitch /></div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
               <LogOut className="w-3.5 h-3.5 mr-2" />
-              Déconnexion
+              {t("account.sign_out")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -46,7 +46,7 @@ test("impression des pièces et actions groupées dans les modules", async ({ pa
 
   obs.etape("comptes clients : facture imprimée et en Excel");
   await page.goto("/receivables/transactions");
-  await page.getByRole("row").filter({ hasText: /FA-|BROUILLON-/ }).first().locator("td").nth(1).click();
+  await page.getByRole("row").filter({ hasText: /FA-|INV-|BROUILLON-/ }).first().locator("td").nth(1).click();
   const panneau = page.getByRole("dialog");
   const facture = await telecharger(page, panneau.getByTestId("btn-document-pdf"), /\.pdf$/);
   expect(await signature(facture)).toBe("%PDF");
