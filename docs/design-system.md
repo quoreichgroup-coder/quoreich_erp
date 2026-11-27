@@ -16,6 +16,7 @@ Premier lot appliqué le 21 novembre 2026. Le socle reste React, Tailwind et les
 
 - Le logo du produit est celui de **QERP**, disponible dans `public/branding/qerp-logo-v1.png` et affiché par `AppLogo`. `inverse` fournit une présentation monochrome claire pour les surfaces foncées.
 - Le titre de l'onglet et le titre de partage nomment aussi QERP ; QUOREICH GROUP reste l'auteur et l'éditeur de l'application.
+- L'icône d'onglet reprend le symbole Q du logo QERP en vectoriel aux couleurs de la charte : `public/favicon.svg` (navigateurs récents), `public/favicon.ico` (16, 32, 48 px) et `public/apple-touch-icon.png` (180 px, fond blanc). Une évolution du logo impose de les régénérer.
 - Le logo QUOREICH GROUP appartient à la société mère. L'identité des sociétés utilisatrices et de leurs pièces comptables reste indépendante.
 - Bleu de marque : **#0062db** ; accent orange : **#ff8a51**. Les composantes HSL de `src/index.css` conservent ces valeurs sans arrondi visible d'un canal RGB. Le thème sombre conserve ses adaptations de contraste.
 - Employer les couleurs sémantiques `primary`, `success`, `destructive`, `warning`, `info`, `muted` et leurs variantes de fond ; éviter de redéfinir les couleurs de statut dans chaque page.

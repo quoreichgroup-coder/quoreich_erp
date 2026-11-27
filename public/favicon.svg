@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+  <title>QERP</title>
+  <!-- Symbole Q du logo QERP (public/branding/qerp-logo-v1.png), couleurs de la charte : bleu #0062db, orange #ff8a51. -->
+  <g transform="translate(-4 1)">
+    <path fill="#0062db" d="M22 300V190L162 45H410L550 185V375L495 430L398 335V178H218L165 232V412Z"/>
+    <path fill="#0062db" d="M240 363H400L585 553H410Z"/>
+    <path fill="#ff8a51" d="M22 315L165 438H280L388 553H135L22 445Z"/>
+  </g>
+</svg>
