@@ -34,7 +34,15 @@ permissions:
 jobs:
   image-main:
     name: Image de l'API (main)
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    # Le filtre `branches: [main]` de workflow_run porte sur le NOM de la branche de tête : une PR venue
+    # d'un fork dont la branche s'appelle « main » le satisfait, et head_sha serait alors le code du fork.
+    # On n'accepte donc qu'une CI déclenchée par une poussée sur main de CE dépôt.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
