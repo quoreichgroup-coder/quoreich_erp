@@ -125,16 +125,32 @@ nothing else going on rather than editing code.
 
 ### Development environment (`infra/compose.dev.yml`)
 
-PostgreSQL 18.6 plus the API, both bound to `127.0.0.1`. The ports are **not** the conventional
-ones, deliberately: on this workstation 5432 is held by `sms_postgres`, 8080 by a Frappe
-container and 8081 by the Vite dev server, so a default `up` on the usual ports fails. Published
-ports are 55433 and 8090; override with `QERP_DEV_DB_PORT` / `QERP_API_PORT`.
+The whole local project runs in Docker with one command: PostgreSQL 18.6 (`postgres`), the API
+(`api`), the PDF renderer (`gotenberg`, hardening reused from `infra/pdf/compose.yml` through
+`extends`, on the internal network `renderer` with no Internet access) and the web client
+(`web`: Vite dev server in `node:26.13.0-bookworm-slim`, repository bind-mounted, HMR by polling
+via `VITE_WATCH_POLLING`, Linux `node_modules` in its own volume, `npm ci` re-run only when
+`package-lock.json` changes). The web client runs in **on-prem mode** (`VITE_QERP_API_URL` =
+the local API, placeholder publishable value): sign-in and data go through the Java API, never
+Supabase. Everything is bound to `127.0.0.1`. The ports are **not** the conventional ones,
+deliberately: on this workstation 5432 is held by `sms_postgres` and 8080 by a Frappe container.
+Published ports are web 8081, API 8090, database 55433; override with `QERP_WEB_PORT` /
+`QERP_API_PORT` / `QERP_DEV_DB_PORT`; `QERP_DEV_DB_NAME=qerp_reel` points the API at the
+real-data copy. The API's `/app/data` (identity signing key, attachments) is the volume
+`api-donnees`: before it existed, every API rebuild rotated the key (all sessions dropped) and
+lost uploaded files. Start order is enforced by health checks: `postgres` and `gotenberg` healthy → `api` healthy (its image HEALTHCHECK, Flyway done) → `web` healthy; `QERP_API_CORS_ALLOWED_ORIGINS` follows `QERP_WEB_PORT`. `up -d --build --wait` returns once all four are healthy. Cloud mode (`npm run dev:cloud`) and the Playwright suites still run on the
+host.
 
 ```bash
-docker compose -f infra/compose.dev.yml up -d --build
-docker compose -f infra/compose.dev.yml logs -f api
-docker compose -f infra/compose.dev.yml down -v    # -v wipes the data volume
+docker compose -f infra/compose.dev.yml up -d --build   # then http://localhost:8081
+docker compose -f infra/compose.dev.yml logs -f api web
+docker compose -f infra/compose.dev.yml down -v    # -v wipes the data volumes (DB, key, files)
 ```
+
+A fresh database has no account: sign up on `/login` (identity signup is enabled in dev) or copy
+accounts with `scripts/identite/reprendre-comptes.sh`. To run a second stack beside the first
+(an agent's worktree), use `-p <name>`, other ports, and an override renaming the four fixed
+`container_name`s.
 
 - The volume mounts at **`/var/lib/postgresql`**, not `/var/lib/postgresql/data`: PostgreSQL 18
   moved `PGDATA` to `/var/lib/postgresql/18/docker`. Mounting the old path silently loses data on
