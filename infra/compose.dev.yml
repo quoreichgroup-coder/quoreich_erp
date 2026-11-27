@@ -64,9 +64,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      gotenberg:
+        condition: service_healthy
     environment:
       # Profil `dev` : journal lisible et interface Swagger ouverte.
       SPRING_PROFILES_ACTIVE: dev
+      # Origine du client web publiée par ce fichier : suit QERP_WEB_PORT, sinon
+      # un port surchargé ferait refuser chaque appel par le navigateur (CORS).
+      QERP_API_CORS_ALLOWED_ORIGINS: http://localhost:${QERP_WEB_PORT:-8081},http://127.0.0.1:${QERP_WEB_PORT:-8081}
 
       # QERP_DEV_DB_NAME=qerp_reel pour la copie de données réelles.
       QERP_DB_URL: jdbc:postgresql://postgres:5432/${QERP_DEV_DB_NAME:-qerp}
@@ -121,6 +126,13 @@ services:
     container_name: qerp-dev-gotenberg
     networks:
       - renderer
+    healthcheck:
+      # L'image ne déclare pas de contrôle de santé ; curl y est présent.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   web:
     # Client web en mode développement : sources montées depuis le dépôt,
@@ -131,8 +143,10 @@ services:
     container_name: qerp-dev-web
     restart: unless-stopped
     depends_on:
+      # L'API (HEALTHCHECK de son image) doit répondre avant d'ouvrir le client :
+      # sinon la première page affiche des erreurs réseau pendant les migrations.
       api:
-        condition: service_started
+        condition: service_healthy
     working_dir: /app
     environment:
       VITE_QERP_API_URL: http://localhost:${QERP_API_PORT:-8090}
@@ -153,6 +167,13 @@ services:
       - ..:/app
       # node_modules Linux, distinct de celui de Windows (binaires natifs).
       - web-node-modules:/app/node_modules
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      # Premier démarrage : `npm ci` dans le volume (plusieurs minutes).
+      start_period: 600s
     ports:
       - "127.0.0.1:${QERP_WEB_PORT:-8081}:8081"
 

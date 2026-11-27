@@ -138,7 +138,7 @@ Published ports are web 8081, API 8090, database 55433; override with `QERP_WEB_
 `QERP_API_PORT` / `QERP_DEV_DB_PORT`; `QERP_DEV_DB_NAME=qerp_reel` points the API at the
 real-data copy. The API's `/app/data` (identity signing key, attachments) is the volume
 `api-donnees`: before it existed, every API rebuild rotated the key (all sessions dropped) and
-lost uploaded files. Cloud mode (`npm run dev:cloud`) and the Playwright suites still run on the
+lost uploaded files. Start order is enforced by health checks: `postgres` and `gotenberg` healthy → `api` healthy (its image HEALTHCHECK, Flyway done) → `web` healthy; `QERP_API_CORS_ALLOWED_ORIGINS` follows `QERP_WEB_PORT`. `up -d --build --wait` returns once all four are healthy. Cloud mode (`npm run dev:cloud`) and the Playwright suites still run on the
 host.
 
 ```bash
